@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
+using TenSecondTom.Features.Search.Handlers;
 using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
@@ -23,6 +24,7 @@ public static class CommandRegistry
         var rootCommand = new RootCommand("Ten Second Tom - Personal Memory Assistant");
         rootCommand.Subcommands.Add(BuildTodayCommand(serviceProvider));
         rootCommand.Subcommands.Add(BuildThisWeekCommand(serviceProvider));
+        rootCommand.Subcommands.Add(BuildSearchCommand(serviceProvider));
         return rootCommand;
     }
 
@@ -88,5 +90,45 @@ public static class CommandRegistry
         });
 
         return thisWeekCommand;
+    }
+
+    private static Command BuildSearchCommand(IServiceProvider serviceProvider)
+    {
+        var searchCommand = new Command("search", "Search memory entries by text query");
+
+        // Add required query argument
+        var queryArgument = new Argument<string>("query")
+        {
+            Description = "The text to search for in memory entries"
+        };
+
+        // Add options for date range filters
+        var fromDateOption = new Option<DateTime?>("--from-date")
+        {
+            Description = "Start date filter (yyyy-MM-dd). Optional."
+        };
+
+        var toDateOption = new Option<DateTime?>("--to-date")
+        {
+            Description = "End date filter (yyyy-MM-dd). Optional."
+        };
+
+        searchCommand.Arguments.Add(queryArgument);
+        searchCommand.Options.Add(fromDateOption);
+        searchCommand.Options.Add(toDateOption);
+
+        // Set action
+        searchCommand.SetAction(async (parseResult) =>
+        {
+            string query = parseResult.GetValue(queryArgument) ?? string.Empty;
+            DateTime? fromDate = parseResult.GetValue(fromDateOption);
+            DateTime? toDate = parseResult.GetValue(toDateOption);
+
+            var handler = serviceProvider.GetRequiredService<SearchMemoriesQueryHandler>();
+            var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
+            await SearchCommandHandler.ExecuteAsync(handler, authService, query, fromDate, toDate).ConfigureAwait(false);
+        });
+
+        return searchCommand;
     }
 }
