@@ -950,7 +950,7 @@ tests/
 
 ## Phase 3.7: Infrastructure - Configuration & Logging (TDD)
 
-### T038 [P]: Test Configuration Loading
+### T038 [P]: Test Configuration Loading ✅ COMPLETE
 **Type**: Test  
 **Dependencies**: T001  
 **Files**:
@@ -967,12 +967,12 @@ tests/
 - Invalid config values return error
 
 **Acceptance Criteria**:
-- [ ] Configuration priority tested
-- [ ] Error handling for missing/invalid values
+- [x] Configuration priority tested (10 tests passing)
+- [x] Error handling for missing/invalid values
 
 ---
 
-### T039 [P]: Configure Application Settings
+### T039 [P]: Configure Application Settings ✅ COMPLETE
 **Type**: Core - Configuration  
 **Dependencies**: T038  
 **Files**:
@@ -1005,14 +1005,15 @@ tests/
 ```
 
 **Acceptance Criteria**:
-- [ ] All T038 tests pass
-- [ ] No secrets in appsettings.json
-- [ ] User Secrets enabled in .csproj
-- [ ] Example provided for setting secrets
+
+- [x] All T038 tests pass (10/10 passing)
+- [x] No secrets in appsettings.json
+- [x] User Secrets enabled in .csproj
+- [x] Example provided for setting secrets (CONFIGURATION.md)
 
 ---
 
-### T040 [P]: Configure Logging with Serilog
+### T040 [P]: Configure Logging with Serilog ✅ COMPLETE
 **Type**: Core - Logging  
 **Dependencies**: T002  
 **Files**:
@@ -1084,15 +1085,16 @@ tests/
 ```
 
 **Acceptance Criteria**:
-- [ ] Serilog configured with Console and File sinks
-- [ ] Structured logging enabled with semantic properties
-- [ ] Log levels configurable via appsettings.json
-- [ ] Rolling file logs in `.logs/` directory (7-day retention)
-- [ ] Logger injected via Microsoft.Extensions.Logging.ILogger<T>
-- [ ] Environment enrichers configured
-- [ ] Security: No secrets or full user content logged
-- [ ] Output templates provide clear, parseable format
-- [ ] `.logs/` directory added to .gitignore
+
+- [x] Serilog configured with Console and File sinks
+- [x] Structured logging enabled with semantic properties
+- [x] Log levels configurable via appsettings.json
+- [x] Rolling file logs in `.logs/` directory (7-day retention)
+- [x] Logger injected via Microsoft.Extensions.Logging.ILogger<T>
+- [x] Environment enrichers configured
+- [x] Security: No secrets or full user content logged
+- [x] Output templates provide clear, parseable format
+- [x] `.logs/` directory added to .gitignore
 
 ---
 

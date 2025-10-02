@@ -93,6 +93,7 @@ BenchmarkDotNet.Artifacts/
 #############################
 *.log
 logs/
+.logs/
 serilog-selflog*.txt
 
 #############################
