@@ -1,5 +1,9 @@
 // This file is used to configure code analysis for test projects
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
+
+// Make internals visible to Moq for mocking internal interfaces
+[assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]
 
 // Namespace naming - "Shared" is intentional and standard
 [assembly: SuppressMessage("Naming", "CA1716:Identifiers should not match keywords", Scope = "namespace", Target = "~N:TenSecondTom.Tests.Unit.Shared", Justification = "Shared is a standard namespace pattern")]
