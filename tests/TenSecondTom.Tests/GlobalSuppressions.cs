@@ -6,3 +6,6 @@ using System.Diagnostics.CodeAnalysis;
 
 // Test method naming - underscores are standard in test method names for readability
 [assembly: SuppressMessage("Naming", "CA1707:Identifiers should not contain underscores", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Tests", Justification = "Test methods use underscores for readability")]
+
+// ConfigureAwait in tests - not needed in test methods
+[assembly: SuppressMessage("Reliability", "CA2007:Consider calling ConfigureAwait on the awaited task", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Tests", Justification = "ConfigureAwait is not necessary in test code")]

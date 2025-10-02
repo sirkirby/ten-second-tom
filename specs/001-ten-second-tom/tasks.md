@@ -707,7 +707,7 @@ tests/
 
 ## Phase 3.5: Infrastructure - Prompt Templates (TDD)
 
-### T029 [P]: Test IPromptTemplateLoader Interface
+### T029 [P]: Test IPromptTemplateLoader Interface ✅ COMPLETE
 **Type**: Test  
 **Dependencies**: T012  
 **Files**:
@@ -723,12 +723,12 @@ tests/
 - Handles missing template (Result.Failure)
 
 **Acceptance Criteria**:
-- [ ] Interface behavior tested via mock
-- [ ] Override precedence tested
+- [x] Interface behavior tested via mock (9 tests passing)
+- [x] Override precedence tested
 
 ---
 
-### T030 [P]: Implement IPromptTemplateLoader Interface
+### T030 [P]: Implement IPromptTemplateLoader Interface ✅ COMPLETE
 **Type**: Core - Interface  
 **Dependencies**: T029  
 **Files**:
@@ -737,13 +737,13 @@ tests/
 **Description**: Define IPromptTemplateLoader interface per research.md.
 
 **Acceptance Criteria**:
-- [ ] All T029 tests pass with mock
-- [ ] Returns Result<PromptTemplate>
-- [ ] XML documentation complete
+- [x] All T029 tests pass with mock (9/9 passing)
+- [x] Returns Result<PromptTemplate>
+- [x] XML documentation complete
 
 ---
 
-### T031: Test EmbeddedPromptTemplateLoader
+### T031: Test EmbeddedPromptTemplateLoader ✅ COMPLETE
 **Type**: Test  
 **Dependencies**: T030  
 **Files**:
@@ -760,13 +760,13 @@ tests/
 - Invalid template format returns error
 
 **Acceptance Criteria**:
-- [ ] Tests cover both embedded and file system sources
-- [ ] Hot reload functionality tested
-- [ ] Error cases covered
+- [x] Tests cover both embedded and file system sources (12 tests passing)
+- [x] Hot reload functionality tested
+- [x] Error cases covered
 
 ---
 
-### T032: Implement EmbeddedPromptTemplateLoader
+### T032: Implement EmbeddedPromptTemplateLoader ✅ COMPLETE
 **Type**: Core - Implementation  
 **Dependencies**: T031  
 **Files**:
@@ -775,15 +775,15 @@ tests/
 **Description**: Implement template loader with embedded resources and file system fallback per research.md.
 
 **Acceptance Criteria**:
-- [ ] All T031 tests pass
-- [ ] Loads from embedded resources
-- [ ] Checks for user overrides in .memory/templates/
-- [ ] Parses markdown and extracts {{VARIABLES}}
-- [ ] XML documentation complete
+- [x] All T031 tests pass (12/12 passing)
+- [x] Loads from embedded resources
+- [x] Checks for user overrides in .memory/templates/
+- [x] Parses markdown and extracts {{VARIABLES}}
+- [x] XML documentation complete
 
 ---
 
-### T033 [P]: Create Embedded Prompt Templates
+### T033 [P]: Create Embedded Prompt Templates ✅ COMPLETE
 **Type**: Core - Resources  
 **Dependencies**: T012  
 **Files**:
@@ -844,12 +844,12 @@ tests/
 - Emphasize numbered lists for accomplishments/challenges, bullet points for others
 
 **Acceptance Criteria**:
-- [ ] Templates marked as embedded resources in .csproj
-- [ ] Variables properly formatted ({{VARIABLE_NAME}})
-- [ ] Clear instructions for LLM with explicit definitions ("key", "notable", "recurring")
-- [ ] Expected output format specified with exact markdown structure
-- [ ] Parsing hints included (section headers, list formats)
-- [ ] Example output provided in template comments
+- [x] Templates marked as embedded resources in .csproj
+- [x] Variables properly formatted ({{VARIABLE_NAME}})
+- [x] Clear instructions for LLM with explicit definitions ("key", "notable", "recurring")
+- [x] Expected output format specified with exact markdown structure
+- [x] Parsing hints included (section headers, list formats)
+- [x] Example output provided in template comments
 
 ---
 

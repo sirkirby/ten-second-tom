@@ -20,3 +20,7 @@ using System.Diagnostics.CodeAnalysis;
 [assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Shared.Models.UserSession", Justification = "Public API for domain models")]
 [assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Shared.Models.StorageConfiguration", Justification = "Public API for domain models")]
 [assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Shared.Models.RetentionPolicy", Justification = "Public API for domain models")]
+
+// Infrastructure interfaces
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Infrastructure.Prompts.IPromptTemplateLoader", Justification = "Public interface for DI registration")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Infrastructure.Prompts.EmbeddedPromptTemplateLoader", Justification = "Public implementation for DI registration")]
