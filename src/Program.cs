@@ -1,5 +1,9 @@
 ﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.CommandLine;
+using TenSecondTom.Infrastructure.Cli;
+using TenSecondTom.Infrastructure.DependencyInjection;
 using TenSecondTom.Infrastructure.Logging;
 
 namespace TenSecondTom;
@@ -40,17 +44,21 @@ internal static class Program
 
             logger.LogInformation("Ten Second Tom starting");
             
-            Console.WriteLine("Ten Second Tom - Personal Memory Assistant");
-            Console.WriteLine("Initializing...");
+            // Build DI container
+            var services = new ServiceCollection();
+            services.AddSingleton<IConfiguration>(configuration);
+            services.AddSingleton(loggerFactory);
+            services.AddTenSecondTomServices();
             
-            // TODO: Initialize dependency injection
-            // TODO: Register System.CommandLine commands
-            // TODO: Execute command
+            using var serviceProvider = services.BuildServiceProvider();
             
-            await Task.CompletedTask.ConfigureAwait(false);
+            // Build and execute CLI command
+            var rootCommand = CommandRegistry.BuildRootCommand(serviceProvider);
+            var parseResult = rootCommand.Parse(args);
+            int exitCode = await parseResult.InvokeAsync().ConfigureAwait(false);
             
-            logger.LogInformation("Ten Second Tom completed successfully");
-            return 0;
+            logger.LogInformation("Ten Second Tom completed with exit code {ExitCode}", exitCode);
+            return exitCode;
         }
         catch (Exception ex)
         {

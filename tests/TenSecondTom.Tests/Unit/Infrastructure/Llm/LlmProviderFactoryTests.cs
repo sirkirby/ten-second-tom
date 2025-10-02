@@ -50,108 +50,104 @@ public sealed class LlmProviderFactoryTests : IDisposable
     }
 
     [Fact]
-    public void Create_WithOpenAI_ReturnsOpenAIProvider()
+    public void CreateProvider_WithOpenAI_ReturnsOpenAIProvider()
     {
         // Arrange
         var factory = new LlmProviderFactory(_serviceProvider);
 
         // Act
-        Result<ILlmProvider> result = factory.Create("OpenAI");
+        ILlmProvider provider = factory.CreateProvider("OpenAI");
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().BeOfType<OpenAILlmProvider>();
-        result.Value.ProviderName.Should().Be("OpenAI");
+        provider.Should().BeOfType<OpenAILlmProvider>();
+        provider.ProviderName.Should().Be("OpenAI");
     }
 
     [Fact]
-    public void Create_WithAnthropic_ReturnsAnthropicProvider()
+    public void CreateProvider_WithAnthropic_ReturnsAnthropicProvider()
     {
         // Arrange
         var factory = new LlmProviderFactory(_serviceProvider);
 
         // Act
-        Result<ILlmProvider> result = factory.Create("Anthropic");
+        ILlmProvider provider = factory.CreateProvider("Anthropic");
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().BeOfType<AnthropicLlmProvider>();
-        result.Value.ProviderName.Should().Be("Anthropic");
+        provider.Should().BeOfType<AnthropicLlmProvider>();
+        provider.ProviderName.Should().Be("Anthropic");
     }
 
     [Fact]
-    public void Create_WithInvalidProvider_ReturnsFailure()
+    public void CreateProvider_WithInvalidProvider_ThrowsArgumentException()
     {
         // Arrange
         var factory = new LlmProviderFactory(_serviceProvider);
 
         // Act
-        Result<ILlmProvider> result = factory.Create("InvalidProvider");
+        Action act = () => factory.CreateProvider("InvalidProvider");
 
         // Assert
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Unsupported LLM provider");
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*Unsupported LLM provider*");
     }
 
     [Theory]
     [InlineData("openai")]
     [InlineData("OPENAI")]
     [InlineData("OpEnAi")]
-    public void Create_WithCaseInsensitiveOpenAI_ReturnsOpenAIProvider(string providerName)
+    public void CreateProvider_WithCaseInsensitiveOpenAI_ReturnsOpenAIProvider(string providerName)
     {
         // Arrange
         var factory = new LlmProviderFactory(_serviceProvider);
 
         // Act
-        Result<ILlmProvider> result = factory.Create(providerName);
+        ILlmProvider provider = factory.CreateProvider(providerName);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().BeOfType<OpenAILlmProvider>();
+        provider.Should().BeOfType<OpenAILlmProvider>();
     }
 
     [Theory]
     [InlineData("anthropic")]
     [InlineData("ANTHROPIC")]
     [InlineData("AnThRoPiC")]
-    public void Create_WithCaseInsensitiveAnthropic_ReturnsAnthropicProvider(string providerName)
+    public void CreateProvider_WithCaseInsensitiveAnthropic_ReturnsAnthropicProvider(string providerName)
     {
         // Arrange
         var factory = new LlmProviderFactory(_serviceProvider);
 
         // Act
-        Result<ILlmProvider> result = factory.Create(providerName);
+        ILlmProvider provider = factory.CreateProvider(providerName);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().BeOfType<AnthropicLlmProvider>();
+        provider.Should().BeOfType<AnthropicLlmProvider>();
     }
 
     [Fact]
-    public void Create_WithNullProvider_ReturnsFailure()
+    public void CreateProvider_WithNullProvider_ThrowsArgumentException()
     {
         // Arrange
         var factory = new LlmProviderFactory(_serviceProvider);
 
         // Act
-        Result<ILlmProvider> result = factory.Create(null!);
+        Action act = () => factory.CreateProvider(null!);
 
         // Assert
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Provider name cannot be empty");
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*Provider name cannot be empty*");
     }
 
     [Fact]
-    public void Create_WithEmptyProvider_ReturnsFailure()
+    public void CreateProvider_WithEmptyProvider_ThrowsArgumentException()
     {
         // Arrange
         var factory = new LlmProviderFactory(_serviceProvider);
 
         // Act
-        Result<ILlmProvider> result = factory.Create(string.Empty);
+        Action act = () => factory.CreateProvider(string.Empty);
 
         // Assert
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Provider name cannot be empty");
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*Provider name cannot be empty*");
     }
 }
