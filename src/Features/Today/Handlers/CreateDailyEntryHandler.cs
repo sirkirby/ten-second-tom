@@ -64,11 +64,11 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
             return validationResult;
         }
 
-        // 2. Check authentication
+                // 2. Check authentication
         bool isAuthenticated = await _authService.IsAuthenticatedAsync(cancellationToken).ConfigureAwait(false);
         if (!isAuthenticated)
         {
-            return Result<DailyEntry>.Failure("Authentication required. Please login first.");
+            return Result<DailyEntry>.Failure("Authentication required. Please authenticate first.");
         }
 
         // 3. Determine entry number for today

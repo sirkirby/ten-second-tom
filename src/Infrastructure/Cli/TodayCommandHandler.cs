@@ -1,6 +1,7 @@
 using Spectre.Console;
 using TenSecondTom.Features.Today.Commands;
 using TenSecondTom.Features.Today.Handlers;
+using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 
@@ -24,12 +25,45 @@ public static class TodayCommandHandler
     /// Executes the today command by prompting the user and creating a daily entry.
     /// </summary>
     /// <param name="handler">The command handler.</param>
+    /// <param name="authService">The authentication service.</param>
     /// <param name="providerOverride">Optional LLM provider override.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2007:Consider calling ConfigureAwait on the awaited task", Justification = "Console application, no synchronization context")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA1849:Call async methods when in an async method", Justification = "Spectre.Console Ask/Confirm are synchronous by design")]
-    public static async Task ExecuteAsync(CreateDailyEntryHandler handler, string? providerOverride)
+    public static async Task ExecuteAsync(CreateDailyEntryHandler handler, IAuthenticationService authService, string? providerOverride)
     {
+        ArgumentNullException.ThrowIfNull(handler);
+        ArgumentNullException.ThrowIfNull(authService);
+
+        // Show warning if using mock authentication
+        if (authService is MockAuthenticationService)
+        {
+            AnsiConsole.MarkupLine("[yellow]⚠ Development Mode: Authentication bypassed[/]");
+            AnsiConsole.WriteLine();
+        }
+
+        // Authenticate first (before collecting user input)
+        try
+        {
+            bool isAuthenticated = await authService.IsAuthenticatedAsync(CancellationToken.None).ConfigureAwait(false);
+            if (!isAuthenticated)
+            {
+                Result<UserSession> authResult = await authService.AuthenticateAsync(CancellationToken.None).ConfigureAwait(false);
+                if (!authResult.IsSuccess)
+                {
+                    AnsiConsole.MarkupLine($"[red]✗ Authentication failed:[/] {authResult.Error}");
+                    return;
+                }
+            }
+        }
+#pragma warning disable CA1031 // Do not catch general exception types - top-level handler for user-facing error display
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            AnsiConsole.MarkupLine($"[red]✗ Authentication error:[/] {ex.Message}");
+            return;
+        }
+
         AnsiConsole.MarkupLine("[bold cyan]📝 Today's Reflection[/]");
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[dim]Answer 3-5 questions about your day. Press Ctrl+C to cancel.[/]");
@@ -134,7 +168,7 @@ public static class TodayCommandHandler
                 AnsiConsole.MarkupLine("[bold]Key Events:[/]");
                 foreach (string keyEvent in entry.Summary.KeyEvents)
                 {
-                    AnsiConsole.MarkupLine($"  • {keyEvent}");
+                    AnsiConsole.MarkupLine($"  • {Markup.Escape(keyEvent)}");
                 }
             }
 
@@ -146,7 +180,7 @@ public static class TodayCommandHandler
                 foreach (TodoItem todo in entry.Summary.TodoItems)
                 {
                     string status = todo.IsCompleted ? "✓" : "○";
-                    AnsiConsole.MarkupLine($"  {status} {todo.Description}");
+                    AnsiConsole.MarkupLine($"  {status} {Markup.Escape(todo.Description)}");
                 }
             }
         }

@@ -1,6 +1,8 @@
 using System.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
+using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Features.Today.Handlers;
+using TenSecondTom.Infrastructure.Auth;
 
 namespace TenSecondTom.Infrastructure.Cli;
 
@@ -20,6 +22,7 @@ public static class CommandRegistry
     {
         var rootCommand = new RootCommand("Ten Second Tom - Personal Memory Assistant");
         rootCommand.Subcommands.Add(BuildTodayCommand(serviceProvider));
+        rootCommand.Subcommands.Add(BuildThisWeekCommand(serviceProvider));
         return rootCommand;
     }
 
@@ -40,9 +43,50 @@ public static class CommandRegistry
         {
             string? provider = parseResult.GetValue(providerOption);
             var handler = serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
-            await TodayCommandHandler.ExecuteAsync(handler, provider).ConfigureAwait(false);
+            var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
+            await TodayCommandHandler.ExecuteAsync(handler, authService, provider).ConfigureAwait(false);
         });
 
         return todayCommand;
+    }
+
+    private static Command BuildThisWeekCommand(IServiceProvider serviceProvider)
+    {
+        var thisWeekCommand = new Command("thisweek", "Generate a weekly review from recent daily entries");
+
+        // Add options for custom date range
+        var fromDateOption = new Option<DateTimeOffset?>("--from-date")
+        {
+            Description = "Start date for custom range (yyyy-MM-dd). Must be used with --to-date."
+        };
+
+        var toDateOption = new Option<DateTimeOffset?>("--to-date")
+        {
+            Description = "End date for custom range (yyyy-MM-dd). Must be used with --from-date."
+        };
+
+        // Add option for LLM provider override
+        var providerOption = new Option<string?>("--provider")
+        {
+            Description = "LLM provider to use (OpenAI or Anthropic). Defaults to configured provider."
+        };
+
+        thisWeekCommand.Options.Add(fromDateOption);
+        thisWeekCommand.Options.Add(toDateOption);
+        thisWeekCommand.Options.Add(providerOption);
+
+        // Set action
+        thisWeekCommand.SetAction(async (parseResult) =>
+        {
+            DateTimeOffset? fromDate = parseResult.GetValue(fromDateOption);
+            DateTimeOffset? toDate = parseResult.GetValue(toDateOption);
+            string? provider = parseResult.GetValue(providerOption);
+
+            var handler = serviceProvider.GetRequiredService<CreateWeeklyReviewHandler>();
+            var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
+            await ThisWeekCommandHandler.ExecuteAsync(handler, authService, fromDate, toDate, provider).ConfigureAwait(false);
+        });
+
+        return thisWeekCommand;
     }
 }

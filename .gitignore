@@ -137,6 +137,11 @@ local.settings.json
 prompt-output/
 
 #############################
+# Memory files
+#############################
+.memory/*
+
+#############################
 # Tooling / Analyzers
 #############################
 .sonar/

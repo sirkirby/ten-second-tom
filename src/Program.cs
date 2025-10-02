@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using DotNetEnv;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.CommandLine;
@@ -28,6 +29,13 @@ internal static class Program
         
         try
         {
+            // Load .env file if it exists (for development configuration)
+            string envFilePath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
+            if (File.Exists(envFilePath))
+            {
+                Env.Load(envFilePath);
+            }
+
             // Build configuration
             var configuration = new ConfigurationBuilder()
                 .SetBasePath(AppContext.BaseDirectory)
@@ -48,6 +56,7 @@ internal static class Program
             var services = new ServiceCollection();
             services.AddSingleton<IConfiguration>(configuration);
             services.AddSingleton(loggerFactory);
+            services.AddLogging(); // Add logging services to enable ILogger<T> resolution
             services.AddTenSecondTomServices();
             
             using var serviceProvider = services.BuildServiceProvider();
