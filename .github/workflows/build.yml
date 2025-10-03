@@ -95,8 +95,7 @@ jobs:
             --self-contained true \
             --output ./publish/osx-x64 \
             -p:PublishSingleFile=true \
-            -p:PublishTrimmed=true \
-            -p:TrimMode=partial
+            -p:PublishTrimmed=false
       
       - name: Verify artifact size
         run: |
@@ -158,8 +157,7 @@ jobs:
             --self-contained true \
             --output ./publish/osx-arm64 \
             -p:PublishSingleFile=true \
-            -p:PublishTrimmed=true \
-            -p:TrimMode=partial
+            -p:PublishTrimmed=false
       
       - name: Verify artifact size
         run: |
@@ -221,8 +219,7 @@ jobs:
             --self-contained true `
             --output ./publish/win-x64 `
             -p:PublishSingleFile=true `
-            -p:PublishTrimmed=true `
-            -p:TrimMode=partial
+            -p:PublishTrimmed=false
       
       - name: Verify artifact size
         shell: pwsh
