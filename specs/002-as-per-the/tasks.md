@@ -42,9 +42,9 @@
 
 ## Phase 3.1: Setup
 
-- [ ] T001 Create `.github/workflows/` directory structure
-- [ ] T002 Create `.github/CODEOWNERS` file for release approval
-- [ ] T003 Document required GitHub secrets in `docs/CICD.md`
+- [x] T001 Create `.github/workflows/` directory structure
+- [x] T002 Create `.github/CODEOWNERS` file for release approval
+- [x] T003 Document required GitHub secrets in `docs/CICD.md`
 
 ---
 
@@ -52,7 +52,7 @@
 
 **CRITICAL: These tests MUST be written and MUST FAIL before ANY implementation**
 
-- [ ] T004 [P] Workflow validation test in `tests/TenSecondTom.IntegrationTests/Workflows/PrValidationWorkflowTests.cs`
+- [x] T004 [P] Workflow validation test in `tests/TenSecondTom.IntegrationTests/Workflows/PrValidationWorkflowTests.cs`
 
 **Test Scenarios**:
 - Parse workflow YAML structure
@@ -67,21 +67,21 @@
 
 ### PR Validation Workflow
 
-- [ ] T005 Create `.github/workflows/pr-validation.yml` skeleton with metadata and triggers
-- [ ] T006 Implement Build job in `.github/workflows/pr-validation.yml`
+- [x] T005 Create `.github/workflows/pr-validation.yml` skeleton with metadata and triggers
+- [x] T006 Implement Build job in `.github/workflows/pr-validation.yml`
   - Checkout code
   - Setup .NET 9 SDK with cache
   - Restore dependencies
   - Build with Release configuration
   - Fail on compiler warnings
 
-- [ ] T007 Implement Test job in `.github/workflows/pr-validation.yml`
+- [x] T007 Implement Test job in `.github/workflows/pr-validation.yml`
   - Run dotnet test with xUnit
   - Generate TRX test results
   - Upload test results artifact
   - Verify all tests pass
 
-- [ ] T008 Implement Coverage job in `.github/workflows/pr-validation.yml`
+- [x] T008 Implement Coverage job in `.github/workflows/pr-validation.yml`
   - Run tests with coverlet collector
   - Generate coverage report with ReportGenerator
   - Parse coverage percentage from Cobertura XML
@@ -89,13 +89,13 @@
   - Upload coverage report artifact
   - Calculate coverage diff vs baseline
 
-- [ ] T009 Implement Coverage PR comment logic in `.github/workflows/pr-validation.yml`
+- [x] T009 Implement Coverage PR comment logic in `.github/workflows/pr-validation.yml`
   - Retrieve baseline coverage from cache
   - Compare current vs baseline
   - Post PR comment if diff ≥5%
   - Include coverage percentage and diff in comment
 
-- [ ] T010 Implement Validate job in `.github/workflows/pr-validation.yml`
+- [x] T010 Implement Validate job in `.github/workflows/pr-validation.yml`
   - Depend on build, test, coverage jobs
   - Aggregate status from all jobs
   - Set overall workflow status
@@ -104,19 +104,19 @@
 
 ## Phase 3.4: Integration
 
-- [ ] T011 Configure concurrency groups in `.github/workflows/pr-validation.yml`
+- [x] T011 Configure concurrency groups in `.github/workflows/pr-validation.yml`
   - Cancel in-progress runs for same PR
   - Use `github.ref` as concurrency key
 
-- [ ] T012 Add caching strategy for NuGet packages in `.github/workflows/pr-validation.yml`
+- [x] T012 Add caching strategy for NuGet packages in `.github/workflows/pr-validation.yml`
   - Cache `~/.nuget/packages`
   - Use lockfile hash as cache key
 
-- [ ] T013 Add caching strategy for baseline coverage in `.github/workflows/pr-validation.yml`
+- [x] T013 Add caching strategy for baseline coverage in `.github/workflows/pr-validation.yml`
   - Cache coverage results by branch
   - Use target branch as cache key
 
-- [ ] T014 Configure artifact retention in `.github/workflows/pr-validation.yml`
+- [x] T014 Configure artifact retention in `.github/workflows/pr-validation.yml`
   - Test results: 7 days
   - Coverage reports: 30 days
 
@@ -124,17 +124,17 @@
 
 ## Phase 3.5: Polish (PR Validation)
 
-- [ ] T015 [P] Add workflow badge to `README.md`
+- [x] T015 [P] Add workflow badge to `README.md`
   - PR Validation workflow status badge
   - Link to Actions tab
 
-- [ ] T016 [P] Update `docs/CICD.md` with PR validation workflow documentation
+- [x] T016 [P] Update `docs/CICD.md` with PR validation workflow documentation
   - Workflow purpose and triggers
   - Job descriptions
   - Performance targets
   - Troubleshooting guide
 
-- [ ] T017 [P] Add inline comments to `.github/workflows/pr-validation.yml`
+- [x] T017 [P] Add inline comments to `.github/workflows/pr-validation.yml`
   - Explain non-obvious configuration
   - Document performance optimizations
   - Note future enhancements (code signing)
@@ -152,7 +152,7 @@
   - Coverage job: ≤3 minutes
   - Total: ≤10 minutes
 
-- [ ] T020 [P] Create `.github/workflows/README.md` with quick reference
+- [x] T020 [P] Create `.github/workflows/README.md` with quick reference
   - List all workflows
   - Trigger conditions
   - Required secrets

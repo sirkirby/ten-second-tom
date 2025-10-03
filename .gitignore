@@ -87,7 +87,7 @@ coverage/
 coverage*.xml
 *.lcov
 BenchmarkDotNet.Artifacts/
-tests/*
+tests/coverage-report/*
 
 #############################
 # Logs & Diagnostics

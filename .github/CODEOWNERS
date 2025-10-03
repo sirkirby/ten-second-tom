@@ -1,0 +1,23 @@
+# GitHub Actions CI/CD Pipeline CODEOWNERS
+# 
+# This file defines code ownership for release approvals.
+# Release workflows require approval from designated maintainers.
+#
+# Maintainers must approve changes to:
+# - Release workflow configuration
+# - Homebrew tap formula updates
+# - Package manager publications
+#
+# Learn more: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Release workflow requires approval from project maintainer
+/.github/workflows/release.yml @sirkirby
+
+# Build workflow changes should be reviewed
+/.github/workflows/build.yml @sirkirby
+
+# PR validation workflow changes should be reviewed
+/.github/workflows/pr-validation.yml @sirkirby
+
+# All workflow files require maintainer review
+/.github/workflows/ @sirkirby

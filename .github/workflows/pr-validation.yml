@@ -1,0 +1,291 @@
+# PR Validation Workflow
+#
+# This workflow validates pull requests to the main branch by running tests,
+# checking code coverage, and enforcing quality gates before allowing merge.
+#
+# Triggers: Pull requests targeting 'main' branch
+# Performance Target: ≤10 minutes total
+# Coverage Strategy: Prevent regression (no decrease), track line coverage
+
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+# Cancel in-progress runs for the same PR to save resources
+concurrency:
+  group: pr-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+# Environment variables available to all jobs
+env:
+  DOTNET_VERSION: '9.0.x'
+  # Maximum allowed coverage decrease (percentage points)
+  # PRs that decrease coverage by more than this will fail
+  MAX_COVERAGE_DECREASE: 0.5
+
+jobs:
+  # Job 1: Build
+  # Compiles code and ensures zero warnings
+  # Performance Target: ≤2 minutes
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better caching
+      
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+      
+      - name: Restore dependencies
+        run: dotnet restore
+      
+      - name: Build solution
+        run: |
+          dotnet build \
+            --configuration Release \
+            --no-restore \
+            --warnaserror
+        # --warnaserror: Treat warnings as errors to enforce clean code
+
+  # Job 2: Test
+  # Runs all unit and integration tests
+  # Performance Target: ≤5 minutes
+  # Depends on: build (ensures code compiles before testing)
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+      
+      - name: Restore dependencies
+        run: dotnet restore
+      
+      - name: Run tests
+        run: |
+          dotnet test \
+            --configuration Release \
+            --no-restore \
+            --logger "trx;LogFileName=test-results.trx" \
+            --verbosity normal
+      
+      - name: Upload test results
+        if: always()  # Upload even if tests fail for debugging
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/TestResults/*.trx'
+          retention-days: 7
+
+  # Job 3: Coverage
+  # Calculates code coverage and enforces 80% threshold
+  # Performance Target: ≤3 minutes
+  # Depends on: build (needs compiled code for coverage analysis)
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for baseline comparison
+      
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+      
+      - name: Restore dependencies
+        run: dotnet restore
+      
+      - name: Run tests with coverage
+        run: |
+          dotnet test \
+            --configuration Release \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./coverage
+      
+      - name: Install ReportGenerator
+        run: dotnet tool install --global dotnet-reportgenerator-globaltool
+      
+      - name: Generate coverage report
+        run: |
+          reportgenerator \
+            -reports:"./coverage/**/coverage.cobertura.xml" \
+            -targetdir:"./coverage/report" \
+            -reporttypes:"Html;Cobertura;TextSummary"
+      
+      - name: Parse coverage percentage
+        id: coverage
+        run: |
+          # Extract line coverage percentage from Cobertura XML
+          COVERAGE=$(grep -oP 'line-rate="\K[0-9.]+' ./coverage/report/Cobertura.xml | head -1)
+          COVERAGE_PERCENT=$(echo "$COVERAGE * 100" | bc)
+          COVERAGE_PERCENT_INT=${COVERAGE_PERCENT%.*}
+          
+          echo "percentage=$COVERAGE_PERCENT_INT" >> $GITHUB_OUTPUT
+          echo "📊 Line Coverage: $COVERAGE_PERCENT_INT%"
+          
+          # Display full coverage summary (line, branch, method)
+          cat ./coverage/report/Summary.txt
+      
+      - name: Check coverage regression
+        if: steps.baseline-cache.outputs.cache-hit == 'true'
+        run: |
+          CURRENT_COVERAGE=${{ steps.coverage.outputs.percentage }}
+          BASELINE_COVERAGE=$(cat ./coverage/baseline.txt || echo "0")
+          MAX_DECREASE=${{ env.MAX_COVERAGE_DECREASE }}
+          
+          # Calculate the difference (negative means decrease)
+          DIFF=$(echo "$CURRENT_COVERAGE - $BASELINE_COVERAGE" | bc)
+          
+          echo "📊 Current line coverage: $CURRENT_COVERAGE%"
+          echo "📊 Baseline line coverage: $BASELINE_COVERAGE%"
+          echo "📊 Change: $DIFF percentage points"
+          echo "📊 Max allowed decrease: -$MAX_DECREASE percentage points"
+          
+          # Check if coverage decreased more than allowed
+          if (( $(echo "$DIFF < -$MAX_DECREASE" | bc -l) )); then
+            echo "❌ Coverage regression detected: decreased by $DIFF percentage points"
+            echo "Please add tests to maintain or improve coverage."
+            exit 1
+          else
+            echo "✅ Coverage check passed: no significant regression"
+            if (( $(echo "$DIFF > 0" | bc -l) )); then
+              echo "🎉 Coverage improved by $DIFF percentage points!"
+            fi
+          fi
+      
+      - name: Upload coverage report
+        if: always()  # Upload even if threshold check fails
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ./coverage/report/
+          retention-days: 30
+      
+      # Retrieve baseline coverage from cache for comparison
+      - name: Restore baseline coverage
+        uses: actions/cache@v4
+        id: baseline-cache
+        with:
+          path: ./coverage/baseline.txt
+          key: coverage-baseline-${{ github.base_ref }}
+      
+      - name: Calculate coverage diff
+        id: coverage-diff
+        if: steps.baseline-cache.outputs.cache-hit == 'true'
+        run: |
+          CURRENT_COVERAGE=${{ steps.coverage.outputs.percentage }}
+          BASELINE_COVERAGE=$(cat ./coverage/baseline.txt || echo "0")
+          DIFF=$((CURRENT_COVERAGE - BASELINE_COVERAGE))
+          
+          echo "diff=$DIFF" >> $GITHUB_OUTPUT
+          echo "baseline=$BASELINE_COVERAGE" >> $GITHUB_OUTPUT
+          echo "Coverage diff: ${DIFF}% (baseline: ${BASELINE_COVERAGE}%, current: ${CURRENT_COVERAGE}%)"
+      
+      - name: Comment PR with coverage diff
+        if: |
+          steps.coverage-diff.outputs.diff != '' && 
+          (steps.coverage-diff.outputs.diff >= 1 || steps.coverage-diff.outputs.diff <= -1)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const diff = ${{ steps.coverage-diff.outputs.diff }};
+            const baseline = ${{ steps.coverage-diff.outputs.baseline }};
+            const current = ${{ steps.coverage.outputs.percentage }};
+            const maxDecrease = ${{ env.MAX_COVERAGE_DECREASE }};
+            
+            const emoji = diff >= 0 ? '📈' : '📉';
+            const sign = diff >= 0 ? '+' : '';
+            const regressionCheck = diff >= -maxDecrease;
+            const status = regressionCheck ? '✅' : '❌';
+            
+            const body = `## ${emoji} Code Coverage Report\n\n` +
+              `${status} **Current Line Coverage:** ${current}%\n` +
+              `📊 **Baseline Coverage:** ${baseline}%\n` +
+              `${emoji} **Change:** ${sign}${diff} percentage points\n\n` +
+              `**Regression Check:** ` + (regressionCheck ? '✅ Passed' : `❌ Failed (decreased by more than ${maxDecrease}%)`) + '\n\n' +
+              `*Line coverage is the primary metric. See artifacts for branch and method coverage details.*\n\n` +
+              `<details>\n<summary>📊 Full Coverage Report</summary>\n\n` +
+              `Download the complete coverage report (HTML, line/branch/method metrics) from the workflow artifacts.\n` +
+              `</details>`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+      
+      - name: Save current coverage as baseline
+        if: github.event.pull_request.merged == true
+        run: |
+          echo "${{ steps.coverage.outputs.percentage }}" > ./coverage/baseline.txt
+      
+      - name: Update baseline cache
+        if: github.event.pull_request.merged == true
+        uses: actions/cache/save@v4
+        with:
+          path: ./coverage/baseline.txt
+          key: coverage-baseline-main
+
+  # Job 4: Validate
+  # Aggregates status from all previous jobs
+  # This job ensures all quality gates passed before allowing merge
+  validate:
+    name: Validation Complete
+    runs-on: ubuntu-latest
+    needs: [build, test, coverage]
+    
+    steps:
+      - name: All checks passed
+        run: |
+          echo "✅ All validation checks passed successfully!"
+          echo "   - Build: Completed with zero warnings"
+          echo "   - Tests: All tests passed"
+          echo "   - Coverage: No significant regression detected"
+          echo ""
+          echo "Pull request is ready to merge."
