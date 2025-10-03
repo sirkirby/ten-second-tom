@@ -128,7 +128,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ten-second-tom-osx-x64
-          path: ./publish/osx-x64/TenSecondTom
+          path: |
+            ./publish/osx-x64/TenSecondTom
+            ./publish/osx-x64/appsettings*.json
+            ./publish/osx-x64/*.dylib
           retention-days: 90
 
   # Job 3: Build macOS ARM64
@@ -189,7 +192,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ten-second-tom-osx-arm64
-          path: ./publish/osx-arm64/TenSecondTom
+          path: |
+            ./publish/osx-arm64/TenSecondTom
+            ./publish/osx-arm64/appsettings*.json
+            ./publish/osx-arm64/*.dylib
           retention-days: 90
 
   # Job 4: Build Windows x64
@@ -252,7 +258,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ten-second-tom-win-x64
-          path: ./publish/win-x64/TenSecondTom.exe
+          path: |
+            ./publish/win-x64/TenSecondTom.exe
+            ./publish/win-x64/appsettings*.json
+            ./publish/win-x64/*.dll
           retention-days: 90
 
   # Job 5: Verify macOS x64
