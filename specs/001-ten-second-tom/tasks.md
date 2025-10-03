@@ -1621,54 +1621,110 @@ Found 3 results for "meeting":
 
 ## Phase 3.11: Feature - Authentication Commands
 
-### T059: Test LoginCommand Handler
+### T059: Test LoginCommand Handler ✅ COMPLETE
+
 **Type**: Test  
 **Dependencies**: T037  
 **Files**:
-- `tests/Unit/Features/Auth/LoginCommandHandlerTests.cs`
+- `tests/TenSecondTom.Tests/Unit/Features/Auth/LoginCommandHandlerTests.cs`
 
 **Description**: Write tests for explicit login command.
 
 **Test Cases**:
-- Login discovers SSH key
-- Prompts for passphrase
-- Creates session
-- Returns success/failure
+
+- [x] Login discovers SSH key
+- [x] Prompts for passphrase
+- [x] Creates session
+- [x] Returns success/failure
 
 **Acceptance Criteria**:
-- [ ] Tests written and failing
-- [ ] Auth service mocked
+
+- [x] 9 comprehensive unit tests written and passing:
+  - Handle_WithValidCredentials_AuthenticatesSuccessfully
+  - Handle_WhenAlreadyAuthenticated_ReturnsExistingSession
+  - Handle_WithMissingSshKey_ReturnsError
+  - Handle_WithIncorrectPassphrase_ReturnsError
+  - Handle_WhenAuthenticationFails_ReturnsError
+  - Handle_PropagatesCancellationToken
+  - Handle_LogsLoginAttempt
+  - Handle_LogsSuccessfulLogin
+  - Handle_LogsFailedLogin
+- [x] Auth service mocked
 
 ---
 
-### T060: Implement LoginCommand
+### T060: Implement LoginCommand ✅ COMPLETE
+
 **Type**: Core - Command  
 **Dependencies**: T059  
 **Files**:
 - `src/Features/Auth/Commands/LoginCommand.cs`
 - `src/Features/Auth/Handlers/LoginCommandHandler.cs`
+- `src/Infrastructure/Cli/LoginCommandHandler.cs`
+- `src/Infrastructure/Cli/CommandRegistry.cs`
+- `src/Infrastructure/DependencyInjection/ServiceCollectionExtensions.cs`
 
 **Description**: Implement explicit login command (calls AuthenticationService).
 
 **Acceptance Criteria**:
-- [ ] All T059 tests pass
-- [ ] CLI command registered
-- [ ] User-friendly messages
+
+- [x] All T059 tests pass (9/9 passing)
+- [x] LoginCommand record implemented with IRequest\<Result\<UserSession\>\>
+- [x] LoginCommandHandler calls AuthenticationService.AuthenticateAsync
+- [x] CLI command registered in CommandRegistry.BuildLoginCommand
+- [x] CLI handler provides user-friendly authentication flow:
+  - Shows "→ Authenticating with SSH key..." message
+  - Displays success with formatted session information table
+  - Shows session ID, creation time, and key hash
+  - Provides helpful error messages for common issues
+  - Tip displayed for SSH key configuration issues
+- [x] Handler registered in DI container (ServiceCollectionExtensions)
+- [x] All tests passing (280/298 succeeded, 18 skipped)
+- [x] No compiler warnings
+- [x] CLI help text working: `dotnet run -- login --help`
+- [x] Manual testing successful with Development mode
 
 ---
 
-### T061: Implement LogoutCommand
+---
+
+### T061: Implement LogoutCommand ✅ COMPLETE
+
 **Type**: Core - Command  
 **Dependencies**: T037  
 **Files**:
 - `src/Features/Auth/Commands/LogoutCommand.cs`
+- `src/Features/Auth/Handlers/LogoutCommandHandler.cs`
+- `src/Infrastructure/Cli/LogoutCommandHandler.cs`
+- `src/Infrastructure/Cli/CommandRegistry.cs`
+- `src/Infrastructure/DependencyInjection/ServiceCollectionExtensions.cs`
+- `tests/TenSecondTom.Tests/Unit/Features/Auth/LogoutCommandHandlerTests.cs`
 
 **Description**: Implement logout command that invalidates session.
 
 **Acceptance Criteria**:
-- [ ] Calls AuthenticationService.Logout
-- [ ] Clears session token
-- [ ] User-friendly confirmation message
+
+- [x] LogoutCommand record implemented with IRequest\<Result\<bool\>\>
+- [x] LogoutCommandHandler calls AuthenticationService.LogoutAsync
+- [x] CLI command registered in CommandRegistry.BuildLogoutCommand
+- [x] CLI handler provides user-friendly confirmation messages
+- [x] Success message: "✓ Successfully logged out."
+- [x] Warning message for no active session
+- [x] Handler registered in DI container (ServiceCollectionExtensions)
+- [x] 7 comprehensive unit tests written and passing:
+  - Handle_WithActiveSession_LogsOutSuccessfully
+  - Handle_WithNoActiveSession_ReturnsError
+  - Handle_WhenAuthServiceFails_ReturnsError
+  - Handle_PropagatesCancellationToken
+  - Handle_LogsLogoutAttempt
+  - Handle_LogsSuccessfulLogout
+  - Handle_LogsFailedLogout
+- [x] All tests passing (271/289 succeeded, 18 skipped)
+- [x] No compiler warnings
+- [x] CLI help text working: `dotnet run -- logout --help`
+- [x] Manual testing successful
+
+---
 
 ---
 

@@ -1,0 +1,71 @@
+using Spectre.Console;
+using TenSecondTom.Features.Auth.Commands;
+using AuthHandler = TenSecondTom.Features.Auth.Handlers.LoginCommandHandler;
+
+namespace TenSecondTom.Infrastructure.Cli;
+
+/// <summary>
+/// Handles the login CLI command execution.
+/// Provides user-friendly output for login operations.
+/// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Top-level CLI handler must catch all exceptions")]
+public static class LoginCommandHandler
+{
+    /// <summary>
+    /// Executes the login command and displays results to the user.
+    /// </summary>
+    /// <param name="handler">The login command handler.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    public static async Task ExecuteAsync(AuthHandler handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+
+        try
+        {
+            AnsiConsole.MarkupLine("[blue]→[/] Authenticating with SSH key...");
+            AnsiConsole.WriteLine();
+
+            var command = new LoginCommand();
+            var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
+
+            if (result.IsSuccess)
+            {
+                var session = result.Value;
+                AnsiConsole.MarkupLine("[green]✓[/] Successfully authenticated!");
+                AnsiConsole.WriteLine();
+                
+                var table = new Table()
+                    .Border(TableBorder.Rounded)
+                    .BorderColor(Color.Green)
+                    .AddColumn(new TableColumn("[bold]Session Information[/]").Centered());
+                
+                table.AddRow($"Session ID: [cyan]{session.SessionId}[/]");
+                table.AddRow($"Created: [dim]{session.CreatedAt:yyyy-MM-dd HH:mm:ss UTC}[/]");
+                table.AddRow($"Key Hash: [dim]{Markup.Escape(session.SshKeyHash)}[/]");
+                
+                AnsiConsole.Write(table);
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine("[dim]You can now use all Ten Second Tom commands.[/]");
+            }
+            else
+            {
+                var errorMessage = result.Error ?? "Unknown error occurred";
+                AnsiConsole.MarkupLine($"[red]✗[/] Authentication failed");
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine($"[yellow]{Markup.Escape(errorMessage)}[/]");
+                AnsiConsole.WriteLine();
+                
+                if (errorMessage.Contains("No SSH key found", StringComparison.OrdinalIgnoreCase) || 
+                    errorMessage.Contains("SSH key", StringComparison.OrdinalIgnoreCase))
+                {
+                    AnsiConsole.MarkupLine("[dim]Tip: Ensure you have an SSH key in ~/.ssh/ (id_ed25519 or id_rsa)[/]");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[red]✗[/] An error occurred during authentication: {Markup.Escape(ex.Message)}");
+        }
+    }
+}

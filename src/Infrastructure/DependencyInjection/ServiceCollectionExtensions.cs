@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OpenAI;
 using OpenAI.Chat;
+using TenSecondTom.Features.Auth.Handlers;
 using TenSecondTom.Features.Search.Handlers;
 using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Features.Today.Handlers;
@@ -126,6 +127,8 @@ public static class ServiceCollectionExtensions
         services.AddTransient<CreateDailyEntryHandler>();
         services.AddTransient<CreateWeeklyReviewHandler>();
         services.AddTransient<SearchMemoriesQueryHandler>();
+        services.AddTransient<LoginCommandHandler>();
+        services.AddTransient<LogoutCommandHandler>();
 
         return services;
     }

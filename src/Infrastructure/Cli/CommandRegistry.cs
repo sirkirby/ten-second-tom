@@ -4,6 +4,8 @@ using TenSecondTom.Features.Search.Handlers;
 using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
+using AuthLoginHandler = TenSecondTom.Features.Auth.Handlers.LoginCommandHandler;
+using AuthLogoutHandler = TenSecondTom.Features.Auth.Handlers.LogoutCommandHandler;
 
 namespace TenSecondTom.Infrastructure.Cli;
 
@@ -25,6 +27,8 @@ public static class CommandRegistry
         rootCommand.Subcommands.Add(BuildTodayCommand(serviceProvider));
         rootCommand.Subcommands.Add(BuildThisWeekCommand(serviceProvider));
         rootCommand.Subcommands.Add(BuildSearchCommand(serviceProvider));
+        rootCommand.Subcommands.Add(BuildLoginCommand(serviceProvider));
+        rootCommand.Subcommands.Add(BuildLogoutCommand(serviceProvider));
         return rootCommand;
     }
 
@@ -130,5 +134,33 @@ public static class CommandRegistry
         });
 
         return searchCommand;
+    }
+
+    private static Command BuildLoginCommand(IServiceProvider serviceProvider)
+    {
+        var loginCommand = new Command("login", "Authenticate with SSH key and create a session");
+
+        // Set action
+        loginCommand.SetAction(async (parseResult) =>
+        {
+            var handler = serviceProvider.GetRequiredService<AuthLoginHandler>();
+            await LoginCommandHandler.ExecuteAsync(handler).ConfigureAwait(false);
+        });
+
+        return loginCommand;
+    }
+
+    private static Command BuildLogoutCommand(IServiceProvider serviceProvider)
+    {
+        var logoutCommand = new Command("logout", "Log out and invalidate the current session");
+
+        // Set action
+        logoutCommand.SetAction(async (parseResult) =>
+        {
+            var handler = serviceProvider.GetRequiredService<AuthLogoutHandler>();
+            await LogoutCommandHandler.ExecuteAsync(handler).ConfigureAwait(false);
+        });
+
+        return logoutCommand;
     }
 }
