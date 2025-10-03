@@ -33,32 +33,13 @@ public static class CommandRegistry
         
         rootCommand.Options.Add(jsonOutputOption);
         
-        // Add --version option
-        var versionOption = new Option<bool>("--version")
-        {
-            Description = "Display version information"
-        };
-        
-        rootCommand.Options.Add(versionOption);
-        
-        // Set handler for version display
+        // Set handler for root command (when no subcommand specified)
         rootCommand.SetAction((parseResult) =>
         {
-            bool showVersion = parseResult.GetValue(versionOption);
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
             
-            if (showVersion)
-            {
-                Logo.DisplayWithVersion(jsonOutput);
-                return 0;
-            }
-            
-            // If no command specified, show logo and help
-            if (parseResult.Tokens.Count == 0 || !parseResult.Tokens.Any(t => t.Type == System.CommandLine.Parsing.TokenType.Command))
-            {
-                Logo.Display(jsonOutput);
-            }
-            
+            // Show logo and help when no subcommand
+            Logo.Display(jsonOutput);
             return 0;
         });
         
@@ -67,7 +48,23 @@ public static class CommandRegistry
         rootCommand.Subcommands.Add(BuildSearchCommand(serviceProvider, jsonOutputOption));
         rootCommand.Subcommands.Add(BuildLoginCommand(serviceProvider, jsonOutputOption));
         rootCommand.Subcommands.Add(BuildLogoutCommand(serviceProvider, jsonOutputOption));
+        rootCommand.Subcommands.Add(BuildVersionCommand(jsonOutputOption));
         return rootCommand;
+    }
+
+    private static Command BuildVersionCommand(Option<bool> jsonOutputOption)
+    {
+        var versionCommand = new Command("version", "Display version information with logo");
+
+        versionCommand.Options.Add(jsonOutputOption);
+
+        versionCommand.SetAction((parseResult) =>
+        {
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
+            Logo.DisplayWithVersion(jsonOutput);
+        });
+
+        return versionCommand;
     }
 
     private static Command BuildTodayCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
