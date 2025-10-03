@@ -644,7 +644,20 @@ Task: "Verify performance targets"
 ✅ Workflow completes in ≤15 minutes
 ✅ All validation tests pass (T021)
 
+**Build Debugging Notes (2025-10-03)**:
+
+- **Issue 1**: IL trimming warnings caused build failures
+  - **Fix**: Added `PublishTrimmed=true`, `TrimMode=link`, and IL warning suppressions to project file
+  - **Result**: Executables reduced from 81MB to 20MB
+- **Issue 2**: Configuration file `appsettings.json` not found at runtime in smoke tests
+  - **Fix**: Added `ExcludeFromSingleFile=true` to appsettings.json Content items in project file
+  - **Result**: Configuration files now deployed alongside executable
+- **Issue 3**: Serilog assemblies not found at runtime due to reflection-based loading
+  - **Fix**: Added `TrimmerRootAssembly` directives for Serilog.Sinks.Console, Serilog.Sinks.File, Serilog.Enrichers.Environment, and Serilog.Settings.Configuration
+  - **Result**: Serilog sinks preserved during trimming, executable works correctly
+
 ### Release Workflow (Phase 3)
+
 ✅ Release workflow triggers on semantic version tags
 ✅ Version validation enforces semver format
 ✅ GitHub release created with all binaries attached
@@ -655,6 +668,7 @@ Task: "Verify performance targets"
 ✅ All validation tests pass (T037)
 
 ### Overall System
+
 ✅ Complete CI/CD pipeline operational
 ✅ Constitution Principle V (automated releases) satisfied
 ✅ All functional requirements (FR-001 to FR-034) covered
