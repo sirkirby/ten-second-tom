@@ -1,0 +1,173 @@
+# Ten Second Tom - .gitignore (C# / .NET 9 CLI)
+# Reference base: GitHub's VisualStudio + Dotnet + macOS templates, trimmed & curated.
+# Only ignore what is safe to regenerate or machine/user specific.
+
+#############################
+# OS / Editor / IDE
+#############################
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# VS Code settings (allow specific tracked files if needed)
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# JetBrains Rider / IntelliJ
+.idea/
+*.iml
+.idea_modules/
+
+# Visual Studio / MonoDevelop
+*.user
+*.userosscache
+*.suo
+*.cache
+*.pidb
+*.userprefs
+*.csproj.user
+*.rsuser
+
+#############################
+# Build Artifacts
+#############################
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+[Dd]ebug/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+
+# Cross-platform props
+*.pid
+
+#############################
+# .NET Specific
+#############################
+# NuGet
+*.nupkg
+*.snupkg
+*.nuspec
+# Package restore / intermediate
+project.lock.json
+project.fragment.lock.json
+artifacts/
+.nuget/packages/*
+# (Keep global packages cache outside repo anyway)
+
+# MSBuild
+*.tlog
+*.lastcodeanalysissucceeded
+*.FileListAbsolute.txt
+*.CopyComplete
+*.nuget.props
+*.nuget.targets
+
+# Publish / generated
+publish/
+app.publish/
+
+#############################
+# Testing & Coverage
+#############################
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+coverage*.xml
+*.lcov
+BenchmarkDotNet.Artifacts/
+tests/*
+
+#############################
+# Logs & Diagnostics
+#############################
+*.log
+logs/
+.logs/
+serilog-selflog*.txt
+
+#############################
+# Cache / Temp
+#############################
+*.tmp
+*.temp
+*.bak
+*.bk
+*.orig
+*.swp
+*.swo
+~$*
+.cache/
+.tmp/
+
+#############################
+# Security / Keys / Certificates
+#############################
+*.pfx
+*.p12
+*.snk
+*.key
+*.cer
+*.crt
+# Dotnet user secrets live outside repo by design (~/.microsoft/usersecrets)
+
+#############################
+# Configuration (local / env specific)
+#############################
+.env
+.env.*
+*.local.json
+local.settings.json
+# If you introduce Azure Functions later, keep local.settings.json ignored.
+
+#############################
+# Generated Prompt / LLM Artifacts (if any)
+#############################
+*.prompt.rendered.txt
+prompt-output/
+
+#############################
+# Memory files
+#############################
+.memory/*
+
+#############################
+# Tooling / Analyzers
+#############################
+.sonar/
+.snyk/
+.stylecop.cache
+
+#############################
+# Redundancies / Misc
+#############################
+Thumbs.db
+$RECYCLE.BIN/
+
+#############################
+# Optional: Deployment Plans
+#############################
+# Uncomment if you do NOT want to commit generated deployment plans.
+# .azure/
+# .deployment/
+
+#############################
+# Keep: Explicitly DO NOT ignore these (documentation / specs)
+#############################
+!specs/
+!AGENTS.md
+!CLAUDE.md
+!SECURITY.md
+
+# End of file

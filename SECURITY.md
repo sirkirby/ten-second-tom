@@ -79,6 +79,44 @@ Planned improvements for self-service recovery:
 3. Regularly rotate SSH keys (every 6-12 months)
 4. Monitor session file permissions: `chmod 600 ~/.tom/session.json`
 
+### Cryptographic Implementation
+
+#### Ed25519 Signature Verification
+
+**Library**: NSec.Cryptography 25.4.0+  
+**Algorithm**: Ed25519 (RFC 8032)  
+**Purpose**: SSH agent authentication signature verification
+
+Ten Second Tom uses NSec.Cryptography for cryptographic verification of Ed25519 signatures during SSH agent authentication. This implementation provides:
+
+**Security Properties**:
+- **RFC 8032 Compliance**: Implements the official Ed25519 standard
+- **Audited Foundation**: Built on libsodium (C library audited for 10+ years)
+- **Constant-Time Operations**: Prevents timing-based side-channel attacks
+- **128-bit Security Level**: Industry-standard cryptographic strength
+- **No Signature Malleability**: Ed25519 signatures cannot be forged or modified
+- **Tamper Detection**: Any modification to signature is immediately detected
+
+**Validation Requirements**:
+- Signature length: Exactly 64 bytes
+- Public key length: Exactly 32 bytes (extracted from SSH format)
+- Cryptographic verification: All signatures must pass NSec verification
+- No fallback modes: Simplified validation is never used
+
+**Implementation Details**:
+- Signature verification: `NSec.Cryptography.SignatureAlgorithm.Ed25519.Verify()`
+- Public key import: SSH wire format → raw 32-byte Ed25519 key
+- Error handling: ArgumentException, CryptographicException caught and logged
+- Security events: Failed verifications logged at Warning level for audit
+
+**Performance**: Signature verification completes in < 1ms (libsodium optimized implementation).
+
+**Dependency Chain**:
+- NSec.Cryptography 25.4.0 (MIT License)
+  - libsodium 1.0.20.1 (embedded, ISC License)
+
+Failed signature verifications are logged as security events for audit and monitoring purposes.
+
 ---
 
 ## Data Security
