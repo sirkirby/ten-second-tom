@@ -52,6 +52,7 @@ public static class CommandRegistry
         };
         
         todayCommand.Options.Add(providerOption);
+        todayCommand.Options.Add(jsonOutputOption);
 
         // Set action
         todayCommand.SetAction(async (parseResult) =>
@@ -90,6 +91,7 @@ public static class CommandRegistry
         thisWeekCommand.Options.Add(fromDateOption);
         thisWeekCommand.Options.Add(toDateOption);
         thisWeekCommand.Options.Add(providerOption);
+        thisWeekCommand.Options.Add(jsonOutputOption);
 
         // Set action
         thisWeekCommand.SetAction(async (parseResult) =>
@@ -131,6 +133,7 @@ public static class CommandRegistry
         searchCommand.Arguments.Add(queryArgument);
         searchCommand.Options.Add(fromDateOption);
         searchCommand.Options.Add(toDateOption);
+        searchCommand.Options.Add(jsonOutputOption);
 
         // Set action
         searchCommand.SetAction(async (parseResult) =>
@@ -152,6 +155,9 @@ public static class CommandRegistry
     {
         var loginCommand = new Command("login", "Authenticate with SSH key and create a session");
 
+        // Add the global JSON output option to this command
+        loginCommand.Options.Add(jsonOutputOption);
+
         // Set action
         loginCommand.SetAction(async (parseResult) =>
         {
@@ -166,6 +172,9 @@ public static class CommandRegistry
     private static Command BuildLogoutCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
     {
         var logoutCommand = new Command("logout", "Log out and invalidate the current session");
+
+        // Add the global JSON output option to this command
+        logoutCommand.Options.Add(jsonOutputOption);
 
         // Set action
         logoutCommand.SetAction(async (parseResult) =>
