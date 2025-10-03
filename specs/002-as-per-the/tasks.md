@@ -649,12 +649,15 @@ Task: "Verify performance targets"
 - **Issue 1**: IL trimming warnings caused build failures
   - **Fix**: Added `PublishTrimmed=true`, `TrimMode=link`, and IL warning suppressions to project file
   - **Result**: Executables reduced from 81MB to 20MB
-- **Issue 2**: Configuration file `appsettings.json` not found at runtime in smoke tests
+- **Issue 2**: Configuration file `appsettings.json` not found at runtime in smoke tests (first occurrence)
   - **Fix**: Added `ExcludeFromSingleFile=true` to appsettings.json Content items in project file
-  - **Result**: Configuration files now deployed alongside executable
+  - **Result**: Configuration files now deployed alongside executable in publish directory
 - **Issue 3**: Serilog assemblies not found at runtime due to reflection-based loading
   - **Fix**: Added `TrimmerRootAssembly` directives for Serilog.Sinks.Console, Serilog.Sinks.File, Serilog.Enrichers.Environment, and Serilog.Settings.Configuration
   - **Result**: Serilog sinks preserved during trimming, executable works correctly
+- **Issue 4**: Configuration file `appsettings.json` not found in verify jobs (second occurrence)
+  - **Fix**: Updated artifact upload paths to include `appsettings*.json` and native libraries (`*.dylib`, `*.dll`)
+  - **Result**: Artifacts now contain all runtime dependencies (executable + config + native libs)
 
 ### Release Workflow (Phase 3)
 
