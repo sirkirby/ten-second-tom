@@ -50,22 +50,14 @@ public static class LoginCommandHandler
             }
             else
             {
-                var errorMessage = result.Error ?? "Unknown error occurred";
-                AnsiConsole.MarkupLine($"[red]✗[/] Authentication failed");
-                AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine($"[yellow]{Markup.Escape(errorMessage)}[/]");
-                AnsiConsole.WriteLine();
-                
-                if (errorMessage.Contains("No SSH key found", StringComparison.OrdinalIgnoreCase) || 
-                    errorMessage.Contains("SSH key", StringComparison.OrdinalIgnoreCase))
-                {
-                    AnsiConsole.MarkupLine("[dim]Tip: Ensure you have an SSH key in ~/.ssh/ (id_ed25519 or id_rsa)[/]");
-                }
+                var errorMessage = result.Error ?? "Unknown authentication error";
+                AuthenticationErrorFormatter.DisplayAuthenticationError(errorMessage);
             }
         }
         catch (Exception ex)
         {
-            AnsiConsole.MarkupLine($"[red]✗[/] An error occurred during authentication: {Markup.Escape(ex.Message)}");
+            var errorMessage = $"An error occurred during authentication: {ex.Message}";
+            AuthenticationErrorFormatter.DisplayAuthenticationError(errorMessage);
         }
     }
 }

@@ -43,7 +43,15 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ILlmProviderFactory, LlmProviderFactory>();
         services.AddSingleton<IPromptTemplateLoader, EmbeddedPromptTemplateLoader>();
         
-        // Register authentication service (use mock in Development)
+        // Register SSH agent client
+        services.AddSingleton<ISshAgentClient>(serviceProvider =>
+        {
+            var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+            var logger = loggerFactory.CreateLogger<SshAgentClient>();
+            return new SshAgentClient(logger);
+        });
+        
+        // Register authentication service (uses factory to select implementation)
         services.AddSingleton<IAuthenticationService>(serviceProvider =>
         {
             var configuration = serviceProvider.GetRequiredService<IConfiguration>();
@@ -61,8 +69,16 @@ public static class ServiceCollectionExtensions
                 return new MockAuthenticationService(mockLogger);
             }
 
-            var logger = loggerFactory.CreateLogger<SshKeyAuthenticationService>();
-            return new SshKeyAuthenticationService(logger);
+            // Use factory to intelligently select authentication method
+            var agentClient = serviceProvider.GetRequiredService<ISshAgentClient>();
+            var sshAgentLogger = loggerFactory.CreateLogger<SshAgentAuthenticationService>();
+            var sshKeyLogger = loggerFactory.CreateLogger<SshKeyAuthenticationService>();
+            
+            return AuthenticationServiceFactory.Create(
+                configuration,
+                agentClient,
+                sshAgentLogger,
+                sshKeyLogger);
         });
 
         // Register OpenAI ChatClient

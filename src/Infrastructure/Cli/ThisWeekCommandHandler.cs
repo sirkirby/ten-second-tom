@@ -50,7 +50,7 @@ public static class ThisWeekCommandHandler
                 Result<UserSession> authResult = await authService.AuthenticateAsync(CancellationToken.None).ConfigureAwait(false);
                 if (!authResult.IsSuccess)
                 {
-                    AnsiConsole.MarkupLine($"[red]✗ Authentication failed:[/] {authResult.Error}");
+                    AuthenticationErrorFormatter.DisplayAuthenticationError(authResult.Error ?? "Unknown authentication error");
                     return;
                 }
             }
@@ -59,7 +59,7 @@ public static class ThisWeekCommandHandler
         catch (Exception ex)
 #pragma warning restore CA1031
         {
-            AnsiConsole.MarkupLine($"[red]✗ Authentication error:[/] {ex.Message}");
+            AuthenticationErrorFormatter.DisplayAuthenticationError(ex.Message);
             return;
         }
 

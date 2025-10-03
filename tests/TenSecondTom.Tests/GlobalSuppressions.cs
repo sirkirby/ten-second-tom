@@ -13,3 +13,8 @@ using System.Runtime.CompilerServices;
 
 // ConfigureAwait in tests - not needed in test methods
 [assembly: SuppressMessage("Reliability", "CA2007:Consider calling ConfigureAwait on the awaited task", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Tests", Justification = "ConfigureAwait is not necessary in test code")]
+
+// Ed25519SignatureVerificationTests - test vectors will be used once NSec implementation is complete
+[assembly: SuppressMessage("Style", "IDE0059:Unnecessary assignment of a value", Scope = "type", Target = "~T:TenSecondTom.Tests.Unit.Infrastructure.Auth.Ed25519SignatureVerificationTests", Justification = "Test stub - variables used once implementation complete")]
+[assembly: SuppressMessage("CodeQuality", "IDE0051:Remove unused private members", Scope = "type", Target = "~T:TenSecondTom.Tests.Unit.Infrastructure.Auth.Ed25519SignatureVerificationTests", Justification = "Test stub - RFC 8032 test vectors used once implementation complete")]
+[assembly: SuppressMessage("Performance", "CA1823:Avoid unused private fields", Scope = "type", Target = "~T:TenSecondTom.Tests.Unit.Infrastructure.Auth.Ed25519SignatureVerificationTests", Justification = "Test stub - RFC 8032 test vectors used once implementation complete")]
