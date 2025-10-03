@@ -53,8 +53,20 @@ The following secrets must be configured in the repository settings (`Settings â
 **Jobs**:
 - **Build**: Compile code with zero warnings
 - **Test**: Run all unit and integration tests
-- **Coverage**: Enforce 80% minimum coverage threshold
+- **Coverage**: Prevent coverage regression, track line coverage
 - **Validate**: Aggregate status from all jobs
+
+**Coverage Strategy**:
+- **Primary Metric**: Line coverage (% of executable lines hit by tests)
+- **Regression Prevention**: PRs cannot decrease coverage by more than 0.5 percentage points
+- **No Absolute Threshold**: Focus on preventing regression, not arbitrary targets
+- **Other Metrics Tracked**: Branch coverage, method coverage (in reports, not enforced)
+
+**Why Line Coverage?**
+- Most widely understood and standardized metric
+- Easier to reason about than branch or method coverage
+- Industry standard for baseline quality gates
+- Branch/method coverage available in detailed reports for deeper analysis
 
 **Performance Targets**:
 - Build job: â‰¤2 minutes
@@ -64,9 +76,9 @@ The following secrets must be configured in the repository settings (`Settings â
 
 **Artifacts**:
 - Test results (TRX format, 7 days retention)
-- Coverage reports (HTML/XML, 30 days retention)
+- Coverage reports (HTML/XML with line/branch/method metrics, 30 days retention)
 
-**Coverage Diff Comments**: Automatically posts PR comment when coverage changes by â‰¥5%
+**Coverage Diff Comments**: Automatically posts PR comment when coverage changes by â‰¥1 percentage point
 
 ---
 

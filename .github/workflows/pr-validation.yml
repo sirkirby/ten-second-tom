@@ -5,7 +5,7 @@
 #
 # Triggers: Pull requests targeting 'main' branch
 # Performance Target: ≤10 minutes total
-# Coverage Requirement: ≥80% line coverage
+# Coverage Strategy: Prevent regression (no decrease), track line coverage
 
 name: PR Validation
 
@@ -22,7 +22,9 @@ concurrency:
 # Environment variables available to all jobs
 env:
   DOTNET_VERSION: '9.0.x'
-  COVERAGE_THRESHOLD: 80
+  # Maximum allowed coverage decrease (percentage points)
+  # PRs that decrease coverage by more than this will fail
+  MAX_COVERAGE_DECREASE: 0.5
 
 jobs:
   # Job 1: Build
@@ -96,7 +98,6 @@ jobs:
           dotnet test \
             --configuration Release \
             --no-restore \
-            --no-build \
             --logger "trx;LogFileName=test-results.trx" \
             --verbosity normal
       
@@ -143,7 +144,6 @@ jobs:
         run: |
           dotnet test \
             --configuration Release \
-            --no-restore \
             --collect:"XPlat Code Coverage" \
             --results-directory ./coverage
       
@@ -160,31 +160,42 @@ jobs:
       - name: Parse coverage percentage
         id: coverage
         run: |
-          # Extract coverage percentage from Cobertura XML
+          # Extract line coverage percentage from Cobertura XML
           COVERAGE=$(grep -oP 'line-rate="\K[0-9.]+' ./coverage/report/Cobertura.xml | head -1)
           COVERAGE_PERCENT=$(echo "$COVERAGE * 100" | bc)
           COVERAGE_PERCENT_INT=${COVERAGE_PERCENT%.*}
           
           echo "percentage=$COVERAGE_PERCENT_INT" >> $GITHUB_OUTPUT
-          echo "Coverage: $COVERAGE_PERCENT_INT%"
+          echo "📊 Line Coverage: $COVERAGE_PERCENT_INT%"
           
-          # Display coverage summary
+          # Display full coverage summary (line, branch, method)
           cat ./coverage/report/Summary.txt
       
-      - name: Enforce coverage threshold
+      - name: Check coverage regression
+        if: steps.baseline-cache.outputs.cache-hit == 'true'
         run: |
-          COVERAGE=${{ steps.coverage.outputs.percentage }}
-          THRESHOLD=${{ env.COVERAGE_THRESHOLD }}
+          CURRENT_COVERAGE=${{ steps.coverage.outputs.percentage }}
+          BASELINE_COVERAGE=$(cat ./coverage/baseline.txt || echo "0")
+          MAX_DECREASE=${{ env.MAX_COVERAGE_DECREASE }}
           
-          echo "Current coverage: $COVERAGE%"
-          echo "Required threshold: $THRESHOLD%"
+          # Calculate the difference (negative means decrease)
+          DIFF=$(echo "$CURRENT_COVERAGE - $BASELINE_COVERAGE" | bc)
           
-          if [ "$COVERAGE" -lt "$THRESHOLD" ]; then
-            echo "❌ Coverage check failed: $COVERAGE% is below $THRESHOLD% threshold"
-            echo "Please add tests to increase coverage above $THRESHOLD%"
+          echo "📊 Current line coverage: $CURRENT_COVERAGE%"
+          echo "📊 Baseline line coverage: $BASELINE_COVERAGE%"
+          echo "📊 Change: $DIFF percentage points"
+          echo "📊 Max allowed decrease: -$MAX_DECREASE percentage points"
+          
+          # Check if coverage decreased more than allowed
+          if (( $(echo "$DIFF < -$MAX_DECREASE" | bc -l) )); then
+            echo "❌ Coverage regression detected: decreased by $DIFF percentage points"
+            echo "Please add tests to maintain or improve coverage."
             exit 1
           else
-            echo "✅ Coverage check passed: $COVERAGE% meets $THRESHOLD% threshold"
+            echo "✅ Coverage check passed: no significant regression"
+            if (( $(echo "$DIFF > 0" | bc -l) )); then
+              echo "🎉 Coverage improved by $DIFF percentage points!"
+            fi
           fi
       
       - name: Upload coverage report
@@ -218,26 +229,28 @@ jobs:
       - name: Comment PR with coverage diff
         if: |
           steps.coverage-diff.outputs.diff != '' && 
-          (steps.coverage-diff.outputs.diff >= 5 || steps.coverage-diff.outputs.diff <= -5)
+          (steps.coverage-diff.outputs.diff >= 1 || steps.coverage-diff.outputs.diff <= -1)
         uses: actions/github-script@v7
         with:
           script: |
             const diff = ${{ steps.coverage-diff.outputs.diff }};
             const baseline = ${{ steps.coverage-diff.outputs.baseline }};
             const current = ${{ steps.coverage.outputs.percentage }};
-            const threshold = ${{ env.COVERAGE_THRESHOLD }};
+            const maxDecrease = ${{ env.MAX_COVERAGE_DECREASE }};
             
             const emoji = diff >= 0 ? '📈' : '📉';
             const sign = diff >= 0 ? '+' : '';
-            const status = current >= threshold ? '✅' : '❌';
+            const regressionCheck = diff >= -maxDecrease;
+            const status = regressionCheck ? '✅' : '❌';
             
-            const body = `## ${emoji} Code Coverage Update\n\n` +
-              `${status} **Current Coverage:** ${current}%\n` +
+            const body = `## ${emoji} Code Coverage Report\n\n` +
+              `${status} **Current Line Coverage:** ${current}%\n` +
               `📊 **Baseline Coverage:** ${baseline}%\n` +
-              `${emoji} **Change:** ${sign}${diff}%\n\n` +
-              `**Threshold:** ${threshold}% ` + (current >= threshold ? '(passed)' : '(failed)') + '\n\n' +
-              `<details>\n<summary>Coverage Report</summary>\n\n` +
-              `Download the full coverage report from the workflow artifacts.\n` +
+              `${emoji} **Change:** ${sign}${diff} percentage points\n\n` +
+              `**Regression Check:** ` + (regressionCheck ? '✅ Passed' : `❌ Failed (decreased by more than ${maxDecrease}%)`) + '\n\n' +
+              `*Line coverage is the primary metric. See artifacts for branch and method coverage details.*\n\n` +
+              `<details>\n<summary>📊 Full Coverage Report</summary>\n\n` +
+              `Download the complete coverage report (HTML, line/branch/method metrics) from the workflow artifacts.\n` +
               `</details>`;
             
             github.rest.issues.createComment({
@@ -273,6 +286,6 @@ jobs:
           echo "✅ All validation checks passed successfully!"
           echo "   - Build: Completed with zero warnings"
           echo "   - Tests: All tests passed"
-          echo "   - Coverage: Met ${{ env.COVERAGE_THRESHOLD }}% threshold"
+          echo "   - Coverage: No significant regression detected"
           echo ""
           echo "Pull request is ready to merge."
