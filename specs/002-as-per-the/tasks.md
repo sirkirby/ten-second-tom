@@ -139,14 +139,14 @@
   - Document performance optimizations
   - Note future enhancements (code signing)
 
-- [ ] T018 Test PR validation workflow manually using quickstart.md scenarios
+- [x] T018 Test PR validation workflow manually using quickstart.md scenarios
   - Create test PR with passing tests
   - Create test PR with failing tests
   - Create test PR with low coverage
   - Create test PR with compiler warnings
   - Verify all expected behaviors
 
-- [ ] T019 Verify PR validation workflow performance meets targets
+- [x] T019 Verify PR validation workflow performance meets targets
   - Build job: ≤2 minutes
   - Test job: ≤5 minutes
   - Coverage job: ≤3 minutes
@@ -164,7 +164,7 @@
 
 **CRITICAL: These tests MUST be written and MUST FAIL before ANY implementation**
 
-- [ ] T021 [P] Build workflow validation test in `tests/TenSecondTom.IntegrationTests/Workflows/BuildWorkflowTests.cs`
+- [x] T021 [P] Build workflow validation test in `tests/TenSecondTom.IntegrationTests/Workflows/BuildWorkflowTests.cs`
 
 **Test Scenarios**:
 - Parse build workflow YAML structure
@@ -181,46 +181,46 @@
 
 ### Build Workflow (Main Branch Automation)
 
-- [ ] T022 Create `.github/workflows/build.yml` skeleton with metadata and triggers
-- [ ] T023 Implement Test job in `.github/workflows/build.yml`
+- [x] T022 Create `.github/workflows/build.yml` skeleton with metadata and triggers
+- [x] T023 Implement Test job in `.github/workflows/build.yml`
   - Re-run all tests on main branch
   - Verify main branch integrity
   - Fail if any tests fail
 
-- [ ] T024 Implement macOS x64 build job in `.github/workflows/build.yml`
+- [x] T024 Implement macOS x64 build job in `.github/workflows/build.yml`
   - Checkout code
   - Setup .NET 9 SDK
   - Publish self-contained executable for osx-x64
   - Enable single-file and trimming
   - Verify output size <50MB
 
-- [ ] T025 Implement macOS ARM64 build job in `.github/workflows/build.yml`
+- [x] T025 Implement macOS ARM64 build job in `.github/workflows/build.yml`
   - Checkout code
   - Setup .NET 9 SDK
   - Publish self-contained executable for osx-arm64
   - Enable single-file and trimming
   - Verify output size <50MB
 
-- [ ] T026 Implement Windows x64 build job in `.github/workflows/build.yml`
+- [x] T026 Implement Windows x64 build job in `.github/workflows/build.yml`
   - Checkout code
   - Setup .NET 9 SDK
   - Publish self-contained executable for win-x64
   - Enable single-file and trimming
   - Verify output size <50MB
 
-- [ ] T027 Implement smoke test verification for macOS builds in `.github/workflows/build.yml`
+- [x] T027 Implement smoke test verification for macOS builds in `.github/workflows/build.yml`
   - Download macOS x64 artifact
   - Download macOS ARM64 artifact
   - Set executable permissions
   - Run `--version` command
   - Verify exit code 0 and output
 
-- [ ] T028 Implement smoke test verification for Windows build in `.github/workflows/build.yml`
+- [x] T028 Implement smoke test verification for Windows build in `.github/workflows/build.yml`
   - Download Windows x64 artifact
   - Run `--version` command
   - Verify exit code 0 and output
 
-- [ ] T029 Implement artifact upload with metadata in `.github/workflows/build.yml`
+- [x] T029 Implement artifact upload with metadata in `.github/workflows/build.yml`
   - Calculate SHA256 checksums for each binary
   - Create metadata JSON (version, commit, timestamp, size)
   - Upload artifacts with descriptive names
@@ -230,16 +230,16 @@
 
 ## Phase 3.8: Build Workflow Integration
 
-- [ ] T030 Configure build concurrency in `.github/workflows/build.yml`
+- [x] T030 Configure build concurrency in `.github/workflows/build.yml`
   - Cancel in-progress builds for same commit
   - Use `github.sha` as concurrency key
 
-- [ ] T031 Add caching strategy for build dependencies in `.github/workflows/build.yml`
+- [x] T031 Add caching strategy for build dependencies in `.github/workflows/build.yml`
   - Cache NuGet packages across build jobs
   - Use lockfile hash as cache key
   - Share cache between platform builds
 
-- [ ] T032 Add size verification step in each build job in `.github/workflows/build.yml`
+- [x] T032 Add size verification step in each build job in `.github/workflows/build.yml`
   - Check file size before upload
   - Fail job if size exceeds 50MB
   - Provide size in error message with trimming suggestions
