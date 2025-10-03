@@ -2,6 +2,7 @@ using Spectre.Console;
 using TenSecondTom.Features.Search.Handlers;
 using TenSecondTom.Features.Search.Queries;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Shared.OutputFormatters;
 
 namespace TenSecondTom.Infrastructure.Cli;
 
@@ -21,6 +22,7 @@ public static class SearchCommandHandler
     /// <param name="query">The search query text.</param>
     /// <param name="fromDate">Optional start date filter.</param>
     /// <param name="toDate">Optional end date filter.</param>
+    /// <param name="jsonOutput">Whether to output results in JSON format.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     public static async Task ExecuteAsync(
         SearchMemoriesQueryHandler handler,
@@ -28,6 +30,7 @@ public static class SearchCommandHandler
         string query,
         DateTime? fromDate = null,
         DateTime? toDate = null,
+        bool jsonOutput = false,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(handler);

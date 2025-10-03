@@ -24,15 +24,24 @@ public static class CommandRegistry
     public static RootCommand BuildRootCommand(IServiceProvider serviceProvider)
     {
         var rootCommand = new RootCommand("Ten Second Tom - Personal Memory Assistant");
-        rootCommand.Subcommands.Add(BuildTodayCommand(serviceProvider));
-        rootCommand.Subcommands.Add(BuildThisWeekCommand(serviceProvider));
-        rootCommand.Subcommands.Add(BuildSearchCommand(serviceProvider));
-        rootCommand.Subcommands.Add(BuildLoginCommand(serviceProvider));
-        rootCommand.Subcommands.Add(BuildLogoutCommand(serviceProvider));
+        
+        // Add global --output-json option
+        var jsonOutputOption = new Option<bool>("--output-json")
+        {
+            Description = "Output results in JSON format for programmatic consumption"
+        };
+        
+        rootCommand.Options.Add(jsonOutputOption);
+        
+        rootCommand.Subcommands.Add(BuildTodayCommand(serviceProvider, jsonOutputOption));
+        rootCommand.Subcommands.Add(BuildThisWeekCommand(serviceProvider, jsonOutputOption));
+        rootCommand.Subcommands.Add(BuildSearchCommand(serviceProvider, jsonOutputOption));
+        rootCommand.Subcommands.Add(BuildLoginCommand(serviceProvider, jsonOutputOption));
+        rootCommand.Subcommands.Add(BuildLogoutCommand(serviceProvider, jsonOutputOption));
         return rootCommand;
     }
 
-    private static Command BuildTodayCommand(IServiceProvider serviceProvider)
+    private static Command BuildTodayCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
     {
         var todayCommand = new Command("today", "Capture today's reflection with 3-5 prompts");
 
@@ -47,16 +56,17 @@ public static class CommandRegistry
         // Set action
         todayCommand.SetAction(async (parseResult) =>
         {
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
             string? provider = parseResult.GetValue(providerOption);
             var handler = serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
             var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
-            await TodayCommandHandler.ExecuteAsync(handler, authService, provider).ConfigureAwait(false);
+            await TodayCommandHandler.ExecuteAsync(handler, authService, provider, jsonOutput).ConfigureAwait(false);
         });
 
         return todayCommand;
     }
 
-    private static Command BuildThisWeekCommand(IServiceProvider serviceProvider)
+    private static Command BuildThisWeekCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
     {
         var thisWeekCommand = new Command("thisweek", "Generate a weekly review from recent daily entries");
 
@@ -84,19 +94,20 @@ public static class CommandRegistry
         // Set action
         thisWeekCommand.SetAction(async (parseResult) =>
         {
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
             DateTimeOffset? fromDate = parseResult.GetValue(fromDateOption);
             DateTimeOffset? toDate = parseResult.GetValue(toDateOption);
             string? provider = parseResult.GetValue(providerOption);
 
             var handler = serviceProvider.GetRequiredService<CreateWeeklyReviewHandler>();
             var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
-            await ThisWeekCommandHandler.ExecuteAsync(handler, authService, fromDate, toDate, provider).ConfigureAwait(false);
+            await ThisWeekCommandHandler.ExecuteAsync(handler, authService, fromDate, toDate, provider, jsonOutput).ConfigureAwait(false);
         });
 
         return thisWeekCommand;
     }
 
-    private static Command BuildSearchCommand(IServiceProvider serviceProvider)
+    private static Command BuildSearchCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
     {
         var searchCommand = new Command("search", "Search memory entries by text query");
 
@@ -124,41 +135,44 @@ public static class CommandRegistry
         // Set action
         searchCommand.SetAction(async (parseResult) =>
         {
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
             string query = parseResult.GetValue(queryArgument) ?? string.Empty;
             DateTime? fromDate = parseResult.GetValue(fromDateOption);
             DateTime? toDate = parseResult.GetValue(toDateOption);
 
             var handler = serviceProvider.GetRequiredService<SearchMemoriesQueryHandler>();
             var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
-            await SearchCommandHandler.ExecuteAsync(handler, authService, query, fromDate, toDate).ConfigureAwait(false);
+            await SearchCommandHandler.ExecuteAsync(handler, authService, query, fromDate, toDate, jsonOutput).ConfigureAwait(false);
         });
 
         return searchCommand;
     }
 
-    private static Command BuildLoginCommand(IServiceProvider serviceProvider)
+    private static Command BuildLoginCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
     {
         var loginCommand = new Command("login", "Authenticate with SSH key and create a session");
 
         // Set action
         loginCommand.SetAction(async (parseResult) =>
         {
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
             var handler = serviceProvider.GetRequiredService<AuthLoginHandler>();
-            await LoginCommandHandler.ExecuteAsync(handler).ConfigureAwait(false);
+            await LoginCommandHandler.ExecuteAsync(handler, jsonOutput).ConfigureAwait(false);
         });
 
         return loginCommand;
     }
 
-    private static Command BuildLogoutCommand(IServiceProvider serviceProvider)
+    private static Command BuildLogoutCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
     {
         var logoutCommand = new Command("logout", "Log out and invalidate the current session");
 
         // Set action
         logoutCommand.SetAction(async (parseResult) =>
         {
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
             var handler = serviceProvider.GetRequiredService<AuthLogoutHandler>();
-            await LogoutCommandHandler.ExecuteAsync(handler).ConfigureAwait(false);
+            await LogoutCommandHandler.ExecuteAsync(handler, jsonOutput).ConfigureAwait(false);
         });
 
         return logoutCommand;

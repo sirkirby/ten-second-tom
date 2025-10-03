@@ -3,6 +3,7 @@ using TenSecondTom.Features.ThisWeek.Commands;
 using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.OutputFormatters;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Infrastructure.Cli;
@@ -22,6 +23,7 @@ public static class ThisWeekCommandHandler
     /// <param name="fromDate">Optional start date for custom range.</param>
     /// <param name="toDate">Optional end date for custom range.</param>
     /// <param name="providerOverride">Optional LLM provider override.</param>
+    /// <param name="jsonOutput">Whether to output results in JSON format.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2007:Consider calling ConfigureAwait on the awaited task", Justification = "Console application, no synchronization context")]
     public static async Task ExecuteAsync(
@@ -29,7 +31,8 @@ public static class ThisWeekCommandHandler
         IAuthenticationService authService,
         DateTimeOffset? fromDate,
         DateTimeOffset? toDate,
-        string? providerOverride)
+        string? providerOverride,
+        bool jsonOutput = false)
     {
         ArgumentNullException.ThrowIfNull(handler);
         ArgumentNullException.ThrowIfNull(authService);

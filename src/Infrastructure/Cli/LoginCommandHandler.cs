@@ -1,5 +1,6 @@
 using Spectre.Console;
 using TenSecondTom.Features.Auth.Commands;
+using TenSecondTom.Shared.OutputFormatters;
 using AuthHandler = TenSecondTom.Features.Auth.Handlers.LoginCommandHandler;
 
 namespace TenSecondTom.Infrastructure.Cli;
@@ -16,20 +17,36 @@ public static class LoginCommandHandler
     /// Executes the login command and displays results to the user.
     /// </summary>
     /// <param name="handler">The login command handler.</param>
+    /// <param name="jsonOutput">Whether to output results in JSON format.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
-    public static async Task ExecuteAsync(AuthHandler handler)
+    public static async Task ExecuteAsync(AuthHandler handler, bool jsonOutput = false)
     {
         ArgumentNullException.ThrowIfNull(handler);
 
         try
         {
-            AnsiConsole.MarkupLine("[blue]→[/] Authenticating with SSH key...");
-            AnsiConsole.WriteLine();
+            if (!jsonOutput)
+            {
+                AnsiConsole.MarkupLine("[blue]→[/] Authenticating with SSH key...");
+                AnsiConsole.WriteLine();
+            }
 
             var command = new LoginCommand();
             var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
 
-            if (result.IsSuccess)
+            if (jsonOutput)
+            {
+                // JSON output mode
+                object? jsonData = result.IsSuccess
+                    ? new { sessionId = result.Value.SessionId, createdAt = result.Value.CreatedAt, keyHash = result.Value.SshKeyHash }
+                    : null;
+                    
+                string json = result.IsSuccess
+                    ? JsonOutputFormatter.FormatSuccess("login", jsonData, DateTimeOffset.UtcNow)
+                    : JsonOutputFormatter.FormatFailure("login", result.Error, DateTimeOffset.UtcNow);
+                Console.WriteLine(json);
+            }
+            else if (result.IsSuccess)
             {
                 var session = result.Value;
                 AnsiConsole.MarkupLine("[green]✓[/] Successfully authenticated!");
@@ -56,8 +73,16 @@ public static class LoginCommandHandler
         }
         catch (Exception ex)
         {
-            var errorMessage = $"An error occurred during authentication: {ex.Message}";
-            AuthenticationErrorFormatter.DisplayAuthenticationError(errorMessage);
+            if (jsonOutput)
+            {
+                string json = JsonOutputFormatter.FormatFailure("login", $"Authentication error: {ex.Message}", DateTimeOffset.UtcNow);
+                Console.WriteLine(json);
+            }
+            else
+            {
+                var errorMessage = $"An error occurred during authentication: {ex.Message}";
+                AuthenticationErrorFormatter.DisplayAuthenticationError(errorMessage);
+            }
         }
     }
 }

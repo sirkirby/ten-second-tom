@@ -3,6 +3,7 @@ using TenSecondTom.Features.Today.Commands;
 using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.OutputFormatters;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Infrastructure.Cli;
@@ -27,16 +28,17 @@ public static class TodayCommandHandler
     /// <param name="handler">The command handler.</param>
     /// <param name="authService">The authentication service.</param>
     /// <param name="providerOverride">Optional LLM provider override.</param>
+    /// <param name="jsonOutput">Whether to output results in JSON format.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2007:Consider calling ConfigureAwait on the awaited task", Justification = "Console application, no synchronization context")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA1849:Call async methods when in an async method", Justification = "Spectre.Console Ask/Confirm are synchronous by design")]
-    public static async Task ExecuteAsync(CreateDailyEntryHandler handler, IAuthenticationService authService, string? providerOverride)
+    public static async Task ExecuteAsync(CreateDailyEntryHandler handler, IAuthenticationService authService, string? providerOverride, bool jsonOutput = false)
     {
         ArgumentNullException.ThrowIfNull(handler);
         ArgumentNullException.ThrowIfNull(authService);
 
-        // Show warning if using mock authentication
-        if (authService is MockAuthenticationService)
+        // Show warning if using mock authentication (only in non-JSON mode)
+        if (!jsonOutput && authService is MockAuthenticationService)
         {
             AnsiConsole.MarkupLine("[yellow]⚠ Development Mode: Authentication bypassed[/]");
             AnsiConsole.WriteLine();
@@ -51,7 +53,15 @@ public static class TodayCommandHandler
                 Result<UserSession> authResult = await authService.AuthenticateAsync(CancellationToken.None).ConfigureAwait(false);
                 if (!authResult.IsSuccess)
                 {
-                    AuthenticationErrorFormatter.DisplayAuthenticationError(authResult.Error ?? "Unknown authentication error");
+                    if (jsonOutput)
+                    {
+                        string json = JsonOutputFormatter.FormatFailure("today", authResult.Error ?? "Authentication failed", DateTimeOffset.UtcNow);
+                        Console.WriteLine(json);
+                    }
+                    else
+                    {
+                        AuthenticationErrorFormatter.DisplayAuthenticationError(authResult.Error ?? "Unknown authentication error");
+                    }
                     return;
                 }
             }
@@ -60,14 +70,26 @@ public static class TodayCommandHandler
         catch (Exception ex)
 #pragma warning restore CA1031
         {
-            AuthenticationErrorFormatter.DisplayAuthenticationError(ex.Message);
+            if (jsonOutput)
+            {
+                string json = JsonOutputFormatter.FormatFailure("today", $"Authentication error: {ex.Message}", DateTimeOffset.UtcNow);
+                Console.WriteLine(json);
+            }
+            else
+            {
+                AuthenticationErrorFormatter.DisplayAuthenticationError(ex.Message);
+            }
             return;
         }
 
-        AnsiConsole.MarkupLine("[bold cyan]📝 Today's Reflection[/]");
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[dim]Answer 3-5 questions about your day. Press Ctrl+C to cancel.[/]");
-        AnsiConsole.WriteLine();
+        // Only show UI elements if not in JSON mode
+        if (!jsonOutput)
+        {
+            AnsiConsole.MarkupLine("[bold cyan]📝 Today's Reflection[/]");
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[dim]Answer 3-5 questions about your day. Press Ctrl+C to cancel.[/]");
+            AnsiConsole.WriteLine();
+        }
 
         var responses = new Dictionary<string, string>();
 
@@ -119,27 +141,68 @@ public static class TodayCommandHandler
             LlmProviderOverride = providerOverride
         };
 
-        // Execute command with progress indicator
+        // Execute command with progress indicator (only show progress in non-JSON mode)
         DailyEntry? entry = null;
-        await AnsiConsole.Status()
-            .Spinner(Spinner.Known.Dots)
-            .SpinnerStyle(Style.Parse("cyan"))
-            .StartAsync("[cyan]Processing your reflection...[/]", async ctx =>
+        Result<DailyEntry> commandResult;
+        
+        if (jsonOutput)
+        {
+            commandResult = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
+            if (commandResult.IsSuccess)
             {
-                Result<DailyEntry> result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
+                entry = commandResult.Value;
+            }
+        }
+        else
+        {
+            commandResult = Result<DailyEntry>.Failure("Not executed");
+            await AnsiConsole.Status()
+                .Spinner(Spinner.Known.Dots)
+                .SpinnerStyle(Style.Parse("cyan"))
+                .StartAsync("[cyan]Processing your reflection...[/]", async ctx =>
+                {
+                    commandResult = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
 
-                if (result.IsSuccess)
-                {
-                    entry = result.Value;
-                }
-                else
-                {
-                    AnsiConsole.MarkupLine($"[red]Error:[/] {result.Error}");
-                }
-            }).ConfigureAwait(false);
+                    if (commandResult.IsSuccess)
+                    {
+                        entry = commandResult.Value;
+                    }
+                    else
+                    {
+                        AnsiConsole.MarkupLine($"[red]Error:[/] {commandResult.Error}");
+                    }
+                }).ConfigureAwait(false);
+        }
 
         // Display results
-        if (entry != null)
+        if (jsonOutput)
+        {
+            // JSON output mode
+            object? jsonData = null;
+            if (commandResult.IsSuccess && entry != null)
+            {
+                jsonData = new
+                {
+                    entryId = entry.EntryId,
+                    timestamp = entry.Timestamp,
+                    provider = entry.Metadata.LlmProvider,
+                    summary = new
+                    {
+                        keyEvents = entry.Summary.KeyEvents,
+                        themes = entry.Summary.Themes,
+                        todoItems = entry.Summary.TodoItems.Select(t => new { description = t.Description, isCompleted = t.IsCompleted }),
+                        importantPeople = entry.Summary.ImportantPeople,
+                        notableTasks = entry.Summary.NotableTasks
+                    }
+                };
+            }
+
+            string json = commandResult.IsSuccess
+                ? JsonOutputFormatter.FormatSuccess("today", jsonData, DateTimeOffset.UtcNow)
+                : JsonOutputFormatter.FormatFailure("today", commandResult.Error, DateTimeOffset.UtcNow);
+            Console.WriteLine(json);
+        }
+        else if (entry != null)
         {
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine("[bold green]✓ Daily entry created successfully![/]");
