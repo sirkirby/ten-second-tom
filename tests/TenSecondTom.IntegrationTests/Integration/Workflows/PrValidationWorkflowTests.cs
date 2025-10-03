@@ -239,25 +239,43 @@ public sealed class PrValidationWorkflowTests
         var steps = coverageJob?["steps"] as List<object>;
 
         // Act
-        var hasCoverageCheck = steps?.Any(step =>
+        var hasRegressionCheck = steps?.Any(step =>
         {
             var stepDict = step as Dictionary<object, object>;
             if (stepDict?.TryGetValue("run", out var runObj) ?? false)
             {
                 var runCommand = runObj?.ToString() ?? string.Empty;
-                // Check for coverage threshold enforcement (80% or 0.8 or similar)
-                return runCommand.Contains("80", StringComparison.OrdinalIgnoreCase) || 
-                       runCommand.Contains("0.8", StringComparison.OrdinalIgnoreCase) || 
-                       (runCommand.Contains("coverage", StringComparison.OrdinalIgnoreCase) && 
-                        runCommand.Contains("threshold", StringComparison.OrdinalIgnoreCase));
+                // Check for regression prevention logic (MAX_COVERAGE_DECREASE or coverage comparison)
+                return (runCommand.Contains("MAX_COVERAGE_DECREASE", StringComparison.OrdinalIgnoreCase) ||
+                        runCommand.Contains("MAX_DECREASE", StringComparison.OrdinalIgnoreCase)) ||
+                       (runCommand.Contains("BASELINE_COVERAGE", StringComparison.OrdinalIgnoreCase) &&
+                        runCommand.Contains("CURRENT_COVERAGE", StringComparison.OrdinalIgnoreCase) &&
+                        runCommand.Contains("DIFF", StringComparison.OrdinalIgnoreCase));
             }
             return false;
         }) ?? false;
 
         // Assert
         steps.Should().NotBeNullOrEmpty("coverage job should have steps");
-        hasCoverageCheck.Should().BeTrue(
-            "coverage job should enforce 80% minimum coverage threshold");
+        hasRegressionCheck.Should().BeTrue(
+            "coverage job should prevent coverage regression by comparing baseline to current coverage");
+    }
+
+    [Fact]
+    public void Workflow_Should_HaveMaxCoverageDecreaseEnvironmentVariable()
+    {
+        // Arrange
+        var workflow = LoadWorkflow();
+
+        // Act
+        var hasEnv = workflow.TryGetValue("env", out var envObj);
+        var env = envObj as Dictionary<object, object>;
+        var hasMaxCoverageDecrease = env?.ContainsKey("MAX_COVERAGE_DECREASE") ?? false;
+
+        // Assert
+        hasEnv.Should().BeTrue("workflow should have environment variables defined");
+        hasMaxCoverageDecrease.Should().BeTrue(
+            "workflow should define MAX_COVERAGE_DECREASE to control regression tolerance");
     }
 
     [Fact]
