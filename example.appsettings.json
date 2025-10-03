@@ -1,0 +1,56 @@
+{
+  "TenSecondTom": {
+    "LlmProvider": "OpenAI",
+    "OpenAI": {
+      "ApiKey": "",
+      "Model": "gpt-4",
+      "MaxTokens": 2000,
+      "Temperature": 0.7
+    },
+    "Anthropic": {
+      "ApiKey": "",
+      "Model": "claude-3-5-sonnet-20241022",
+      "MaxTokens": 2000
+    },
+    "MemoryDirectory": "./.memory",
+    "DataRetention": {
+      "DefaultPolicy": "OneYear",
+      "AutoPurgeEnabled": false
+    },
+    "Logging": {
+      "LogLevel": {
+        "Default": "Information",
+        "Microsoft": "Warning",
+        "System": "Warning"
+      }
+    },
+    "Serilog": {
+      "Using": ["Serilog.Sinks.Console", "Serilog.Sinks.File"],
+      "MinimumLevel": {
+        "Default": "Information",
+        "Override": {
+          "Microsoft": "Warning",
+          "System": "Warning"
+        }
+      },
+      "WriteTo": [
+        {
+          "Name": "Console",
+          "Args": {
+            "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}"
+          }
+        },
+        {
+          "Name": "File",
+          "Args": {
+            "path": "logs/ten-second-tom-.log",
+            "rollingInterval": "Day",
+            "retainedFileCountLimit": 7,
+            "outputTemplate": "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj}{NewLine}{Exception}"
+          }
+        }
+      ],
+      "Enrich": ["FromLogContext", "WithMachineName", "WithThreadId"]
+    }
+  }
+}

@@ -27,6 +27,7 @@ public static class LoginCommandHandler
         {
             if (!jsonOutput)
             {
+                Logo.Display(); // Display logo on authentication screen
                 AnsiConsole.MarkupLine("[blue]→[/] Authenticating with SSH key...");
                 AnsiConsole.WriteLine();
             }

@@ -33,6 +33,35 @@ public static class CommandRegistry
         
         rootCommand.Options.Add(jsonOutputOption);
         
+        // Add --version option
+        var versionOption = new Option<bool>("--version")
+        {
+            Description = "Display version information"
+        };
+        
+        rootCommand.Options.Add(versionOption);
+        
+        // Set handler for version display
+        rootCommand.SetAction((parseResult) =>
+        {
+            bool showVersion = parseResult.GetValue(versionOption);
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
+            
+            if (showVersion)
+            {
+                Logo.DisplayWithVersion(jsonOutput);
+                return 0;
+            }
+            
+            // If no command specified, show logo and help
+            if (parseResult.Tokens.Count == 0 || !parseResult.Tokens.Any(t => t.Type == System.CommandLine.Parsing.TokenType.Command))
+            {
+                Logo.Display(jsonOutput);
+            }
+            
+            return 0;
+        });
+        
         rootCommand.Subcommands.Add(BuildTodayCommand(serviceProvider, jsonOutputOption));
         rootCommand.Subcommands.Add(BuildThisWeekCommand(serviceProvider, jsonOutputOption));
         rootCommand.Subcommands.Add(BuildSearchCommand(serviceProvider, jsonOutputOption));

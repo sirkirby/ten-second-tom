@@ -1,5 +1,10 @@
 // This file is used to configure code analysis
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
+
+// Make internal types visible to test projects
+[assembly: InternalsVisibleTo("TenSecondTom.Tests")]
+[assembly: InternalsVisibleTo("TenSecondTom.IntegrationTests")]
 
 // Namespace naming - "Shared" is intentional and commonly used in .NET projects
 [assembly: SuppressMessage("Naming", "CA1716:Identifiers should not match keywords", Scope = "namespace", Target = "~N:TenSecondTom.Shared", Justification = "Shared is a standard namespace pattern in .NET")]
