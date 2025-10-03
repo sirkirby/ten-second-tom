@@ -6,6 +6,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UserSecretsId>ten-second-tom-secrets</UserSecretsId>
+    
+    <!-- Trimming configuration for self-contained publishing -->
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>link</TrimMode>
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+    <!-- Suppress specific trimming warnings -->
+    <NoWarn>$(NoWarn);IL2026;IL2067;IL2070;IL2075;IL2077;IL3050</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
