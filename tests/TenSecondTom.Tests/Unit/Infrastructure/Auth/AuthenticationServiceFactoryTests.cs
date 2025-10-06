@@ -27,7 +27,10 @@ public sealed class AuthenticationServiceFactoryTests
     public void Create_WithSshAgentAvailableAndPublicKeyConfigured_ReturnsSshAgentService()
     {
         // Arrange
-        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", "/tmp/ssh-agent.sock");
+        // Create a temporary socket file that File.Exists() can verify
+        var socketPath = Path.Combine(Path.GetTempPath(), $"test-ssh-agent-{Guid.NewGuid()}.sock");
+        File.WriteAllText(socketPath, ""); // Create empty file to simulate socket
+        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", socketPath);
         
         // Create properly formatted Ed25519 public key in SSH wire format
         var keyType = "ssh-ed25519"u8.ToArray();
@@ -60,7 +63,8 @@ public sealed class AuthenticationServiceFactoryTests
         
         var configData = new Dictionary<string, string?>
         {
-            ["TenSecondTom:Auth:PublicKey"] = publicKeyBase64
+            ["TenSecondTom:Auth:PublicKey"] = publicKeyBase64,
+            ["TenSecondTom:Auth:SshAgentProvider"] = "System" // Use System provider to check SSH_AUTH_SOCK
         };
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(configData)
@@ -78,13 +82,20 @@ public sealed class AuthenticationServiceFactoryTests
         
         // Cleanup
         Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", null);
+        if (File.Exists(socketPath))
+        {
+            File.Delete(socketPath);
+        }
     }
 
     [Fact]
     public void Create_WithSshAgentAvailableAndPublicKeyPathConfigured_ReturnsSshAgentService()
     {
         // Arrange
-        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", "/tmp/ssh-agent.sock");
+        // Create a temporary socket file that File.Exists() can verify
+        var socketPath = Path.Combine(Path.GetTempPath(), $"test-ssh-agent-{Guid.NewGuid()}.sock");
+        File.WriteAllText(socketPath, ""); // Create empty file to simulate socket
+        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", socketPath);
         
         // Create a temporary SSH public key file
         var tempFile = Path.GetTempFileName();
@@ -124,7 +135,8 @@ public sealed class AuthenticationServiceFactoryTests
             
             var configData = new Dictionary<string, string?>
             {
-                ["TenSecondTom:Auth:PublicKeyPath"] = tempFile
+                ["TenSecondTom:Auth:PublicKeyPath"] = tempFile,
+                ["TenSecondTom:Auth:SshAgentProvider"] = "System" // Use System provider to check SSH_AUTH_SOCK
             };
             var configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(configData)
@@ -146,6 +158,10 @@ public sealed class AuthenticationServiceFactoryTests
             if (File.Exists(tempFile))
             {
                 File.Delete(tempFile);
+            }
+            if (File.Exists(socketPath))
+            {
+                File.Delete(socketPath);
             }
             Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", null);
         }
@@ -297,7 +313,10 @@ public sealed class AuthenticationServiceFactoryTests
     public void Create_WithFullSshPublicKeyLine_ReturnsSshAgentService()
     {
         // Arrange
-        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", "/tmp/ssh-agent.sock");
+        // Create a temporary socket file that File.Exists() can verify
+        var socketPath = Path.Combine(Path.GetTempPath(), $"test-ssh-agent-{Guid.NewGuid()}.sock");
+        File.WriteAllText(socketPath, ""); // Create empty file to simulate socket
+        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", socketPath);
         
         // Create properly formatted Ed25519 public key in SSH wire format
         var keyType = "ssh-ed25519"u8.ToArray();
@@ -333,7 +352,8 @@ public sealed class AuthenticationServiceFactoryTests
         
         var configData = new Dictionary<string, string?>
         {
-            ["TenSecondTom:Auth:PublicKey"] = fullKeyLine
+            ["TenSecondTom:Auth:PublicKey"] = fullKeyLine,
+            ["TenSecondTom:Auth:SshAgentProvider"] = "System" // Use System provider to check SSH_AUTH_SOCK
         };
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(configData)
@@ -351,6 +371,10 @@ public sealed class AuthenticationServiceFactoryTests
         
         // Cleanup
         Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", null);
+        if (File.Exists(socketPath))
+        {
+            File.Delete(socketPath);
+        }
     }
 
     [Fact]
