@@ -4,7 +4,7 @@
 # It runs tests to verify main branch integrity, then builds self-contained executables
 # for macOS (x64, ARM64) and Windows (x64), and performs smoke tests on each.
 #
-# Triggers: Push to 'main' branch
+# Triggers: Push to 'main' branch, Manual dispatch
 # Performance Target: ≤15 minutes total
 # Artifacts: Self-contained executables with metadata and checksums
 
@@ -14,6 +14,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:  # Allow manual triggering for debugging
+    inputs:
+      skip_tests:
+        description: 'Skip test job (for faster workflow testing)'
+        required: false
+        type: boolean
+        default: false
 
 # Cancel in-progress builds for the same commit to save resources
 concurrency:
@@ -32,6 +38,7 @@ jobs:
   test:
     name: Test on Main
     runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.skip_tests != 'true' }}
     
     steps:
       - name: Checkout code
@@ -75,6 +82,7 @@ jobs:
     name: Build macOS x64
     runs-on: macos-latest
     needs: test
+    if: ${{ always() && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
     
     steps:
       - name: Checkout code
@@ -142,6 +150,7 @@ jobs:
     name: Build macOS ARM64
     runs-on: macos-latest
     needs: test
+    if: ${{ always() && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
     
     steps:
       - name: Checkout code
@@ -209,6 +218,7 @@ jobs:
     name: Build Windows x64
     runs-on: windows-latest
     needs: test
+    if: ${{ always() && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
     
     steps:
       - name: Checkout code
@@ -287,12 +297,12 @@ jobs:
           path: ./artifacts
       
       - name: Set executable permissions
-        run: chmod +x ./artifacts/TenSecondTom
+        run: chmod +x ./artifacts/tom
       
       - name: Run smoke test (--version)
         run: |
           echo "🧪 Running smoke test: --version"
-          ./artifacts/TenSecondTom --version
+          ./artifacts/tom --version
           
           if [ $? -eq 0 ]; then
             echo "✅ Smoke test passed: executable runs successfully"
@@ -317,12 +327,12 @@ jobs:
           path: ./artifacts
       
       - name: Set executable permissions
-        run: chmod +x ./artifacts/TenSecondTom
+        run: chmod +x ./artifacts/tom
       
       - name: Run smoke test (--version)
         run: |
           echo "🧪 Running smoke test: --version"
-          ./artifacts/TenSecondTom --version
+          ./artifacts/tom --version
           
           if [ $? -eq 0 ]; then
             echo "✅ Smoke test passed: executable runs successfully"

@@ -9,6 +9,22 @@
 # Triggers: Push of semantic version tag (e.g., v1.2.3)
 # Performance Target: ≤10 minutes total (excluding manual approval)
 # Artifacts: Reuses build artifacts, creates release packages
+#
+# Manual Testing on PR:
+#   1. Run Build workflow manually on your PR branch first
+#   2. Note the commit SHA from the build run
+#   3. Use Actions tab → Release → Run workflow
+#      - Select your PR branch
+#      - Enter test version (e.g., v0.0.1-test)
+#      - Check 'Skip Homebrew' to avoid tap updates
+#      - Check 'Dry run' to skip actual release creation
+#   4. Review logs to verify workflow logic
+#
+# Production Release:
+#   1. Merge PR to main → triggers build.yml automatically
+#   2. Wait for build to complete successfully
+#   3. Tag the merge commit: git tag v1.0.0 && git push origin v1.0.0
+#   4. Release workflow triggers automatically
 
 name: Release
 
@@ -19,9 +35,19 @@ on:
   workflow_dispatch:  # Allow manual triggering for testing
     inputs:
       tag:
-        description: 'Version tag to release (e.g., v1.2.3)'
+        description: 'Version tag to release (e.g., v0.0.1-test for testing)'
         required: true
         type: string
+      skip_homebrew:
+        description: 'Skip Homebrew publication (for PR testing)'
+        required: false
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Dry run - skip release creation (logs only)'
+        required: false
+        type: boolean
+        default: false
 
 # Prevent concurrent releases to avoid conflicts
 # Do not cancel in-progress releases as they involve publishing to external services
@@ -269,6 +295,15 @@ jobs:
         run: |
           VERSION="v${{ needs.validate-version.outputs.version }}"
           
+          # Check if this is a dry run
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            echo "🧪 DRY RUN - Would create release $VERSION"
+            echo "📝 Release notes:"
+            cat release-notes.md
+            echo "⏭️  Skipping actual release creation"
+            exit 0
+          fi
+          
           # Create release with notes
           gh release create "$VERSION" \
             --title "Release $VERSION" \
@@ -277,6 +312,12 @@ jobs:
             --latest
           
           echo "✅ GitHub release created: $VERSION"
+          
+          # Check if this is a dry run
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            echo "🧪 DRY RUN - Skipping artifact uploads"
+            exit 0
+          fi
           
           # Upload all artifacts
           echo "📤 Uploading artifacts..."
@@ -303,10 +344,12 @@ jobs:
   # Performance Target: ≤7 minutes
   # Requires: HOMEBREW_TAP_TOKEN secret configured in 'production' environment
   # Note: VS Code may show "'production' is not valid" - this is a false positive
+  # Can be skipped with workflow_dispatch skip_homebrew input for PR testing
   publish-homebrew:
     name: Publish to Homebrew
     runs-on: macos-latest  # Changed to macOS for bottle creation
     needs: [validate-version, create-github-release]
+    if: ${{ github.event.inputs.skip_homebrew != 'true' && github.event.inputs.dry_run != 'true' }}
     environment:
       name: production  # Configured in GitHub repository settings
     permissions:
