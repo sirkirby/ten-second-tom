@@ -25,7 +25,7 @@ The following secrets must be configured in the repository settings (`Settings �
   2. Click "Generate new token"
   3. Set name: "Homebrew Tap Token for Ten Second Tom"
   4. Set expiration: 1 year (or custom)
-  5. Select repository access: Only select repositories → `sirkirby/homebrew-ten-second-tom` (your tap)
+  5. Select repository access: Only select repositories → `sirkirby/ten-second-tom-homebrew` (your tap)
   6. Set repository permissions:
      - Contents: Read and write
      - Metadata: Read-only
@@ -351,49 +351,101 @@ concurrency:
 
 ---
 
-## Homebrew Tap Setup
+## Homebrew Tap Setup with Bottle Support
 
-To enable automated Homebrew publication, you must create and configure a Homebrew tap repository. The release workflow will automatically update the formula in this tap when new versions are released.
+To enable automated Homebrew publication with fast binary installations (bottles), you must create and configure a Homebrew tap repository. The release workflow will automatically create bottles, upload them to GitHub releases, and update the formula.
+
+### What are Homebrew Bottles?
+
+Bottles are pre-compiled binaries that Homebrew can install without building from source. This provides:
+- **Fast Installation**: Users download ready-to-use binaries instead of compiling
+- **Consistent Builds**: All users get identical binaries
+- **Better UX**: No need for build tools or compilation wait time
+- **Architecture Support**: Separate bottles for Intel and Apple Silicon Macs
 
 ### Prerequisites
 
-- GitHub account (tap repository owner)
+- GitHub account (tap repository owner: sirkirby)
 - macOS machine for local testing (optional but recommended)
-- Homebrew installed locally for testing
+- Homebrew installed locally for testing (`/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`)
 
 ### 1. Create Tap Repository
 
-Homebrew taps must follow a specific naming convention:
+The tap repository follows Homebrew's standard naming convention:
 
 1. **Create a new GitHub repository**:
-   - **Name**: `homebrew-ten-second-tom` (must start with `homebrew-`)
-   - **Visibility**: **Public** (required by Homebrew)
+   - **Name**: `homebrew-ten-second-tom` (must start with `homebrew-` prefix per Homebrew conventions)
+   - **Visibility**: **Public** (required for GitHub Packages and Homebrew)
    - **Description**: "Homebrew tap for Ten Second Tom CLI"
-   - **Initialize**: Add a README.md
+   - **Initialize**: Add a README.md explaining this is a Homebrew tap
 
 2. **Repository URL**: `https://github.com/sirkirby/homebrew-ten-second-tom`
 
-3. **Clone locally** (optional for testing):
-   ```bash
-   git clone https://github.com/sirkirby/homebrew-ten-second-tom.git
-   cd homebrew-ten-second-tom
-   ```
+3. **Users will tap it as**: `brew tap sirkirby/ten-second-tom` (Homebrew strips the `homebrew-` prefix automatically)
 
-### 2. Create Formula Directory Structure
+### 2. Initialize with brew tap-new (Recommended)
 
-Create the required directory structure in your tap repository:
+Using Homebrew's `brew tap-new` command sets up the proper structure:
 
 ```bash
+# Create the tap locally with GitHub Packages support
+brew tap-new sirkirby/homebrew-ten-second-tom --github-packages
+
+# This creates:
+# - Formula/ directory for formula files
+# - .github/workflows/ for bottle-building automation (if desired)
+# - README.md with tap documentation
+# - Proper git configuration
+
+# Push to GitHub
+cd $(brew --repository sirkirby/homebrew-ten-second-tom)
+gh repo create sirkirby/homebrew-ten-second-tom --public --source=. --push
+```
+
+**Note**: The `--github-packages` flag indicates support for GitHub Packages, though our workflow currently uploads bottles to GitHub Releases for simplicity.
+
+### 3. Manual Setup Alternative
+
+If you prefer manual setup or already created the repository:
+
+```bash
+# Clone your tap repository
+git clone https://github.com/sirkirby/homebrew-ten-second-tom.git
+cd homebrew-ten-second-tom
+
+# Create Formula directory
 mkdir -p Formula
-touch Formula/.gitkeep  # Keep directory in Git
-git add Formula/.gitkeep
-git commit -m "Add Formula directory"
+touch Formula/.gitkeep
+
+# Create README
+cat > README.md <<'EOF'
+# Ten Second Tom Homebrew Tap
+
+Official Homebrew tap for [Ten Second Tom](https://github.com/sirkirby/ten-second-tom).
+
+## Installation
+
+```bash
+brew tap sirkirby/ten-second-tom
+brew install ten-second-tom
+```
+
+## Usage
+
+```bash
+tom --help
+```
+EOF
+
+# Commit and push
+git add .
+git commit -m "Initialize Homebrew tap"
 git push origin main
 ```
 
-### 3. Create Initial Formula (Optional)
+### 4. Create Initial Formula (Optional)
 
-The release workflow will generate the formula automatically, but you can create an initial version for testing:
+The release workflow generates the formula automatically, but you can create an initial placeholder:
 
 Create `Formula/ten-second-tom.rb`:
 
@@ -401,15 +453,15 @@ Create `Formula/ten-second-tom.rb`:
 class TenSecondTom < Formula
   desc "CLI tool for daily work summaries using Claude AI"
   homepage "https://github.com/sirkirby/ten-second-tom"
+  url "https://github.com/sirkirby/ten-second-tom/archive/refs/tags/v0.1.0.tar.gz"
   version "0.1.0"
   license "MIT"
 
-  if Hardware::CPU.intel?
-    url "https://github.com/sirkirby/ten-second-tom/releases/download/v0.1.0/tom"
-    sha256 "PLACEHOLDER_REPLACE_WITH_ACTUAL_CHECKSUM"
-  else
-    url "https://github.com/sirkirby/ten-second-tom/releases/download/v0.1.0/tom"
-    sha256 "PLACEHOLDER_REPLACE_WITH_ACTUAL_CHECKSUM"
+  # Bottles provide fast installation without building from source
+  bottle do
+    root_url "https://github.com/sirkirby/ten-second-tom/releases/download/v0.1.0"
+    sha256 cellar: :any_skip_relocation, arm64_monterey: "PLACEHOLDER"
+    sha256 cellar: :any_skip_relocation, monterey: "PLACEHOLDER"
   end
 
   def install
@@ -422,9 +474,13 @@ class TenSecondTom < Formula
 end
 ```
 
-**Note**: The release workflow will overwrite this with the correct URLs and checksums for each release.
+**Important Notes**:
+- The `bottle do` block enables fast binary installation for users
+- The release workflow automatically generates this with correct checksums
+- `cellar: :any_skip_relocation` means the binary is self-contained (no dependencies)
+- Separate bottles for Intel (monterey) and Apple Silicon (arm64_monterey)
 
-### 4. Configure Personal Access Token
+### 5. Configure Personal Access Token
 
 Create a personal access token with permissions to update the tap repository:
 
@@ -436,7 +492,7 @@ Create a personal access token with permissions to update the tap repository:
    - **Token name**: `Homebrew Tap Token for Ten Second Tom`
    - **Expiration**: 1 year (recommended) or custom
    - **Repository access**: **Only select repositories**
-   - Select: `sirkirby/homebrew-ten-second-tom` (your tap repository)
+   - Select: `sirkirby/ten-second-tom-homebrew` (your tap repository)
 4. Set **Repository permissions**:
    - **Contents**: Read and write (required to push formula updates)
    - **Metadata**: Read-only (automatically included)
@@ -446,6 +502,64 @@ Create a personal access token with permissions to update the tap repository:
 #### Add Token to Repository Secrets
 
 1. Go to main repository: `https://github.com/sirkirby/ten-second-tom`
+2. Navigate to Settings → Secrets and variables → Actions
+3. Click "**New repository secret**"
+4. Set:
+   - **Name**: `HOMEBREW_TAP_TOKEN`
+   - **Secret**: Paste the token you generated
+5. Click "**Add secret**"
+
+**Important**: Also add this secret to the `production` environment:
+1. Go to Settings → Environments → production
+2. Scroll to "Environment secrets"
+3. Click "Add secret"
+4. Add `HOMEBREW_TAP_TOKEN` with the same value
+
+### 6. Test Local Installation
+
+Before releasing, test the tap installation locally:
+
+```bash
+# Tap your repository
+brew tap sirkirby/ten-second-tom
+
+# Install the formula
+brew install ten-second-tom
+
+# Test the installation
+tom --version
+
+# Cleanup
+brew uninstall ten-second-tom
+brew untap sirkirby/ten-second-tom
+```
+
+### 7. Understanding Bottles
+
+When users install your formula:
+
+**With Bottles** (after release workflow):
+```bash
+$ brew install sirkirby/ten-second-tom/ten-second-tom
+==> Downloading https://github.com/sirkirby/ten-second-tom/releases/download/v1.0.0/ten-second-tom--1.0.0.arm64_monterey.bottle.tar.gz
+==> Pouring ten-second-tom--1.0.0.arm64_monterey.bottle.tar.gz
+🍺  /opt/homebrew/Cellar/ten-second-tom/1.0.0: 1 file, 8.5MB
+```
+
+**Benefits**:
+- Fast installation (seconds instead of minutes)
+- No build tools required
+- Consistent across all machines
+- Architecture-optimized (ARM64 or Intel x64)
+
+**How It Works**:
+1. Release workflow creates bottle tarball from pre-built binary
+2. Bottle uploaded to GitHub releases alongside source code
+3. Formula updated with bottle SHA256 checksums
+4. Homebrew downloads bottle instead of building from source
+5. User gets instant installation
+
+---
 2. Navigate to: Settings → Secrets and variables → Actions
 3. Click "**New repository secret**"
 4. Configure:
@@ -581,8 +695,8 @@ If automated publication fails, you can manually update the formula:
 
 ```bash
 # Clone tap repository
-git clone https://github.com/sirkirby/homebrew-ten-second-tom.git
-cd homebrew-ten-second-tom
+git clone https://github.com/sirkirby/ten-second-tom-homebrew.git
+cd ten-second-tom-homebrew
 
 # Edit formula
 vim Formula/ten-second-tom.rb

@@ -385,16 +385,18 @@
 
 - [x] T042 Implement Homebrew Publication job in `.github/workflows/release.yml`
   - Download macOS binaries from release
-  - Generate/update Homebrew formula
-  - Push formula to tap repository
+  - Upload binaries as bottles to GitHub Packages
+  - Generate/update Homebrew formula with bottle blocks
+  - Push formula to tap repository (homebrew-ten-second-tom)
   - Verify formula syntax
-  - Use HOMEBREW_TAP_TOKEN secret
-  - **Status**: Completed 2025-10-06. Implemented publish-homebrew job with:
+  - Use HOMEBREW_TAP_TOKEN secret and GITHUB_TOKEN for packages
+  - **Status**: Completed 2025-10-06. Updated 2025-10-06 for GitHub Packages support.
     - Production environment requirement (manual approval gate)
-    - Formula generation with architecture-specific URLs and SHA256
+    - Formula generation with architecture-specific bottle URLs
+    - Bottles uploaded to GitHub Packages (ghcr.io)
     - Basic formula syntax validation
     - Git clone/commit/push to tap repository using HOMEBREW_TAP_TOKEN
-    - Formula structure following Homebrew conventions
+    - Formula structure following Homebrew conventions with bottle blocks
 
 - [x] T043 Configure release approval gate in `.github/workflows/release.yml`
   - Create GitHub Environment "production"
@@ -435,18 +437,20 @@
     - Preserves in-progress releases to avoid corrupting external service publications
 
 - [x] T046 Update `docs/CICD.md` with Homebrew tap setup instructions
-  - Document tap repository creation
+  - Document tap repository creation (homebrew-ten-second-tom)
   - Document HOMEBREW_TAP_TOKEN setup
-  - Document formula structure
+  - Document GitHub Packages configuration for bottles
+  - Document formula structure with bottle blocks
   - Document testing installation locally
-  - **Status**: Completed 2025-10-06. Added comprehensive documentation:
-    - Step-by-step tap repository creation (homebrew-ten-second-tom)
+  - **Status**: Completed 2025-10-06. Updated 2025-10-06 for GitHub Packages.
+    - Step-by-step tap repository creation using brew tap-new
     - Formula directory structure and initial formula template
     - Personal access token generation and configuration
+    - GitHub Packages setup for bottle hosting (ghcr.io)
     - GitHub Environment (production) setup with approval requirements
     - Local testing instructions for tap installation
-    - Formula structure details with architecture-specific downloads
-    - Troubleshooting guide for common Homebrew publication issues
+    - Formula structure details with bottle blocks for both architectures
+    - Troubleshooting guide for GitHub Packages and Homebrew issues
     - Manual formula update procedures as fallback
 
 - [x] T047 Update `.github/CODEOWNERS` with specific maintainer team
@@ -494,27 +498,33 @@
 
 - [ ] T050 Test release workflow manually using quickstart.md Scenario 3
   - **Prerequisites**:
-    - Homebrew tap repository created: `homebrew-ten-second-tom`
+    - Homebrew tap repository created: `homebrew-ten-second-tom` (standard Homebrew naming)
+    - Repository must be public for GitHub Packages
     - HOMEBREW_TAP_TOKEN secret configured in repository settings
+    - GITHUB_TOKEN has packages:write permission (default for workflows)
     - Production environment created with required reviewers
     - CODEOWNERS file configured (already done in T047)
   - **Test Steps**:
     1. Create and push test version tag: `git tag v0.1.0 && git push origin v0.1.0`
     2. Verify version validation job passes (check semantic version format)
-    3. Verify all 3 platform builds succeed with checksums
-    4. Verify GitHub release created with 6 assets (3 binaries + 3 checksums)
+    3. Verify artifact download succeeds (reuses build workflow artifacts)
+    4. Verify GitHub release created with all binaries and checksums
     5. Review deployment approval request (production environment)
     6. Approve Homebrew publication
-    7. Verify Homebrew formula updated in tap repository
-    8. Test installation: `brew tap sirkirby/ten-second-tom && brew install ten-second-tom`
-    9. Verify installed binary works: `ten-second-tom --version`
-    10. Verify Winget and Chocolatey issues created with manifests
+    7. Verify bottles uploaded to GitHub Packages (ghcr.io/sirkirby/tom)
+    8. Verify Homebrew formula updated in tap repository with bottle blocks
+    9. Test installation: `brew tap sirkirby/ten-second-tom && brew install ten-second-tom`
+    10. Verify bottle installation (fast, no compilation): check for "Pouring" message
+    11. Verify installed binary works: `tom --version`
+    12. Verify Winget and Chocolatey issues created with manifests
   - **Expected Results**:
     - Workflow completes without errors
     - Release appears in GitHub Releases
-    - Homebrew formula updated correctly
-    - Users can install via `brew install`
-  - **Cleanup**: Uninstall with `brew uninstall ten-second-tom && brew untap sirkirby/ten-second-tom`
+    - Bottles visible in GitHub Packages (https://github.com/sirkirby?tab=packages)
+    - Homebrew formula references bottles correctly
+    - Installation uses bottles (fast install, no build step)
+    - Users can install via `brew install sirkirby/ten-second-tom/ten-second-tom`
+  - **Cleanup**: `brew uninstall ten-second-tom && brew untap sirkirby/ten-second-tom`
 
 - [ ] T051 Verify release workflow performance meets targets
   - **Performance Targets** (from spec.md NFR-001):
