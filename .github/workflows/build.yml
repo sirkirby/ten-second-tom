@@ -97,9 +97,12 @@ jobs:
             --output ./publish/osx-x64 \
             -p:PublishSingleFile=true
       
+      - name: Rename executable to 'tom'
+        run: mv ./publish/osx-x64/TenSecondTom ./publish/osx-x64/tom
+      
       - name: Verify artifact size
         run: |
-          FILE_PATH="./publish/osx-x64/TenSecondTom"
+          FILE_PATH="./publish/osx-x64/tom"
           FILE_SIZE=$(stat -f%z "$FILE_PATH")
           FILE_SIZE_MB=$((FILE_SIZE / 1024 / 1024))
           MAX_SIZE_MB=${{ env.MAX_ARTIFACT_SIZE_MB }}
@@ -118,7 +121,7 @@ jobs:
       - name: Calculate checksum
         id: checksum
         run: |
-          CHECKSUM=$(shasum -a 256 ./publish/osx-x64/TenSecondTom | cut -d ' ' -f 1)
+          CHECKSUM=$(shasum -a 256 ./publish/osx-x64/tom | cut -d ' ' -f 1)
           echo "sha256=$CHECKSUM" >> $GITHUB_OUTPUT
           echo "📝 SHA256: $CHECKSUM"
       
@@ -127,7 +130,7 @@ jobs:
         with:
           name: ten-second-tom-osx-x64
           path: |
-            ./publish/osx-x64/TenSecondTom
+            ./publish/osx-x64/tom
             ./publish/osx-x64/appsettings*.json
             ./publish/osx-x64/*.dylib
           retention-days: 90
@@ -161,9 +164,12 @@ jobs:
             --output ./publish/osx-arm64 \
             -p:PublishSingleFile=true
       
+      - name: Rename executable to 'tom'
+        run: mv ./publish/osx-arm64/TenSecondTom ./publish/osx-arm64/tom
+      
       - name: Verify artifact size
         run: |
-          FILE_PATH="./publish/osx-arm64/TenSecondTom"
+          FILE_PATH="./publish/osx-arm64/tom"
           FILE_SIZE=$(stat -f%z "$FILE_PATH")
           FILE_SIZE_MB=$((FILE_SIZE / 1024 / 1024))
           MAX_SIZE_MB=${{ env.MAX_ARTIFACT_SIZE_MB }}
@@ -182,7 +188,7 @@ jobs:
       - name: Calculate checksum
         id: checksum
         run: |
-          CHECKSUM=$(shasum -a 256 ./publish/osx-arm64/TenSecondTom | cut -d ' ' -f 1)
+          CHECKSUM=$(shasum -a 256 ./publish/osx-arm64/tom | cut -d ' ' -f 1)
           echo "sha256=$CHECKSUM" >> $GITHUB_OUTPUT
           echo "📝 SHA256: $CHECKSUM"
       
@@ -191,7 +197,7 @@ jobs:
         with:
           name: ten-second-tom-osx-arm64
           path: |
-            ./publish/osx-arm64/TenSecondTom
+            ./publish/osx-arm64/tom
             ./publish/osx-arm64/appsettings*.json
             ./publish/osx-arm64/*.dylib
           retention-days: 90
@@ -225,10 +231,13 @@ jobs:
             --output ./publish/win-x64 `
             -p:PublishSingleFile=true
       
+      - name: Rename executable to 'tom.exe'
+        run: Move-Item ./publish/win-x64/TenSecondTom.exe ./publish/win-x64/tom.exe
+      
       - name: Verify artifact size
         shell: pwsh
         run: |
-          $filePath = "./publish/win-x64/TenSecondTom.exe"
+          $filePath = "./publish/win-x64/tom.exe"
           $fileSize = (Get-Item $filePath).Length
           $fileSizeMB = [math]::Round($fileSize / 1MB)
           $maxSizeMB = $env:MAX_ARTIFACT_SIZE_MB
@@ -248,7 +257,7 @@ jobs:
         shell: pwsh
         id: checksum
         run: |
-          $hash = (Get-FileHash -Path ./publish/win-x64/TenSecondTom.exe -Algorithm SHA256).Hash
+          $hash = (Get-FileHash -Path ./publish/win-x64/tom.exe -Algorithm SHA256).Hash
           echo "sha256=$hash" >> $env:GITHUB_OUTPUT
           Write-Host "📝 SHA256: $hash"
       
@@ -257,7 +266,7 @@ jobs:
         with:
           name: ten-second-tom-win-x64
           path: |
-            ./publish/win-x64/TenSecondTom.exe
+            ./publish/win-x64/tom.exe
             ./publish/win-x64/appsettings*.json
             ./publish/win-x64/*.dll
           retention-days: 90
@@ -341,7 +350,7 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "🧪 Running smoke test: --version"
-          $output = & ./artifacts/TenSecondTom.exe --version
+          $output = & ./artifacts/tom.exe --version
           
           if ($LASTEXITCODE -eq 0) {
             Write-Host "✅ Smoke test passed: executable runs successfully"

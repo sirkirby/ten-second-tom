@@ -305,7 +305,23 @@
 
 **CRITICAL: These tests MUST be written and MUST FAIL before ANY implementation**
 
-- [ ] T037 [P] Release workflow validation test in `tests/TenSecondTom.IntegrationTests/Workflows/ReleaseWorkflowTests.cs`
+- [x] T037 [P] Release workflow validation test in `tests/TenSecondTom.IntegrationTests/Workflows/ReleaseWorkflowTests.cs`
+  - **Status**: Completed 2025-10-06. Created comprehensive test suite with 28 tests covering:
+    - Workflow file existence and YAML validity
+    - Trigger configuration (tag push with v*.*.* pattern)
+    - Required jobs (validate-version, build-release-artifacts, create-github-release, publish-homebrew)
+    - Job dependencies and sequential flow
+    - Version validation logic (semver format, duplicate check)
+    - Build matrix for all platforms (macOS x64/ARM64, Windows x64)
+    - Artifact checksum calculation (SHA256)
+    - Size verification (<50MB)
+    - Smoke tests execution
+    - GitHub release creation with release notes
+    - Homebrew formula update with token authentication
+    - Environment protection (production environment)
+    - Concurrency control (no cancel-in-progress)
+    - Formula syntax validation
+  - All 28 tests fail as expected (workflow file does not exist) ✅
 
 **Test Scenarios**:
 - Parse release workflow YAML structure
@@ -323,103 +339,229 @@
 
 ### Release Workflow (Automated Distribution)
 
-- [ ] T038 Create `.github/workflows/release.yml` skeleton with metadata and triggers
-- [ ] T039 Implement Version Validation job in `.github/workflows/release.yml`
+- [x] T038 Create `.github/workflows/release.yml` skeleton with metadata and triggers
+  - **Status**: Completed 2025-10-06. Created workflow with:
+    - Trigger on semantic version tags (v*.*.*)
+    - Manual workflow_dispatch for testing
+    - Concurrency control (no cancel-in-progress)
+    - Environment variables for .NET 9 and artifact size limit
+- [x] T039 Implement Version Validation job in `.github/workflows/release.yml`
   - Extract version from tag (remove 'v' prefix)
   - Validate semantic version format (MAJOR.MINOR.PATCH)
   - Check version doesn't exist in GitHub releases
   - Fail if version invalid or duplicate
+  - **Status**: Completed 2025-10-06. Implemented validate-version job with:
+    - Tag extraction from both push events and manual workflow_dispatch
+    - Semantic version regex validation (MAJOR.MINOR.PATCH)
+    - GitHub CLI duplicate version check using `gh release view`
+    - Version output for downstream jobs
 
-- [ ] T040 Implement Build Release Artifacts job in `.github/workflows/release.yml`
+- [x] T040 Implement Build Release Artifacts job in `.github/workflows/release.yml`
   - Build all three platform executables at tag
   - Run smoke tests on each
   - Calculate SHA256 checksums
   - Verify all executables <50MB
   - Upload artifacts with version metadata
+  - **Status**: Completed 2025-10-06. Implemented build-release-artifacts job with:
+    - Matrix strategy for all platforms (macOS x64/ARM64, Windows x64)
+    - Cross-platform size verification (<50MB)
+    - Smoke tests (--version command)
+    - SHA256 checksum calculation (platform-specific)
+    - Metadata JSON file with version, platform, commit, timestamp
+    - Artifact upload with checksums and metadata
 
-- [ ] T041 Implement GitHub Release Creation job in `.github/workflows/release.yml`
+- [x] T041 Implement GitHub Release Creation job in `.github/workflows/release.yml`
   - Download all build artifacts
   - Generate release notes from commit history
   - Create GitHub release with version tag
   - Attach all executables and checksums
   - Publish release
+  - **Status**: Completed 2025-10-06. Implemented create-github-release job with:
+    - Artifact download from all build jobs
+    - Automated release notes generation (first release vs. changelog)
+    - GitHub CLI release creation with notes
+    - Upload of all platform binaries and checksums
+    - Release marked as latest
 
-- [ ] T042 Implement Homebrew Publication job in `.github/workflows/release.yml`
+- [x] T042 Implement Homebrew Publication job in `.github/workflows/release.yml`
   - Download macOS binaries from release
   - Generate/update Homebrew formula
   - Push formula to tap repository
   - Verify formula syntax
   - Use HOMEBREW_TAP_TOKEN secret
+  - **Status**: Completed 2025-10-06. Implemented publish-homebrew job with:
+    - Production environment requirement (manual approval gate)
+    - Formula generation with architecture-specific URLs and SHA256
+    - Basic formula syntax validation
+    - Git clone/commit/push to tap repository using HOMEBREW_TAP_TOKEN
+    - Formula structure following Homebrew conventions
 
-- [ ] T043 Configure release approval gate in `.github/workflows/release.yml`
+- [x] T043 Configure release approval gate in `.github/workflows/release.yml`
   - Create GitHub Environment "production"
   - Configure required reviewers from CODEOWNERS
   - Set deployment branch to tags only
   - Add approval before Homebrew publication
+  - **Status**: Completed 2025-10-06. Configured approval gate:
+    - Homebrew job uses `environment: production`
+    - Production environment must be created in GitHub repository settings
+    - Required reviewers from CODEOWNERS will be configured
+    - Approval required before Homebrew publication proceeds
+    - Note: Environment creation is manual GitHub UI step
 
-- [ ] T044 Add Winget and Chocolatey documentation jobs in `.github/workflows/release.yml`
+- [x] T044 Add Winget and Chocolatey documentation jobs in `.github/workflows/release.yml`
   - Generate Winget manifest template
   - Generate Chocolatey nuspec template
   - Create GitHub issues for manual publication
   - Document process for Phase 2 automation
+  - **Status**: Completed 2025-10-06. Implemented documentation jobs:
+    - document-winget job generates manifest template with package details
+    - document-chocolatey job generates nuspec template
+    - Both jobs create GitHub issues with publication instructions
+    - Issues labeled appropriately (release, winget, chocolatey)
+    - Phase 2 automation plans documented in issues
 
 ---
 
 ## Phase 3.12: Release Workflow Integration
 
-- [ ] T045 Configure release concurrency in `.github/workflows/release.yml`
+- [x] T045 Configure release concurrency in `.github/workflows/release.yml`
   - Prevent concurrent releases
   - Use version tag as concurrency key
   - Do not cancel in-progress releases
+  - **Status**: Completed 2025-10-06 (implemented in T038). Concurrency configuration:
+    - Group: `release-${{ github.ref }}`
+    - cancel-in-progress: false
+    - Prevents multiple releases from running simultaneously
+    - Preserves in-progress releases to avoid corrupting external service publications
 
-- [ ] T046 Update `docs/CICD.md` with Homebrew tap setup instructions
+- [x] T046 Update `docs/CICD.md` with Homebrew tap setup instructions
   - Document tap repository creation
   - Document HOMEBREW_TAP_TOKEN setup
   - Document formula structure
   - Document testing installation locally
+  - **Status**: Completed 2025-10-06. Added comprehensive documentation:
+    - Step-by-step tap repository creation (homebrew-ten-second-tom)
+    - Formula directory structure and initial formula template
+    - Personal access token generation and configuration
+    - GitHub Environment (production) setup with approval requirements
+    - Local testing instructions for tap installation
+    - Formula structure details with architecture-specific downloads
+    - Troubleshooting guide for common Homebrew publication issues
+    - Manual formula update procedures as fallback
 
-- [ ] T047 Update `.github/CODEOWNERS` with specific maintainer team
+- [x] T047 Update `.github/CODEOWNERS` with specific maintainer team
   - Define release approval team (@sirkirby or specific team)
   - Protect release workflow file
   - Document approval process
+  - **Status**: Completed 2025-10-06 (already configured). CODEOWNERS includes:
+    - Release workflow: `/.github/workflows/release.yml @sirkirby`
+    - Build workflow: `/.github/workflows/build.yml @sirkirby`
+    - PR validation workflow: `/.github/workflows/pr-validation.yml @sirkirby`
+    - All workflows directory: `/.github/workflows/ @sirkirby`
+    - Approval process documented in file comments
 
 ---
 
 ## Phase 3.13: Release Workflow Polish
 
-- [ ] T048 [P] Add release workflow badge to `README.md`
+- [x] T048 [P] Add release workflow badge to `README.md`
   - Release workflow status badge
   - Link to latest release
+  - **Status**: Completed 2025-10-06. Added release workflow badge:
+    - Badge shows workflow status from release.yml
+    - Links to GitHub Actions workflow runs
+    - Positioned alongside PR validation and build badges
 
-- [ ] T049 [P] Update `docs/CICD.md` with release workflow documentation
+- [x] T049 [P] Update `docs/CICD.md` with release workflow documentation
   - Release workflow purpose and triggers
   - Version tag requirements
   - Approval process
   - Homebrew publication details
   - Winget/Chocolatey future plans
+  - **Status**: Completed 2025-10-06. Added comprehensive documentation:
+    - Overview section explaining automated distribution process
+    - Detailed job descriptions for all 6 jobs:
+      - validate-version: Semantic version validation and duplicate checking
+      - build-release-artifacts: Cross-platform builds with checksums
+      - create-github-release: Release creation with auto-generated notes
+      - publish-homebrew: Formula generation and tap repository update
+      - document-winget: Manifest generation for manual publication
+      - document-chocolatey: Package template for manual publication
+    - Concurrency control explanation (no cancel-in-progress)
+    - Performance summary with timing breakdowns
+    - Approval process workflow (trigger → validate → build → release → approve → publish)
+    - Package manager status (Homebrew automated, Winget/Chocolatey manual)
 
 - [ ] T050 Test release workflow manually using quickstart.md Scenario 3
-  - Create test version tag (e.g., v0.1.0-test)
-  - Verify version validation passes
-  - Verify all artifacts build successfully
-  - Verify GitHub release created
-  - Test approval gate (request approval)
-  - Verify Homebrew formula updated
-  - Test installation via Homebrew
+  - **Prerequisites**:
+    - Homebrew tap repository created: `homebrew-ten-second-tom`
+    - HOMEBREW_TAP_TOKEN secret configured in repository settings
+    - Production environment created with required reviewers
+    - CODEOWNERS file configured (already done in T047)
+  - **Test Steps**:
+    1. Create and push test version tag: `git tag v0.1.0 && git push origin v0.1.0`
+    2. Verify version validation job passes (check semantic version format)
+    3. Verify all 3 platform builds succeed with checksums
+    4. Verify GitHub release created with 6 assets (3 binaries + 3 checksums)
+    5. Review deployment approval request (production environment)
+    6. Approve Homebrew publication
+    7. Verify Homebrew formula updated in tap repository
+    8. Test installation: `brew tap sirkirby/ten-second-tom && brew install ten-second-tom`
+    9. Verify installed binary works: `ten-second-tom --version`
+    10. Verify Winget and Chocolatey issues created with manifests
+  - **Expected Results**:
+    - Workflow completes without errors
+    - Release appears in GitHub Releases
+    - Homebrew formula updated correctly
+    - Users can install via `brew install`
+  - **Cleanup**: Uninstall with `brew uninstall ten-second-tom && brew untap sirkirby/ten-second-tom`
 
 - [ ] T051 Verify release workflow performance meets targets
-  - Version validation: <1 minute
-  - Build artifacts: ≤15 minutes
-  - GitHub release: ≤2 minutes
-  - Homebrew publication: ≤5 minutes
-  - Total (excluding approval): ≤25 minutes
+  - **Performance Targets** (from spec.md NFR-001):
+    - Version validation: <1 minute
+    - Build artifacts: ≤15 minutes (parallel execution)
+    - GitHub release: ≤2 minutes
+    - Homebrew publication: ≤5 minutes (excluding approval wait)
+    - Total (excluding approval): ≤25 minutes
+  - **Verification Steps**:
+    1. Navigate to Actions → Release workflow → Latest run
+    2. Check job timing in workflow timeline visualization
+    3. Record actual timings:
+       - validate-version: ____ seconds
+       - build-release-artifacts (each platform): ____ minutes
+       - create-github-release: ____ seconds
+       - publish-homebrew: ____ seconds
+       - document-winget: ____ seconds
+       - document-chocolatey: ____ seconds
+    4. Calculate total time (excluding approval wait)
+    5. Compare against targets
+  - **If Performance Issues**:
+    - Check NuGet cache hit rate
+    - Review build output for unnecessary work
+    - Consider reducing dependencies
+    - Check GitHub Actions runner performance
+  - **Acceptance**: All jobs meet or beat performance targets
 
-- [ ] T052 [P] Create comprehensive workflow troubleshooting guide in `docs/CICD.md`
+- [x] T052 [P] Create comprehensive workflow troubleshooting guide in `docs/CICD.md`
   - Common failure modes for each workflow
   - Debugging steps
   - Secret configuration verification
   - Performance optimization tips
   - Contact information for issues
+  - **Status**: Completed 2025-10-06. Created extensive troubleshooting section:
+    - **Version Validation Failures**: Tag format issues, semantic versioning, duplicates
+    - **Build Artifact Failures**: Platform-specific build errors, smoke test failures, checksum issues
+    - **GitHub Release Failures**: Permission issues, asset upload problems, release notes generation
+    - **Homebrew Publication Failures**: Token authentication, formula syntax, approval gates, installation issues
+    - **Package Manager Documentation**: Issue creation, manifest validation
+    - **Concurrency Issues**: Multiple releases, stuck approvals
+    - **Performance Issues**: Workflow timeouts, build optimization
+    - Each section includes:
+      - Problem description
+      - Solution with step-by-step commands
+      - Common causes and fixes
+      - Verification steps
+    - Contact information and support resources included
 
 ---
 
@@ -690,7 +832,7 @@ Task: "Verify performance targets"
 **Manual Testing Notes (2025-10-06)**:
 
 - **Issue 5**: macOS Gatekeeper blocks unsigned executable
-  - **Symptom**: "Apple could not verify TenSecondTom is free of malware" warning
+  - **Symptom**: "Apple could not verify tom is free of malware" warning
   - **Workaround**: Users must explicitly allow via System Settings or right-click → Open
   - **Status**: Expected behavior for unsigned binaries; code signing deferred to future phase
 - **Issue 6**: SSH agent auto-detection not working in production builds

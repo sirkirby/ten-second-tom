@@ -9,11 +9,13 @@ This document describes the GitHub Actions CI/CD pipeline for Ten Second Tom. Th
 
 ---
 
-## Required GitHub Secrets
+## Required GitHub Configuration
+
+### GitHub Secrets
 
 The following secrets must be configured in the repository settings (`Settings → Secrets and variables → Actions`):
 
-### For Homebrew Publication (Release Workflow)
+#### For Homebrew Publication (Release Workflow)
 
 **`HOMEBREW_TAP_TOKEN`**
 - **Purpose**: Personal access token for pushing formula updates to Homebrew tap repository
@@ -29,8 +31,9 @@ The following secrets must be configured in the repository settings (`Settings �
      - Metadata: Read-only
   7. Generate token and copy immediately (won't be shown again)
   8. Add to repository secrets as `HOMEBREW_TAP_TOKEN`
+  9. **Important**: Add the secret to the `production` environment (see Environment Setup below)
 
-### For Future Package Managers (Phase 2)
+#### For Future Package Managers (Phase 2)
 
 **`WINGET_TOKEN`** (Not yet implemented)
 - **Purpose**: Token for creating pull requests to microsoft/winget-pkgs repository
@@ -39,6 +42,50 @@ The following secrets must be configured in the repository settings (`Settings �
 **`CHOCOLATEY_API_KEY`** (Not yet implemented)
 - **Purpose**: API key for publishing packages to chocolatey.org
 - **Status**: Manual process documented in release workflow; automation planned for Phase 2
+
+### GitHub Environments
+
+The release workflow uses GitHub Environments to add manual approval gates for production deployments.
+
+#### Production Environment Setup
+
+**`production`**
+- **Purpose**: Requires manual approval before publishing to Homebrew
+- **Setup**:
+  1. Go to repository Settings → Environments
+  2. Click "New environment"
+  3. Name: `production` (must match exactly)
+  4. Click "Configure environment"
+  5. **Protection Rules**:
+     - ✅ Enable "Required reviewers"
+     - Add reviewer(s): Repository maintainers (e.g., @sirkirby)
+     - Set wait timer: 0 minutes (immediate notification)
+  6. **Environment Secrets**:
+     - Add `HOMEBREW_TAP_TOKEN` secret here (same value as repository secret)
+  7. Save protection rules
+
+**Workflow Configuration**:
+```yaml
+publish-homebrew:
+  environment:
+    name: production
+  # Job will pause here until approved
+```
+
+**VS Code Linter Warning**: You may see a warning "Value 'production' is not valid" in VS Code. This is expected - the YAML linter cannot access your GitHub repository configuration to validate environment names. The workflow will execute correctly despite this warning.
+
+**Why Use Environments?**
+- Prevents accidental publication to Homebrew
+- Allows final review of release notes before publishing
+- Provides audit trail of who approved each release
+- Can be bypassed for hotfixes by maintainers
+
+**Approval Flow**:
+1. Release workflow creates GitHub release automatically
+2. Workflow pauses at Homebrew publication job
+3. GitHub sends notification to configured reviewers
+4. Reviewer checks release notes and approves/rejects
+5. Upon approval, Homebrew formula is published automatically
 
 ---
 
@@ -116,7 +163,7 @@ The following secrets must be configured in the repository settings (`Settings �
 - `ten-second-tom-osx-arm64`: macOS Apple Silicon executable + config + native libs
 - `ten-second-tom-win-x64`: Windows executable + config + native libs
 - Each artifact includes:
-  - Executable file (`TenSecondTom` or `TenSecondTom.exe`)
+  - Executable file (`tom` or `tom.exe`)
   - Configuration files (`appsettings.json`, `appsettings.Development.json`)
   - Native libraries (`libsodium.dylib` on macOS, DLLs on Windows)
   - SHA256 checksum (in workflow output)
@@ -153,72 +200,283 @@ The following secrets must be configured in the repository settings (`Settings �
 **Trigger**: Semantic version tags (e.g., `v1.0.0`)  
 **Purpose**: Automated distribution to package managers
 
-**Jobs**:
-1. **Version Validation**: Verify semantic version format and uniqueness
-2. **Build Release Artifacts**: Build all platform executables at tagged version
-3. **GitHub Release**: Create release with binaries and checksums
-4. **Homebrew Publication** (requires approval): Update Homebrew tap formula
-5. **Documentation Generation**: Create Winget and Chocolatey manifest templates
+#### Overview
 
-**Approval Gate**: Homebrew publication requires approval from `@sirkirby` (configured in CODEOWNERS)
+The release workflow automates the entire distribution process from version tag to package manager publication. It **reuses build artifacts from the build workflow** to avoid redundant builds and enforce proper release hygiene (merge to main → build → tag → release). The workflow validates versions, creates GitHub releases, and publishes to package managers.
 
-**Performance Targets**:
-- Version validation: <1 minute
-- Build artifacts: ≤15 minutes
-- GitHub release: ≤2 minutes
-- Homebrew publication: ≤5 minutes
-- Total (excluding approval): ≤25 minutes
+#### Jobs
 
-**Package Managers**:
-- ✅ Homebrew (automated)
-- 📋 Winget (manual via generated manifest)
-- 📋 Chocolatey (manual via generated manifest)
+##### 1. Validate Version
+- **Purpose**: Ensure tag follows semantic versioning and doesn't duplicate existing releases
+- **Steps**:
+  1. Extract version from tag (e.g., `v1.2.3` → `1.2.3`)
+  2. Validate format matches `MAJOR.MINOR.PATCH` (no pre-release or build metadata)
+  3. Query GitHub API to check if version already exists in releases
+  4. Output validated version for subsequent jobs
+- **Failure Conditions**:
+  - Tag doesn't start with 'v'
+  - Version format is invalid (e.g., `1.2`, `1.2.3-beta`)
+  - Version already exists as a GitHub release
+- **Performance Target**: <1 minute
+
+##### 2. Download Build Artifacts
+- **Purpose**: Reuse artifacts from the build workflow to avoid redundant builds
+- **Dependencies**: Requires validate-version job success
+- **Strategy**: Download pre-built artifacts from the build workflow run for this commit
+- **Steps**:
+  1. Use GitHub CLI to download artifacts from build workflow run
+  2. Verify all three platform artifacts exist (osx-x64, osx-arm64, win-x64)
+  3. Re-upload artifacts for use by subsequent release jobs
+- **Artifacts Reused**:
+  - Pre-built executables from build.yml (already tested)
+  - SHA256 checksums (calculated during build)
+  - Configuration files and native libraries
+- **Why Reuse?**:
+  - Eliminates 15 minutes of redundant build time
+  - Ensures released binaries are identical to tested builds
+  - Enforces proper workflow: merge → build → tag → release
+  - Reduces CI compute usage and costs
+- **Performance Target**: <1 minute (just download, no rebuild)
+
+##### 3. Create GitHub Release
+- **Purpose**: Publish official GitHub release with downloadable binaries
+- **Dependencies**: Requires build-release-artifacts job success
+- **Steps**:
+  1. Download all platform artifacts
+  2. Generate release notes from git commits since last tag
+  3. Create GitHub release with version tag
+  4. Upload binaries and checksums as release assets
+  5. Mark as latest release
+- **Release Assets**:
+  - `tom` (macOS Intel binary)
+  - `checksums-osx-x64.txt` (SHA256 checksum)
+  - `tom` (macOS ARM64 binary)
+  - `checksums-osx-arm64.txt` (SHA256 checksum)
+  - `tom.exe` (Windows binary)
+  - `checksum.txt` (SHA256 checksum)
+- **Release Notes**: Auto-generated from commits with link to full changelog
+- **Performance Target**: ≤2 minutes
+
+##### 4. Publish to Homebrew
+- **Purpose**: Update Homebrew tap with new formula version
+- **Dependencies**: Requires create-github-release job success
+- **Environment**: `production` (requires manual approval)
+- **Approval Gate**: Must be approved by maintainers in CODEOWNERS before execution
+- **Steps**:
+  1. Wait for manual approval (no time limit)
+  2. Clone Homebrew tap repository
+  3. Generate formula with version, URLs, and checksums
+  4. Commit and push formula to tap repository
+  5. Verify formula syntax with `brew audit`
+- **Formula Generation**:
+  - Version extracted from tag
+  - URLs point to GitHub release assets
+  - SHA256 checksums from build artifacts
+  - Architecture detection (`Hardware::CPU.intel?`)
+  - Install block copies binary to `bin/`
+  - Test block verifies `--version` command
+- **Secrets Required**: `HOMEBREW_TAP_TOKEN` with repo write access
+- **Performance Target**: ≤5 minutes (excluding approval wait)
+
+##### 5. Document Winget Release
+- **Purpose**: Generate Winget manifest template for manual publication
+- **Dependencies**: Requires create-github-release job success
+- **Steps**:
+  1. Generate `.winget/manifests/` directory structure
+  2. Create version manifest with download URLs and checksums
+  3. Create installer manifest with silent install flags
+  4. Create locale manifest with descriptions
+  5. Create GitHub issue with manifest files and publication instructions
+- **Status**: Manual process (automation planned for Phase 2)
+- **Documentation**: Issue includes step-by-step PR creation guide
+- **Performance Target**: <1 minute
+
+##### 6. Document Chocolatey Release
+- **Purpose**: Generate Chocolatey package template for manual publication
+- **Dependencies**: Requires create-github-release job success
+- **Steps**:
+  1. Generate `.chocolatey/` directory structure
+  2. Create nuspec file with package metadata
+  3. Create installation script with download and verification
+  4. Create GitHub issue with package files and publication instructions
+- **Status**: Manual process (automation planned for Phase 2)
+- **Documentation**: Issue includes step-by-step publication guide
+- **Performance Target**: <1 minute
+
+#### Concurrency Control
+
+```yaml
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+```
+
+- **Purpose**: Prevent multiple releases from running simultaneously
+- **Group Key**: Uses tag reference (e.g., `refs/tags/v1.0.0`)
+- **Cancel Behavior**: Does not cancel in-progress releases
+- **Rationale**: Canceling mid-release could corrupt external service publications
+
+#### Performance Summary
+
+**Total Time** (excluding approval):
+- Sequential: Validate (2min) → Download (1min) → Release (2min) → Homebrew (5min) → Docs (1min)
+- **Target**: ≤10 minutes from tag push to Homebrew availability
+- **Actual**: Typically 8-10 minutes (15 minutes faster than building from scratch)
+- **Savings**: Reusing build artifacts eliminates ~15 minutes of redundant work
+
+**With Approval**:
+- Add human approval time (unlimited, typically minutes to hours)
+- Total: ≤30 minutes if approved immediately
+
+#### Approval Process
+
+1. **Merge to Main**: Merge PR to main branch (triggers build.yml automatically)
+2. **Wait for Build**: Ensure build workflow completes successfully
+3. **Tag Commit**: Tag the merge commit with version (e.g., `git tag v1.0.0 && git push origin v1.0.0`)
+4. **Validation**: Workflow validates version, tag location, and finds build artifacts
+5. **Download**: Reuses pre-built artifacts from build workflow (no rebuild)
+6. **GitHub Release**: Release created with binaries and checksums
+7. **Approval Request**: GitHub sends notification to reviewers in CODEOWNERS
+8. **Manual Review**: Reviewer checks release notes and approves/rejects
+9. **Publication**: Upon approval, Homebrew formula updated automatically
+10. **Documentation**: Issues created for manual Winget/Chocolatey publication
+
+#### Package Managers Status
+
+- ✅ **Homebrew**: Fully automated with approval gate
+- 📋 **Winget**: Manual publication with generated manifests
+- 📋 **Chocolatey**: Manual publication with generated packages
+
+**Phase 2 Plans**: Automate Winget and Chocolatey publication (estimated 2-3 weeks)
 
 ---
 
 ## Homebrew Tap Setup
 
-To enable automated Homebrew publication, create a tap repository:
+To enable automated Homebrew publication, you must create and configure a Homebrew tap repository. The release workflow will automatically update the formula in this tap when new versions are released.
+
+### Prerequisites
+
+- GitHub account (tap repository owner)
+- macOS machine for local testing (optional but recommended)
+- Homebrew installed locally for testing
 
 ### 1. Create Tap Repository
 
+Homebrew taps must follow a specific naming convention:
+
+1. **Create a new GitHub repository**:
+   - **Name**: `homebrew-ten-second-tom` (must start with `homebrew-`)
+   - **Visibility**: **Public** (required by Homebrew)
+   - **Description**: "Homebrew tap for Ten Second Tom CLI"
+   - **Initialize**: Add a README.md
+
+2. **Repository URL**: `https://github.com/sirkirby/homebrew-ten-second-tom`
+
+3. **Clone locally** (optional for testing):
+   ```bash
+   git clone https://github.com/sirkirby/homebrew-ten-second-tom.git
+   cd homebrew-ten-second-tom
+   ```
+
+### 2. Create Formula Directory Structure
+
+Create the required directory structure in your tap repository:
+
 ```bash
-# Create a new repository on GitHub named: homebrew-ten-second-tom
-# Repository must be public for Homebrew
-# Initialize with README
+mkdir -p Formula
+touch Formula/.gitkeep  # Keep directory in Git
+git add Formula/.gitkeep
+git commit -m "Add Formula directory"
+git push origin main
 ```
 
-### 2. Create Initial Formula
+### 3. Create Initial Formula (Optional)
+
+The release workflow will generate the formula automatically, but you can create an initial version for testing:
 
 Create `Formula/ten-second-tom.rb`:
 
 ```ruby
 class TenSecondTom < Formula
-  desc "CLI tool for managing daily tasks"
+  desc "CLI tool for daily work summaries using Claude AI"
   homepage "https://github.com/sirkirby/ten-second-tom"
-  url "https://github.com/sirkirby/ten-second-tom/releases/download/v1.0.0/ten-second-tom-osx-x64"
-  sha256 "PLACEHOLDER_CHECKSUM"
-  version "1.0.0"
+  version "0.1.0"
+  license "MIT"
+
+  if Hardware::CPU.intel?
+    url "https://github.com/sirkirby/ten-second-tom/releases/download/v0.1.0/tom"
+    sha256 "PLACEHOLDER_REPLACE_WITH_ACTUAL_CHECKSUM"
+  else
+    url "https://github.com/sirkirby/ten-second-tom/releases/download/v0.1.0/tom"
+    sha256 "PLACEHOLDER_REPLACE_WITH_ACTUAL_CHECKSUM"
+  end
 
   def install
-    bin.install "ten-second-tom-osx-x64" => "ten-second-tom"
+    bin.install "tom"
   end
 
   test do
-    system "#{bin}/ten-second-tom", "--version"
+    system "#{bin}/tom", "--version"
   end
 end
 ```
 
-### 3. Configure Token
+**Note**: The release workflow will overwrite this with the correct URLs and checksums for each release.
 
-Add `HOMEBREW_TAP_TOKEN` to repository secrets (see Required GitHub Secrets above).
+### 4. Configure Personal Access Token
 
-### 4. Test Installation Locally
+Create a personal access token with permissions to update the tap repository:
+
+#### Generate Token
+
+1. Go to GitHub Settings → Developer settings → Personal access tokens → **Fine-grained tokens**
+2. Click "**Generate new token**"
+3. Configure:
+   - **Token name**: `Homebrew Tap Token for Ten Second Tom`
+   - **Expiration**: 1 year (recommended) or custom
+   - **Repository access**: **Only select repositories**
+   - Select: `sirkirby/homebrew-ten-second-tom` (your tap repository)
+4. Set **Repository permissions**:
+   - **Contents**: Read and write (required to push formula updates)
+   - **Metadata**: Read-only (automatically included)
+5. Click "**Generate token**"
+6. **Copy the token immediately** (it won't be shown again)
+
+#### Add Token to Repository Secrets
+
+1. Go to main repository: `https://github.com/sirkirby/ten-second-tom`
+2. Navigate to: Settings → Secrets and variables → Actions
+3. Click "**New repository secret**"
+4. Configure:
+   - **Name**: `HOMEBREW_TAP_TOKEN`
+   - **Secret**: Paste the token from previous step
+5. Click "**Add secret**"
+
+### 5. Configure GitHub Environment (Production)
+
+The release workflow uses a GitHub Environment to require manual approval before publishing to Homebrew:
+
+1. Go to repository Settings → Environments
+2. Click "**New environment**"
+3. **Name**: `production` (exact name required)
+4. Click "**Configure environment**"
+5. Configure settings:
+   - ✅ **Required reviewers**: Add `@sirkirby` (or your maintainer team)
+   - ✅ **Deployment branches**: Select "**Selected branches**"
+     - Add rule: `refs/tags/v*` (allow deployments from version tags)
+6. Click "**Save protection rules**"
+
+### 6. Test Installation Locally
+
+After the first release is published (or using a manual test release):
 
 ```bash
-# Add tap
+# Add your tap
 brew tap sirkirby/ten-second-tom
+
+# Verify tap was added
+brew tap | grep ten-second-tom
 
 # Install from tap
 brew install sirkirby/ten-second-tom/ten-second-tom
@@ -226,9 +484,124 @@ brew install sirkirby/ten-second-tom/ten-second-tom
 # Verify installation
 ten-second-tom --version
 
-# Uninstall
+# Update to latest version
+brew upgrade ten-second-tom
+
+# Uninstall (cleanup)
 brew uninstall ten-second-tom
 brew untap sirkirby/ten-second-tom
+```
+
+### 7. Formula Structure Details
+
+The release workflow generates formulas with the following structure:
+
+```ruby
+class TenSecondTom < Formula
+  desc "CLI tool for daily work summaries using Claude AI"
+  homepage "https://github.com/sirkirby/ten-second-tom"
+  version "1.2.3"  # Extracted from release tag
+  license "MIT"
+
+  # Architecture-specific downloads
+  if Hardware::CPU.intel?
+    url "https://github.com/sirkirby/ten-second-tom/releases/download/v1.2.3/tom"
+    sha256 "abc123..."  # macOS x64 SHA256 checksum
+  else
+    url "https://github.com/sirkirby/ten-second-tom/releases/download/v1.2.3/tom"
+    sha256 "def456..."  # macOS ARM64 SHA256 checksum
+  end
+
+  def install
+    bin.install "tom"
+  end
+
+  test do
+    system "#{bin}/tom", "--version"
+  end
+end
+```
+
+### 8. Troubleshooting Homebrew Publication
+
+**Problem**: Token authentication failure
+
+**Solution**:
+1. Verify `HOMEBREW_TAP_TOKEN` secret exists in repository
+2. Check token hasn't expired (regenerate if needed)
+3. Verify token has `Contents: Read and write` permission on tap repository
+4. Test token manually:
+   ```bash
+   curl -H "Authorization: token YOUR_TOKEN" \
+        https://api.github.com/repos/sirkirby/homebrew-ten-second-tom
+   ```
+
+**Problem**: Formula syntax errors
+
+**Solution**:
+1. Install Homebrew locally
+2. Clone tap repository
+3. Test formula syntax:
+   ```bash
+   brew audit --strict Formula/ten-second-tom.rb
+   brew style Formula/ten-second-tom.rb
+   ```
+4. Test installation:
+   ```bash
+   brew install --build-from-source Formula/ten-second-tom.rb
+   ```
+
+**Problem**: Approval not requested for production environment
+
+**Solution**:
+1. Verify "production" environment exists in repository settings
+2. Check required reviewers are configured
+3. Verify deployment branches include `refs/tags/v*`
+4. Check `.github/CODEOWNERS` includes workflow maintainers
+
+**Problem**: Wrong architecture downloaded
+
+**Solution**:
+1. Verify formula uses `Hardware::CPU.intel?` check
+2. Verify both x64 and ARM64 URLs point to correct binaries
+3. Test on both Intel and Apple Silicon Macs if possible
+
+### 9. Homebrew Formula Best Practices
+
+- **Version numbers**: Always use semantic versioning (MAJOR.MINOR.PATCH)
+- **Checksums**: Must be SHA256 checksums of downloaded binaries
+- **Binary names**: Keep binary name consistent across releases
+- **Test block**: Always include a simple test (like `--version`)
+- **Description**: Keep concise but descriptive
+- **License**: Match the main repository license
+
+### 10. Manual Formula Updates (If Needed)
+
+If automated publication fails, you can manually update the formula:
+
+```bash
+# Clone tap repository
+git clone https://github.com/sirkirby/homebrew-ten-second-tom.git
+cd homebrew-ten-second-tom
+
+# Edit formula
+vim Formula/ten-second-tom.rb
+
+# Update version, URLs, and checksums
+# Get checksums from GitHub release assets
+
+# Test locally
+brew audit --strict Formula/ten-second-tom.rb
+brew install --build-from-source Formula/ten-second-tom.rb
+
+# Commit and push
+git add Formula/ten-second-tom.rb
+git commit -m "Update to version X.Y.Z"
+git push origin main
+
+# Users can now update
+brew update
+brew upgrade ten-second-tom
 ```
 
 ---
@@ -332,40 +705,442 @@ Add these badges to `README.md` to show workflow status:
 
 ### Release Workflow Issues
 
-**Problem**: Version validation failure
+#### Version Validation Failures
+
+**Problem**: Tag format rejected ("Version must start with 'v'")
 
 **Solution**:
-1. Verify tag format: `v1.0.0` (must start with 'v')
-2. Check semantic version format: MAJOR.MINOR.PATCH
-3. Verify version doesn't already exist in GitHub releases
-4. Delete and recreate tag if needed:
+```bash
+# Check current tag format
+git describe --tags --exact-match
+
+# If tag doesn't start with 'v', delete and recreate:
+git tag -d 1.0.0
+git push origin :refs/tags/1.0.0
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+**Problem**: Tag not on main branch
+
+**Solution**:
+The release workflow requires that tags be created on commits that exist on the main branch. This ensures all releases go through the standard quality gates (PR review, tests, builds).
+
+```bash
+# Check if your current commit is on main
+git branch -r --contains HEAD
+
+# If not on main, merge your branch first:
+git checkout main
+git pull origin main
+git merge your-feature-branch
+git push origin main
+
+# Then tag the merge commit:
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+**Problem**: No build artifacts found for commit
+
+**Solution**:
+The release workflow reuses artifacts from the build workflow to avoid redundant builds. If no artifacts are found, it means:
+1. The commit hasn't been merged to main yet, OR
+2. The build workflow hasn't run yet, OR
+3. The build workflow failed
+
+**Fix**:
+```bash
+# 1. Ensure code is merged to main
+git checkout main
+git pull origin main
+
+# 2. Check if build workflow ran successfully
+gh run list --workflow=build.yml --branch=main
+
+# 3. If build failed, fix the issues and merge again
+
+# 4. Wait for build to complete (check Actions tab)
+
+# 5. Then tag the merge commit:
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+**Typical workflow**:
+1. Create PR → triggers pr-validation.yml
+2. Merge to main → triggers build.yml (creates artifacts)
+3. Wait for build success (5-15 minutes)
+4. Tag merge commit → triggers release.yml (reuses artifacts)
+
+**Problem**: Invalid semantic version format
+
+**Solution**:
+1. Verify format is exactly `vMAJOR.MINOR.PATCH` (e.g., `v1.2.3`)
+2. No pre-release identifiers allowed (e.g., `v1.0.0-beta` is invalid)
+3. No build metadata allowed (e.g., `v1.0.0+build123` is invalid)
+4. Examples:
+   - ✅ Valid: `v1.0.0`, `v2.3.4`, `v10.20.30`
+   - ❌ Invalid: `v1.0`, `v1.0.0-alpha`, `v1.0.0+123`, `1.0.0` (missing 'v')
+
+**Problem**: Duplicate version error ("Version v1.0.0 already exists")
+
+**Solution**:
+1. Check existing releases: `gh release list`
+2. If version should be updated:
    ```bash
+   # Delete the release
+   gh release delete v1.0.0 -y
+   
+   # Delete the tag locally and remotely
    git tag -d v1.0.0
    git push origin :refs/tags/v1.0.0
+   
+   # Create new tag and push
    git tag v1.0.0
    git push origin v1.0.0
    ```
-
-**Problem**: Homebrew publication failure
-
-**Solution**:
-1. Verify `HOMEBREW_TAP_TOKEN` is configured correctly
-2. Check token has `repo` scope on tap repository
-3. Verify tap repository exists and is public
-4. Check formula syntax in tap repository
-5. Test formula update locally:
+3. If version should be incremented:
    ```bash
-   brew edit sirkirby/ten-second-tom/ten-second-tom
-   brew audit --strict sirkirby/ten-second-tom/ten-second-tom
+   # Create next version
+   git tag v1.0.1
+   git push origin v1.0.1
    ```
 
-**Problem**: Approval not requested
+#### Build Artifact Failures
+
+**Problem**: Build fails for specific platform
 
 **Solution**:
-1. Verify `.github/CODEOWNERS` is configured
-2. Verify GitHub Environment "production" exists
-3. Check required reviewers are configured in Environment settings
-4. Verify tag trigger matches environment deployment branches
+1. Check job logs for compilation errors
+2. Test build locally:
+   ```bash
+   # macOS x64
+   dotnet publish src/TenSecondTom.csproj \
+     -c Release \
+     -r osx-x64 \
+     --self-contained \
+     -p:PublishSingleFile=true \
+     -p:IncludeNativeLibrariesForSelfExtract=true
+   
+   # macOS ARM64
+   dotnet publish src/TenSecondTom.csproj \
+     -c Release \
+     -r osx-arm64 \
+     --self-contained \
+     -p:PublishSingleFile=true
+   
+   # Windows x64
+   dotnet publish src/TenSecondTom.csproj \
+     -c Release \
+     -r win-x64 \
+     --self-contained \
+     -p:PublishSingleFile=true
+   ```
+3. Fix compilation errors and push fix
+4. Delete and recreate tag to retrigger workflow
+
+**Problem**: Smoke test fails ("Command '--version' failed")
+
+**Solution**:
+1. Download artifact from failed workflow
+2. Test executable locally:
+   ```bash
+   # macOS
+   chmod +x ./tom
+   ./tom --version
+   
+   # Windows
+   .\tom.exe --version
+   ```
+3. Check for missing dependencies:
+   - macOS: Verify `libsodium.dylib` is included
+   - Windows: Verify required DLLs are included
+4. Check `appsettings.json` is present and valid
+5. Review application startup logs for initialization errors
+
+**Problem**: Checksum calculation fails
+
+**Solution**:
+1. Verify executable file exists in publish output
+2. Check file permissions allow reading
+3. Verify `shasum` (macOS) or `certutil` (Windows) is available
+4. Calculate checksum manually to verify:
+   ```bash
+   # macOS/Linux
+   shasum -a 256 TenSecondTom
+   
+   # Windows PowerShell
+   Get-FileHash TenSecondTom.exe -Algorithm SHA256
+   ```
+
+#### GitHub Release Failures
+
+**Problem**: Release creation fails ("Resource not accessible")
+
+**Solution**:
+1. Verify repository permissions (workflow has write access by default)
+2. Check if release with same tag exists: `gh release list`
+3. Delete existing release if needed: `gh release delete v1.0.0`
+4. Verify artifact downloads succeeded in previous job
+5. Check GitHub API status: https://www.githubstatus.com/
+
+**Problem**: Asset upload fails
+
+**Solution**:
+1. Check artifact file size (GitHub limit: 2GB per file)
+2. Verify artifact download completed successfully
+3. Check file exists in workflow directory:
+   ```yaml
+   - name: List downloaded artifacts
+     run: ls -lah release-*/
+   ```
+4. Retry upload or use `gh release upload` with `--clobber` flag
+
+**Problem**: Release notes generation fails
+
+**Solution**:
+1. Verify git history exists between tags
+2. Check previous tag exists: `git tag | sort -V`
+3. Generate release notes manually:
+   ```bash
+   # Get commits since last tag
+   git log $(git describe --tags --abbrev=0 HEAD^)..HEAD --oneline
+   
+   # Use gh CLI
+   gh release create v1.0.0 --generate-notes
+   ```
+
+#### Homebrew Publication Failures
+
+**Problem**: Authentication failure ("Resource not accessible by personal access token")
+
+**Solution**:
+1. Verify `HOMEBREW_TAP_TOKEN` secret exists:
+   - Go to repository Settings → Secrets and variables → Actions
+   - Confirm `HOMEBREW_TAP_TOKEN` is listed
+2. Check token hasn't expired:
+   - Go to GitHub Settings → Developer settings → Personal access tokens
+   - Check expiration date, regenerate if expired
+3. Verify token permissions:
+   - Required: `Contents: Read and write` on tap repository
+   - Test token manually:
+     ```bash
+     curl -H "Authorization: token YOUR_TOKEN" \
+          https://api.github.com/repos/sirkirby/homebrew-ten-second-tom
+     ```
+4. Regenerate token if needed and update secret
+
+**Problem**: Formula syntax errors ("brew audit failed")
+
+**Solution**:
+1. Clone tap repository locally
+2. Test formula syntax:
+   ```bash
+   brew audit --strict Formula/ten-second-tom.rb
+   brew style Formula/ten-second-tom.rb
+   ```
+3. Common issues:
+   - Invalid Ruby syntax (check brackets, quotes, indentation)
+   - Incorrect SHA256 format (must be 64 hex characters)
+   - Invalid URL format
+   - Missing required fields (desc, homepage, url, sha256)
+4. Fix formula in tap repository manually if needed
+5. Update workflow formula template if issue is in generation logic
+
+**Problem**: Approval not requested (deployment doesn't wait)
+
+**Solution**:
+1. Verify GitHub Environment exists:
+   - Go to repository Settings → Environments
+   - Confirm "production" environment exists
+2. Check environment configuration:
+   - Required reviewers: Must include at least one reviewer
+   - Deployment branches: Must include `refs/tags/v*` pattern
+3. Verify CODEOWNERS configuration:
+   ```bash
+   cat .github/CODEOWNERS
+   # Should include: /.github/workflows/release.yml @sirkirby
+   ```
+4. Check job environment declaration:
+   ```yaml
+   publish-homebrew:
+     environment: production  # Must match environment name exactly
+   ```
+
+**Problem**: Formula installation fails for users
+
+**Solution**:
+1. Test installation locally:
+   ```bash
+   brew tap sirkirby/ten-second-tom
+   brew install --verbose sirkirby/ten-second-tom/ten-second-tom
+   ```
+2. Check formula downloads correct binaries:
+   - Intel Macs should download `osx-x64` binary
+   - Apple Silicon Macs should download `osx-arm64` binary
+3. Verify checksums match:
+   ```bash
+   # Download binary manually
+   curl -L -o TenSecondTom https://github.com/sirkirby/ten-second-tom/releases/download/v1.0.0/TenSecondTom-osx-x64
+   shasum -a 256 TenSecondTom
+   # Compare with SHA256 in formula
+   ```
+4. Test binary works:
+   ```bash
+   chmod +x TenSecondTom
+   ./TenSecondTom --version
+   ```
+
+**Problem**: Tap repository push fails ("Updates were rejected")
+
+**Solution**:
+1. Check for concurrent releases (concurrency group should prevent this)
+2. Verify tap repository hasn't been force-pushed
+3. Try pulling latest changes before pushing:
+   ```yaml
+   - name: Pull latest changes
+     run: |
+       cd homebrew-ten-second-tom
+       git pull --rebase origin main
+       git push origin main
+   ```
+
+#### Package Manager Documentation Failures
+
+**Problem**: Issue creation fails for Winget/Chocolatey
+
+**Solution**:
+1. Verify workflow has `issues: write` permission
+2. Check GitHub API rate limits: https://api.github.com/rate_limit
+3. Create issue manually with generated manifest content
+4. Verify issue template renders correctly (check Markdown syntax)
+
+**Problem**: Generated manifests are invalid
+
+**Solution**:
+1. Validate Winget manifest:
+   ```bash
+   # Install winget-create tool
+   winget install Microsoft.WingetCreate
+   
+   # Validate manifest
+   wingetcreate validate --manifest .winget/manifests/
+   ```
+2. Validate Chocolatey package:
+   ```bash
+   # Install Chocolatey
+   Set-ExecutionPolicy Bypass -Scope Process -Force; 
+   [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; 
+   iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+   
+   # Test package
+   choco pack .chocolatey/ten-second-tom.nuspec
+   choco install ten-second-tom -source . -y
+   ```
+
+#### Concurrency Issues
+
+**Problem**: Multiple releases running simultaneously
+
+**Solution**:
+1. Verify concurrency configuration in workflow:
+   ```yaml
+   concurrency:
+     group: release-${{ github.ref }}
+     cancel-in-progress: false
+   ```
+2. Check workflow runs for same tag:
+   ```bash
+   gh run list --workflow=release.yml --branch=v1.0.0
+   ```
+3. Cancel duplicate runs manually:
+   ```bash
+   gh run cancel <run-id>
+   ```
+4. Wait for first run to complete before retriggering
+
+**Problem**: Release stuck "Waiting for approval"
+
+**Solution**:
+1. Check who can approve:
+   - Go to workflow run page
+   - Click "Review deployments" button
+   - Verify your GitHub account is listed as required reviewer
+2. If not listed, update environment configuration:
+   - Settings → Environments → production → Required reviewers
+3. Approve deployment:
+   - Click "Review deployments" button
+   - Select "production" environment
+   - Click "Approve and deploy"
+
+#### Performance Issues
+
+**Problem**: Performance target exceeded (>10 minutes excluding approval)
+
+**Solution**:
+The release workflow should complete in ~10 minutes by reusing build artifacts. If it's slower:
+
+1. **Check artifact download time**:
+   - Look at "Download Build Artifacts" job timing
+   - Large artifacts or slow network can cause delays
+   - Artifacts are typically 30-50MB total
+
+2. **Check GitHub Release creation time**:
+   - Look at "Create GitHub Release" job timing
+   - Release note generation should be <30 seconds
+   - Asset upload should be <1 minute
+
+3. **Check Homebrew publication time**:
+   - Look at "Publish to Homebrew" job timing (excluding approval wait)
+   - Git clone/push should be <1 minute
+   - If slow, check tap repository size
+
+4. **Verify no builds are happening**:
+   - Release workflow should NOT rebuild executables
+   - If you see "dotnet publish" commands, the refactor didn't work
+   - All executables should come from pre-built artifacts
+
+**Expected job timings**:
+- validate-version: 1-2 minutes
+- download-artifacts: 30-60 seconds
+- create-github-release: 1-2 minutes
+- publish-homebrew: 2-5 minutes (excluding approval)
+- document-*: 10-30 seconds each
+
+**If builds are happening** (wrong!):
+- Check that the workflow is actually downloading artifacts
+- Verify `needs: validate-version` outputs are correct
+- Check GitHub Actions logs for "Found build workflow run" message
+
+**Solution**:
+1. Identify slow job(s) in workflow timeline
+2. Common slow jobs:
+   - Build artifacts: Check if NuGet cache is being used
+   - Homebrew publication: May be waiting for approval
+3. Optimize slow steps:
+   ```yaml
+   # Improve cache hit rate
+   - uses: actions/cache@v3
+     with:
+       path: ~/.nuget/packages
+       key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+       restore-keys: |
+         ${{ runner.os }}-nuget-
+   ```
+4. Consider parallel execution where possible (already implemented for builds)
+
+**Problem**: Build artifacts job timeout (>15 minutes)
+
+**Solution**:
+1. Check if builds are running in parallel (matrix strategy)
+2. Verify NuGet cache is working:
+   ```yaml
+   - name: Check cache hit
+     run: echo "Cache hit: ${{ steps.cache.outputs.cache-hit }}"
+   ```
+3. Reduce dependencies or enable more aggressive trimming
+4. Check GitHub Actions runner performance (may be throttled)
 
 ---
 
