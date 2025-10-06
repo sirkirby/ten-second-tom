@@ -46,7 +46,7 @@ public static class AuthenticationServiceFactory
         // Check if SSH agent is available via provider resolution
         var agentSocketPath = SshAgentProviderResolver.GetSocketPath(provider);
         
-        if (!string.IsNullOrEmpty(agentSocketPath) && File.Exists(agentSocketPath))
+        if (!string.IsNullOrEmpty(agentSocketPath))
         {
             // Check if public key is configured
             var publicKeyBase64 = configuration["TenSecondTom:Auth:PublicKey"];
