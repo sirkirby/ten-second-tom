@@ -6,15 +6,35 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UserSecretsId>ten-second-tom-secrets</UserSecretsId>
+    
+    <!-- Trimming configuration for self-contained publishing -->
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>link</TrimMode>
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+    <!-- Suppress specific trimming warnings -->
+    <NoWarn>$(NoWarn);IL2026;IL2067;IL2070;IL2075;IL2077;IL3050</NoWarn>
   </PropertyGroup>
 
+  <!-- Preserve assemblies that are loaded via reflection (e.g., Serilog sinks) -->
   <ItemGroup>
-    <None Update="appsettings.json">
+    <TrimmerRootAssembly Include="Serilog.Sinks.Console" />
+    <TrimmerRootAssembly Include="Serilog.Sinks.File" />
+    <TrimmerRootAssembly Include="Serilog.Enrichers.Environment" />
+    <TrimmerRootAssembly Include="Serilog.Settings.Configuration" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Include appsettings.json in single-file bundle and extract at runtime -->
+    <Content Include="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="appsettings.Development.json">
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="appsettings.Development.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

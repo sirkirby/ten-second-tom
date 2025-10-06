@@ -37,10 +37,16 @@ public static class AuthenticationServiceFactory
         ArgumentNullException.ThrowIfNull(sshAgentLogger);
         ArgumentNullException.ThrowIfNull(sshKeyLogger);
 
-        // Check if SSH agent is available
-        var sshAuthSock = Environment.GetEnvironmentVariable("SSH_AUTH_SOCK");
+        // Get configured SSH agent provider (defaults to Auto)
+        var providerConfig = configuration["TenSecondTom:Auth:SshAgentProvider"];
+        var provider = string.IsNullOrWhiteSpace(providerConfig)
+            ? SshAgentProvider.Auto
+            : Enum.Parse<SshAgentProvider>(providerConfig, ignoreCase: true);
+
+        // Check if SSH agent is available via provider resolution
+        var agentSocketPath = SshAgentProviderResolver.GetSocketPath(provider);
         
-        if (!string.IsNullOrWhiteSpace(sshAuthSock))
+        if (!string.IsNullOrEmpty(agentSocketPath))
         {
             // Check if public key is configured
             var publicKeyBase64 = configuration["TenSecondTom:Auth:PublicKey"];
