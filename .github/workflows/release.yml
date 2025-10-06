@@ -228,13 +228,13 @@ jobs:
 
           Choose the appropriate binary for your platform:
 
-          - **macOS (Intel)**: \`ten-second-tom-osx-x64\`
-          - **macOS (Apple Silicon)**: \`ten-second-tom-osx-arm64\`
-          - **Windows**: \`ten-second-tom-win-x64\`
+          - **macOS (Intel)**: \`tom\` (from ten-second-tom-osx-x64)
+          - **macOS (Apple Silicon)**: \`tom\` (from ten-second-tom-osx-arm64)
+          - **Windows**: \`tom.exe\` (from ten-second-tom-win-x64)
 
           ### ✅ Verification
 
-          SHA256 checksums are provided in \`checksum.txt\` files for each platform."
+          Use \`shasum -a 256\` or \`Get-FileHash\` to verify the downloaded binaries."
           else
             echo "📝 Generating changelog from $PREV_TAG to $VERSION"
             
@@ -249,13 +249,13 @@ jobs:
 
           Choose the appropriate binary for your platform:
 
-          - **macOS (Intel)**: \`ten-second-tom-osx-x64\`
-          - **macOS (Apple Silicon)**: \`ten-second-tom-osx-arm64\`
-          - **Windows**: \`ten-second-tom-win-x64\`
+          - **macOS (Intel)**: \`tom\` (from ten-second-tom-osx-x64)
+          - **macOS (Apple Silicon)**: \`tom\` (from ten-second-tom-osx-arm64)
+          - **Windows**: \`tom.exe\` (from ten-second-tom-win-x64)
 
           ### ✅ Verification
 
-          SHA256 checksums are provided in \`checksum.txt\` files for each platform."
+          Use \`shasum -a 256\` or \`Get-FileHash\` to verify the downloaded binaries."
           fi
           
           # Save notes to file (handle multiline)
@@ -284,25 +284,16 @@ jobs:
           # Upload macOS x64
           gh release upload "$VERSION" \
             ./artifacts/ten-second-tom-osx-x64/tom \
-            ./artifacts/ten-second-tom-osx-x64/checksum.txt \
             --clobber
-          
-          # Rename checksum for clarity
-          mv ./artifacts/ten-second-tom-osx-x64/checksum.txt ./artifacts/ten-second-tom-osx-x64/checksums-osx-x64.txt
           
           # Upload macOS ARM64
           gh release upload "$VERSION" \
             ./artifacts/ten-second-tom-osx-arm64/tom \
-            ./artifacts/ten-second-tom-osx-arm64/checksum.txt \
             --clobber
-          
-          # Rename checksum for clarity
-          mv ./artifacts/ten-second-tom-osx-arm64/checksum.txt ./artifacts/ten-second-tom-osx-arm64/checksums-osx-arm64.txt
           
           # Upload Windows x64
           gh release upload "$VERSION" \
             ./artifacts/ten-second-tom-win-x64/tom.exe \
-            ./artifacts/ten-second-tom-win-x64/checksum.txt \
             --clobber
           
           echo "✅ All artifacts uploaded"
@@ -387,11 +378,13 @@ jobs:
           echo "bottle-tag=$BOTTLE_TAG" >> $GITHUB_OUTPUT
           echo "bottle-sha=$BOTTLE_SHA" >> $GITHUB_OUTPUT
           
-          # Also get checksums for both architectures for formula
-          SHA256_X64=$(cat ./artifacts/ten-second-tom-osx-x64/checksum.txt | cut -d ' ' -f 1)
-          SHA256_ARM64=$(cat ./artifacts/ten-second-tom-osx-arm64/checksum.txt | cut -d ' ' -f 1)
+          # Calculate checksums for both architectures directly from binaries
+          SHA256_X64=$(shasum -a 256 ./artifacts/ten-second-tom-osx-x64/tom | cut -d ' ' -f 1)
+          SHA256_ARM64=$(shasum -a 256 ./artifacts/ten-second-tom-osx-arm64/tom | cut -d ' ' -f 1)
           echo "sha256-x64=$SHA256_X64" >> $GITHUB_OUTPUT
           echo "sha256-arm64=$SHA256_ARM64" >> $GITHUB_OUTPUT
+          echo "   x64 SHA256: $SHA256_X64"
+          echo "   ARM64 SHA256: $SHA256_ARM64"
       
       - name: Upload bottle to GitHub Packages
         run: |
