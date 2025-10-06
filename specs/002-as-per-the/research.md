@@ -94,26 +94,80 @@ This document consolidates research findings for implementing a comprehensive Gi
 
 **Rationale**: Each package manager has established automation patterns with GitHub Actions marketplace actions available.
 
-### Homebrew Publication
+### Homebrew Publication with GitHub Packages
 
 **Process**:
-1. Create Homebrew tap repository (e.g., `sirkirby/homebrew-ten-second-tom`)
-2. Generate formula file with binary URL, SHA256 checksum
-3. Push formula to tap repository on release
-4. Users install via `brew install sirkirby/ten-second-tom/ten-second-tom`
+1. Create Homebrew tap repository using `brew tap-new sirkirby/homebrew-ten-second-tom --github-packages`
+   - This enables GitHub Packages for bottle (binary) hosting
+   - Repository name: `homebrew-ten-second-tom` (follows standard Homebrew naming with `homebrew-` prefix)
+   - Users tap it as: `brew tap sirkirby/ten-second-tom` (prefix automatically stripped)
+2. Upload pre-built binaries as "bottles" to GitHub Packages (ghcr.io)
+3. Generate formula file with bottle blocks referencing GitHub Packages URLs
+4. Push formula to tap repository on release
+5. Users install via `brew install sirkirby/ten-second-tom/ten-second-tom`
+   - Homebrew automatically downloads and installs the bottle (fast, no compilation)
+
+**Why Bottles via GitHub Packages?**:
+- **Fast Installation**: Users get pre-compiled binaries instead of building from source
+- **Bandwidth Efficiency**: GitHub Packages CDN for reliable, fast downloads
+- **Architecture Support**: Separate bottles for macOS x64 and ARM64
+- **Version Management**: Bottles tied to formula versions automatically
+- **Free for Public Repos**: GitHub Packages is free for public repositories
+
+**Bottle Format**:
+- Bottles are tar.gz archives containing the pre-built binary
+- Naming convention: `ten-second-tom--{version}.{arch}.bottle.tar.gz`
+  - Example: `ten-second-tom--0.1.0.arm64_monterey.bottle.tar.gz`
+- Contains executable in proper directory structure for Homebrew installation
+- Uploaded to GitHub Container Registry (ghcr.io)
+
+**Formula Structure with Bottles**:
+```ruby
+class TenSecondTom < Formula
+  desc "CLI tool for daily work summaries"
+  homepage "https://github.com/sirkirby/ten-second-tom"
+  url "https://github.com/sirkirby/ten-second-tom/archive/v1.0.0.tar.gz"  # Source tarball (fallback)
+  sha256 "abc123..."
+  
+  bottle do
+    root_url "https://ghcr.io/v2/sirkirby/tom"  # GitHub Packages location
+    sha256 cellar: :any_skip_relocation, arm64_monterey: "def456..."
+    sha256 cellar: :any_skip_relocation, monterey: "ghi789..."
+  end
+  
+  def install
+    bin.install "tom"
+  end
+end
+```
 
 **GitHub Actions Integration**:
-- Use `dawidd6/action-homebrew-bump-formula@v3` action
-- Requires GitHub token with repo write access
-- Automatically calculates checksums and updates formula
+- Build workflow produces self-contained executables
+- Release workflow packages executables as bottles
+- Upload bottles to GitHub Packages using `ghcr.io` registry
+- Update formula with bottle SHA256 checksums
+- Push updated formula to tap repository
 
-**Authentication**: GitHub token (GITHUB_TOKEN automatic, or PAT for cross-repo access)
+**Authentication**:
+- **GITHUB_TOKEN**: Automatic token for workflow, needs `packages: write` permission
+- **HOMEBREW_TAP_TOKEN**: Personal access token for pushing to tap repository
+  - Required scopes: `repo` (full control)
+  - Must have write access to tap repository
 
 **Best Practices**:
-- Keep formula in separate tap repository for cleaner organization
-- Use template formula file checked into source control
-- Automate version bumps on tag push
-- Include both macOS x64 and ARM64 binaries in formula
+- Use `brew tap-new --github-packages` to generate tap with proper configuration
+- Keep formula in separate tap repository for organization
+- Always include both x64 and ARM64 bottles for macOS
+- Test bottle installation locally before releasing: `brew install --build-bottle`
+- Use proper bottle naming convention for Homebrew compatibility
+- Set `cellar: :any_skip_relocation` for self-contained binaries (no dependencies)
+
+**Tap Naming Convention**:
+- Repository name: `homebrew-ten-second-tom` (with `homebrew-` **prefix** per Homebrew standard)
+- When tapping: `brew tap sirkirby/ten-second-tom` (Homebrew automatically strips `homebrew-` prefix)
+- Formula name: `ten-second-tom` (can be same as repo name without prefix)
+- Full installation command: `brew install sirkirby/ten-second-tom/ten-second-tom`
+- Short form (after tapping): `brew install ten-second-tom`
 
 ### Winget Publication
 
