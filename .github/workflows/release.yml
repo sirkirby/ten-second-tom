@@ -94,14 +94,26 @@ jobs:
         run: |
           VERSION="${{ steps.extract.outputs.version }}"
           
-          # Validate semver format: MAJOR.MINOR.PATCH
-          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "❌ Error: Invalid semantic version format: $VERSION"
-            echo "Expected format: MAJOR.MINOR.PATCH (e.g., 1.2.3)"
-            exit 1
+          # For manual testing, allow pre-release versions (e.g., 0.0.1-test)
+          # For production, only allow strict semver (MAJOR.MINOR.PATCH)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual dispatch: Allow semver with optional pre-release suffix
+            if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$'; then
+              echo "❌ Error: Invalid version format: $VERSION"
+              echo "Expected format: MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-prerelease"
+              echo "Examples: 1.2.3 or 0.0.1-test or 1.0.0-rc.1"
+              exit 1
+            fi
+          else
+            # Tag push: Strict semver only (no pre-release)
+            if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "❌ Error: Invalid semantic version format: $VERSION"
+              echo "Expected format: MAJOR.MINOR.PATCH (e.g., 1.2.3)"
+              exit 1
+            fi
           fi
           
-          echo "✅ Valid semantic version: $VERSION"
+          echo "✅ Valid version format: $VERSION"
       
       - name: Validate tag is on main branch
         id: validate
@@ -111,14 +123,20 @@ jobs:
           echo "commit-sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
           echo "📍 Tag commit: $COMMIT_SHA"
           
-          # Check if this commit is on main branch
-          if ! git branch -r --contains $COMMIT_SHA | grep -q "origin/main"; then
-            echo "❌ Error: Tag must be on a commit that exists on main branch"
-            echo "Please merge to main first, then tag the merge commit"
-            exit 1
+          # For manual testing, allow any branch
+          # For production tag push, enforce main branch only
+          if [ "${{ github.event_name }}" = "push" ]; then
+            # Check if this commit is on main branch
+            if ! git branch -r --contains $COMMIT_SHA | grep -q "origin/main"; then
+              echo "❌ Error: Tag must be on a commit that exists on main branch"
+              echo "Please merge to main first, then tag the merge commit"
+              exit 1
+            fi
+            echo "✅ Tag is on main branch"
+          else
+            echo "⚠️  Manual dispatch: Skipping main branch check"
+            echo "✅ Running on branch: ${{ github.ref_name }}"
           fi
-          
-          echo "✅ Tag is on main branch"
       
       - name: Check for duplicate version in releases
         env:
@@ -128,12 +146,18 @@ jobs:
           
           # Check if this version already exists as a release
           if gh release view "v$VERSION" &>/dev/null; then
-            echo "❌ Error: Release v$VERSION already exists"
-            echo "Please use a new version number"
-            exit 1
+            # For test versions, just warn instead of failing
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ] && echo "$VERSION" | grep -q -- "-"; then
+              echo "⚠️  Warning: Release v$VERSION already exists (test version)"
+              echo "💡 Consider using a different test version or deleting the existing one"
+            else
+              echo "❌ Error: Release v$VERSION already exists"
+              echo "Please use a new version number"
+              exit 1
+            fi
+          else
+            echo "✅ Version v$VERSION is unique"
           fi
-          
-          echo "✅ Version v$VERSION is unique"
       
       - name: Find build workflow artifacts
         id: find-artifacts
