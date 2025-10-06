@@ -85,31 +85,65 @@ The following secrets must be configured in the repository settings (`Settings �
 ### 2. Build Workflow
 
 **File**: `.github/workflows/build.yml`  
-**Trigger**: Pushes to `main` branch  
+**Trigger**: Pushes to `main` branch, manual dispatch  
 **Purpose**: Build cross-platform self-contained executables
 
 **Jobs**:
-- **Test**: Re-run all tests on main branch
-- **Build macOS x64**: Build for Intel Macs
-- **Build macOS ARM64**: Build for Apple Silicon Macs
-- **Build Windows x64**: Build for Windows
-- **Smoke Test**: Verify all executables run successfully
+1. **Test**: Re-run all tests on main branch to verify integrity
+2. **Build macOS x64**: Build self-contained executable for Intel Macs
+3. **Build macOS ARM64**: Build self-contained executable for Apple Silicon Macs
+4. **Build Windows x64**: Build self-contained executable for Windows
+5. **Verify macOS x64**: Smoke test Intel Mac executable with `--version`
+6. **Verify macOS ARM64**: Smoke test Apple Silicon executable with `--version`
+7. **Verify Windows x64**: Smoke test Windows executable with `--version`
 
 **Performance Targets**:
 - Test job: ≤5 minutes
-- Each build job: ≤5 minutes (parallel)
-- Smoke tests: <1 minute each
+- Each build job: ≤5 minutes (run in parallel)
+- Each verify job: <1 minute
 - Total: ≤15 minutes
 
-**Artifacts**:
-- Self-contained executables (<50MB each, 90 days retention)
-- SHA256 checksums for verification
-- Build metadata (version, commit, timestamp, size)
+**Build Configuration**:
+- **Runtime**: Self-contained (includes .NET runtime)
+- **Single File**: Executable + embedded dependencies
+- **Trimming**: Assembly-level IL trimming (`TrimMode=link`)
+- **Size Target**: <50MB per executable (enforced by workflow)
+- **Configuration Files**: `appsettings.json` excluded from single-file bundle
+- **Native Libraries**: Included alongside executable (e.g., `libsodium.dylib`)
+
+**Artifacts** (90 days retention):
+- `ten-second-tom-osx-x64`: macOS Intel executable + config + native libs
+- `ten-second-tom-osx-arm64`: macOS Apple Silicon executable + config + native libs
+- `ten-second-tom-win-x64`: Windows executable + config + native libs
+- Each artifact includes:
+  - Executable file (`TenSecondTom` or `TenSecondTom.exe`)
+  - Configuration files (`appsettings.json`, `appsettings.Development.json`)
+  - Native libraries (`libsodium.dylib` on macOS, DLLs on Windows)
+  - SHA256 checksum (in workflow output)
 
 **Platforms**:
-- macOS x64 (`osx-x64`)
-- macOS ARM64 (`osx-arm64`)
-- Windows x64 (`win-x64`)
+- **macOS x64** (`osx-x64`): Intel-based Macs (macOS 10.15+)
+- **macOS ARM64** (`osx-arm64`): Apple Silicon Macs (M1/M2/M3+)
+- **Windows x64** (`win-x64`): 64-bit Windows (Windows 10+)
+
+**Concurrency**: Uses `github.sha` to cancel duplicate builds for the same commit
+
+**Manual Triggering**: Available via Actions UI for debugging build issues
+
+**Build Process**:
+1. Restore NuGet packages (with caching)
+2. Publish self-contained executable with single-file bundling
+3. Verify executable size (fail if >50MB)
+4. Calculate SHA256 checksum
+5. Upload artifact with all runtime dependencies
+6. Download artifact and run smoke test (`--version`)
+
+**Troubleshooting Build Issues**:
+- **Trimming Warnings**: Add `TrimmerRootAssembly` directives for reflection-loaded assemblies
+- **Size Violations**: Review dependencies, enable more aggressive trimming
+- **Missing Config**: Ensure `ExcludeFromSingleFile=true` for config files
+- **Native Library Errors**: Include `*.dylib` (macOS) or `*.dll` (Windows) in artifact upload
+- **Smoke Test Failures**: Verify all runtime dependencies are in artifact
 
 ---
 
