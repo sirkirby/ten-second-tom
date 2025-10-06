@@ -248,11 +248,11 @@
 
 ## Phase 3.9: Build Workflow Polish
 
-- [ ] T033 [P] Add build workflow badge to `README.md`
+- [x] T033 [P] Add build workflow badge to `README.md`
   - Build workflow status badge
   - Link to latest artifacts
 
-- [ ] T034 [P] Update `docs/CICD.md` with build workflow documentation
+- [x] T034 [P] Update `docs/CICD.md` with build workflow documentation
   - Build workflow purpose and triggers
   - Platform-specific build details
   - Artifact specifications
