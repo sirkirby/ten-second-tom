@@ -258,14 +258,14 @@
   - Artifact specifications
   - Troubleshooting build failures
 
-- [ ] T035 Test build workflow manually using quickstart.md Scenario 2
+- [x] T035 Test build workflow manually using quickstart.md Scenario 2
   - Merge PR to main branch
   - Verify test job passes
   - Verify all three platform builds succeed
   - Download and verify each artifact
   - Run smoke tests locally on each platform
 
-- [ ] T036 Verify build workflow performance meets targets
+- [x] T036 Verify build workflow performance meets targets
   - Test job: ≤5 minutes
   - Each build job: ≤5 minutes (parallel)
   - Smoke tests: <1 minute each
