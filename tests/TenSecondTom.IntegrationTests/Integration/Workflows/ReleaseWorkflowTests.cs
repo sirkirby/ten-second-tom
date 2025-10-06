@@ -108,7 +108,7 @@ public sealed class ReleaseWorkflowTests
         // Assert
         hasJobs.Should().BeTrue("workflow should have jobs");
         jobNames.Should().Contain("validate-version", "workflow should have a version validation job");
-        jobNames.Should().Contain("build-release-artifacts", "workflow should have a build release artifacts job");
+        jobNames.Should().Contain("download-artifacts", "workflow should have a download artifacts job");
         jobNames.Should().Contain("create-github-release", "workflow should have a GitHub release creation job");
         jobNames.Should().Contain("publish-homebrew", "workflow should have a Homebrew publication job");
     }
@@ -190,7 +190,7 @@ public sealed class ReleaseWorkflowTests
         hasValidateStep.Should().BeTrue("validate-version job should validate semantic version format");
     }
 
-    [Fact]
+    [Fact(Skip = "Obsolete - build-release-artifacts job removed")]
     public void BuildReleaseArtifactsJob_Should_DependOnValidateVersion()
     {
         // Arrange
@@ -208,7 +208,7 @@ public sealed class ReleaseWorkflowTests
         dependencies.Should().Contain("validate-version", "build-release-artifacts job should depend on validate-version job");
     }
 
-    [Fact]
+    [Fact(Skip = "Obsolete - build-release-artifacts job removed")]
     public void BuildReleaseArtifactsJob_Should_UseMatrixForPlatforms()
     {
         // Arrange
@@ -227,7 +227,7 @@ public sealed class ReleaseWorkflowTests
         hasMatrix.Should().BeTrue("build-release-artifacts job should use matrix strategy for multiple platforms");
     }
 
-    [Fact]
+    [Fact(Skip = "Obsolete - build-release-artifacts job removed")]
     public void BuildReleaseArtifactsJob_Should_BuildAllPlatforms()
     {
         // Arrange
@@ -254,7 +254,7 @@ public sealed class ReleaseWorkflowTests
         platformList.Should().Contain(rid => rid != null && rid.Contains("win-x64"), "should build Windows x64");
     }
 
-    [Fact]
+    [Fact(Skip = "Obsolete - build-release-artifacts job removed")]
     public void BuildReleaseArtifactsJob_Should_CalculateChecksums()
     {
         // Arrange
@@ -278,7 +278,7 @@ public sealed class ReleaseWorkflowTests
         hasChecksumStep.Should().BeTrue("build-release-artifacts job should calculate SHA256 checksums");
     }
 
-    [Fact]
+    [Fact(Skip = "Obsolete - build-release-artifacts job removed")]
     public void BuildReleaseArtifactsJob_Should_VerifySizeLimit()
     {
         // Arrange
@@ -302,7 +302,7 @@ public sealed class ReleaseWorkflowTests
         hasSizeCheckStep.Should().BeTrue("build-release-artifacts job should verify executable size is <50MB");
     }
 
-    [Fact]
+    [Fact(Skip = "Obsolete - build-release-artifacts job removed")]
     public void BuildReleaseArtifactsJob_Should_RunSmokeTests()
     {
         // Arrange
@@ -326,7 +326,7 @@ public sealed class ReleaseWorkflowTests
     }
 
     [Fact]
-    public void CreateGitHubReleaseJob_Should_DependOnBuildArtifacts()
+    public void CreateGitHubReleaseJob_Should_DependOnDownloadArtifacts()
     {
         // Arrange
         var workflow = LoadWorkflow();
@@ -340,7 +340,7 @@ public sealed class ReleaseWorkflowTests
 
         // Assert
         releaseJob.Should().NotBeNull("create-github-release job should exist");
-        dependencies.Should().Contain("build-release-artifacts", "create-github-release job should depend on build-release-artifacts job");
+        dependencies.Should().Contain("download-artifacts", "create-github-release job should depend on download-artifacts job");
     }
 
     [Fact]
@@ -377,10 +377,11 @@ public sealed class ReleaseWorkflowTests
         var hasReleaseNotesStep = steps.Any(step =>
         {
             var stepDict = step as Dictionary<object, object>;
-            var name = stepDict?["name"]?.ToString() ?? "";
-            var uses = stepDict?["uses"]?.ToString() ?? "";
+            var name = stepDict?.TryGetValue("name", out var nameObj) == true ? nameObj?.ToString() ?? "" : "";
+            var run = stepDict?.TryGetValue("run", out var runObj) == true ? runObj?.ToString() ?? "" : "";
             return name.Contains("release notes", StringComparison.OrdinalIgnoreCase) ||
-                   uses.Contains("release-notes", StringComparison.OrdinalIgnoreCase);
+                   run.Contains("NOTES=", StringComparison.OrdinalIgnoreCase) ||
+                   run.Contains("changelog", StringComparison.OrdinalIgnoreCase);
         });
 
         // Assert
@@ -400,10 +401,12 @@ public sealed class ReleaseWorkflowTests
         var hasCreateReleaseStep = steps.Any(step =>
         {
             var stepDict = step as Dictionary<object, object>;
-            var uses = stepDict?["uses"]?.ToString() ?? "";
-            var name = stepDict?["name"]?.ToString() ?? "";
+            var uses = stepDict?.TryGetValue("uses", out var usesObj) == true ? usesObj?.ToString() ?? "" : "";
+            var name = stepDict?.TryGetValue("name", out var nameObj) == true ? nameObj?.ToString() ?? "" : "";
+            var run = stepDict?.TryGetValue("run", out var runObj) == true ? runObj?.ToString() ?? "" : "";
             return uses.Contains("create-release", StringComparison.OrdinalIgnoreCase) ||
                    uses.Contains("gh-release", StringComparison.OrdinalIgnoreCase) ||
+                   run.Contains("gh release create", StringComparison.OrdinalIgnoreCase) ||
                    name.Contains("Create release", StringComparison.OrdinalIgnoreCase);
         });
 
@@ -442,8 +445,8 @@ public sealed class ReleaseWorkflowTests
         var usesHomebrewToken = steps.Any(step =>
         {
             var stepDict = step as Dictionary<object, object>;
-            var env = stepDict?["env"] as Dictionary<object, object>;
-            var with_ = stepDict?["with"] as Dictionary<object, object>;
+            var env = stepDict?.TryGetValue("env", out var envObj) == true ? envObj as Dictionary<object, object> : null;
+            var with_ = stepDict?.TryGetValue("with", out var withObj) == true ? withObj as Dictionary<object, object> : null;
             
             var envValues = env?.Values.Select(v => v.ToString()).ToList() ?? [];
             var withValues = with_?.Values.Select(v => v.ToString()).ToList() ?? [];
@@ -469,10 +472,11 @@ public sealed class ReleaseWorkflowTests
         var hasFormulaUpdateStep = steps.Any(step =>
         {
             var stepDict = step as Dictionary<object, object>;
-            var name = stepDict?["name"]?.ToString() ?? "";
-            var run = stepDict?["run"]?.ToString() ?? "";
+            var name = stepDict?.TryGetValue("name", out var nameObj) == true ? nameObj?.ToString() ?? "" : "";
+            var run = stepDict?.TryGetValue("run", out var runObj) == true ? runObj?.ToString() ?? "" : "";
             return name.Contains("formula", StringComparison.OrdinalIgnoreCase) ||
-                   run.Contains("formula", StringComparison.OrdinalIgnoreCase);
+                   run.Contains("formula", StringComparison.OrdinalIgnoreCase) ||
+                   run.Contains("git push", StringComparison.OrdinalIgnoreCase);
         });
 
         // Assert
@@ -490,7 +494,10 @@ public sealed class ReleaseWorkflowTests
         var hasProductionEnvironment = jobs?.Values.Any(jobObj =>
         {
             var job = jobObj as Dictionary<object, object>;
-            var environment = job?["environment"];
+            if (job?.TryGetValue("environment", out var environment) != true)
+            {
+                return false;
+            }
             
             if (environment is string envString)
             {
@@ -543,8 +550,8 @@ public sealed class ReleaseWorkflowTests
         var hasDuplicateCheckStep = steps.Any(step =>
         {
             var stepDict = step as Dictionary<object, object>;
-            var name = stepDict?["name"]?.ToString() ?? "";
-            var run = stepDict?["run"]?.ToString() ?? "";
+            var name = stepDict?.TryGetValue("name", out var nameObj) == true ? nameObj?.ToString() ?? "" : "";
+            var run = stepDict?.TryGetValue("run", out var runObj) == true ? runObj?.ToString() ?? "" : "";
             return name.Contains("duplicate", StringComparison.OrdinalIgnoreCase) ||
                    name.Contains("exists", StringComparison.OrdinalIgnoreCase) ||
                    run.Contains("gh release view", StringComparison.OrdinalIgnoreCase);
@@ -554,7 +561,7 @@ public sealed class ReleaseWorkflowTests
         hasDuplicateCheckStep.Should().BeTrue("validate-version job should check for duplicate version in releases");
     }
 
-    [Fact]
+    [Fact(Skip = "Obsolete - build-release-artifacts job removed")]
     public void BuildReleaseArtifactsJob_Should_UploadArtifacts()
     {
         // Arrange
@@ -588,8 +595,8 @@ public sealed class ReleaseWorkflowTests
         var hasValidationStep = steps.Any(step =>
         {
             var stepDict = step as Dictionary<object, object>;
-            var name = stepDict?["name"]?.ToString() ?? "";
-            var run = stepDict?["run"]?.ToString() ?? "";
+            var name = stepDict?.TryGetValue("name", out var nameObj) == true ? nameObj?.ToString() ?? "" : "";
+            var run = stepDict?.TryGetValue("run", out var runObj) == true ? runObj?.ToString() ?? "" : "";
             return name.Contains("validate", StringComparison.OrdinalIgnoreCase) ||
                    run.Contains("brew audit", StringComparison.OrdinalIgnoreCase) ||
                    run.Contains("brew style", StringComparison.OrdinalIgnoreCase);
