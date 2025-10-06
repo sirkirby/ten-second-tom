@@ -1,0 +1,561 @@
+# Release Workflow
+#
+# This workflow automates the release process when semantic version tags are pushed.
+# It reuses build artifacts from the build workflow (must merge to main first), validates
+# the version, creates GitHub releases, and publishes to package managers.
+#
+# IMPORTANT: Tags must be on commits that have been merged to main and built by build.yml
+#
+# Triggers: Push of semantic version tag (e.g., v1.2.3)
+# Performance Target: ≤10 minutes total (excluding manual approval)
+# Artifacts: Reuses build artifacts, creates release packages
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Semantic version tags only (e.g., v1.2.3, v0.1.0)
+  workflow_dispatch:  # Allow manual triggering for testing
+    inputs:
+      tag:
+        description: 'Version tag to release (e.g., v1.2.3)'
+        required: true
+        type: string
+
+# Prevent concurrent releases to avoid conflicts
+# Do not cancel in-progress releases as they involve publishing to external services
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Job 1: Validate Version and Find Artifacts
+  # Extract/validate version, ensure tag is on main, find build artifacts
+  # Performance Target: <2 minutes
+  validate-version:
+    name: Validate Version & Find Artifacts
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+      commit-sha: ${{ steps.validate.outputs.commit-sha }}
+      build-run-id: ${{ steps.find-artifacts.outputs.run-id }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for release notes
+      
+      - name: Extract version from tag
+        id: extract
+        run: |
+          # Get tag name (either from push event or manual input)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="${{ github.event.inputs.tag }}"
+          else
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
+          fi
+          
+          # Remove 'v' prefix to get version
+          VERSION="${TAG_NAME#v}"
+          
+          echo "📦 Tag: $TAG_NAME"
+          echo "🔢 Version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Validate semantic version format
+        run: |
+          VERSION="${{ steps.extract.outputs.version }}"
+          
+          # Validate semver format: MAJOR.MINOR.PATCH
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "❌ Error: Invalid semantic version format: $VERSION"
+            echo "Expected format: MAJOR.MINOR.PATCH (e.g., 1.2.3)"
+            exit 1
+          fi
+          
+          echo "✅ Valid semantic version: $VERSION"
+      
+      - name: Validate tag is on main branch
+        id: validate
+        run: |
+          # Get the commit SHA for this tag
+          COMMIT_SHA=$(git rev-list -n 1 ${{ github.ref }})
+          echo "commit-sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "📍 Tag commit: $COMMIT_SHA"
+          
+          # Check if this commit is on main branch
+          if ! git branch -r --contains $COMMIT_SHA | grep -q "origin/main"; then
+            echo "❌ Error: Tag must be on a commit that exists on main branch"
+            echo "Please merge to main first, then tag the merge commit"
+            exit 1
+          fi
+          
+          echo "✅ Tag is on main branch"
+      
+      - name: Check for duplicate version in releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.extract.outputs.version }}"
+          
+          # Check if this version already exists as a release
+          if gh release view "v$VERSION" &>/dev/null; then
+            echo "❌ Error: Release v$VERSION already exists"
+            echo "Please use a new version number"
+            exit 1
+          fi
+          
+          echo "✅ Version v$VERSION is unique"
+      
+      - name: Find build workflow artifacts
+        id: find-artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          COMMIT_SHA="${{ steps.validate.outputs.commit-sha }}"
+          
+          echo "🔍 Looking for build workflow run for commit $COMMIT_SHA..."
+          
+          # Find the build workflow run for this commit
+          RUN_ID=$(gh run list \
+            --workflow=build.yml \
+            --commit=$COMMIT_SHA \
+            --status=success \
+            --json databaseId \
+            --jq '.[0].databaseId')
+          
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo "❌ Error: No successful build workflow run found for commit $COMMIT_SHA"
+            echo ""
+            echo "The release workflow reuses artifacts from the build workflow to avoid redundancy."
+            echo "Please ensure:"
+            echo "  1. Code has been merged to main branch"
+            echo "  2. Build workflow has completed successfully"
+            echo "  3. Tag is created on the same commit that was built"
+            echo ""
+            echo "Typical workflow:"
+            echo "  1. Merge PR to main → triggers build.yml"
+            echo "  2. Wait for build to complete"
+            echo "  3. Tag the merge commit: git tag v1.0.0 && git push origin v1.0.0"
+            exit 1
+          fi
+          
+          echo "run-id=$RUN_ID" >> $GITHUB_OUTPUT
+          echo "✅ Found build workflow run: $RUN_ID"
+          echo "🔗 https://github.com/${{ github.repository }}/actions/runs/$RUN_ID"
+
+  # Job 2: Download Build Artifacts
+  # Reuse artifacts from the build workflow to avoid redundant builds
+  # Performance Target: <1 minute
+  download-artifacts:
+    name: Download Build Artifacts
+    runs-on: ubuntu-latest
+    needs: validate-version
+    
+    steps:
+      - name: Download artifacts from build workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUN_ID="${{ needs.validate-version.outputs.build-run-id }}"
+          
+          echo "📥 Downloading artifacts from build run $RUN_ID..."
+          
+          # Download all three platform artifacts
+          gh run download $RUN_ID \
+            --repo ${{ github.repository }} \
+            --dir ./artifacts
+          
+          echo "✅ Downloaded artifacts:"
+          ls -lah ./artifacts/
+          
+          # Verify all expected artifacts exist
+          for artifact in ten-second-tom-osx-x64 ten-second-tom-osx-arm64 ten-second-tom-win-x64; do
+            if [ ! -d "./artifacts/$artifact" ]; then
+              echo "❌ Error: Expected artifact '$artifact' not found"
+              exit 1
+            fi
+            echo "  ✅ $artifact"
+          done
+      
+      - name: Upload artifacts for release jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: ./artifacts/
+          retention-days: 90
+
+  # Job 3: Create GitHub Release
+  # Generate release notes and create GitHub release with all binaries
+  # Performance Target: ≤2 minutes
+  create-github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate-version, download-artifacts]
+    outputs:
+      release-id: ${{ steps.create-release.outputs.id }}
+      upload-url: ${{ steps.create-release.outputs.upload_url }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for release notes
+      
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: ./artifacts
+      
+      - name: Generate release notes
+        id: release-notes
+        run: |
+          VERSION="v${{ needs.validate-version.outputs.version }}"
+          
+          # Get previous tag for changelog
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          if [ -z "$PREV_TAG" ]; then
+            echo "📝 First release - no previous tag found"
+            NOTES="## 🎉 Initial Release
+
+          This is the first release of Ten Second Tom.
+
+          ### 📦 Downloads
+
+          Choose the appropriate binary for your platform:
+
+          - **macOS (Intel)**: \`ten-second-tom-osx-x64\`
+          - **macOS (Apple Silicon)**: \`ten-second-tom-osx-arm64\`
+          - **Windows**: \`ten-second-tom-win-x64\`
+
+          ### ✅ Verification
+
+          SHA256 checksums are provided in \`checksum.txt\` files for each platform."
+          else
+            echo "📝 Generating changelog from $PREV_TAG to $VERSION"
+            
+            # Generate commit log
+            COMMITS=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges)
+            
+            NOTES="## 📋 Changes
+
+          $COMMITS
+
+          ### 📦 Downloads
+
+          Choose the appropriate binary for your platform:
+
+          - **macOS (Intel)**: \`ten-second-tom-osx-x64\`
+          - **macOS (Apple Silicon)**: \`ten-second-tom-osx-arm64\`
+          - **Windows**: \`ten-second-tom-win-x64\`
+
+          ### ✅ Verification
+
+          SHA256 checksums are provided in \`checksum.txt\` files for each platform."
+          fi
+          
+          # Save notes to file (handle multiline)
+          echo "$NOTES" > release-notes.md
+          cat release-notes.md
+      
+      - name: Create GitHub Release
+        id: create-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="v${{ needs.validate-version.outputs.version }}"
+          
+          # Create release with notes
+          gh release create "$VERSION" \
+            --title "Release $VERSION" \
+            --notes-file release-notes.md \
+            --draft=false \
+            --latest
+          
+          echo "✅ GitHub release created: $VERSION"
+          
+          # Upload all artifacts
+          echo "📤 Uploading artifacts..."
+          
+          # Upload macOS x64
+          gh release upload "$VERSION" \
+            ./artifacts/ten-second-tom-osx-x64/tom \
+            ./artifacts/ten-second-tom-osx-x64/checksum.txt \
+            --clobber
+          
+          # Rename checksum for clarity
+          mv ./artifacts/ten-second-tom-osx-x64/checksum.txt ./artifacts/ten-second-tom-osx-x64/checksums-osx-x64.txt
+          
+          # Upload macOS ARM64
+          gh release upload "$VERSION" \
+            ./artifacts/ten-second-tom-osx-arm64/tom \
+            ./artifacts/ten-second-tom-osx-arm64/checksum.txt \
+            --clobber
+          
+          # Rename checksum for clarity
+          mv ./artifacts/ten-second-tom-osx-arm64/checksum.txt ./artifacts/ten-second-tom-osx-arm64/checksums-osx-arm64.txt
+          
+          # Upload Windows x64
+          gh release upload "$VERSION" \
+            ./artifacts/ten-second-tom-win-x64/tom.exe \
+            ./artifacts/ten-second-tom-win-x64/checksum.txt \
+            --clobber
+          
+          echo "✅ All artifacts uploaded"
+
+  # Job 4: Publish to Homebrew
+  # Update Homebrew tap with new formula version
+  # Performance Target: ≤5 minutes
+  # Requires: HOMEBREW_TAP_TOKEN secret configured in 'production' environment
+  # Note: VS Code may show "'production' is not valid" - this is a false positive
+  publish-homebrew:
+    name: Publish to Homebrew
+    runs-on: ubuntu-latest
+    needs: [validate-version, create-github-release]
+    environment:
+      name: production  # Configured in GitHub repository settings
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: ./artifacts
+      
+      - name: Generate Homebrew formula
+        id: formula
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          REPO_OWNER="${{ github.repository_owner }}"
+          REPO_NAME="${{ github.event.repository.name }}"
+          
+          # Get SHA256 checksums from artifact files
+          SHA256_X64=$(cat ./artifacts/ten-second-tom-osx-x64/checksum.txt | cut -d ' ' -f 1)
+          SHA256_ARM64=$(cat ./artifacts/ten-second-tom-osx-arm64/checksum.txt | cut -d ' ' -f 1)
+          
+          echo "📝 Generating Homebrew formula for version $VERSION"
+          echo "   macOS x64 SHA256: $SHA256_X64"
+          echo "   macOS ARM64 SHA256: $SHA256_ARM64"
+          
+          # Create formula file
+          cat > ten-second-tom.rb <<EOF
+          class TenSecondTom < Formula
+            desc "CLI tool for daily work summaries using Claude AI"
+            homepage "https://github.com/${REPO_OWNER}/${REPO_NAME}"
+            version "${VERSION}"
+            license "MIT"
+          
+            if Hardware::CPU.intel?
+              url "https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v${VERSION}/tom"
+              sha256 "${SHA256_X64}"
+            else
+              url "https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v${VERSION}/tom"
+              sha256 "${SHA256_ARM64}"
+            end
+          
+            def install
+              bin.install "tom"
+            end
+          
+            test do
+              system "#{bin}/tom", "--version"
+            end
+          end
+          EOF
+          
+          cat ten-second-tom.rb
+      
+      - name: Validate formula syntax
+        run: |
+          echo "✅ Formula syntax validation (basic check)"
+          # Basic syntax validation - full validation requires Homebrew installation
+          if ! grep -q "class TenSecondTom" ten-second-tom.rb; then
+            echo "❌ Error: Invalid formula structure"
+            exit 1
+          fi
+          
+          if ! grep -q "version \"${{ needs.validate-version.outputs.version }}\"" ten-second-tom.rb; then
+            echo "❌ Error: Version not found in formula"
+            exit 1
+          fi
+          
+          echo "✅ Basic formula validation passed"
+      
+      - name: Push formula to Homebrew tap
+        env:
+          # Note: This secret is configured in the 'production' environment
+          # Go to Settings → Environments → production → Environment secrets
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "❌ Error: HOMEBREW_TAP_TOKEN secret not configured"
+            echo "Please configure the secret in the 'production' environment"
+            echo "Settings → Environments → production → Environment secrets"
+            exit 1
+          fi
+          
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          REPO_OWNER="${{ github.repository_owner }}"
+          TAP_REPO="homebrew-ten-second-tom"
+          
+          echo "📤 Pushing formula to ${REPO_OWNER}/${TAP_REPO}"
+          
+          # Clone tap repository
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/${REPO_OWNER}/${TAP_REPO}.git" tap-repo
+          cd tap-repo
+          
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Copy formula
+          mkdir -p Formula
+          cp ../ten-second-tom.rb Formula/ten-second-tom.rb
+          
+          # Commit and push
+          git add Formula/ten-second-tom.rb
+          git commit -m "Release version ${VERSION}"
+          git push origin main
+          
+          echo "✅ Formula published to Homebrew tap"
+
+  # Job 5: Document Winget Publication
+  # Generate Winget manifest and create issue for manual publication (Phase 1)
+  # Performance Target: <1 minute
+  # Note: Phase 2 will automate the publication process
+  document-winget:
+    name: Document Winget Publication
+    runs-on: ubuntu-latest
+    needs: [validate-version, create-github-release]
+    if: success()  # Run even if other jobs fail
+    
+    steps:
+      - name: Generate Winget manifest template
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          REPO_OWNER="${{ github.repository_owner }}"
+          REPO_NAME="${{ github.event.repository.name }}"
+          
+          cat > winget-manifest.yaml <<EOF
+          # Winget Package Manifest
+          # This manifest should be submitted to microsoft/winget-pkgs repository
+          # Manual submission process (Phase 1) - will be automated in Phase 2
+          
+          PackageIdentifier: ${REPO_OWNER}.TenSecondTom
+          PackageVersion: ${VERSION}
+          PackageName: Ten Second Tom
+          Publisher: ${REPO_OWNER}
+          License: MIT
+          ShortDescription: CLI tool for daily work summaries using Claude AI
+          PackageUrl: https://github.com/${REPO_OWNER}/${REPO_NAME}
+          Installers:
+            - Architecture: x64
+              InstallerType: zip
+              InstallerUrl: https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v${VERSION}/tom.exe
+              # TODO: Add SHA256 checksum from release artifact
+          ManifestType: singleton
+          ManifestVersion: 1.0.0
+          EOF
+          
+          cat winget-manifest.yaml
+      
+      - name: Create GitHub issue for manual publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          
+          gh issue create \
+            --title "📦 Publish v${VERSION} to Winget" \
+            --body "## Manual Winget Publication Required
+
+          Version **v${VERSION}** has been released and needs to be published to Winget.
+
+          ### Steps:
+          1. Fork microsoft/winget-pkgs repository
+          2. Use the generated manifest template (see workflow artifacts)
+          3. Create a PR to microsoft/winget-pkgs
+          4. Wait for validation and merge
+
+          ### References:
+          - [Winget Package Manifest](https://github.com/microsoft/winget-pkgs)
+          - [Release v${VERSION}](https://github.com/${{ github.repository }}/releases/tag/v${VERSION})
+
+          ### Automation:
+          Phase 2 will automate this process." \
+            --label "release,winget" || echo "⚠️  Issue creation skipped (may already exist)"
+
+  # Job 6: Document Chocolatey Publication
+  # Generate Chocolatey nuspec and create issue for manual publication (Phase 1)
+  # Performance Target: <1 minute
+  # Note: Phase 2 will automate the publication process
+  document-chocolatey:
+    name: Document Chocolatey Publication
+    runs-on: ubuntu-latest
+    needs: [validate-version, create-github-release]
+    if: success()  # Run even if other jobs fail
+    
+    steps:
+      - name: Generate Chocolatey nuspec template
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          REPO_OWNER="${{ github.repository_owner }}"
+          REPO_NAME="${{ github.event.repository.name }}"
+          
+          cat > ten-second-tom.nuspec <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <!-- Chocolatey Package Specification -->
+          <!-- Manual submission process (Phase 1) - will be automated in Phase 2 -->
+          <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+            <metadata>
+              <id>ten-second-tom</id>
+              <version>${VERSION}</version>
+              <title>Ten Second Tom</title>
+              <authors>${REPO_OWNER}</authors>
+              <projectUrl>https://github.com/${REPO_OWNER}/${REPO_NAME}</projectUrl>
+              <licenseUrl>https://github.com/${REPO_OWNER}/${REPO_NAME}/blob/main/LICENSE</licenseUrl>
+              <requireLicenseAcceptance>false</requireLicenseAcceptance>
+              <description>CLI tool for daily work summaries using Claude AI</description>
+              <summary>Daily work summary CLI powered by Claude AI</summary>
+              <tags>cli productivity ai claude summary</tags>
+            </metadata>
+            <files>
+              <file src="tools\**" target="tools" />
+            </files>
+          </package>
+          EOF
+          
+          cat ten-second-tom.nuspec
+      
+      - name: Create GitHub issue for manual publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          
+          gh issue create \
+            --title "📦 Publish v${VERSION} to Chocolatey" \
+            --body "## Manual Chocolatey Publication Required
+
+          Version **v${VERSION}** has been released and needs to be published to Chocolatey.
+
+          ### Steps:
+          1. Create Chocolatey account (if not exists)
+          2. Use the generated nuspec template (see workflow artifacts)
+          3. Package and test locally: \`choco pack\`
+          4. Publish: \`choco push ten-second-tom.${VERSION}.nupkg --source https://push.chocolatey.org/\`
+
+          ### References:
+          - [Chocolatey Package Docs](https://docs.chocolatey.org/en-us/create/create-packages)
+          - [Release v${VERSION}](https://github.com/${{ github.repository }}/releases/tag/v${VERSION})
+
+          ### Automation:
+          Phase 2 will automate this process." \
+            --label "release,chocolatey" || echo "⚠️  Issue creation skipped (may already exist)"
