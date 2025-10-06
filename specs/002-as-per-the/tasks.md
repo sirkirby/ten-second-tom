@@ -659,6 +659,20 @@ Task: "Verify performance targets"
   - **Fix**: Updated artifact upload paths to include `appsettings*.json` and native libraries (`*.dylib`, `*.dll`)
   - **Result**: Artifacts now contain all runtime dependencies (executable + config + native libs)
 
+**Manual Testing Notes (2025-10-06)**:
+
+- **Issue 5**: macOS Gatekeeper blocks unsigned executable
+  - **Symptom**: "Apple could not verify TenSecondTom is free of malware" warning
+  - **Workaround**: Users must explicitly allow via System Settings or right-click → Open
+  - **Status**: Expected behavior for unsigned binaries; code signing deferred to future phase
+- **Issue 6**: SSH agent auto-detection not working in production builds
+  - **Symptom**: Authentication fell back to file-based even with 1Password running
+  - **Root Cause 1**: `AuthenticationServiceFactory` only checked `SSH_AUTH_SOCK` environment variable
+  - **Root Cause 2**: Missing `Auth` configuration section in `appsettings.json`
+  - **Root Cause 3**: No default `PublicKeyPath` for standard SSH key locations
+  - **Fix**: Added `Auth.SshAgentProvider=Auto` and `Auth.PublicKeyPath=~/.ssh/id_ed25519.pub` to appsettings.json; updated factory to use `SshAgentProviderResolver`
+  - **Result**: SSH agent (1Password/Secretive/System) auto-detection works in production without .env file
+
 ### Release Workflow (Phase 3)
 
 ✅ Release workflow triggers on semantic version tags
