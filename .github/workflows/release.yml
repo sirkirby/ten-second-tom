@@ -63,12 +63,36 @@ permissions:
   issues: write        # Required for creating Winget/Chocolatey publication issues
 
 jobs:
+  select-runner:
+    name: Select Linux Runner
+    runs-on: ubuntu-latest
+    outputs:
+      linux: ${{ steps.detect.outputs.linux }}
+
+    steps:
+      - name: Detect available self-hosted runners
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUNNERS=$(gh api repos/${{ github.repository }}/actions/runners --paginate)
+          LINUX_COUNT=$(echo "$RUNNERS" | jq '[.runners[]? | select(.status == "online" and .os == "linux" and (.labels[]?.name == "self-hosted"))] | length')
+
+          if [ "$LINUX_COUNT" -gt 0 ]; then
+            echo "🤖 Found $LINUX_COUNT online self-hosted Linux runner(s); selecting self-hosted"
+            echo "linux=self-hosted" >> "$GITHUB_OUTPUT"
+          else
+            echo "☁️ No online self-hosted Linux runners found; using ubuntu-latest"
+            echo "linux=ubuntu-latest" >> "$GITHUB_OUTPUT"
+          fi
+
   # Job 1: Validate Version and Find Artifacts
   # Extract/validate version, ensure tag is on main, find build artifacts
   # Performance Target: <2 minutes
   validate-version:
     name: Validate Version & Find Artifacts
-    runs-on: ubuntu-latest
+    needs: select-runner
+    runs-on: ${{ needs.select-runner.outputs.linux }}
     outputs:
       version: ${{ steps.extract.outputs.version }}
       commit-sha: ${{ steps.validate.outputs.commit-sha }}
@@ -198,8 +222,8 @@ jobs:
   # Performance Target: <1 minute
   download-artifacts:
     name: Download Build Artifacts
-    runs-on: ubuntu-latest
-    needs: validate-version
+    runs-on: ${{ needs.select-runner.outputs.linux }}
+    needs: [select-runner, validate-version]
     
     steps:
       - name: Download artifacts from build workflow
@@ -239,8 +263,8 @@ jobs:
   # Performance Target: ≤2 minutes
   create-github-release:
     name: Create GitHub Release
-    runs-on: ubuntu-latest
-    needs: [validate-version, download-artifacts]
+    runs-on: ${{ needs.select-runner.outputs.linux }}
+    needs: [select-runner, validate-version, download-artifacts]
     outputs:
       release-id: ${{ steps.create-release.outputs.id }}
       upload-url: ${{ steps.create-release.outputs.upload_url }}
@@ -596,8 +620,8 @@ jobs:
   # Note: Phase 2 will automate the publication process
   document-winget:
     name: Document Winget Publication
-    runs-on: ubuntu-latest
-    needs: [validate-version, create-github-release]
+    runs-on: ${{ needs.select-runner.outputs.linux }}
+    needs: [select-runner, validate-version, create-github-release]
     if: success()  # Run even if other jobs fail
     
     steps:
@@ -663,8 +687,8 @@ jobs:
   # Note: Phase 2 will automate the publication process
   document-chocolatey:
     name: Document Chocolatey Publication
-    runs-on: ubuntu-latest
-    needs: [validate-version, create-github-release]
+    runs-on: ${{ needs.select-runner.outputs.linux }}
+    needs: [select-runner, validate-version, create-github-release]
     if: success()  # Run even if other jobs fail
     
     steps:
