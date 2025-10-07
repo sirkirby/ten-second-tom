@@ -476,31 +476,37 @@ jobs:
           
           echo "📝 Generating Homebrew formula for version $VERSION with bottle support"
           
-          # Create formula file with bottle block
-          cat > ten-second-tom.rb <<FORMULA
-          class TenSecondTom < Formula
-            desc "CLI tool for daily work summaries using Claude AI"
-            homepage "https://github.com/${REPO_OWNER}/${REPO_NAME}"
-            url "https://github.com/${REPO_OWNER}/${REPO_NAME}/archive/refs/tags/v${VERSION}.tar.gz"
-            version "${VERSION}"
-            license "MIT"
+          # Download source tarball to calculate SHA256
+          SOURCE_TARBALL_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/archive/refs/tags/v${VERSION}.tar.gz"
+          curl -sSL "$SOURCE_TARBALL_URL" -o source.tar.gz
+          SOURCE_SHA=$(shasum -a 256 source.tar.gz | cut -d ' ' -f 1)
+          echo "Source tarball SHA256: $SOURCE_SHA"
           
-            # Bottles (pre-built binaries) for fast installation
-            bottle do
-              root_url "https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v${VERSION}"
-              sha256 cellar: :any_skip_relocation, ${BOTTLE_TAG_ARM64}: "${BOTTLE_SHA_ARM64}"
-              sha256 cellar: :any_skip_relocation, ${BOTTLE_TAG_X64}: "${BOTTLE_SHA_X64}"
-            end
-          
-            def install
-              bin.install "tom"
-            end
-          
-            test do
-              system "#{bin}/tom", "--version"
-            end
-          end
-          FORMULA
+          # Create formula file with bottle block using echo to avoid heredoc YAML issues
+          {
+            echo "class TenSecondTom < Formula"
+            echo "  desc \"CLI tool for daily work summaries using Claude AI\""
+            echo "  homepage \"https://github.com/${REPO_OWNER}/${REPO_NAME}\""
+            echo "  url \"https://github.com/${REPO_OWNER}/${REPO_NAME}/archive/refs/tags/v${VERSION}.tar.gz\""
+            echo "  sha256 \"${SOURCE_SHA}\""
+            echo "  license \"MIT\""
+            echo ""
+            echo "  # Bottles (pre-built binaries) for fast installation"
+            echo "  bottle do"
+            echo "    root_url \"https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v${VERSION}\""
+            echo "    sha256 cellar: :any_skip_relocation, ${BOTTLE_TAG_ARM64}: \"${BOTTLE_SHA_ARM64}\""
+            echo "    sha256 cellar: :any_skip_relocation, ${BOTTLE_TAG_X64}:     \"${BOTTLE_SHA_X64}\""
+            echo "  end"
+            echo ""
+            echo "  def install"
+            echo "    bin.install \"tom\""
+            echo "  end"
+            echo ""
+            echo "  test do"
+            echo "    system \"#{bin}/tom\", \"--version\""
+            echo "  end"
+            echo "end"
+          } > ten-second-tom.rb
           
           cat ten-second-tom.rb
       
