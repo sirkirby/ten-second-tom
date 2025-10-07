@@ -60,6 +60,7 @@ permissions:
   contents: write      # Required for creating releases and reading repo
   actions: read        # Required for downloading artifacts from build workflow
   packages: write      # Required for GitHub Packages (bottles)
+  issues: write        # Required for creating Winget/Chocolatey publication issues
 
 jobs:
   # Job 1: Validate Version and Find Artifacts
@@ -634,6 +635,7 @@ jobs:
           VERSION="${{ needs.validate-version.outputs.version }}"
           
           gh issue create \
+            --repo ${{ github.repository }} \
             --title "📦 Publish v${VERSION} to Winget" \
             --body "## Manual Winget Publication Required
 
@@ -702,6 +704,7 @@ jobs:
           VERSION="${{ needs.validate-version.outputs.version }}"
           
           gh issue create \
+            --repo ${{ github.repository }} \
             --title "📦 Publish v${VERSION} to Chocolatey" \
             --body "## Manual Chocolatey Publication Required
 
