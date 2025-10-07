@@ -208,11 +208,11 @@ jobs:
         run: |
           # Extract line coverage percentage from Cobertura XML
           COVERAGE=$(grep -oP 'line-rate="\K[0-9.]+' ./coverage/report/Cobertura.xml | head -1)
-          COVERAGE_PERCENT=$(echo "$COVERAGE * 100" | bc)
-          COVERAGE_PERCENT_INT=${COVERAGE_PERCENT%.*}
+          # Convert to percentage using awk (no bc dependency)
+          COVERAGE_PERCENT=$(awk "BEGIN {printf \"%.0f\", $COVERAGE * 100}")
           
-          echo "percentage=$COVERAGE_PERCENT_INT" >> $GITHUB_OUTPUT
-          echo "📊 Line Coverage: $COVERAGE_PERCENT_INT%"
+          echo "percentage=$COVERAGE_PERCENT" >> $GITHUB_OUTPUT
+          echo "📊 Line Coverage: $COVERAGE_PERCENT%"
           
           # Display full coverage summary (line, branch, method)
           cat ./coverage/report/Summary.txt
@@ -232,22 +232,26 @@ jobs:
           BASELINE_COVERAGE=$(cat ./coverage/baseline.txt || echo "0")
           MAX_DECREASE=${{ env.MAX_COVERAGE_DECREASE }}
           
-          # Calculate the difference (negative means decrease)
-          DIFF=$(echo "$CURRENT_COVERAGE - $BASELINE_COVERAGE" | bc)
+          # Calculate the difference using awk (no bc dependency)
+          DIFF=$(awk "BEGIN {printf \"%.1f\", $CURRENT_COVERAGE - $BASELINE_COVERAGE}")
           
           echo "📊 Current line coverage: $CURRENT_COVERAGE%"
           echo "📊 Baseline line coverage: $BASELINE_COVERAGE%"
           echo "📊 Change: $DIFF percentage points"
           echo "📊 Max allowed decrease: -$MAX_DECREASE percentage points"
           
-          # Check if coverage decreased more than allowed
-          if (( $(echo "$DIFF < -$MAX_DECREASE" | bc -l) )); then
+          # Check if coverage decreased more than allowed using awk
+          REGRESSION=$(awk "BEGIN {print ($DIFF < -$MAX_DECREASE) ? 1 : 0}")
+          
+          if [ "$REGRESSION" -eq 1 ]; then
             echo "❌ Coverage regression detected: decreased by $DIFF percentage points"
             echo "Please add tests to maintain or improve coverage."
             exit 1
           else
             echo "✅ Coverage check passed: no significant regression"
-            if (( $(echo "$DIFF > 0" | bc -l) )); then
+            # Check if coverage improved
+            IMPROVED=$(awk "BEGIN {print ($DIFF > 0) ? 1 : 0}")
+            if [ "$IMPROVED" -eq 1 ]; then
               echo "🎉 Coverage improved by $DIFF percentage points!"
             fi
           fi
