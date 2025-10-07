@@ -374,7 +374,7 @@ jobs:
     environment:
       name: production  # Configured in GitHub repository settings
     permissions:
-      contents: read
+      contents: write  # Required for uploading bottles to release
       packages: write  # Required for GitHub Packages (bottles)
     
     steps:
