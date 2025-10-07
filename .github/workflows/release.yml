@@ -119,6 +119,21 @@ jobs:
       build-run-id: ${{ steps.find-artifacts.outputs.run-id }}
     
     steps:
+      - name: Install GitHub CLI (self-hosted runner)
+        run: |
+          if ! command -v gh &> /dev/null; then
+            echo "📦 Installing GitHub CLI..."
+            type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update
+            sudo apt install gh -y
+            echo "✅ GitHub CLI installed"
+          else
+            echo "✅ GitHub CLI already installed"
+          fi
+      
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -246,6 +261,21 @@ jobs:
     needs: [select-runner, validate-version]
     
     steps:
+      - name: Install GitHub CLI (self-hosted runner)
+        run: |
+          if ! command -v gh &> /dev/null; then
+            echo "📦 Installing GitHub CLI..."
+            type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update
+            sudo apt install gh -y
+            echo "✅ GitHub CLI installed"
+          else
+            echo "✅ GitHub CLI already installed"
+          fi
+      
       - name: Download artifacts from build workflow
         env:
           GH_TOKEN: ${{ github.token }}
@@ -290,6 +320,21 @@ jobs:
       upload-url: ${{ steps.create-release.outputs.upload_url }}
     
     steps:
+      - name: Install GitHub CLI (self-hosted runner)
+        run: |
+          if ! command -v gh &> /dev/null; then
+            echo "📦 Installing GitHub CLI..."
+            type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update
+            sudo apt install gh -y
+            echo "✅ GitHub CLI installed"
+          else
+            echo "✅ GitHub CLI already installed"
+          fi
+      
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -645,6 +690,21 @@ jobs:
     if: success()  # Run even if other jobs fail
     
     steps:
+      - name: Install GitHub CLI (self-hosted runner)
+        run: |
+          if ! command -v gh &> /dev/null; then
+            echo "📦 Installing GitHub CLI..."
+            type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update
+            sudo apt install gh -y
+            echo "✅ GitHub CLI installed"
+          else
+            echo "✅ GitHub CLI already installed"
+          fi
+      
       - name: Generate Winget manifest template
         run: |
           VERSION="${{ needs.validate-version.outputs.version }}"
@@ -712,6 +772,21 @@ jobs:
     if: success()  # Run even if other jobs fail
     
     steps:
+      - name: Install GitHub CLI (self-hosted runner)
+        run: |
+          if ! command -v gh &> /dev/null; then
+            echo "📦 Installing GitHub CLI..."
+            type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update
+            sudo apt install gh -y
+            echo "✅ GitHub CLI installed"
+          else
+            echo "✅ GitHub CLI already installed"
+          fi
+      
       - name: Generate Chocolatey nuspec template
         run: |
           VERSION="${{ needs.validate-version.outputs.version }}"
