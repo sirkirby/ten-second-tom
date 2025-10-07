@@ -447,6 +447,8 @@ jobs:
           echo "bottle-sha-x64=$BOTTLE_SHA_X64" >> $GITHUB_OUTPUT
       
       - name: Upload bottles to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${{ needs.validate-version.outputs.version }}"
           BOTTLE_NAME_ARM64="${{ steps.bottles.outputs.bottle-name-arm64 }}"
