@@ -519,8 +519,15 @@ jobs:
             exit 1
           fi
           
-          if ! grep -q "version \"${{ needs.validate-version.outputs.version }}\"" ten-second-tom.rb; then
-            echo "❌ Error: Version not found in formula"
+          # Check that source URL contains the version
+          if ! grep -q "archive/refs/tags/v${{ needs.validate-version.outputs.version }}.tar.gz" ten-second-tom.rb; then
+            echo "❌ Error: Version not found in source URL"
+            exit 1
+          fi
+          
+          # Check that source has SHA256
+          if ! grep -q "sha256 \"" ten-second-tom.rb; then
+            echo "❌ Error: Source SHA256 not found in formula"
             exit 1
           fi
           
