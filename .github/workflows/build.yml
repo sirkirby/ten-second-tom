@@ -32,12 +32,56 @@ env:
   MAX_ARTIFACT_SIZE_MB: 50
 
 jobs:
+  select-runner:
+    name: Select Linux Runner
+    runs-on: ubuntu-latest
+    outputs:
+      linux: ${{ steps.detect.outputs.linux }}
+
+    steps:
+      - name: Detect available self-hosted runners
+        id: detect
+        env:
+          GH_TOKEN: ${{ secrets.RUNNER_QUERY_TOKEN }}
+        run: |
+          echo "🔍 Checking for online self-hosted Linux runners"
+          
+          # Fallback to ubuntu-latest if token not available or API fails
+          if [ -z "$GH_TOKEN" ]; then
+            echo "⚠️  RUNNER_QUERY_TOKEN secret not configured; using ubuntu-latest"
+            echo "linux=ubuntu-latest" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          
+          if ! RUNNERS=$(gh api repos/${{ github.repository }}/actions/runners --paginate 2>&1); then
+            echo "⚠️  Unable to query runner API; using ubuntu-latest"
+            echo "Error: $RUNNERS"
+            echo "linux=ubuntu-latest" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          
+          # Debug: show what we got
+          echo "📊 Runner API response:"
+          echo "$RUNNERS" | jq -r '.runners[]? | "  - \(.name): status=\(.status), os=\(.os), labels=\(.labels | map(.name) | join(","))"'
+          
+          # Match runners with status=online, os=Linux (case-insensitive), and self-hosted label
+          LINUX_COUNT=$(echo "$RUNNERS" | jq '[.runners[]? | select(.status == "online" and (.os | ascii_downcase) == "linux" and (.labels[]?.name == "self-hosted"))] | length')
+
+          if [ "$LINUX_COUNT" -gt 0 ]; then
+            echo "🤖 Found $LINUX_COUNT online self-hosted Linux runner(s); selecting self-hosted"
+            echo "linux=self-hosted" >> "$GITHUB_OUTPUT"
+          else
+            echo "☁️ No online self-hosted Linux runners found; using ubuntu-latest"
+            echo "linux=ubuntu-latest" >> "$GITHUB_OUTPUT"
+          fi
+
   # Job 1: Test
   # Re-run all tests to verify main branch integrity
   # Performance Target: ≤5 minutes
   test:
     name: Test on Main
-    runs-on: ubuntu-latest
+    needs: select-runner
+    runs-on: ${{ needs.select-runner.outputs.linux }}
     if: ${{ github.event.inputs.skip_tests != 'true' }}
     
     steps:

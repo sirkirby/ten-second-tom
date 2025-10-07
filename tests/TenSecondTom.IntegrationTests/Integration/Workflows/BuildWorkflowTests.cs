@@ -108,10 +108,48 @@ public sealed class BuildWorkflowTests
 
         // Assert
         hasJobs.Should().BeTrue("workflow should have jobs");
+        jobNames.Should().Contain("select-runner", "workflow should have a runner selection job");
         jobNames.Should().Contain("test", "workflow should have a test job");
         jobNames.Should().Contain("build-macos-x64", "workflow should have a macOS x64 build job");
         jobNames.Should().Contain("build-macos-arm64", "workflow should have a macOS ARM64 build job");
         jobNames.Should().Contain("build-windows-x64", "workflow should have a Windows x64 build job");
+    }
+
+    [Fact]
+    public void SelectRunnerJob_Should_HaveCorrectConfiguration()
+    {
+        // Arrange
+        var workflow = LoadWorkflow();
+        var jobs = workflow["jobs"] as Dictionary<object, object>;
+        var selectRunnerJob = jobs?["select-runner"] as Dictionary<object, object>;
+
+        // Act & Assert
+        selectRunnerJob.Should().NotBeNull("select-runner job should exist");
+        
+        var runsOn = selectRunnerJob?["runs-on"]?.ToString();
+        runsOn.Should().Be("ubuntu-latest", "select-runner job should run on ubuntu-latest");
+        
+        var outputs = selectRunnerJob?["outputs"] as Dictionary<object, object>;
+        outputs.Should().NotBeNull("select-runner job should have outputs");
+        outputs.Should().ContainKey("linux", "select-runner job should output linux runner choice");
+    }
+
+    [Fact]
+    public void TestJob_Should_DependOnSelectRunner()
+    {
+        // Arrange
+        var workflow = LoadWorkflow();
+        var jobs = workflow["jobs"] as Dictionary<object, object>;
+        var testJob = jobs?["test"] as Dictionary<object, object>;
+
+        // Act
+        var needs = testJob?["needs"] as List<object> ?? 
+                   (testJob?["needs"] != null ? new List<object> { testJob["needs"] } : []);
+        var dependencies = needs.Select(n => n.ToString()).ToList();
+
+        // Assert
+        testJob.Should().NotBeNull("test job should exist");
+        dependencies.Should().Contain("select-runner", "test job should depend on select-runner job");
     }
 
     [Fact]
@@ -126,7 +164,8 @@ public sealed class BuildWorkflowTests
         var runsOn = testJob?["runs-on"]?.ToString();
 
         // Assert
-        runsOn.Should().Be("ubuntu-latest", "test job should run on ubuntu-latest for performance");
+        runsOn.Should().Be("${{ needs.select-runner.outputs.linux }}", 
+            "test job should use dynamic runner selection with fallback to ubuntu-latest");
     }
 
     [Fact]

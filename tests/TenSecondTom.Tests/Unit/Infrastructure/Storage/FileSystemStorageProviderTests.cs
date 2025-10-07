@@ -287,8 +287,13 @@ public sealed class FileSystemStorageProviderTests : IDisposable
     [Fact]
     public async Task SaveAsync_ReturnsFailureOnIOError()
     {
-        // Arrange - Use invalid path to trigger IO error
-        var provider = new FileSystemStorageProvider("/invalid/path/that/does/not/exist", _mockLogger.Object);
+        // Arrange - Use a path that will definitely fail across all environments
+        // Try to write to root system directory which should be read-only or restricted
+        string invalidPath = OperatingSystem.IsWindows() 
+            ? "C:\\Windows\\System32\\test" 
+            : "/dev/null/test"; // On Unix, /dev/null is a character device, not a directory
+        
+        var provider = new FileSystemStorageProvider(invalidPath, _mockLogger.Object);
         var entry = CreateTestDailyEntry("today-10-02-2025-1", 1, new DateTimeOffset(2025, 10, 2, 14, 0, 0, TimeSpan.Zero));
 
         // Act
