@@ -55,6 +55,12 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+# Workflow-level permissions
+permissions:
+  contents: write      # Required for creating releases and reading repo
+  actions: read        # Required for downloading artifacts from build workflow
+  packages: write      # Required for GitHub Packages (bottles)
+
 jobs:
   # Job 1: Validate Version and Find Artifacts
   # Extract/validate version, ensure tag is on main, find build artifacts
