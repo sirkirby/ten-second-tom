@@ -30,6 +30,8 @@ jobs:
   select-runner:
     name: Select Linux Runner
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
     outputs:
       linux: ${{ steps.detect.outputs.linux }}
 
