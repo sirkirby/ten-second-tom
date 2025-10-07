@@ -395,7 +395,7 @@ jobs:
           
           echo "🍾 Creating Homebrew bottles for version $VERSION"
           
-          # Determine macOS version for bottle tag (e.g., arm64_monterey, monterey)
+          # Determine macOS version for bottle tag
           MACOS_VERSION=$(sw_vers -productVersion | cut -d '.' -f 1)
           case $MACOS_VERSION in
             12) MACOS_TAG="monterey" ;;
@@ -405,78 +405,61 @@ jobs:
             *) MACOS_TAG="monterey" ;;  # Default fallback
           esac
           
-          # Detect current architecture
-          ARCH=$(uname -m)
-          if [ "$ARCH" = "arm64" ]; then
-            BOTTLE_TAG="arm64_${MACOS_TAG}"
-            BINARY_PATH="./artifacts/ten-second-tom-osx-arm64/tom"
-            CHECKSUM_PATH="./artifacts/ten-second-tom-osx-arm64/checksum.txt"
-          else
-            BOTTLE_TAG="${MACOS_TAG}"
-            BINARY_PATH="./artifacts/ten-second-tom-osx-x64/tom"
-            CHECKSUM_PATH="./artifacts/ten-second-tom-osx-x64/checksum.txt"
-          fi
+          echo "📦 Building bottles for macOS $MACOS_TAG (both architectures)"
           
-          echo "📦 Building bottle for $BOTTLE_TAG"
+          # Create ARM64 bottle
+          BOTTLE_TAG_ARM64="arm64_${MACOS_TAG}"
+          BOTTLE_NAME_ARM64="ten-second-tom--${VERSION}.${BOTTLE_TAG_ARM64}.bottle.tar.gz"
+          BOTTLE_DIR_ARM64="ten-second-tom/${VERSION}/bin"
           
-          # Create bottle directory structure
-          BOTTLE_DIR="ten-second-tom/${VERSION}/bin"
-          mkdir -p "$BOTTLE_DIR"
+          mkdir -p "$BOTTLE_DIR_ARM64"
+          cp "./artifacts/ten-second-tom-osx-arm64/tom" "$BOTTLE_DIR_ARM64/tom"
+          chmod +x "$BOTTLE_DIR_ARM64/tom"
+          tar czf "$BOTTLE_NAME_ARM64" ten-second-tom
           
-          # Copy binary
-          cp "$BINARY_PATH" "$BOTTLE_DIR/tom"
-          chmod +x "$BOTTLE_DIR/tom"
+          BOTTLE_SHA_ARM64=$(shasum -a 256 "$BOTTLE_NAME_ARM64" | cut -d ' ' -f 1)
+          echo "✅ ARM64 bottle: $BOTTLE_NAME_ARM64"
+          echo "   SHA256: $BOTTLE_SHA_ARM64"
           
-          # Create bottle tarball
-          BOTTLE_NAME="ten-second-tom--${VERSION}.${BOTTLE_TAG}.bottle.tar.gz"
-          tar czf "$BOTTLE_NAME" -C . ten-second-tom
+          # Clean up for x64 bottle
+          rm -rf ten-second-tom
           
-          # Calculate bottle SHA256
-          BOTTLE_SHA=$(shasum -a 256 "$BOTTLE_NAME" | cut -d ' ' -f 1)
+          # Create x64 bottle
+          BOTTLE_TAG_X64="${MACOS_TAG}"
+          BOTTLE_NAME_X64="ten-second-tom--${VERSION}.${BOTTLE_TAG_X64}.bottle.tar.gz"
+          BOTTLE_DIR_X64="ten-second-tom/${VERSION}/bin"
           
-          echo "✅ Bottle created: $BOTTLE_NAME"
-          echo "   SHA256: $BOTTLE_SHA"
+          mkdir -p "$BOTTLE_DIR_X64"
+          cp "./artifacts/ten-second-tom-osx-x64/tom" "$BOTTLE_DIR_X64/tom"
+          chmod +x "$BOTTLE_DIR_X64/tom"
+          tar czf "$BOTTLE_NAME_X64" ten-second-tom
+          
+          BOTTLE_SHA_X64=$(shasum -a 256 "$BOTTLE_NAME_X64" | cut -d ' ' -f 1)
+          echo "✅ x64 bottle: $BOTTLE_NAME_X64"
+          echo "   SHA256: $BOTTLE_SHA_X64"
           
           # Output variables for later steps
-          echo "bottle-name=$BOTTLE_NAME" >> $GITHUB_OUTPUT
-          echo "bottle-tag=$BOTTLE_TAG" >> $GITHUB_OUTPUT
-          echo "bottle-sha=$BOTTLE_SHA" >> $GITHUB_OUTPUT
-          
-          # Calculate checksums for both architectures directly from binaries
-          SHA256_X64=$(shasum -a 256 ./artifacts/ten-second-tom-osx-x64/tom | cut -d ' ' -f 1)
-          SHA256_ARM64=$(shasum -a 256 ./artifacts/ten-second-tom-osx-arm64/tom | cut -d ' ' -f 1)
-          echo "sha256-x64=$SHA256_X64" >> $GITHUB_OUTPUT
-          echo "sha256-arm64=$SHA256_ARM64" >> $GITHUB_OUTPUT
-          echo "   x64 SHA256: $SHA256_X64"
-          echo "   ARM64 SHA256: $SHA256_ARM64"
+          echo "bottle-name-arm64=$BOTTLE_NAME_ARM64" >> $GITHUB_OUTPUT
+          echo "bottle-name-x64=$BOTTLE_NAME_X64" >> $GITHUB_OUTPUT
+          echo "bottle-tag-arm64=$BOTTLE_TAG_ARM64" >> $GITHUB_OUTPUT
+          echo "bottle-tag-x64=$BOTTLE_TAG_X64" >> $GITHUB_OUTPUT
+          echo "bottle-sha-arm64=$BOTTLE_SHA_ARM64" >> $GITHUB_OUTPUT
+          echo "bottle-sha-x64=$BOTTLE_SHA_X64" >> $GITHUB_OUTPUT
       
-      - name: Upload bottle to GitHub Packages
+      - name: Upload bottles to GitHub release
         run: |
           VERSION="${{ needs.validate-version.outputs.version }}"
-          REPO_OWNER="${{ github.repository_owner }}"
-          BOTTLE_NAME="${{ steps.bottles.outputs.bottle-name }}"
+          BOTTLE_NAME_ARM64="${{ steps.bottles.outputs.bottle-name-arm64 }}"
+          BOTTLE_NAME_X64="${{ steps.bottles.outputs.bottle-name-x64 }}"
           
-          echo "📤 Uploading bottle to GitHub Packages (ghcr.io)"
+          echo "📤 Uploading bottles to GitHub release"
           
-          # Login to GitHub Container Registry
-          echo "${{ github.token }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          # Upload both bottles to GitHub release
+          gh release upload "v${VERSION}" "$BOTTLE_NAME_ARM64" "$BOTTLE_NAME_X64" --clobber
           
-          # Use GitHub CLI to upload as package
-          # Note: For Homebrew bottles, we use GitHub Packages generic packages
-          # The bottle will be available at: ghcr.io/v2/$REPO_OWNER/tom/bottles/$BOTTLE_NAME
-          
-          # Create package metadata
-          PACKAGE_NAME="tom"
-          PACKAGE_URL="ghcr.io/${REPO_OWNER}/${PACKAGE_NAME}"
-          
-          # Upload using oras (OCI Registry As Storage) or curl to GitHub Packages API
-          # For simplicity, we'll attach to the release as well and document the ghcr.io URL
-          
-          # Upload to GitHub release as backup
-          gh release upload "v${VERSION}" "$BOTTLE_NAME" --clobber
-          
-          echo "✅ Bottle uploaded to release assets"
-          echo "📦 Bottle available at: https://github.com/${REPO_OWNER}/${{ github.event.repository.name }}/releases/download/v${VERSION}/${BOTTLE_NAME}"
+          echo "✅ Bottles uploaded to release assets"
+          echo "📦 ARM64: https://github.com/${{ github.repository }}/releases/download/v${VERSION}/${BOTTLE_NAME_ARM64}"
+          echo "📦 x64: https://github.com/${{ github.repository }}/releases/download/v${VERSION}/${BOTTLE_NAME_X64}"
       
       - name: Generate Homebrew formula with bottle blocks
         id: formula
@@ -484,10 +467,10 @@ jobs:
           VERSION="${{ needs.validate-version.outputs.version }}"
           REPO_OWNER="${{ github.repository_owner }}"
           REPO_NAME="${{ github.event.repository.name }}"
-          BOTTLE_TAG="${{ steps.bottles.outputs.bottle-tag }}"
-          BOTTLE_SHA="${{ steps.bottles.outputs.bottle-sha }}"
-          SHA256_X64="${{ steps.bottles.outputs.sha256-x64 }}"
-          SHA256_ARM64="${{ steps.bottles.outputs.sha256-arm64 }}"
+          BOTTLE_TAG_ARM64="${{ steps.bottles.outputs.bottle-tag-arm64 }}"
+          BOTTLE_TAG_X64="${{ steps.bottles.outputs.bottle-tag-x64 }}"
+          BOTTLE_SHA_ARM64="${{ steps.bottles.outputs.bottle-sha-arm64 }}"
+          BOTTLE_SHA_X64="${{ steps.bottles.outputs.bottle-sha-x64 }}"
           
           echo "📝 Generating Homebrew formula for version $VERSION with bottle support"
           
@@ -503,8 +486,8 @@ jobs:
             # Bottles (pre-built binaries) for fast installation
             bottle do
               root_url "https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v${VERSION}"
-              sha256 cellar: :any_skip_relocation, arm64_monterey: "${SHA256_ARM64}"
-              sha256 cellar: :any_skip_relocation, monterey: "${SHA256_X64}"
+              sha256 cellar: :any_skip_relocation, ${BOTTLE_TAG_ARM64}: "${BOTTLE_SHA_ARM64}"
+              sha256 cellar: :any_skip_relocation, ${BOTTLE_TAG_X64}: "${BOTTLE_SHA_X64}"
             end
           
             def install
