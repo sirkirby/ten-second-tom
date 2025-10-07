@@ -483,6 +483,20 @@ jobs:
           echo "Source tarball SHA256: $SOURCE_SHA"
           
           # Create formula file with bottle block using echo to avoid heredoc YAML issues
+          # Calculate spacing for bottle digest alignment
+          ARM64_LEN=${#BOTTLE_TAG_ARM64}
+          X64_LEN=${#BOTTLE_TAG_X64}
+          # Add spaces to shorter tag to align the SHA256 values
+          if [ $ARM64_LEN -gt $X64_LEN ]; then
+            SPACES=$((ARM64_LEN - X64_LEN))
+            X64_PADDING=$(printf '%*s' $SPACES '')
+            ARM64_PADDING=""
+          else
+            SPACES=$((X64_LEN - ARM64_LEN))
+            ARM64_PADDING=$(printf '%*s' $SPACES '')
+            X64_PADDING=""
+          fi
+          
           {
             echo "class TenSecondTom < Formula"
             echo "  desc \"CLI tool for daily work summaries using Claude AI\""
@@ -494,8 +508,8 @@ jobs:
             echo "  # Bottles (pre-built binaries) for fast installation"
             echo "  bottle do"
             echo "    root_url \"https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v${VERSION}\""
-            echo "    sha256 cellar: :any_skip_relocation, ${BOTTLE_TAG_ARM64}: \"${BOTTLE_SHA_ARM64}\""
-            echo "    sha256 cellar: :any_skip_relocation, ${BOTTLE_TAG_X64}:     \"${BOTTLE_SHA_X64}\""
+            echo "    sha256 cellar: :any_skip_relocation, ${BOTTLE_TAG_ARM64}:${ARM64_PADDING} \"${BOTTLE_SHA_ARM64}\""
+            echo "    sha256 cellar: :any_skip_relocation, ${BOTTLE_TAG_X64}:${X64_PADDING} \"${BOTTLE_SHA_X64}\""
             echo "  end"
             echo ""
             echo "  def install"
