@@ -192,7 +192,9 @@ jobs:
             --results-directory ./coverage
       
       - name: Install ReportGenerator
-        run: dotnet tool install --global dotnet-reportgenerator-globaltool
+        run: |
+          dotnet tool install --global dotnet-reportgenerator-globaltool
+          echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
       
       - name: Generate coverage report
         run: |
