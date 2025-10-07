@@ -101,23 +101,13 @@ jobs:
         run: |
           VERSION="${{ steps.extract.outputs.version }}"
           
-          # For manual testing, allow pre-release versions (e.g., 0.0.1-test)
-          # For production, only allow strict semver (MAJOR.MINOR.PATCH)
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            # Manual dispatch: Allow semver with optional pre-release suffix
-            if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$'; then
-              echo "❌ Error: Invalid version format: $VERSION"
-              echo "Expected format: MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-prerelease"
-              echo "Examples: 1.2.3 or 0.0.1-test or 1.0.0-rc.1"
-              exit 1
-            fi
-          else
-            # Tag push: Strict semver only (no pre-release)
-            if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-              echo "❌ Error: Invalid semantic version format: $VERSION"
-              echo "Expected format: MAJOR.MINOR.PATCH (e.g., 1.2.3)"
-              exit 1
-            fi
+          # Allow semver with optional pre-release/build metadata
+          # Valid formats: 1.2.3, 1.2.3-beta.1, 1.2.3+build.123, 1.2.3-rc.1+build.456
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$'; then
+            echo "❌ Error: Invalid semantic version format: $VERSION"
+            echo "Expected format: MAJOR.MINOR.PATCH with optional pre-release and build metadata"
+            echo "Examples: 1.2.3, 0.1.0-beta.1, 1.0.0-rc.1+build.123"
+            exit 1
           fi
           
           echo "✅ Valid version format: $VERSION"
