@@ -377,7 +377,9 @@ public sealed class ReleaseWorkflowTests
         var hasDownloadStep = steps.Any(step =>
         {
             var stepDict = step as Dictionary<object, object>;
-            var uses = stepDict?["uses"]?.ToString() ?? "";
+            if (stepDict == null || !stepDict.ContainsKey("uses"))
+                return false;
+            var uses = stepDict["uses"]?.ToString() ?? "";
             return uses.Contains("actions/download-artifact", StringComparison.OrdinalIgnoreCase);
         });
 
