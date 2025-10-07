@@ -99,7 +99,7 @@ public sealed class PrValidationWorkflowTests
     {
         // Arrange
         var workflow = LoadWorkflow();
-        var requiredJobs = new[] { "BUILD", "TEST", "COVERAGE", "VALIDATE" };
+        var requiredJobs = new[] { "SELECT-RUNNER", "BUILD", "TEST", "COVERAGE", "VALIDATE" };
 
         // Act
         var hasJobs = workflow.TryGetValue("jobs", out var jobsObj);
@@ -117,6 +117,25 @@ public sealed class PrValidationWorkflowTests
     }
 
     [Fact]
+    public void SelectRunnerJob_Should_HaveCorrectConfiguration()
+    {
+        // Arrange
+        var workflow = LoadWorkflow();
+        var jobs = workflow["jobs"] as Dictionary<object, object>;
+        var selectRunnerJob = jobs?["select-runner"] as Dictionary<object, object>;
+
+        // Act & Assert
+        selectRunnerJob.Should().NotBeNull("select-runner job should exist");
+        
+        var runsOn = selectRunnerJob?["runs-on"]?.ToString();
+        runsOn.Should().Be("ubuntu-latest", "select-runner job should run on ubuntu-latest");
+        
+        var outputs = selectRunnerJob?["outputs"] as Dictionary<object, object>;
+        outputs.Should().NotBeNull("select-runner job should have outputs");
+        outputs.Should().ContainKey("linux", "select-runner job should output linux runner choice");
+    }
+
+    [Fact]
     public void BuildJob_Should_HaveCorrectConfiguration()
     {
         // Arrange
@@ -131,7 +150,8 @@ public sealed class PrValidationWorkflowTests
         var runsOn = runsOnObj?.ToString();
         
         hasRunsOn.Should().BeTrue("build job should specify runner");
-        runsOn.Should().Be("ubuntu-latest", "build job should run on ubuntu-latest");
+        runsOn.Should().Be("${{ needs.select-runner.outputs.linux }}", 
+            "build job should use dynamic runner selection with fallback to ubuntu-latest");
         
         var hasSteps = buildJob.TryGetValue("steps", out var stepsObj);
         var steps = stepsObj as List<object>;

@@ -91,7 +91,12 @@ jobs:
             exit 0
           fi
           
-          LINUX_COUNT=$(echo "$RUNNERS" | jq '[.runners[]? | select(.status == "online" and .os == "linux" and (.labels[]?.name == "self-hosted"))] | length')
+          # Debug: show what we got
+          echo "📊 Runner API response:"
+          echo "$RUNNERS" | jq -r '.runners[]? | "  - \(.name): status=\(.status), os=\(.os), labels=\(.labels | map(.name) | join(","))"'
+          
+          # Match runners with status=online, os=Linux (case-insensitive), and self-hosted label
+          LINUX_COUNT=$(echo "$RUNNERS" | jq '[.runners[]? | select(.status == "online" and (.os | ascii_downcase) == "linux" and (.labels[]?.name == "self-hosted"))] | length')
 
           if [ "$LINUX_COUNT" -gt 0 ]; then
             echo "🤖 Found $LINUX_COUNT online self-hosted Linux runner(s); selecting self-hosted"
