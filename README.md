@@ -1,18 +1,13 @@
 # Ten Second Tom
 
 ```
-╔══════════════════════════════════════════════════════════════════╗
-║                                                                  ║
-║  ████████╗ ███████╗ ███╗   ██╗   ███████╗ ███████╗  ██████╗      ║
-║  ╚══██╔══╝ ██╔════╝ ████╗  ██║   ██╔════╝ ██╔════╝ ██╔════╝      ║
-║     ██║    █████╗   ██╔██╗ ██║   ███████╗ █████╗   ██║           ║
-║     ██║    ██╔══╝   ██║╚██╗██║   ╚════██║ ██╔══╝   ██║           ║
-║     ██║    ███████╗ ██║ ╚████║   ███████║ ███████╗ ╚██████╗      ║
-║     ╚═╝    ╚══════╝ ╚═╝  ╚═══╝   ╚══════╝ ╚══════╝  ╚═════╝      ║
-║                                                                  ║
-║            TOM - Your personal memory assistant                  ║
-║                                                                  ║
-╚══════════════════════════════════════════════════════════════════╝
+ _____               ____                          _   _____
+|_   _|__ _ __      / ___|  ___  ___ ___  _ __   __| | |_   _|__  _ __ ___
+  | |/ _ \ '_ \     \___ \ / _ \/ __/ _ \| '_ \ / _` |   | |/ _ \| '_ ` _ \
+  | |  __/ | | |     ___) |  __/ (_| (_) | | | | (_| |   | | (_) | | | | | |
+  |_|\___|_| |_|    |____/ \___|\___\___/|_| |_|\__,_|   |_|\___/|_| |_| |_|
+
+                    Your personal memory assistant
 ```
 
 **Ten Second Tom** is a CLI application for personal memory management that guides you through daily reflection prompts, leverages AI to generate structured summaries, and builds a searchable archive of your experiences. Named after the character from the movie *50 First Dates*, Ten Second Tom helps you remember what matters.
@@ -159,15 +154,13 @@ When you run Ten Second Tom for the first time, it will prompt for SSH authentic
 ```bash
 $ tom login
 
-╔════════════════════════════════════════════════════════════════════════════╗
-║  ████████╗███████╗███╗   ██╗    ███████╗███████╗ ██████╗                ║
-║  ╚══██╔══╝██╔════╝████╗  ██║    ██╔════╝██╔════╝██╔════╝                ║
-║     ██║   █████╗  ██╔██╗ ██║    ███████╗█████╗  ██║                     ║
-║     ██║   ██╔══╝  ██║╚██╗██║    ╚════██║██╔══╝  ██║                     ║
-║     ██║   ███████╗██║ ╚████║    ███████║███████╗╚██████╗                ║
-║     ╚═╝   ╚══════╝╚═╝  ╚═══╝    ╚══════╝╚══════╝ ╚═════╝                ║
-║                   TOM - Your personal memory assistant               ║
-╚════════════════════════════════════════════════════════════════════════════╝
+ _____               ____                          _   _____
+|_   _|__ _ __      / ___|  ___  ___ ___  _ __   __| | |_   _|__  _ __ ___
+  | |/ _ \ '_ \     \___ \ / _ \/ __/ _ \| '_ \ / _` |   | |/ _ \| '_ ` _ \
+  | |  __/ | | |     ___) |  __/ (_| (_) | | | | (_| |   | | (_) | | | | | |
+  |_|\___|_| |_|    |____/ \___|\___\___/|_| |_|\__,_|   |_|\___/|_| |_| |_|
+
+                    Your personal memory assistant
 
 → Authenticating with SSH key...
 
@@ -275,7 +268,101 @@ $ tom logout
 
 ---
 
-## 📁 File Structure
+## � Shell Mode
+
+**New!** Run Tom in interactive shell mode for a persistent session:
+
+```bash
+$ tom
+```
+
+This launches an interactive shell where you can execute multiple commands without re-authentication:
+
+```text
+ _____               ____                          _   _____
+|_   _|__ _ __      / ___|  ___  ___ ___  _ __   __| | |_   _|__  _ __ ___
+  | |/ _ \ '_ \     \___ \ / _ \/ __/ _ \| '_ \ / _` |   | |/ _ \| '_ ` _ \
+  | |  __/ | | |     ___) |  __/ (_| (_) | | | | (_| |   | | (_) | | | | | |
+  |_|\___|_| |_|    |____/ \___|\___\___/|_| |_|\__,_|   |_|\___/|_| |_| |_|
+
+Version 1.0.0 - Your personal memory assistant
+
+Type /help for available commands, /quit to exit
+
+>
+```
+
+### Shell Commands
+
+All commands in shell mode use a slash prefix:
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `/today` | Capture today's reflection | `/today` |
+| `/thisweek` | Generate weekly review | `/thisweek` |
+| `/search` | Search memory entries | `/search meeting` |
+| `/login` | Authenticate with SSH key | `/login` |
+| `/logout` | End current session | `/logout` |
+| `/help` | Display available commands | `/help` |
+| `/quit` or `/exit` | Exit the shell | `/quit` |
+
+### Shell Features
+
+✨ **Autocomplete**: Press Tab to see command suggestions
+
+- Type `/to` + Tab → shows `/today`
+- Works with partial command names
+
+🕐 **Command History**: Navigate previous commands with arrow keys
+
+- Arrow Up/Down to scroll through history
+- History persists during session only (not saved between launches)
+
+⚡ **Fast Execution**: No re-authentication between commands
+
+- Session remains active throughout shell lifetime
+- Commands execute immediately
+
+🛑 **Graceful Interruption**: Press Ctrl+C to cancel running commands
+
+- First Ctrl+C: Cancels current command, returns to prompt
+- Second Ctrl+C: Exits shell
+- Partial results displayed when available
+
+📄 **Smart Pagination**: Long output is automatically paginated
+
+- Short output displays fully inline
+- Long output uses interactive pager (Space = next page, Q = quit)
+
+### Shell vs Single Command Mode
+
+**Shell Mode** (no arguments):
+
+```bash
+tom           # Launches interactive shell
+```
+
+**Single Command Mode** (with arguments):
+
+```bash
+tom today     # Executes command and exits
+```
+
+Use shell mode for:
+
+- Multiple operations in sequence
+- Exploring commands interactively
+- Avoiding repeated authentication
+
+Use single command mode for:
+
+- Scripting and automation
+- One-off commands
+- CI/CD pipelines
+
+---
+
+## �📁 File Structure
 
 Your memories are stored as plain markdown files:
 

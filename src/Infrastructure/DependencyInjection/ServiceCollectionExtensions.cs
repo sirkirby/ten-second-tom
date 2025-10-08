@@ -6,6 +6,7 @@ using OpenAI;
 using OpenAI.Chat;
 using TenSecondTom.Features.Auth.Handlers;
 using TenSecondTom.Features.Search.Handlers;
+using TenSecondTom.Features.Shell.Services;
 using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
@@ -145,6 +146,13 @@ public static class ServiceCollectionExtensions
         services.AddTransient<SearchMemoriesQueryHandler>();
         services.AddTransient<LoginCommandHandler>();
         services.AddTransient<LogoutCommandHandler>();
+
+        // Shell services (Singletons for session persistence during app lifetime)
+        services.AddSingleton<IReplLoop, ReplLoop>();
+        services.AddSingleton<ICommandRouter, CommandRouter>();
+        services.AddSingleton<ISessionManager, SessionManager>();
+        services.AddSingleton<IAutocompleteEngine, AutocompleteEngine>();
+        services.AddSingleton<IOutputPaginator, OutputPaginator>();
 
         return services;
     }

@@ -1,6 +1,8 @@
 using System.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
+using Spectre.Console;
 using TenSecondTom.Features.Search.Handlers;
+using TenSecondTom.Features.Shell.Services;
 using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
@@ -16,6 +18,8 @@ namespace TenSecondTom.Infrastructure.Cli;
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API for CLI commands")]
 public static class CommandRegistry
 {
+    private static readonly string[] QuitAliases = ["exit"];
+
     /// <summary>
     /// Builds and configures the root command with all subcommands.
     /// </summary>
@@ -48,23 +52,97 @@ public static class CommandRegistry
         rootCommand.Subcommands.Add(BuildSearchCommand(serviceProvider, jsonOutputOption));
         rootCommand.Subcommands.Add(BuildLoginCommand(serviceProvider, jsonOutputOption));
         rootCommand.Subcommands.Add(BuildLogoutCommand(serviceProvider, jsonOutputOption));
+        rootCommand.Subcommands.Add(BuildShellCommand(serviceProvider));
+        rootCommand.Subcommands.Add(BuildHelpCommand(jsonOutputOption));
         rootCommand.Subcommands.Add(BuildVersionCommand(jsonOutputOption));
         return rootCommand;
     }
 
     private static Command BuildVersionCommand(Option<bool> jsonOutputOption)
     {
-        var versionCommand = new Command("version", "Display version information with logo");
+        var versionCommand = new Command("version", "Display version information");
 
         versionCommand.Options.Add(jsonOutputOption);
 
         versionCommand.SetAction((parseResult) =>
         {
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
-            Logo.DisplayWithVersion(jsonOutput);
+            
+            // Simple version output (no logo in shell mode to avoid duplication)
+            var version = typeof(Logo).Assembly.GetName().Version;
+            var versionString = $"Ten Second Tom v{version?.Major}.{version?.Minor}.{version?.Build ?? 0}";
+            
+            if (jsonOutput)
+            {
+                AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { version = versionString }));
+            }
+            else
+            {
+                AnsiConsole.MarkupLine($"[yellow]{versionString}[/]");
+                AnsiConsole.MarkupLine("[dim]Your personal memory assistant[/]");
+            }
         });
 
         return versionCommand;
+    }
+
+    private static Command BuildHelpCommand(Option<bool> jsonOutputOption)
+    {
+        var helpCommand = new Command("help", "Display available commands with descriptions");
+
+        helpCommand.Options.Add(jsonOutputOption);
+
+        helpCommand.SetAction((parseResult) =>
+        {
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
+            
+            if (jsonOutput)
+            {
+                // JSON output for help
+                var commands = new List<object>
+                {
+                    new { command = "today", description = "Capture today's reflection with 3-5 prompts", requiresAuth = true },
+                    new { command = "thisweek", description = "Generate a weekly review from recent daily entries", requiresAuth = true },
+                    new { command = "search", description = "Search memory entries by text query", requiresAuth = true },
+                    new { command = "login", description = "Authenticate with SSH key and create a session", requiresAuth = false },
+                    new { command = "logout", description = "Log out and invalidate the current session", requiresAuth = true },
+                    new { command = "help", description = "Display available commands with descriptions", requiresAuth = false },
+                    new { command = "quit", description = "Exit the shell", requiresAuth = false, aliases = QuitAliases },
+                    new { command = "version", description = "Display version information", requiresAuth = false }
+                };
+                
+                Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { success = true, commands }));
+            }
+            else
+            {
+                // Pretty formatted help for human readers
+                AnsiConsole.MarkupLine("[bold cyan]Available Commands:[/]");
+                AnsiConsole.WriteLine();
+                
+                var table = new Table()
+                    .Border(TableBorder.Rounded)
+                    .AddColumn(new TableColumn("[bold]Command[/]"))
+                    .AddColumn(new TableColumn("[bold]Description[/]"))
+                    .AddColumn(new TableColumn("[bold]Auth Required[/]"));
+                
+                table.AddRow("[cyan]/today[/]", "Capture today's reflection with 3-5 prompts", "[green]Yes[/]");
+                table.AddRow("[cyan]/thisweek[/]", "Generate a weekly review from recent daily entries", "[green]Yes[/]");
+                table.AddRow("[cyan]/search[/] [dim]<query>[/]", "Search memory entries by text query", "[green]Yes[/]");
+                table.AddRow("[cyan]/login[/]", "Authenticate with SSH key and create a session", "[red]No[/]");
+                table.AddRow("[cyan]/logout[/]", "Log out and invalidate the current session", "[green]Yes[/]");
+                table.AddRow("[cyan]/help[/]", "Display available commands with descriptions", "[red]No[/]");
+                table.AddRow("[cyan]/quit[/] or [cyan]/exit[/]", "Exit the shell", "[red]No[/]");
+                table.AddRow("[cyan]/version[/]", "Display version information", "[red]No[/]");
+                
+                AnsiConsole.Write(table);
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine("[dim]Tip: Type partial commands (e.g., /to) to see suggestions[/]");
+            }
+            
+            return 0;
+        });
+
+        return helpCommand;
     }
 
     private static Command BuildTodayCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
@@ -211,5 +289,19 @@ public static class CommandRegistry
         });
 
         return logoutCommand;
+    }
+
+    private static Command BuildShellCommand(IServiceProvider serviceProvider)
+    {
+        var shellCommand = new Command("shell", "Start interactive shell mode");
+
+        shellCommand.SetAction(async (parseResult) =>
+        {
+            var replLoop = serviceProvider.GetRequiredService<IReplLoop>();
+            var exitCode = await replLoop.RunAsync(CancellationToken.None).ConfigureAwait(false);
+            return exitCode;
+        });
+
+        return shellCommand;
     }
 }
