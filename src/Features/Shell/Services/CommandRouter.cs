@@ -59,7 +59,13 @@ public sealed class CommandRouter : ICommandRouter
         try
         {
             // Remove leading slash for System.CommandLine parsing
-            string normalizedCommand = commandLine[1..];
+            string normalizedCommand = commandLine[1..].Trim();
+            
+            // Check for empty command after slash
+            if (string.IsNullOrWhiteSpace(normalizedCommand))
+            {
+                return ShellCommandResult.Failure("Command cannot be empty. Type /help for available commands.");
+            }
             
             // Special handling for /quit and /exit - these should terminate the shell
             if (normalizedCommand.Equals("quit", StringComparison.OrdinalIgnoreCase) ||

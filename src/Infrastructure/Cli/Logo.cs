@@ -18,18 +18,13 @@ internal static class Logo
             return;
         }
 
-        AnsiConsole.MarkupLine("[cyan]╔══════════════════════════════════════════════════════════════════╗[/]");
-        AnsiConsole.MarkupLine("[cyan]║[/]                                                                  [cyan]║[/]");
-        AnsiConsole.MarkupLine("[cyan]║[/]  [bold yellow]████████╗ ███████╗ ███╗   ██╗   ███████╗ ███████╗  ██████╗[/]      [cyan]║[/]");
-        AnsiConsole.MarkupLine("[cyan]║[/]  [bold yellow]╚══██╔══╝ ██╔════╝ ████╗  ██║   ██╔════╝ ██╔════╝ ██╔════╝[/]      [cyan]║[/]");
-        AnsiConsole.MarkupLine("[cyan]║[/]  [bold yellow]   ██║    █████╗   ██╔██╗ ██║   ███████╗ █████╗   ██║     [/]      [cyan]║[/]");
-        AnsiConsole.MarkupLine("[cyan]║[/]  [bold yellow]   ██║    ██╔══╝   ██║╚██╗██║   ╚════██║ ██╔══╝   ██║     [/]      [cyan]║[/]");
-        AnsiConsole.MarkupLine("[cyan]║[/]  [bold yellow]   ██║    ███████╗ ██║ ╚████║   ███████║ ███████╗ ╚██████╗[/]      [cyan]║[/]");
-        AnsiConsole.MarkupLine("[cyan]║[/]  [bold yellow]   ╚═╝    ╚══════╝ ╚═╝  ╚═══╝   ╚══════╝ ╚══════╝  ╚═════╝[/]      [cyan]║[/]");
-        AnsiConsole.MarkupLine("[cyan]║[/]                                                                  [cyan]║[/]");
-        AnsiConsole.MarkupLine("[cyan]║[/]            [bold white]TOM[/] [dim]- Your personal memory assistant[/]                  [cyan]║[/]");
-        AnsiConsole.MarkupLine("[cyan]║[/]                                                                  [cyan]║[/]");
-        AnsiConsole.MarkupLine("[cyan]╚══════════════════════════════════════════════════════════════════╝[/]");
+        AnsiConsole.WriteLine();
+        AnsiConsole.Write(
+            new FigletText("Ten Second Tom")
+                .Centered()
+                .Color(Color.Yellow));
+
+        AnsiConsole.MarkupLine("[dim]Your personal memory assistant[/]");
         AnsiConsole.WriteLine();
     }
 

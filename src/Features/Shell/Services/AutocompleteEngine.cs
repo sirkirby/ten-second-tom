@@ -32,6 +32,8 @@ public sealed class AutocompleteEngine : IAutocompleteEngine
     /// <inheritdoc/>
     public IReadOnlyList<AutocompleteSuggestion> GetSuggestions(string input)
     {
+        ArgumentNullException.ThrowIfNull(input);
+        
         // Return empty for invalid input
         if (string.IsNullOrWhiteSpace(input) || !input.StartsWith('/'))
             return Array.Empty<AutocompleteSuggestion>();

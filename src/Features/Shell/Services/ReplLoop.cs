@@ -28,6 +28,7 @@ public sealed class ReplLoop : IReplLoop
     private readonly IAutocompleteEngine _autocompleteEngine;
     private readonly IOutputPaginator _paginator;
     private readonly ILogger<ReplLoop> _logger;
+    private readonly CommandAutoCompleteSource _autoCompleteSource;
 
     public ReplLoop(
         ICommandRouter router,
@@ -41,6 +42,7 @@ public sealed class ReplLoop : IReplLoop
         _autocompleteEngine = autocompleteEngine;
         _paginator = paginator;
         _logger = logger;
+        _autoCompleteSource = new CommandAutoCompleteSource(autocompleteEngine);
     }
 
     /// <inheritdoc/>
@@ -92,6 +94,9 @@ public sealed class ReplLoop : IReplLoop
 
                     // Display result feedback
                     DisplayResult(result);
+                    
+                    // Add visual spacing between commands
+                    AnsiConsole.WriteLine();
                 }
                 catch (OperationCanceledException)
                 {
@@ -124,14 +129,16 @@ public sealed class ReplLoop : IReplLoop
     /// </summary>
     private void DisplayBanner()
     {
+        AnsiConsole.WriteLine();
         AnsiConsole.Write(
             new FigletText("Ten Second Tom")
                 .Centered()
                 .Color(Color.Cyan1));
 
         var version = typeof(ReplLoop).Assembly.GetName().Version?.ToString() ?? "1.0.0";
-        AnsiConsole.MarkupLine($"[dim]Version {version}[/]");
-        AnsiConsole.MarkupLine("[dim]Type /help for available commands, /quit to exit[/]");
+        AnsiConsole.MarkupLine($"[dim]Version {version} - Your personal memory assistant[/]");
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[dim]Type [cyan]/help[/] for commands, [cyan]/quit[/] to exit[/]");
         AnsiConsole.WriteLine();
     }
 
@@ -140,12 +147,26 @@ public sealed class ReplLoop : IReplLoop
     /// </summary>
     private string? ReadInput()
     {
-        // For now, use simple prompt - full autocomplete integration with TextPrompt
-        // requires custom IAutoCompleteSource implementation (Task T034)
-        var prompt = new TextPrompt<string>("[cyan]>[/]")
-            .AllowEmpty();
+        // Show helpful hint on first line
+        var prompt = new TextPrompt<string>("[cyan]>[/] [dim](Type /help for commands)[/]")
+            .AllowEmpty()
+            .ShowDefaultValue(false);
 
-        return AnsiConsole.Prompt(prompt);
+        var input = AnsiConsole.Prompt(prompt);
+
+        // If user typed partial command starting with '/', show matching suggestions
+        if (!string.IsNullOrWhiteSpace(input) && input.StartsWith('/') && input.Length > 1)
+        {
+            var suggestions = _autoCompleteSource.GetSuggestions(input).ToList();
+            
+            // Show suggestions if we have matches (changed from <=3 to show all matches)
+            if (suggestions.Count > 0)
+            {
+                AnsiConsole.MarkupLine($"[dim]  💡 Did you mean: {string.Join(" | ", suggestions)}[/]");
+            }
+        }
+
+        return input;
     }
 
     /// <summary>

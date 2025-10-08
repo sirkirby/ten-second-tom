@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.CommandLine;
+using TenSecondTom.Features.Shell.Services;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.DependencyInjection;
 using TenSecondTom.Infrastructure.Logging;
@@ -26,9 +27,31 @@ internal static class Program
     public static async Task<int> Main(string[] args)
     {
         ILoggerFactory? loggerFactory = null;
+        CancellationTokenSource? cancellationTokenSource = null;
         
         try
         {
+            // Setup global Ctrl+C handler
+            cancellationTokenSource = new CancellationTokenSource();
+            bool firstCancellation = true;
+            
+            Console.CancelKeyPress += (sender, eventArgs) =>
+            {
+                if (firstCancellation)
+                {
+                    // First Ctrl+C: Cancel gracefully
+                    eventArgs.Cancel = true; // Prevent immediate termination
+                    cancellationTokenSource.Cancel();
+                    firstCancellation = false;
+                    Console.Error.WriteLine("\nCancelling... Press Ctrl+C again to force exit.");
+                }
+                else
+                {
+                    // Second Ctrl+C: Force exit
+                    eventArgs.Cancel = false; // Allow default behavior (immediate termination)
+                }
+            };
+
             // Load .env file if it exists (for development configuration)
             string envFilePath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
             if (File.Exists(envFilePath))
@@ -61,10 +84,24 @@ internal static class Program
             
             using var serviceProvider = services.BuildServiceProvider();
             
-            // Build and execute CLI command
-            var rootCommand = CommandRegistry.BuildRootCommand(serviceProvider);
-            var parseResult = rootCommand.Parse(args);
-            int exitCode = await parseResult.InvokeAsync().ConfigureAwait(false);
+            // Determine execution mode: shell or single command
+            int exitCode;
+            
+            if (args.Length == 0)
+            {
+                // No arguments: Launch shell mode
+                logger.LogInformation("Starting shell mode");
+                var replLoop = serviceProvider.GetRequiredService<IReplLoop>();
+                exitCode = await replLoop.RunAsync(cancellationTokenSource.Token).ConfigureAwait(false);
+            }
+            else
+            {
+                // Arguments provided: Execute single command (existing behavior)
+                logger.LogInformation("Executing single command mode");
+                var rootCommand = CommandRegistry.BuildRootCommand(serviceProvider);
+                var parseResult = rootCommand.Parse(args);
+                exitCode = await parseResult.InvokeAsync().ConfigureAwait(false);
+            }
             
             logger.LogInformation("Ten Second Tom completed with exit code {ExitCode}", exitCode);
             return exitCode;
@@ -83,6 +120,9 @@ internal static class Program
         }
         finally
         {
+            // Dispose cancellation token source
+            cancellationTokenSource?.Dispose();
+            
             // Dispose logger factory
             loggerFactory?.Dispose();
             

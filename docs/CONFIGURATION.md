@@ -100,6 +100,84 @@ $env:TenSecondTom__MemoryDirectory="C:\tom\memory"
 | `TenSecondTom:DataRetention:DefaultPolicy` | `Indefinite` | Retention policy: `Indefinite`, `Days30`, `Days90`, `OneYear`, `TwoYears` |
 | `TenSecondTom:DataRetention:AutoPurgeEnabled` | `false` | Automatically purge old entries on startup |
 
+## Shell Mode Configuration
+
+### Terminal Requirements
+
+Ten Second Tom's shell mode uses Spectre.Console for rich terminal formatting, which requires terminal support for:
+
+- **ANSI color codes**: Most modern terminals support this
+- **Unicode characters**: Required for the banner and UI elements
+- **Terminal width**: Minimum 80 characters recommended for optimal display
+
+### Supported Terminals
+
+✅ **Fully Supported:**
+
+- macOS: Terminal.app, iTerm2, Warp
+- Linux: GNOME Terminal, Konsole, Alacritty, Kitty
+- Windows: Windows Terminal, PowerShell 7+
+
+⚠️ **Limited Support:**
+
+- Windows PowerShell 5.x: Colors supported, but limited Unicode
+- Git Bash (Windows): May have color/Unicode rendering issues
+- PuTTY: Limited color palette
+
+❌ **Not Supported:**
+
+- Windows Command Prompt (cmd.exe): No ANSI color support
+
+### Exit Codes
+
+Shell mode uses the following exit codes:
+
+| Code | Meaning | Description |
+|------|---------|-------------|
+| `0` | Success | Shell exited normally or command completed successfully |
+| `1` | General Error | Command execution failed or unexpected error occurred |
+| `2` | Authentication Error | SSH authentication failed or user is not logged in |
+
+### Environment Variables
+
+No shell-specific environment variables are required. Shell mode uses the same configuration as single-command mode.
+
+### Color Customization
+
+Shell mode automatically detects terminal capabilities:
+
+- **Color support**: Automatically detected via Spectre.Console
+- **No-color mode**: Respects `NO_COLOR` environment variable (see <https://no-color.org/>)
+- **Accessibility**: Output remains readable with colors disabled
+
+To disable colors globally:
+
+```bash
+# Disable colors for all applications that respect NO_COLOR
+export NO_COLOR=1
+tom  # Launches shell with no colors
+```
+
+### Cross-Platform Considerations
+
+**macOS:**
+
+- Full support for all features
+- Terminal.app has excellent Unicode and color support
+- Recommended for optimal experience
+
+**Linux:**
+
+- Full support in modern terminal emulators
+- Ensure `TERM` environment variable is set correctly (e.g., `xterm-256color`)
+- Some older terminals may have limited Unicode support
+
+**Windows:**
+
+- Use Windows Terminal or PowerShell 7+ for best experience
+- Avoid Windows Command Prompt (cmd.exe)
+- Windows Terminal supports full Unicode and ANSI colors
+
 ## Security Best Practices
 
 - ✅ **DO** use User Secrets for local development
@@ -115,6 +193,7 @@ $env:TenSecondTom__MemoryDirectory="C:\tom\memory"
 If you get an error about missing User Secrets:
 
 1. Verify User Secrets are initialized:
+
    ```bash
    cd src
    dotnet user-secrets list
@@ -131,6 +210,7 @@ If you get an error about missing User Secrets:
 ### Configuration Not Loading
 
 Ensure `appsettings.json` is copied to the output directory:
+
 ```bash
 cd src
 dotnet build
