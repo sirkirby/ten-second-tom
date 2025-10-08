@@ -52,9 +52,9 @@ Ten Second Tom uses the following configuration priority (highest to lowest):
 
 5. **appsettings.json** (defaults, lowest priority)
 
-## Environment Variables (Production)
+## Environment Variables (Production & Installed Applications)
 
-For production deployments, use environment variables instead of User Secrets:
+For production deployments or for users who have installed the application via a package manager (Homebrew, Winget, etc.), use environment variables. This is the most secure and flexible method.
 
 ```bash
 # Linux/macOS

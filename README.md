@@ -98,20 +98,18 @@ export TenSecondTom__Anthropic__ApiKey="sk-ant-your-anthropic-key"
 
 **Option 3: Configuration File**
 
-Create `appsettings.json` in your working directory:
+You can also use an `appsettings.json` file for non-sensitive configuration. **API keys should not be stored here.**
 
 ```json
 {
   "TenSecondTom": {
     "LlmProvider": "OpenAI",
     "OpenAI": {
-      "ApiKey": "sk-your-key-here",
       "Model": "gpt-4",
       "MaxTokens": 2000,
       "Temperature": 0.7
     },
     "Anthropic": {
-      "ApiKey": "sk-ant-your-key-here",
       "Model": "claude-3-5-sonnet-20241022",
       "MaxTokens": 2000
     }
@@ -119,7 +117,7 @@ Create `appsettings.json` in your working directory:
 }
 ```
 
-⚠️ **Never commit API keys to version control!**
+⚠️ **Never commit API keys to version control!** For installed applications, environment variables are the recommended way to configure secrets. See [SECURITY.md](SECURITY.md) for more details.
 
 ### Memory Directory
 
