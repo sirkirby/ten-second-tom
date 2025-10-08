@@ -75,5 +75,50 @@ using System.Runtime.CompilerServices;
 [assembly: SuppressMessage("Globalization", "CA1305:Specify IFormatProvider", Scope = "member", Target = "~M:TenSecondTom.Features.ThisWeek.Handlers.CreateWeeklyReviewHandler.AggregateDailyEntries(System.Collections.Generic.IReadOnlyList{TenSecondTom.Shared.Models.MemoryEntry})~System.String", Justification = "User-facing date format should respect current culture")]
 [assembly: SuppressMessage("Globalization", "CA1305:Specify IFormatProvider", Scope = "member", Target = "~M:TenSecondTom.Features.ThisWeek.Handlers.CreateWeeklyReviewHandler.RenderPrompt(TenSecondTom.Shared.Models.PromptTemplate,System.String,TenSecondTom.Shared.Models.DateRange,System.Int32)~System.String", Justification = "User-facing date format should respect current culture")]
 
+// Shell feature - public API for DI registration and REPL functionality
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Features.Shell.Models.ShellSession", Justification = "Public API for shell feature")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Features.Shell.Models.SessionStatus", Justification = "Public API for shell feature")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Features.Shell.Models.CommandHistoryEntry", Justification = "Public API for shell feature")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Features.Shell.Models.CommandMetadata", Justification = "Public API for shell feature")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Features.Shell.Models.AutocompleteSuggestion", Justification = "Public API for shell feature")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Features.Shell.Models.CommandResult", Justification = "Public API for shell feature")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Features.Shell.Services.IAutocompleteEngine", Justification = "Public interface for DI registration")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Features.Shell.Services.AutocompleteEngine", Justification = "Public implementation for DI registration")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Features.Shell.Services.ISessionManager", Justification = "Public interface for DI registration")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Features.Shell.Services.SessionManager", Justification = "Public implementation for DI registration")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Features.Shell.Services.ICommandRouter", Justification = "Public interface for DI registration")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Features.Shell.Services.CommandRouter", Justification = "Public implementation for DI registration")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Features.Shell.Services.IReplLoop", Justification = "Public interface for DI registration")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Features.Shell.Services.ReplLoop", Justification = "Public implementation for DI registration")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Features.Shell.Services.IOutputPaginator", Justification = "Public interface for DI registration")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Features.Shell.Services.OutputPaginator", Justification = "Public implementation for DI registration")]
+
+// Shell feature - properties and arrays
+[assembly: SuppressMessage("Performance", "CA1819:Properties should not return arrays", Scope = "member", Target = "~P:TenSecondTom.Features.Shell.Models.CommandMetadata.Aliases", Justification = "Array is intentional for collection initializers in static catalog")]
+
+// Shell feature - string methods
+[assembly: SuppressMessage("Globalization", "CA1307:The behavior of 'string.Contains(char)' could vary based on the current user's locale settings", Scope = "member", Target = "~M:TenSecondTom.Features.Shell.Models.CommandMetadata.IsValid~System.Boolean", Justification = "Char contains is culture-invariant, no StringComparison overload needed")]
+
+// Shell feature - logging performance
+[assembly: SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates", Scope = "type", Target = "~T:TenSecondTom.Features.Shell.Services.ReplLoop", Justification = "Logging clarity preferred for shell operations")]
+[assembly: SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates", Scope = "type", Target = "~T:TenSecondTom.Features.Shell.Services.CommandRouter", Justification = "Logging clarity preferred for command routing")]
+[assembly: SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates", Scope = "type", Target = "~T:TenSecondTom.Features.Shell.Services.OutputPaginator", Justification = "Logging clarity preferred for pagination")]
+
+// Shell feature - exception handling
+[assembly: SuppressMessage("Design", "CA1031:Do not catch general exception types", Scope = "member", Target = "~M:TenSecondTom.Features.Shell.Services.ReplLoop.RunAsync(System.Threading.CancellationToken)~System.Threading.Tasks.Task{System.Int32}", Justification = "REPL loop must handle all exceptions gracefully to maintain interactive session")]
+[assembly: SuppressMessage("Design", "CA1031:Do not catch general exception types", Scope = "member", Target = "~M:TenSecondTom.Features.Shell.Services.CommandRouter.RouteAsync(System.String,System.Threading.CancellationToken)~System.Threading.Tasks.Task{TenSecondTom.Features.Shell.Models.CommandResult}", Justification = "Router must handle all exceptions to return CommandResult instead of throwing")]
+
+// Shell feature - static members
+[assembly: SuppressMessage("Performance", "CA1822:Mark members as static", Scope = "member", Target = "~M:TenSecondTom.Features.Shell.Services.ReplLoop.DisplayBanner", Justification = "Instance method for consistency with other display methods")]
+[assembly: SuppressMessage("Performance", "CA1822:Mark members as static", Scope = "member", Target = "~M:TenSecondTom.Features.Shell.Services.ReplLoop.ReadInput~System.String", Justification = "Instance method for potential future use of session context")]
+[assembly: SuppressMessage("Performance", "CA1822:Mark members as static", Scope = "member", Target = "~M:TenSecondTom.Features.Shell.Services.ReplLoop.DisplayResult(TenSecondTom.Features.Shell.Models.CommandResult)", Justification = "Instance method for consistency with other display methods")]
+[assembly: SuppressMessage("Performance", "CA1822:Mark members as static", Scope = "member", Target = "~M:TenSecondTom.Features.Shell.Services.OutputPaginator.DisplayPagedAsync(System.Collections.Generic.List{System.String},System.Int32,System.Threading.CancellationToken)~System.Threading.Tasks.Task", Justification = "Instance method may need logger in future")]
+
+// Shell feature - cancellation token propagation
+[assembly: SuppressMessage("Reliability", "CA2016:Forward the CancellationToken parameter", Scope = "member", Target = "~M:TenSecondTom.Features.Shell.Services.CommandRouter.RouteAsync(System.String,System.Threading.CancellationToken)~System.Threading.Tasks.Task{TenSecondTom.Features.Shell.Models.CommandResult}", Justification = "System.CommandLine InvokeAsync handles cancellation internally via Console.CancelKeyPress")]
+
+
+
+
 
 

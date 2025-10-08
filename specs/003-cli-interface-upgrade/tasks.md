@@ -45,13 +45,13 @@
 
 ## Phase 3.1: Setup & Dependencies
 
-- [ ] **T001** Verify Spectre.Console dependency (v0.51.1+) in `src/TenSecondTom.csproj`
-- [ ] **T002** Verify System.CommandLine dependency (v2.0.0-rc.1+) in `src/TenSecondTom.csproj`
-- [ ] **T003** Create `src/Features/Shell/` directory structure
-- [ ] **T004** Create `src/Features/Shell/Services/` directory
-- [ ] **T005** Create `src/Features/Shell/Models/` directory
-- [ ] **T006** Create `tests/Unit/Features/Shell/` directory structure
-- [ ] **T007** Create `tests/Integration/Features/Shell/` directory structure
+- [x] **T001** Verify Spectre.Console dependency (v0.51.1+) in `src/TenSecondTom.csproj`
+- [x] **T002** Verify System.CommandLine dependency (v2.0.0-rc.1+) in `src/TenSecondTom.csproj`
+- [x] **T003** Create `src/Features/Shell/` directory structure
+- [x] **T004** Create `src/Features/Shell/Services/` directory
+- [x] **T005** Create `src/Features/Shell/Models/` directory
+- [x] **T006** Create `tests/Unit/Features/Shell/` directory structure
+- [x] **T007** Create `tests/Integration/Features/Shell/` directory structure
 
 ---
 
@@ -61,7 +61,7 @@
 
 ### Contract Tests (All Parallel)
 
-- [ ] **T008 [P]** Contract test for ReplLoop in `tests/Integration/Features/Shell/ReplLoopContractTests.cs`
+- [x] **T008 [P]** Contract test for ReplLoop in `tests/Integration/Features/Shell/ReplLoopContractTests.cs`
   - Test: `RunAsync_WithNoInput_ExitsCleanly`
   - Test: `RunAsync_WithQuitCommand_ExitsWithZero`
   - Test: `RunAsync_WithValidCommand_InvokesRouter`
@@ -69,7 +69,7 @@
   - Test: `RunAsync_WithEmptyInput_RedisplaysPrompt`
   - Test: `RunAsync_WithCancellationToken_ExitsGracefully`
 
-- [ ] **T009 [P]** Contract test for CommandRouter in `tests/Integration/Features/Shell/CommandRouterContractTests.cs`
+- [x] **T009 [P]** Contract test for CommandRouter in `tests/Integration/Features/Shell/CommandRouterContractTests.cs`
   - Test: `RouteAsync_WithValidCommand_ReturnsSuccess`
   - Test: `RouteAsync_WithUnknownCommand_ReturnsFailure`
   - Test: `RouteAsync_WithoutSlashPrefix_ReturnsFailure`
@@ -78,7 +78,7 @@
   - Test: `RouteAsync_WithArguments_ParsesCorrectly`
   - Test: `RouteAsync_WithAuthenticationError_ReturnsFailureWithHint`
 
-- [ ] **T010 [P]** Contract test for SessionManager in `tests/Unit/Features/Shell/SessionManagerContractTests.cs`
+- [x] **T010 [P]** Contract test for SessionManager in `tests/Unit/Features/Shell/SessionManagerContractTests.cs`
   - Test: `StartSession_InitializesNewSession`
   - Test: `AddToHistory_WithValidCommand_AddsEntry`
   - Test: `AddToHistory_ExceedsCapacity_RemovesOldest`
@@ -87,7 +87,7 @@
   - Test: `StartSession_CalledTwice_ThrowsException`
   - Test: `AddToHistory_BeforeStart_ThrowsException`
 
-- [ ] **T011 [P]** Contract test for AutocompleteEngine in `tests/Unit/Features/Shell/AutocompleteEngineContractTests.cs`
+- [x] **T011 [P]** Contract test for AutocompleteEngine in `tests/Unit/Features/Shell/AutocompleteEngineContractTests.cs`
   - Test: `GetSuggestions_WithValidPrefix_ReturnsSuggestions`
   - Test: `GetSuggestions_WithEmptyInput_ReturnsEmptyList`
   - Test: `GetSuggestions_WithoutSlashPrefix_ReturnsEmptyList`
@@ -99,49 +99,49 @@
 
 ### Integration Tests (Quickstart Scenarios)
 
-- [ ] **T012 [P]** Integration test for Scenario 1 (Launch & Single Command) in `tests/Integration/Features/Shell/LaunchAndExecuteTests.cs`
+- [x] **T012 [P]** Integration test for Scenario 1 (Launch & Single Command) in `tests/Integration/Features/Shell/LaunchAndExecuteTests.cs`
   - Test: Shell launches with banner (logo, name, version per FR-004)
   - Test: Single command executes successfully
   - Test: Prompt returns after command
   - Test: `/quit` exits cleanly with code 0
 
-- [ ] **T013 [P]** Integration test for Scenario 2 (Multiple Commands) in `tests/Integration/Features/Shell/MultipleCommandsTests.cs`
+- [x] **T013 [P]** Integration test for Scenario 2 (Multiple Commands) in `tests/Integration/Features/Shell/MultipleCommandsTests.cs`
   - Test: Three sequential commands execute
   - Test: No re-authentication between commands
   - Test: Session maintains context
   - Test: Clean exit after multiple commands
 
-- [ ] **T014 [P]** Integration test for Scenario 3 (Autocomplete) in `tests/Integration/Features/Shell/AutocompleteIntegrationTests.cs`
+- [x] **T014 [P]** Integration test for Scenario 3 (Autocomplete) in `tests/Integration/Features/Shell/AutocompleteIntegrationTests.cs`
   - Test: Tab key triggers suggestions
   - Test: Suggestions include help text
   - Test: Accepting suggestion completes command
   - Test: Multiple Tab presses cycle through matches
 
-- [ ] **T015 [P]** Integration test for Scenario 4 (Command History) in `tests/Integration/Features/Shell/CommandHistoryTests.cs`
+- [x] **T015 [P]** Integration test for Scenario 4 (Command History) in `tests/Integration/Features/Shell/CommandHistoryTests.cs`
   - Test: Arrow Up recalls previous command
   - Test: Arrow Down navigates forward in history
   - Test: History persists during session only (FR-011)
   - Test: History cleared on exit (no persistence between launches)
 
-- [ ] **T016 [P]** Integration test for Scenario 5 (Error Handling) in `tests/Integration/Features/Shell/ErrorHandlingTests.cs`
+- [x] **T016 [P]** Integration test for Scenario 5 (Error Handling) in `tests/Integration/Features/Shell/ErrorHandlingTests.cs`
   - Test: Unknown command displays error inline
   - Test: Auth error shows `/login` hint
   - Test: Prompt returns after error
   - Test: Session continues after error
 
-- [ ] **T017 [P]** Integration test for Scenario 6 (Ctrl+C) in `tests/Integration/Features/Shell/CommandInterruptionTests.cs`
+- [x] **T017 [P]** Integration test for Scenario 6 (Ctrl+C) in `tests/Integration/Features/Shell/CommandInterruptionTests.cs`
   - Test: Ctrl+C cancels running command
   - Test: Partial results displayed
   - Test: Prompt returns immediately
   - Test: Session remains active
 
-- [ ] **T018 [P]** Integration test for Scenario 7 (Long Output) in `tests/Integration/Features/Shell/OutputFormattingTests.cs`
+- [x] **T018 [P]** Integration test for Scenario 7 (Long Output) in `tests/Integration/Features/Shell/OutputFormattingTests.cs`
   - Test: Short output (< terminal height - 5) displays fully
   - Test: Long output triggers pagination
   - Test: Pagination uses Space=next, q=quit controls (FR-014)
   - Test: Terminal height detection works
 
-- [ ] **T019 [P]** Integration test for Scenario 8 (Multiple Sessions) in `tests/Integration/Features/Shell/MultipleSessionsTests.cs`
+- [x] **T019 [P]** Integration test for Scenario 8 (Multiple Sessions) in `tests/Integration/Features/Shell/MultipleSessionsTests.cs`
   - Test: Two shell instances launch concurrently
   - Test: Sessions have isolated state
   - Test: Commands in session A don't affect session B
@@ -153,45 +153,45 @@
 
 ### Data Models (Parallel)
 
-- [ ] **T020 [P]** Create `ShellSession` record in `src/Features/Shell/Models/ShellSession.cs`
+- [x] **T020 [P]** Create `ShellSession` record in `src/Features/Shell/Models/ShellSession.cs`
   - Properties: SessionId, StartTime, EndTime, CommandCount, Status
   - Validation: StartTime <= EndTime, CommandCount >= 0
   - Status enum: Created, Active, Terminated
 
-- [ ] **T021 [P]** Create `CommandHistoryEntry` record in `src/Features/Shell/Models/CommandHistoryEntry.cs`
+- [x] **T021 [P]** Create `CommandHistoryEntry` record in `src/Features/Shell/Models/CommandHistoryEntry.cs`
   - Properties: SequenceNumber, Command, Timestamp, WasSuccessful, WasInterrupted, ResultSummary
   - Validation: SequenceNumber > 0, Command not null, ResultSummary <= 100 chars (truncate at word boundary with '...')
 
-- [ ] **T022 [P]** Create `CommandMetadata` record in `src/Features/Shell/Models/CommandMetadata.cs`
+- [x] **T022 [P]** Create `CommandMetadata` record in `src/Features/Shell/Models/CommandMetadata.cs`
   - Properties: Name, HelpText, Aliases, RequiresAuthentication
   - Validation: Name starts with '/', length 2-20 chars
 
-- [ ] **T023 [P]** Create `AutocompleteSuggestion` record in `src/Features/Shell/Models/AutocompleteSuggestion.cs`
+- [x] **T023 [P]** Create `AutocompleteSuggestion` record in `src/Features/Shell/Models/AutocompleteSuggestion.cs`
   - Properties: CommandName, HelpText, MatchScore
 
-- [ ] **T024 [P]** Create `CommandResult` record in `src/Features/Shell/Models/CommandResult.cs`
+- [x] **T024 [P]** Create `CommandResult` record in `src/Features/Shell/Models/CommandResult.cs`
   - Properties: IsSuccess, Message, Error
 
 ### Services (Sequential - Dependency Order)
 
-- [ ] **T025** Create `IAutocompleteEngine` interface and implementation in `src/Features/Shell/Services/AutocompleteEngine.cs`
+- [x] **T025** Create `IAutocompleteEngine` interface and implementation in `src/Features/Shell/Services/AutocompleteEngine.cs`
   - Implement GetSuggestions method
   - Static command catalog with all slash commands
   - Match scoring algorithm (exact prefix > fuzzy)
   - Limit to 10 suggestions, ranked by score
 
-- [ ] **T026** Create `ISessionManager` interface and implementation in `src/Features/Shell/Services/SessionManager.cs`
+- [x] **T026** Create `ISessionManager` interface and implementation in `src/Features/Shell/Services/SessionManager.cs`
   - Implement StartSession, AddToHistory, GetHistory, EndSession
   - Circular buffer (100 entries max)
   - Session lifecycle management (in-memory only, no persistence per FR-011)
 
-- [ ] **T027** Create `ICommandRouter` interface and implementation in `src/Features/Shell/Services/CommandRouter.cs`
+- [x] **T027** Create `ICommandRouter` interface and implementation in `src/Features/Shell/Services/CommandRouter.cs`
   - Implement RouteAsync method
   - Command parsing (slash prefix, args extraction)
   - Handler resolution from service provider
   - Error handling (unknown command, auth errors, cancellation)
 
-- [ ] **T028** Create `IReplLoop` interface and implementation in `src/Features/Shell/Services/ReplLoop.cs`
+- [x] **T028** Create `IReplLoop` interface and implementation in `src/Features/Shell/Services/ReplLoop.cs`
   - Implement RunAsync method
   - Display banner on startup: ASCII logo, "Ten Second Tom", version number (FR-004)
   - Read-Eval-Print loop with Spectre.Console
@@ -199,7 +199,7 @@
   - Command history with Arrow keys
   - Ctrl+C handling via Console.CancelKeyPress
 
-- [ ] **T029** Create `IOutputPaginator` interface and implementation in `src/Features/Shell/Services/OutputPaginator.cs`
+- [x] **T029** Create `IOutputPaginator` interface and implementation in `src/Features/Shell/Services/OutputPaginator.cs`
   - Detect terminal height dynamically
   - Apply algorithm: if lines <= (terminal height - 5), display full output (FR-014)
   - If lines > threshold, use Spectre.Console pager
