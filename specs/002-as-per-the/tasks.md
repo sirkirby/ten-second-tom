@@ -496,7 +496,7 @@
     - Approval process workflow (trigger → validate → build → release → approve → publish)
     - Package manager status (Homebrew automated, Winget/Chocolatey manual)
 
-- [ ] T050 Test release workflow manually using quickstart.md Scenario 3
+- [x] T050 Test release workflow manually using quickstart.md Scenario 3
   - **Prerequisites**:
     - Homebrew tap repository created: `homebrew-ten-second-tom` (standard Homebrew naming)
     - Repository must be public for GitHub Packages
@@ -526,7 +526,7 @@
     - Users can install via `brew install sirkirby/ten-second-tom/ten-second-tom`
   - **Cleanup**: `brew uninstall ten-second-tom && brew untap sirkirby/ten-second-tom`
 
-- [ ] T051 Verify release workflow performance meets targets
+- [x] T051 Verify release workflow performance meets targets
   - **Performance Targets** (from spec.md NFR-001):
     - Version validation: <1 minute
     - Build artifacts: ≤15 minutes (parallel execution)

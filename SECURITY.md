@@ -159,9 +159,9 @@ dotnet user-secrets set "OpenAI:ApiKey" "your-api-key-here"
 dotnet user-secrets set "Anthropic:ApiKey" "your-api-key-here"
 ```
 
-### Production
+### Production & Installed Application
 
-Use environment variables:
+Use environment variables. This is the recommended approach for both production servers and for users who have installed the application via a package manager (e.g., Homebrew, Winget).
 ```bash
 export TENSECONDTOM__OPENAI__APIKEY="your-api-key-here"
 export TENSECONDTOM__ANTHROPIC__APIKEY="your-api-key-here"

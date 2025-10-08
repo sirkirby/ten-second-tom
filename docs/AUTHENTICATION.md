@@ -172,22 +172,10 @@ export TENSECONDTOM_AUTH_PUBLICKEYPATH="~/.ssh/id_ed25519.pub"
 echo 'export TENSECONDTOM_AUTH_PUBLICKEYPATH="~/.ssh/id_ed25519.pub"' >> ~/.zshrc
 ```
 
-**Option 3: Configuration File (Recommended for Production)**
+**Option 3: Configuration File (Not for Secrets)**
 
-Add to `appsettings.json` or `appsettings.Development.json`:
-```json
-{
-  "TenSecondTom": {
-    "Auth": {
-      "PublicKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMockPublicKeyDataHere your.email@example.com"
-    }
-  }
-}
-```
+You can add non-sensitive authentication settings to `appsettings.json`. **Never store private keys or other secrets in this file.**
 
-**Option 3: Public Key File Path**
-
-Point to your `.pub` file (supports `~` expansion):
 ```json
 {
   "TenSecondTom": {
