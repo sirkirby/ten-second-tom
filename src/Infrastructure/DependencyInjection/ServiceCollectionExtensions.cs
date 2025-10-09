@@ -6,10 +6,15 @@ using OpenAI;
 using OpenAI.Chat;
 using TenSecondTom.Features.Auth.Handlers;
 using TenSecondTom.Features.Search.Handlers;
+using TenSecondTom.Features.Setup.Handlers;
+using TenSecondTom.Features.Setup.Queries;
+using TenSecondTom.Features.Setup.Validation;
 using TenSecondTom.Features.Shell.Services;
 using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Infrastructure.Auth.SshProviders;
+using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
@@ -29,6 +34,9 @@ public static class ServiceCollectionExtensions
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddTenSecondTomServices(this IServiceCollection services)
     {
+        // Add HttpClient support for API validators
+        services.AddHttpClient();
+        
         // Infrastructure services
         services.AddSingleton<IMemoryStorageProvider>(serviceProvider =>
         {
@@ -146,6 +154,30 @@ public static class ServiceCollectionExtensions
         services.AddTransient<SearchMemoriesQueryHandler>();
         services.AddTransient<LoginCommandHandler>();
         services.AddTransient<LogoutCommandHandler>();
+
+        // Setup feature services
+        services.AddTransient<SetupCommandHandler>();
+        services.AddTransient<ConfigCommandHandler>();
+        
+        // SSH Key Detectors - registered as both concrete types and interface for factory injection
+        services.AddTransient<ISshKeyDetector, SystemSshAgentDetector>();
+        services.AddTransient<ISshKeyDetector, OnePasswordSshAgentDetector>();
+        services.AddTransient<ISshKeyDetector, SecretiveSshAgentDetector>();
+        services.AddTransient<ISshKeyDetector, FileSystemSshKeyDetector>();
+        services.AddSingleton<ISshKeyDetectorFactory, SshKeyDetectorFactory>();
+        
+        // API Key Validators
+        services.AddTransient<IApiKeyValidator, OpenAIApiKeyValidator>();
+        services.AddTransient<IApiKeyValidator, AnthropicApiKeyValidator>();
+        
+        // Configuration Storage
+        services.AddSingleton<IConfigurationStorageService, UserSecretsStorageService>();
+        
+        // Spectre.Console AnsiConsole for rich terminal UI
+        services.AddSingleton<Spectre.Console.IAnsiConsole>(Spectre.Console.AnsiConsole.Console);
+        
+        // Setup Wizard UI
+        services.AddTransient<ISetupWizardUI, SpectreConsoleSetupWizard>();
 
         // Shell services (Singletons for session persistence during app lifetime)
         services.AddSingleton<IReplLoop, ReplLoop>();

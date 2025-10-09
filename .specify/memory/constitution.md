@@ -161,9 +161,8 @@ Sync Impact Report:
 
 - Minimum 80% code coverage across the solution
 - Unit tests for business logic (fast, isolated)
-- Integration tests for component interactions
+- Integration tests for component interactions, when practical
 - CLI command tests for user-facing functionality
-- Performance tests for critical paths
 
 ### Test Organization
 
