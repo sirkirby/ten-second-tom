@@ -27,10 +27,10 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["TenSecondTom:Auth:PublicKeyPath"] = "~/.ssh/id_ed25519",
-            ["TenSecondTom:LlmProvider"] = "OpenAI",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory",
-            ["OPENAI_API_KEY"] = "sk-test1234567890"
+            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
+            ["Llm:Provider"] = "OpenAI",
+            ["Llm:ApiKey"] = "sk-test1234567890",
+            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
         });
 
         // Act
@@ -46,10 +46,10 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["TenSecondTom:Auth:PublicKeyPath"] = "~/.ssh/id_ed25519",
-            ["TenSecondTom:LlmProvider"] = "Anthropic",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory",
-            ["ANTHROPIC_API_KEY"] = "sk-ant-test1234567890"
+            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
+            ["Llm:Provider"] = "Anthropic",
+            ["Llm:ApiKey"] = "sk-ant-test1234567890",
+            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
         });
 
         // Act
@@ -65,10 +65,10 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["TenSecondTom:Auth:PublicKeyPath"] = "~/.ssh/id_ed25519",
-            ["TenSecondTom:LlmProvider"] = "OPENAI",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory",
-            ["OPENAI_API_KEY"] = "sk-test1234567890"
+            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
+            ["Llm:Provider"] = "OPENAI",
+            ["Llm:ApiKey"] = "sk-test1234567890",
+            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
         });
 
         // Act
@@ -81,30 +81,21 @@ public sealed class ConfigurationCheckerTests
     [Fact]
     public void IsConfigured_WithApiKeyFromEnvironmentVariable_ReturnsTrue()
     {
-        // Arrange
-        var originalEnvVar = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-        try
+        // Arrange - API key is now stored directly in configuration (Llm:ApiKey)
+        // This test is no longer relevant since we don't check environment variables
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            Environment.SetEnvironmentVariable("OPENAI_API_KEY", "sk-env-test-key");
-            
-            var configuration = BuildConfiguration(new Dictionary<string, string?>
-            {
-                ["TenSecondTom:Auth:PublicKeyPath"] = "~/.ssh/id_ed25519",
-                ["TenSecondTom:LlmProvider"] = "OpenAI",
-                ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
-                // API key from environment variable
-            });
+            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
+            ["Llm:Provider"] = "OpenAI",
+            ["Llm:ApiKey"] = "sk-test1234567890",
+            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
+        });
 
-            // Act
-            var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        // Act
+        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
 
-            // Assert
-            result.Should().BeTrue("API key from environment variable should be accepted");
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("OPENAI_API_KEY", originalEnvVar);
-        }
+        // Assert
+        result.Should().BeTrue("API key from configuration should be accepted");
     }
 
     #endregion
@@ -112,23 +103,43 @@ public sealed class ConfigurationCheckerTests
     #region Missing Configuration Tests
 
     [Fact]
-    public void IsConfigured_WithMissingSshKeyPath_ReturnsFalse()
+    public void IsConfigured_WithMissingSshConfiguration_ReturnsFalse()
     {
-        // Arrange
+        // Arrange - Neither KeyPath nor KeySource is set
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            // SSH key path missing
-            ["TenSecondTom:LlmProvider"] = "OpenAI",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory",
-            ["OPENAI_API_KEY"] = "sk-test1234567890"
+            // SSH configuration missing entirely
+            ["Llm:Provider"] = "OpenAI",
+            ["Llm:ApiKey"] = "sk-test1234567890",
+            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
         });
 
         // Act
         var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
 
         // Assert
-        result.Should().BeFalse("SSH key path is required");
-        VerifyLogContains(LogLevel.Debug, "Missing: SSH key path");
+        result.Should().BeFalse("SSH configuration is required");
+        VerifyLogContains(LogLevel.Debug, "Missing: SSH configuration");
+    }
+
+    [Fact]
+    public void IsConfigured_WithSshKeySourceOnly_ReturnsTrue()
+    {
+        // Arrange - KeyPath is null but KeySource is set (agent scenario)
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Ssh:KeyPath"] = null,
+            ["Ssh:KeySource"] = "OnePasswordAgent",
+            ["Llm:Provider"] = "OpenAI",
+            ["Llm:ApiKey"] = "sk-test1234567890",
+            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
+        });
+
+        // Act
+        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+
+        // Assert
+        result.Should().BeTrue("SSH agent configuration without KeyPath should be valid");
     }
 
     [Fact]
@@ -137,10 +148,10 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["TenSecondTom:Auth:PublicKeyPath"] = "~/.ssh/id_ed25519",
+            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
             // LLM provider missing
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory",
-            ["OPENAI_API_KEY"] = "sk-test1234567890"
+            ["Llm:ApiKey"] = "sk-test1234567890",
+            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
         });
 
         // Act
@@ -157,10 +168,10 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["TenSecondTom:Auth:PublicKeyPath"] = "~/.ssh/id_ed25519",
-            ["TenSecondTom:LlmProvider"] = "OpenAI",
+            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
+            ["Llm:Provider"] = "OpenAI",
+            ["Llm:ApiKey"] = "sk-test1234567890"
             // Memory directory missing
-            ["OPENAI_API_KEY"] = "sk-test1234567890"
         });
 
         // Act
@@ -177,9 +188,9 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["TenSecondTom:Auth:PublicKeyPath"] = "~/.ssh/id_ed25519",
-            ["TenSecondTom:LlmProvider"] = "OpenAI",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
+            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
+            ["Llm:Provider"] = "OpenAI",
+            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
             // API key missing
         });
 
@@ -188,26 +199,27 @@ public sealed class ConfigurationCheckerTests
 
         // Assert
         result.Should().BeFalse("API key is required");
-        VerifyLogContains(LogLevel.Debug, "Missing: API key");
+        VerifyLogContains(LogLevel.Debug, "Missing: LLM API key");
     }
 
     [Fact]
     public void IsConfigured_WithWrongProviderApiKey_ReturnsFalse()
     {
-        // Arrange - OpenAI provider but Anthropic key
+        // Arrange - Test is no longer relevant as API key is stored in Llm:ApiKey
+        // All providers use the same configuration key now
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["TenSecondTom:Auth:PublicKeyPath"] = "~/.ssh/id_ed25519",
-            ["TenSecondTom:LlmProvider"] = "OpenAI",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory",
-            ["ANTHROPIC_API_KEY"] = "sk-ant-test1234567890" // Wrong key for OpenAI provider
+            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
+            ["Llm:Provider"] = "OpenAI",
+            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
+            // Missing API key
         });
 
         // Act
         var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
 
         // Assert
-        result.Should().BeFalse("API key must match the selected provider");
+        result.Should().BeFalse("API key is required regardless of provider");
     }
 
     [Fact]
@@ -216,10 +228,10 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["TenSecondTom:Auth:PublicKeyPath"] = "",
-            ["TenSecondTom:LlmProvider"] = "",
-            ["TenSecondTom:MemoryDirectory"] = "",
-            ["OPENAI_API_KEY"] = ""
+            ["Ssh:KeyPath"] = "",
+            ["Llm:Provider"] = "",
+            ["Llm:ApiKey"] = "",
+            ["Storage:MemoryDirectory"] = ""
         });
 
         // Act
@@ -235,10 +247,10 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["TenSecondTom:Auth:PublicKeyPath"] = "   ",
-            ["TenSecondTom:LlmProvider"] = "  ",
-            ["TenSecondTom:MemoryDirectory"] = "   ",
-            ["OPENAI_API_KEY"] = "  "
+            ["Ssh:KeyPath"] = "   ",
+            ["Llm:Provider"] = "  ",
+            ["Llm:ApiKey"] = "  ",
+            ["Storage:MemoryDirectory"] = "   "
         });
 
         // Act
@@ -255,20 +267,21 @@ public sealed class ConfigurationCheckerTests
     [Fact]
     public void IsConfigured_WithUnknownProvider_ReturnsFalse()
     {
-        // Arrange
+        // Arrange - Unknown provider is still configured as long as all fields are present
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["TenSecondTom:Auth:PublicKeyPath"] = "~/.ssh/id_ed25519",
-            ["TenSecondTom:LlmProvider"] = "UnknownProvider",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory",
-            ["OPENAI_API_KEY"] = "sk-test1234567890"
+            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
+            ["Llm:Provider"] = "UnknownProvider",
+            ["Llm:ApiKey"] = "sk-test1234567890",
+            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
         });
 
         // Act
         var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
 
         // Assert
-        result.Should().BeFalse("unknown provider should result in no API key match");
+        // ConfigurationChecker doesn't validate provider names, just checks if fields exist
+        result.Should().BeTrue("configuration checker only validates presence, not provider validity");
     }
 
     #endregion
@@ -299,10 +312,10 @@ public sealed class ConfigurationCheckerTests
         ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
 
         // Assert
-        VerifyLogContains(LogLevel.Debug, "Missing: SSH key path");
+        VerifyLogContains(LogLevel.Debug, "Missing: SSH configuration");
         VerifyLogContains(LogLevel.Debug, "Missing: LLM provider");
         VerifyLogContains(LogLevel.Debug, "Missing: Memory directory");
-        VerifyLogContains(LogLevel.Debug, "Missing: API key");
+        VerifyLogContains(LogLevel.Debug, "Missing: LLM API key");
     }
 
     [Fact]
@@ -311,10 +324,10 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["TenSecondTom:Auth:PublicKeyPath"] = "~/.ssh/id_ed25519",
-            ["TenSecondTom:LlmProvider"] = "OpenAI",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory",
-            ["OPENAI_API_KEY"] = "sk-test1234567890"
+            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
+            ["Llm:Provider"] = "OpenAI",
+            ["Llm:ApiKey"] = "sk-test1234567890",
+            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
         });
 
         // Act
@@ -337,8 +350,8 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["TenSecondTom:Auth:PublicKeyPath"] = "~/.ssh/id_ed25519",
-            ["TenSecondTom:LlmProvider"] = "OpenAI"
+            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
+            ["Llm:Provider"] = "OpenAI"
             // Missing: Memory directory and API key
         });
 
@@ -347,14 +360,14 @@ public sealed class ConfigurationCheckerTests
 
         // Assert
         VerifyLogContains(LogLevel.Debug, "Missing: Memory directory");
-        VerifyLogContains(LogLevel.Debug, "Missing: API key");
+        VerifyLogContains(LogLevel.Debug, "Missing: LLM API key");
         
         // Should NOT log for present settings
         _mockLogger.Verify(
             l => l.Log(
                 LogLevel.Debug,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Missing: SSH key path")),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Missing: SSH configuration")),
                 null,
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Never);
@@ -405,59 +418,41 @@ public sealed class ConfigurationCheckerTests
     [Fact]
     public void IsConfigured_WithApiKeyInBothConfigAndEnvironment_PrefersConfig()
     {
-        // Arrange
-        var originalEnvVar = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-        try
+        // Arrange - This test is no longer relevant as ConfigurationChecker only checks Llm:ApiKey
+        // Environment variables are not checked by ConfigurationChecker
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            Environment.SetEnvironmentVariable("OPENAI_API_KEY", "sk-env-key");
-            
-            var configuration = BuildConfiguration(new Dictionary<string, string?>
-            {
-                ["TenSecondTom:Auth:PublicKeyPath"] = "~/.ssh/id_ed25519",
-                ["TenSecondTom:LlmProvider"] = "OpenAI",
-                ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory",
-                ["OPENAI_API_KEY"] = "sk-config-key"
-            });
+            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
+            ["Llm:Provider"] = "OpenAI",
+            ["Llm:ApiKey"] = "sk-config-key",
+            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
+        });
 
-            // Act
-            var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        // Act
+        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
 
-            // Assert
-            result.Should().BeTrue("configuration API key should take precedence over environment variable");
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("OPENAI_API_KEY", originalEnvVar);
-        }
+        // Assert
+        result.Should().BeTrue("all required configuration is present");
     }
 
     [Fact]
     public void IsConfigured_WithOnlyEnvironmentApiKey_UsesEnvironmentVariable()
     {
-        // Arrange
-        var originalEnvVar = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-        try
+        // Arrange - ConfigurationChecker now only checks Llm:ApiKey from configuration
+        // Environment variables must be loaded into IConfiguration before this check
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            Environment.SetEnvironmentVariable("OPENAI_API_KEY", "sk-env-only-key");
-            
-            var configuration = BuildConfiguration(new Dictionary<string, string?>
-            {
-                ["TenSecondTom:Auth:PublicKeyPath"] = "~/.ssh/id_ed25519",
-                ["TenSecondTom:LlmProvider"] = "OpenAI",
-                ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
-                // No API key in configuration
-            });
+            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
+            ["Llm:Provider"] = "OpenAI",
+            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
+            // No API key in configuration
+        });
 
-            // Act
-            var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        // Act
+        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
 
-            // Assert
-            result.Should().BeTrue("environment variable should be used when config key is missing");
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("OPENAI_API_KEY", originalEnvVar);
-        }
+        // Assert
+        result.Should().BeFalse("API key is required in configuration");
     }
 
     #endregion

@@ -17,38 +17,36 @@ public static class ConfigurationChecker
     /// <returns>True if configured, false if setup is needed</returns>
     public static bool IsConfigured(IConfiguration configuration, ILogger logger)
     {
-        // Check for required configuration keys
-        string? sshKeyPath = configuration["TenSecondTom:Auth:PublicKeyPath"];
-        string? llmProvider = configuration["TenSecondTom:LlmProvider"];
-        string? memoryDirectory = configuration["TenSecondTom:MemoryDirectory"];
-        
-        // Check for API keys based on provider
-        string? apiKey = llmProvider?.ToLowerInvariant() switch
-        {
-            "openai" => configuration["OPENAI_API_KEY"] ?? 
-                       Environment.GetEnvironmentVariable("OPENAI_API_KEY"),
-            "anthropic" => configuration["ANTHROPIC_API_KEY"] ?? 
-                          Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY"),
-            _ => null
-        };
+        // Check for required configuration keys (matching UserSecretsStorageService format)
+        // Keys are stored as: Ssh:KeyPath, Llm:Provider, Llm:ApiKey, Storage:MemoryDirectory
+        // Note: Either Ssh:KeyPath OR Ssh:KeySource must be present (agents don't need KeyPath)
+        string? sshKeyPath = configuration["Ssh:KeyPath"];
+        string? sshKeySource = configuration["Ssh:KeySource"];
+        string? llmProvider = configuration["Llm:Provider"];
+        string? llmApiKey = configuration["Llm:ApiKey"];
+        string? memoryDirectory = configuration["Storage:MemoryDirectory"];
 
-        bool isConfigured = !string.IsNullOrWhiteSpace(sshKeyPath) &&
+        // SSH is configured if either KeyPath is set OR KeySource is set
+        bool hasSshConfiguration = !string.IsNullOrWhiteSpace(sshKeyPath) || 
+                                  !string.IsNullOrWhiteSpace(sshKeySource);
+
+        bool isConfigured = hasSshConfiguration &&
                            !string.IsNullOrWhiteSpace(llmProvider) &&
                            !string.IsNullOrWhiteSpace(memoryDirectory) &&
-                           !string.IsNullOrWhiteSpace(apiKey);
+                           !string.IsNullOrWhiteSpace(llmApiKey);
 
         if (!isConfigured)
         {
             logger.LogInformation("Application is not configured. Setup wizard will be launched.");
             
-            if (string.IsNullOrWhiteSpace(sshKeyPath))
-                logger.LogDebug("Missing: SSH key path");
+            if (!hasSshConfiguration)
+                logger.LogDebug("Missing: SSH configuration (neither Ssh:KeyPath nor Ssh:KeySource is set)");
             if (string.IsNullOrWhiteSpace(llmProvider))
-                logger.LogDebug("Missing: LLM provider");
+                logger.LogDebug("Missing: LLM provider (Llm:Provider)");
             if (string.IsNullOrWhiteSpace(memoryDirectory))
-                logger.LogDebug("Missing: Memory directory");
-            if (string.IsNullOrWhiteSpace(apiKey))
-                logger.LogDebug("Missing: API key for provider {Provider}", llmProvider ?? "unknown");
+                logger.LogDebug("Missing: Memory directory (Storage:MemoryDirectory)");
+            if (string.IsNullOrWhiteSpace(llmApiKey))
+                logger.LogDebug("Missing: LLM API key (Llm:ApiKey)");
         }
 
         return isConfigured;
