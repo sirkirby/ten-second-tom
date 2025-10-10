@@ -132,7 +132,7 @@ public sealed class ReplLoop : IReplLoop
         AnsiConsole.WriteLine();
         AnsiConsole.Write(
             new FigletText("Ten Second Tom")
-                .Centered()
+                .LeftJustified()
                 .Color(Color.Cyan1));
 
         var version = typeof(ReplLoop).Assembly.GetName().Version?.ToString() ?? "1.0.0";

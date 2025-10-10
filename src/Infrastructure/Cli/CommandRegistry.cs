@@ -9,6 +9,7 @@ using TenSecondTom.Features.Shell.Services;
 using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Shared.OutputFormatters;
 using AuthLoginHandler = TenSecondTom.Features.Auth.Handlers.LoginCommandHandler;
 using AuthLogoutHandler = TenSecondTom.Features.Auth.Handlers.LogoutCommandHandler;
 
@@ -226,13 +227,7 @@ public static class CommandRegistry
     {
         var searchCommand = new Command("search", "Search memory entries by text query");
 
-        // Add required query argument
-        var queryArgument = new Argument<string>("query")
-        {
-            Description = "The text to search for in memory entries"
-        };
-
-        // Add options for date range filters
+        // Add options for date range filters FIRST (before arguments)
         var fromDateOption = new Option<DateTime?>("--from-date")
         {
             Description = "Start date filter (yyyy-MM-dd). Optional."
@@ -243,16 +238,44 @@ public static class CommandRegistry
             Description = "End date filter (yyyy-MM-dd). Optional."
         };
 
-        searchCommand.Arguments.Add(queryArgument);
         searchCommand.Options.Add(fromDateOption);
         searchCommand.Options.Add(toDateOption);
         searchCommand.Options.Add(jsonOutputOption);
+
+        // Add required query argument AFTER options - allow multiple words without quotes
+        // Using ZeroOrMore to allow options to be recognized, then require at least one word in handler
+        var queryArgument = new Argument<string[]>("query")
+        {
+            Description = "The text to search for in memory entries",
+            Arity = ArgumentArity.ZeroOrMore
+        };
+
+        searchCommand.Arguments.Add(queryArgument);
 
         // Set action
         searchCommand.SetAction(async (parseResult) =>
         {
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
-            string query = parseResult.GetValue(queryArgument) ?? string.Empty;
+            string[] queryWords = parseResult.GetValue(queryArgument) ?? [];
+            
+            // Validate that at least one query word was provided
+            if (queryWords.Length == 0)
+            {
+                if (jsonOutput)
+                {
+                    Console.WriteLine(JsonOutputFormatter.FormatFailure("search", 
+                        "Query is required. Usage: search <query> [options]", 
+                        DateTimeOffset.UtcNow));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine("[red]Error:[/] Query is required.");
+                    AnsiConsole.MarkupLine("[dim]Usage: search <query> [--from-date YYYY-MM-DD] [--to-date YYYY-MM-DD] [--output-json][/]");
+                }
+                return;
+            }
+            
+            string query = string.Join(" ", queryWords); // Join multiple words into single query
             DateTime? fromDate = parseResult.GetValue(fromDateOption);
             DateTime? toDate = parseResult.GetValue(toDateOption);
 

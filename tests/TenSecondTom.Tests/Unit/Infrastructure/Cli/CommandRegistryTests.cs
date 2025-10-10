@@ -112,6 +112,72 @@ public sealed class CommandRegistryTests : IDisposable
         }
     }
 
+    [Fact]
+    public void BuildRootCommand_SearchCommand_ShouldAcceptMultiWordQueries()
+    {
+        // Arrange & Act
+        var rootCommand = CommandRegistry.BuildRootCommand(_serviceProvider);
+        var searchCommand = rootCommand.Subcommands.FirstOrDefault(c => c.Name == "search");
+
+        // Assert
+        searchCommand.Should().NotBeNull("search command should be registered");
+        
+        // Verify the query argument accepts multiple words
+        var queryArgument = searchCommand!.Arguments.FirstOrDefault();
+        queryArgument.Should().NotBeNull("search command should have a query argument");
+        queryArgument!.Name.Should().Be("query", "argument should be named 'query'");
+        queryArgument.Arity.MinimumNumberOfValues.Should().Be(0, 
+            "query argument uses ZeroOrMore to allow options to be parsed first");
+        queryArgument.Arity.MaximumNumberOfValues.Should().BeGreaterThan(1, 
+            "query argument should accept multiple words without quotes");
+    }
+
+    [Fact]
+    public void BuildRootCommand_SearchCommand_ShouldHaveQueryArgument()
+    {
+        // Arrange & Act
+        var rootCommand = CommandRegistry.BuildRootCommand(_serviceProvider);
+        var searchCommand = rootCommand.Subcommands.FirstOrDefault(c => c.Name == "search");
+
+        // Assert
+        searchCommand.Should().NotBeNull("search command should be registered");
+        searchCommand!.Arguments.Should().HaveCount(1, "search command should have exactly one argument");
+        
+        var queryArgument = searchCommand.Arguments.First();
+        queryArgument.Name.Should().Be("query", "argument should be named 'query'");
+        queryArgument.Description.Should().Contain("search", 
+            "query argument should describe search functionality");
+    }
+
+    [Fact]
+    public void BuildRootCommand_SearchCommand_ShouldHaveDateFilterOptions()
+    {
+        // Arrange & Act
+        var rootCommand = CommandRegistry.BuildRootCommand(_serviceProvider);
+        var searchCommand = rootCommand.Subcommands.FirstOrDefault(c => c.Name == "search");
+
+        // Assert
+        searchCommand.Should().NotBeNull("search command should be registered");
+        
+        var optionNames = searchCommand!.Options.Select(o => o.Name).ToList();
+        optionNames.Should().Contain("--from-date", "search should support --from-date filter");
+        optionNames.Should().Contain("--to-date", "search should support --to-date filter");
+    }
+
+    [Fact]
+    public void BuildRootCommand_SearchCommand_ShouldSupportJsonOutput()
+    {
+        // Arrange & Act
+        var rootCommand = CommandRegistry.BuildRootCommand(_serviceProvider);
+        var searchCommand = rootCommand.Subcommands.FirstOrDefault(c => c.Name == "search");
+
+        // Assert
+        searchCommand.Should().NotBeNull("search command should be registered");
+        
+        var jsonOption = searchCommand!.Options.FirstOrDefault(o => o.Name == "--output-json");
+        jsonOption.Should().NotBeNull("search should support --output-json option");
+    }
+
     public void Dispose()
     {
         _serviceProvider.Dispose();

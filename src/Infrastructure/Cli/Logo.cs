@@ -21,8 +21,8 @@ internal static class Logo
         AnsiConsole.WriteLine();
         AnsiConsole.Write(
             new FigletText("Ten Second Tom")
-                .Centered()
-                .Color(Color.Yellow));
+                .LeftJustified()
+                .Color(Color.Cyan1));
 
         AnsiConsole.MarkupLine("[dim]Your personal memory assistant[/]");
         AnsiConsole.WriteLine();

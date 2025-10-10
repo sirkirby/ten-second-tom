@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Shared.OutputFormatters;
@@ -15,7 +16,10 @@ public static class JsonOutputFormatter
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = false,
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
+        TypeInfoResolver = JsonTypeInfoResolver.Combine(
+            JsonOutputContext.Default,
+            new DefaultJsonTypeInfoResolver())
     };
 
     /// <summary>
@@ -83,7 +87,7 @@ public static class JsonOutputFormatter
     /// <summary>
     /// Represents the JSON output structure for CLI commands.
     /// </summary>
-    private sealed class JsonOutput
+    internal sealed class JsonOutput
     {
         /// <summary>
         /// Gets or sets a value indicating whether the command succeeded.
