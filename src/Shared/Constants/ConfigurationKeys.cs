@@ -7,19 +7,22 @@ namespace TenSecondTom.Shared.Constants;
 public static class ConfigurationKeys
 {
     /// <summary>
-    /// Configuration key (or environment variable) for the OpenAI API key.
+    /// Configuration key for the LLM API key.
+    /// Environment variable: Llm__ApiKey
     /// </summary>
-    public const string OpenAIApiKey = "OPENAI_API_KEY";
+    public const string LlmApiKey = "Llm:ApiKey";
 
     /// <summary>
-    /// Configuration key (or environment variable) for the Anthropic API key.
+    /// Configuration key for the LLM provider (OpenAI, Anthropic).
+    /// Environment variable: Llm__Provider
     /// </summary>
-    public const string AnthropicApiKey = "ANTHROPIC_API_KEY";
+    public const string LlmProvider = "Llm:Provider";
 
     /// <summary>
-    /// Configuration key for selecting the active LLM provider (e.g. OpenAI, Anthropic).
+    /// Configuration key for the LLM model selection.
+    /// Environment variable: Llm__Model
     /// </summary>
-    public const string LlmProvider = "TenSecondTom:LlmProvider";
+    public const string LlmModel = "Llm:Model";
 
     /// <summary>
     /// Configuration key for the .NET environment name (Development, Production, etc.).

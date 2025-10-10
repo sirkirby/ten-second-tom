@@ -88,16 +88,21 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ChatClient>(serviceProvider =>
         {
             var configuration = serviceProvider.GetRequiredService<IConfiguration>();
-            string? apiKey = configuration["OPENAI_API_KEY"] ?? 
-                            Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+            
+            // Use standard .NET configuration hierarchy: appsettings → user secrets → environment variables
+            // Configuration system handles priority automatically (Llm:ApiKey or Llm__ApiKey env var)
+            string? apiKey = configuration["Llm:ApiKey"];
             
             if (string.IsNullOrWhiteSpace(apiKey))
             {
                 throw new InvalidOperationException(
-                    "OpenAI API key not configured. Set OPENAI_API_KEY environment variable or add to configuration.");
+                    "OpenAI API key not configured. Run 'tom setup' to configure your API key, " +
+                    "or set Llm__ApiKey environment variable.");
             }
 
-            string model = configuration["TenSecondTom:OpenAI:Model"] ?? "gpt-4o";
+            string model = configuration["Llm:Model"] ?? 
+                          configuration["TenSecondTom:OpenAI:Model"] ?? 
+                          "gpt-4o";
             var openAIClient = new OpenAIClient(apiKey);
             return openAIClient.GetChatClient(model);
         });
@@ -106,8 +111,10 @@ public static class ServiceCollectionExtensions
         services.AddTransient<AnthropicClient>(serviceProvider =>
         {
             var configuration = serviceProvider.GetRequiredService<IConfiguration>();
-            string? apiKey = configuration["ANTHROPIC_API_KEY"] ?? 
-                            Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+            
+            // Use standard .NET configuration hierarchy: appsettings → user secrets → environment variables
+            // Configuration system handles priority automatically (Llm:ApiKey or Llm__ApiKey env var)
+            string? apiKey = configuration["Llm:ApiKey"];
             
             if (string.IsNullOrWhiteSpace(apiKey))
             {
@@ -127,7 +134,9 @@ public static class ServiceCollectionExtensions
             var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger<OpenAILlmProvider>();
             
-            string model = configuration["TenSecondTom:OpenAI:Model"] ?? "gpt-4o";
+            string model = configuration["Llm:Model"] ?? 
+                          configuration["TenSecondTom:OpenAI:Model"] ?? 
+                          "gpt-4o";
             return new OpenAILlmProvider(chatClient, logger, model);
         });
 
@@ -138,7 +147,9 @@ public static class ServiceCollectionExtensions
             var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger<AnthropicLlmProvider>();
             
-            string model = configuration["TenSecondTom:Anthropic:Model"] ?? "claude-3-5-sonnet-20241022";
+            string model = configuration["Llm:Model"] ?? 
+                          configuration["TenSecondTom:Anthropic:Model"] ?? 
+                          "claude-3-5-sonnet-20241022";
             return new AnthropicLlmProvider(client, logger, model);
         });
 

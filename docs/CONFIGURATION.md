@@ -342,13 +342,67 @@ $env:TenSecondTom__MemoryDirectory="C:\tom\memory"
 
 ## Configuration Hierarchy
 
-Ten Second Tom uses the following configuration priority (highest to lowest):
+Ten Second Tom follows standard .NET configuration patterns with a hierarchical override system.
 
-1. **Command-line arguments** (highest priority)
-2. **Environment variables**
-3. **User Secrets** (development/local)
-4. **appsettings.Development.json** (development environment)
-5. **appsettings.json** (defaults, lowest priority)
+### Priority Order (Highest to Lowest)
+
+1. **Command-line arguments** - Highest priority, runtime overrides
+2. **Environment variables** - System or session configuration
+3. **User Secrets** - Secure local storage (`~/.microsoft/usersecrets/ten-second-tom-secrets/secrets.json`)
+4. **appsettings.{Environment}.json** - Environment-specific settings (Development, Production, etc.)
+5. **appsettings.json** - Default configuration, lowest priority
+
+### Configuration Keys
+
+Ten Second Tom stores configuration using a structured hierarchy:
+
+```json
+{
+  "Llm": {
+    "Provider": "Anthropic",
+    "ApiKey": "your-api-key",
+    "Model": "claude-3-5-sonnet-20241022"
+  },
+  "Ssh": {
+    "KeyPath": "~/.ssh/id_ed25519",
+    "KeySource": "OnePasswordAgent",
+    "AgentSocketPath": "/path/to/agent.sock"
+  },
+  "Storage": {
+    "MemoryDirectory": "~/.memory/ten-second-tom",
+    "CreateIfMissing": true
+  }
+}
+```
+
+### Environment Variable Naming
+
+Following .NET conventions, use double underscores (`__`) to specify nested keys:
+
+```bash
+# Standard .NET pattern
+Llm__Provider=Anthropic
+Llm__ApiKey=your-api-key-here
+Llm__Model=claude-3-5-sonnet-20241022
+
+Ssh__KeySource=ManualPath
+Ssh__KeyPath=~/.ssh/id_ed25519
+
+Storage__MemoryDirectory=~/.memory/ten-second-tom
+```
+
+The double underscore (`__`) in environment variables maps to a colon (`:`) in configuration keys,
+which is the standard .NET convention for nested configuration.
+
+### Viewing Effective Configuration
+
+```bash
+# Show current configuration (secrets masked)
+tom config show
+
+# Show with secrets visible (use caution!)
+tom config show --show-secrets
+```
 
 ## Timeout Configuration
 

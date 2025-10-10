@@ -18,6 +18,9 @@ The `.env` file is automatically loaded at startup and is already in `.gitignore
 
 ### Available Environment Variables
 
+Ten Second Tom follows standard .NET configuration conventions. Use double underscores (`__`)
+to specify nested configuration keys (e.g., `Llm__ApiKey` maps to `Llm:ApiKey` in config).
+
 ```bash
 # Environment (Development, Staging, Production)
 DOTNET_ENVIRONMENT=Development
@@ -25,16 +28,14 @@ DOTNET_ENVIRONMENT=Development
 # Memory storage directory
 TenSecondTom__MemoryDirectory=./.memory
 
-# LLM Provider Configuration
-TenSecondTom__LlmProvider=OpenAI
+# LLM Provider Configuration (Standard .NET convention)
+Llm__Provider=Anthropic
+Llm__ApiKey=your-api-key-here
+Llm__Model=claude-3-5-sonnet-20241022
 
-# OpenAI Configuration
-OPENAI_API_KEY=your-api-key-here
-
-# Anthropic Configuration
-ANTHROPIC_API_KEY=your-api-key-here
-
-# SSH Agent Authentication (Phase 3.11a)
+# SSH Agent Authentication
+Ssh__KeySource=ManualPath
+Ssh__KeyPath=~/.ssh/id_ed25519
 TenSecondTom__Auth__PublicKey=ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA...
 TenSecondTom__Auth__PublicKeyPath=~/.ssh/id_ed25519.pub
 
