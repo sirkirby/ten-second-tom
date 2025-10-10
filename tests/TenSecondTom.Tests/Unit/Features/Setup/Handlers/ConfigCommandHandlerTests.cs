@@ -118,8 +118,8 @@ public sealed class ConfigCommandHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Config.NotConfigured");
-        result.Error.Should().Contain("Run /setup first");
+        result.Error.Should().Contain("No configuration found");
+        result.Error.Should().Contain("tom setup");
     }
 
     [Fact]
@@ -166,8 +166,8 @@ public sealed class ConfigCommandHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Config.MissingSettingName");
         result.Error.Should().Contain("Setting name is required");
+        result.Error.Should().Contain("Example:");
     }
 
     [Fact]
@@ -186,7 +186,7 @@ public sealed class ConfigCommandHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Config.MissingSettingName");
+        result.Error.Should().Contain("Setting name is required");
     }
 
     [Fact]
@@ -205,8 +205,8 @@ public sealed class ConfigCommandHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Config.MissingSettingValue");
         result.Error.Should().Contain("Setting value is required");
+        result.Error.Should().Contain("Example:");
     }
 
     [Fact]
@@ -228,7 +228,8 @@ public sealed class ConfigCommandHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Config.NotConfigured");
+        result.Error.Should().Contain("No configuration found");
+        result.Error.Should().Contain("tom setup");
     }
 
     [Fact]
@@ -306,7 +307,7 @@ public sealed class ConfigCommandHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Invalid value for llm-provider");
+        result.Error.Should().Contain("Invalid LLM provider");
         result.Error.Should().Contain("Valid values: OpenAI, Anthropic");
     }
 
@@ -390,8 +391,8 @@ public sealed class ConfigCommandHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Config.ValidationFailed");
-        result.Error.Should().Contain("Invalid API key format");
+        result.Error.Should().Contain("Invalid OpenAI API key format");
+        result.Error.Should().Contain("https://platform.openai.com/api-keys");
     }
 
     #endregion
@@ -445,7 +446,7 @@ public sealed class ConfigCommandHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("ValidationFailed", "path with null character should fail validation");
+        result.Error.Should().Contain("Invalid directory path", "path with null character should fail validation");
     }
 
     #endregion
@@ -507,8 +508,8 @@ public sealed class ConfigCommandHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Config.ValidationFailed");
         result.Error.Should().Contain("SSH key file not found");
+        result.Error.Should().Contain("Example:");
     }
 
     [Fact]
@@ -686,7 +687,7 @@ public sealed class ConfigCommandHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Config.ValidationFailed");
+        result.Error.Should().Contain("Invalid retention days");
         result.Error.Should().Contain("positive integer");
     }
 
@@ -778,7 +779,8 @@ public sealed class ConfigCommandHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Config.NotConfigured");
+        result.Error.Should().Contain("No configuration found");
+        result.Error.Should().Contain("tom setup");
     }
 
     [Fact]
@@ -802,8 +804,8 @@ public sealed class ConfigCommandHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Config.ValidationFailed");
-        result.Error.Should().Contain("Required fields missing or invalid");
+        result.Error.Should().Contain("Configuration validation failed");
+        result.Error.Should().Contain("Required fields");
     }
 
     #endregion
@@ -821,8 +823,8 @@ public sealed class ConfigCommandHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Config.NotImplemented");
         result.Error.Should().Contain("Reset configuration is not yet implemented");
+        result.Error.Should().Contain("tom setup");
     }
 
     #endregion
@@ -847,7 +849,8 @@ public sealed class ConfigCommandHandlerTests
         // Assert
         // Handler catches exceptions and returns failure result
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Config.Failed");
+        result.Error.Should().Contain("Configuration operation failed");
+        result.Error.Should().Contain("canceled");
     }
 
     #endregion
@@ -868,8 +871,8 @@ public sealed class ConfigCommandHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Config.Failed");
         result.Error.Should().Contain("Configuration operation failed");
+        result.Error.Should().Contain("Test exception");
     }
 
     #endregion

@@ -67,7 +67,10 @@ public sealed class SetupCommandHandler
 
             if (selectedSshKey == null && !command.NonInteractive)
             {
-                return Result<ConfigurationSettings>.Failure("Setup was cancelled: No SSH key selected");
+                _wizardUI.ShowError("Setup cannot continue without an SSH key.");
+                _wizardUI.ShowStatus("Please generate an SSH key or add one to your SSH agent, then run 'tom setup' again.");
+                _wizardUI.ShowStatus("Learn more: https://docs.github.com/en/authentication/connecting-to-github-with-ssh");
+                return Result<ConfigurationSettings>.Failure("Setup cancelled: No SSH key selected. Run 'tom setup' after adding an SSH key.");
             }
 
             // Step 2: LLM Provider Selection
@@ -78,7 +81,9 @@ public sealed class SetupCommandHandler
 
             if (!selectedProvider.HasValue)
             {
-                return Result<ConfigurationSettings>.Failure("Setup was cancelled: No LLM provider selected");
+                _wizardUI.ShowError("Setup cannot continue without selecting an AI provider.");
+                _wizardUI.ShowStatus("Please choose OpenAI or Anthropic to continue.");
+                return Result<ConfigurationSettings>.Failure("Setup cancelled: No LLM provider selected. Run 'tom setup' to try again.");
             }
 
             // Step 3: API Key Configuration
@@ -90,7 +95,13 @@ public sealed class SetupCommandHandler
 
             if (string.IsNullOrWhiteSpace(apiKey))
             {
-                return Result<ConfigurationSettings>.Failure("Setup was cancelled: No API key provided");
+                _wizardUI.ShowError("Setup cannot continue without a valid API key.");
+                var providerName = selectedProvider.Value == LlmProvider.OpenAI ? "OpenAI" : "Anthropic";
+                var keyUrl = selectedProvider.Value == LlmProvider.OpenAI 
+                    ? "https://platform.openai.com/api-keys" 
+                    : "https://console.anthropic.com/settings/keys";
+                _wizardUI.ShowStatus($"Get your {providerName} API key from: {keyUrl}");
+                return Result<ConfigurationSettings>.Failure($"Setup cancelled: No API key provided. Visit {keyUrl} to create an API key, then run 'tom setup' again.");
             }
 
             // Step 4: Memory Directory Configuration
@@ -158,7 +169,9 @@ public sealed class SetupCommandHandler
             
             if (!confirmed)
             {
-                return Result<ConfigurationSettings>.Failure("Setup was cancelled by user");
+                _wizardUI.ShowWarning("Setup cancelled by user. No changes were saved.");
+                _wizardUI.ShowStatus("Run 'tom setup' anytime to configure Ten Second Tom.");
+                return Result<ConfigurationSettings>.Failure("Setup cancelled: User chose not to save configuration. Run 'tom setup' to try again.");
             }
 
             // Step 8: Save Configuration
@@ -170,24 +183,33 @@ public sealed class SetupCommandHandler
             if (!saveResult.IsSuccess)
             {
                 _wizardUI.ShowError($"Failed to save configuration: {saveResult.Error}");
-                return Result<ConfigurationSettings>.Failure($"Failed to save configuration: {saveResult.Error}");
+                _wizardUI.ShowStatus("Your configuration could not be saved. This might be a permissions issue.");
+                _wizardUI.ShowStatus("Try running the command again, or check the logs for more details.");
+                return Result<ConfigurationSettings>.Failure($"Failed to save configuration: {saveResult.Error}. Check file permissions and try 'tom setup' again.");
             }
 
             _wizardUI.ShowSuccess("✓ Setup complete!");
             _wizardUI.ShowStatus($"Configuration saved to {saveResult.Value}");
+            _wizardUI.ShowStatus("You can view your configuration anytime with: tom config --show");
+            _wizardUI.ShowStatus("To change individual settings, use: tom config --set <setting-name> <value>");
 
             _logger.LogInformation("Setup wizard completed successfully");
             return Result<ConfigurationSettings>.Success(newConfiguration);
         }
         catch (OperationCanceledException)
         {
+            _wizardUI.ShowWarning("Setup was interrupted. No changes were saved.");
+            _wizardUI.ShowStatus("Run 'tom setup' anytime to complete configuration.");
             _logger.LogWarning("Setup wizard was cancelled");
-            return Result<ConfigurationSettings>.Failure("Setup was cancelled");
+            return Result<ConfigurationSettings>.Failure("Setup cancelled: Operation was interrupted. Run 'tom setup' to try again.");
         }
         catch (Exception ex)
         {
+            _wizardUI.ShowError($"An unexpected error occurred: {ex.Message}");
+            _wizardUI.ShowStatus("Please check the logs for more details, then try running 'tom setup' again.");
+            _wizardUI.ShowStatus("If the problem persists, please report it at: https://github.com/sirkirby/ten-second-tom/issues");
             _logger.LogError(ex, "Setup wizard failed");
-            return Result<ConfigurationSettings>.Failure($"Setup failed: {ex.Message}");
+            return Result<ConfigurationSettings>.Failure($"Setup failed: {ex.Message}. Check logs and try 'tom setup' again, or report the issue if it persists.");
         }
     }
 

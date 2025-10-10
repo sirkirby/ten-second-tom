@@ -28,7 +28,15 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
     {
         if (!availableKeys.Any())
         {
-            ShowWarning("No SSH keys detected. You can manually enter a path or run setup later.");
+            ShowWarning("No SSH keys detected automatically.");
+            _console.MarkupLine("[grey]ℹ️  Ten Second Tom needs an ED25519 SSH key to authenticate with GitHub.[/]");
+            _console.MarkupLine("[grey]   You can:[/]");
+            _console.MarkupLine("[grey]   • Generate a new key: ssh-keygen -t ed25519 -C \"your-email@example.com\"[/]");
+            _console.MarkupLine("[grey]   • Add an existing key to your SSH agent[/]");
+            _console.MarkupLine("[grey]   • Specify a manual path in the next step[/]");
+            _console.MarkupLine("[grey]   • Exit setup and run 'tom setup' again later[/]");
+            _console.WriteLine();
+            _console.MarkupLine("[grey]   Learn more: https://docs.github.com/en/authentication/connecting-to-github-with-ssh[/]");
             return Task.FromResult<SshKeyInfo?>(null);
         }
 
@@ -143,6 +151,10 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         int? currentDays,
         CancellationToken cancellationToken)
     {
+        _console.MarkupLine("[grey]ℹ️  Choose how long to keep your memories before automatic deletion.[/]");
+        _console.MarkupLine("[grey]   Enter 'unlimited' to keep all memories forever (recommended).[/]");
+        _console.WriteLine();
+
         var prompt = new TextPrompt<string>("How long should memories be kept? (enter 'unlimited' or number of days)")
             .DefaultValue(currentDays.HasValue && currentDays.Value > 0 ? currentDays.Value.ToString() : "unlimited")
             .AllowEmpty();
@@ -163,7 +175,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             return Task.FromResult<int?>(days);
         }
         
-        ShowWarning("Invalid input. Using unlimited retention.");
+        ShowWarning("Invalid input. Please enter a positive number or 'unlimited'. Using unlimited retention.");
         return Task.FromResult<int?>(-1);
     }
 

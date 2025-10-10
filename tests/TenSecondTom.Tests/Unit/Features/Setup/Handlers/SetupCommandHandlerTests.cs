@@ -307,7 +307,8 @@ public sealed class SetupCommandHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("cancelled by user");
+        result.Error.Should().Contain("Setup cancelled");
+        result.Error.Should().Contain("User chose not to save configuration");
     }
 
     [Fact]

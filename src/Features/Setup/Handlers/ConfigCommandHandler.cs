@@ -42,13 +42,13 @@ public sealed class ConfigCommandHandler
                 ConfigAction.Set => await HandleSetAsync(command, cancellationToken),
                 ConfigAction.Reset => await HandleResetAsync(cancellationToken),
                 ConfigAction.Validate => await HandleValidateAsync(cancellationToken),
-                _ => Result<ConfigurationSettings>.Failure($"Config.InvalidAction: {$"Unknown action: {command.Action}"}")
+                _ => Result<ConfigurationSettings>.Failure($"Unknown action '{command.Action}'. Valid actions: show, set, validate, reset. Use 'tom config --help' for more information.")
             };
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Config command failed");
-            return Result<ConfigurationSettings>.Failure($"Config.Failed: {$"Configuration operation failed: {ex.Message}"}");
+            return Result<ConfigurationSettings>.Failure($"Configuration operation failed: {ex.Message}. Check logs for details or try 'tom config --help' for usage information.");
         }
     }
 
@@ -60,7 +60,7 @@ public sealed class ConfigCommandHandler
         
         if (!loadResult.IsSuccess)
         {
-            return Result<ConfigurationSettings>.Failure($"Config.NotConfigured: {"No configuration found. Run /setup first"}");
+            return Result<ConfigurationSettings>.Failure("No configuration found. Run 'tom setup' first to configure Ten Second Tom.");
         }
 
         _logger.LogInformation("Displaying current configuration (ShowSecrets: {ShowSecrets})", 
@@ -76,12 +76,12 @@ public sealed class ConfigCommandHandler
         // Validate command
         if (string.IsNullOrWhiteSpace(command.SettingName))
         {
-            return Result<ConfigurationSettings>.Failure($"Config.MissingSettingName: {"Setting name is required for Set action"}");
+            return Result<ConfigurationSettings>.Failure("Setting name is required. Example: tom config --set llm-provider OpenAI");
         }
 
         if (string.IsNullOrWhiteSpace(command.SettingValue))
         {
-            return Result<ConfigurationSettings>.Failure($"Config.MissingSettingValue: {"Setting value is required for Set action"}");
+            return Result<ConfigurationSettings>.Failure("Setting value is required. Example: tom config --set llm-provider OpenAI");
         }
 
         // Load current configuration
@@ -89,7 +89,7 @@ public sealed class ConfigCommandHandler
         
         if (!loadResult.IsSuccess)
         {
-            return Result<ConfigurationSettings>.Failure($"Config.NotConfigured: {"No configuration found. Run /setup first"}");
+            return Result<ConfigurationSettings>.Failure("No configuration found. Run 'tom setup' first to create initial configuration, then use 'tom config --set' to update settings.");
         }
 
         var currentConfig = loadResult.Value!;
@@ -113,7 +113,7 @@ public sealed class ConfigCommandHandler
         
         if (!saveResult.IsSuccess)
         {
-            return Result<ConfigurationSettings>.Failure($"Failed to save configuration: {saveResult.Error}");
+            return Result<ConfigurationSettings>.Failure($"Failed to save configuration: {saveResult.Error}. Changes were not applied. Try again or check file permissions.");
         }
 
         _logger.LogInformation("Configuration setting '{Setting}' updated successfully", command.SettingName);
@@ -134,7 +134,7 @@ public sealed class ConfigCommandHandler
             "ssh-key-path" => UpdateSshKeyPath(currentConfig, settingValue),
             "log-level" => UpdateLogLevel(currentConfig, settingValue),
             "retention-days" => UpdateRetentionDays(currentConfig, settingValue),
-            _ => Result<ConfigurationSettings>.Failure($"Unknown setting: {settingName}")
+            _ => Result<ConfigurationSettings>.Failure($"Unknown setting '{settingName}'. Valid settings: llm-provider, api-key, memory-directory, ssh-key-path, log-level, retention-days. Use 'tom config --help' for examples.")
         };
     }
 
@@ -145,7 +145,7 @@ public sealed class ConfigCommandHandler
     {
         if (!Enum.TryParse<LlmProvider>(value, ignoreCase: true, out var provider))
         {
-            return Result<ConfigurationSettings>.Failure($"Invalid value for llm-provider: {value}. Valid values: OpenAI, Anthropic");
+            return Result<ConfigurationSettings>.Failure($"Invalid LLM provider '{value}'. Valid values: OpenAI, Anthropic. Example: tom config --set llm-provider OpenAI");
         }
 
         // Await a completed task to satisfy async method
@@ -171,7 +171,11 @@ public sealed class ConfigCommandHandler
             var validationResult = validator.ValidateFormatAsync(value).Result;
             if (!validationResult.IsValid)
             {
-                return Result<ConfigurationSettings>.Failure($"Config.ValidationFailed: {$"Invalid API key format: {validationResult.ErrorMessage}"}");
+                var providerName = currentConfig.Llm.Provider == LlmProvider.OpenAI ? "OpenAI" : "Anthropic";
+                var keyUrl = currentConfig.Llm.Provider == LlmProvider.OpenAI 
+                    ? "https://platform.openai.com/api-keys" 
+                    : "https://console.anthropic.com/settings/keys";
+                return Result<ConfigurationSettings>.Failure($"Invalid {providerName} API key format: {validationResult.ErrorMessage}. Get a valid key from {keyUrl}");
             }
         }
 
@@ -200,7 +204,7 @@ public sealed class ConfigCommandHandler
         }
         catch (Exception ex)
         {
-            return Result<ConfigurationSettings>.Failure($"Config.ValidationFailed: {$"Invalid directory path: {ex.Message}"}");
+            return Result<ConfigurationSettings>.Failure($"Invalid directory path '{value}': {ex.Message}. Provide an absolute path or relative path like './memory'.");
         }
     }
 
@@ -215,7 +219,7 @@ public sealed class ConfigCommandHandler
 
             if (!File.Exists(fullPath))
             {
-                return Result<ConfigurationSettings>.Failure($"Config.ValidationFailed: {$"SSH key file not found: {fullPath}"}");
+                return Result<ConfigurationSettings>.Failure($"SSH key file not found: {fullPath}. Verify the file exists and the path is correct. Example: ~/.ssh/id_ed25519.pub");
             }
 
             var newConfig = currentConfig with
@@ -231,7 +235,7 @@ public sealed class ConfigCommandHandler
         }
         catch (Exception ex)
         {
-            return Result<ConfigurationSettings>.Failure($"Invalid SSH key path: {ex.Message}");
+            return Result<ConfigurationSettings>.Failure($"Invalid SSH key path '{value}': {ex.Message}. Provide a valid path like ~/.ssh/id_ed25519.pub");
         }
     }
 
@@ -241,7 +245,7 @@ public sealed class ConfigCommandHandler
     {
         if (!Enum.TryParse<Microsoft.Extensions.Logging.LogLevel>(value, ignoreCase: true, out var logLevel))
         {
-            return Result<ConfigurationSettings>.Failure($"Invalid log level: {value}. Valid values: Debug, Information, Warning, Error");
+            return Result<ConfigurationSettings>.Failure($"Invalid log level '{value}'. Valid values: Debug, Information, Warning, Error. Example: tom config --set log-level Information");
         }
 
         var newConfig = currentConfig with
@@ -258,7 +262,7 @@ public sealed class ConfigCommandHandler
     {
         if (!int.TryParse(value, out var days) || days <= 0)
         {
-            return Result<ConfigurationSettings>.Failure($"Config.ValidationFailed: {"Retention days must be a positive integer"}");
+            return Result<ConfigurationSettings>.Failure($"Invalid retention days '{value}'. Must be a positive integer. Example: tom config --set retention-days 30");
         }
 
         var newConfig = currentConfig with
@@ -272,7 +276,7 @@ public sealed class ConfigCommandHandler
     private Task<Result<ConfigurationSettings>> HandleResetAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Reset configuration not yet implemented");
-        return Task.FromResult(Result<ConfigurationSettings>.Failure($"Config.NotImplemented: {"Reset configuration is not yet implemented"}"));
+        return Task.FromResult(Result<ConfigurationSettings>.Failure("Reset configuration is not yet implemented. To reconfigure, run 'tom setup' to walk through all settings again."));
     }
 
     private async Task<Result<ConfigurationSettings>> HandleValidateAsync(CancellationToken cancellationToken)
@@ -281,14 +285,14 @@ public sealed class ConfigCommandHandler
         
         if (!loadResult.IsSuccess)
         {
-            return Result<ConfigurationSettings>.Failure($"Config.NotConfigured: {"No configuration found. Run /setup first"}");
+            return Result<ConfigurationSettings>.Failure("No configuration found. Run 'tom setup' first to create a configuration.");
         }
 
         var config = loadResult.Value!;
 
         if (!config.IsValid())
         {
-            return Result<ConfigurationSettings>.Failure($"Config.ValidationFailed: {"Configuration validation failed: Required fields missing or invalid"}");
+            return Result<ConfigurationSettings>.Failure("Configuration validation failed: Required fields are missing or invalid. Run 'tom setup' to reconfigure.");
         }
 
         _logger.LogInformation("Configuration validation passed");

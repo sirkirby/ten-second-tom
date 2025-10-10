@@ -214,8 +214,8 @@ public sealed class ConfigurationValidationTests : IDisposable
 
         // Assert
         result.IsFailure.Should().BeTrue("validation should fail when no configuration exists");
-        (result.Error?.Contains("not", StringComparison.OrdinalIgnoreCase) ?? false)
-            .Should().BeTrue("error should indicate configuration not found");
+        result.Error.Should().Contain("No configuration found", "error should indicate configuration not found");
+        result.Error.Should().Contain("tom setup", "error should provide actionable guidance");
     }
 
     [Fact]
