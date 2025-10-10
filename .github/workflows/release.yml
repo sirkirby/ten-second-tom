@@ -527,6 +527,8 @@ jobs:
           
           mkdir -p "$BOTTLE_DIR_ARM64"
           cp "./artifacts/ten-second-tom-osx-arm64/tom" "$BOTTLE_DIR_ARM64/tom"
+          cp ./artifacts/ten-second-tom-osx-arm64/appsettings*.json "$BOTTLE_DIR_ARM64/" 2>/dev/null || true
+          cp ./artifacts/ten-second-tom-osx-arm64/*.dylib "$BOTTLE_DIR_ARM64/" 2>/dev/null || true
           chmod +x "$BOTTLE_DIR_ARM64/tom"
           tar czf "$BOTTLE_NAME_ARM64" ten-second-tom
           
@@ -544,6 +546,8 @@ jobs:
           
           mkdir -p "$BOTTLE_DIR_X64"
           cp "./artifacts/ten-second-tom-osx-x64/tom" "$BOTTLE_DIR_X64/tom"
+          cp ./artifacts/ten-second-tom-osx-x64/appsettings*.json "$BOTTLE_DIR_X64/" 2>/dev/null || true
+          cp ./artifacts/ten-second-tom-osx-x64/*.dylib "$BOTTLE_DIR_X64/" 2>/dev/null || true
           chmod +x "$BOTTLE_DIR_X64/tom"
           tar czf "$BOTTLE_NAME_X64" ten-second-tom
           
