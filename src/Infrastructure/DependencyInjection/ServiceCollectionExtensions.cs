@@ -64,15 +64,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAuthenticationService>(serviceProvider =>
         {
             var configuration = serviceProvider.GetRequiredService<IConfiguration>();
-            var environment = configuration["ASPNETCORE_ENVIRONMENT"] ?? 
-                             configuration["DOTNET_ENVIRONMENT"] ?? 
-                             Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ??
-                             Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") ??
-                             "Production";
-
             var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
 
-            if (environment.Equals("Development", StringComparison.OrdinalIgnoreCase))
+            if (EnvironmentHelper.IsDevelopment(configuration))
             {
                 var mockLogger = loggerFactory.CreateLogger<MockAuthenticationService>();
                 return new MockAuthenticationService(mockLogger);

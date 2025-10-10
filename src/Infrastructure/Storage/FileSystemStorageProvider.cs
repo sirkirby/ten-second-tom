@@ -6,6 +6,7 @@ using Markdig.Extensions.Yaml;
 using Markdig.Syntax;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Results;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -354,7 +355,7 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
         string directory = Path.Combine(_baseDirectory, entry.Command);
         string fileName;
 
-        if (entry.Command == "today")
+    if (entry.Command == CommandNames.Today)
         {
             // Daily entries: MM-DD-YYYY_N.md
             fileName = $"{entry.Timestamp.ToString("MM-dd-yyyy", CultureInfo.InvariantCulture)}_{entry.EntryNumber}.md";
@@ -448,9 +449,9 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
                 ProcessingDuration = TimeSpan.FromSeconds(Convert.ToDouble(frontmatter.GetValueOrDefault("processing-duration") ?? 0, CultureInfo.InvariantCulture))
             };
 
-            string command = frontmatter.GetValueOrDefault("command")?.ToString() ?? "today";
+            string command = frontmatter.GetValueOrDefault("command")?.ToString() ?? CommandNames.Today;
 
-            if (command == "today")
+            if (command == CommandNames.Today)
             {
                 return new DailyEntry
                 {

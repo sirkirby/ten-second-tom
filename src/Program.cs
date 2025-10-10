@@ -66,7 +66,7 @@ internal static class Program
             var configurationBuilder = new ConfigurationBuilder()
                 .SetBasePath(AppContext.BaseDirectory)
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") ?? "Production"}.json", optional: true, reloadOnChange: true);
+                .AddJsonFile($"appsettings.{EnvironmentHelper.GetCurrentEnvironment()}.json", optional: true, reloadOnChange: true);
             
             // Add User Secrets explicitly (for self-contained/trimmed binaries)
             // This doesn't rely on assembly reflection like AddUserSecrets<T>()

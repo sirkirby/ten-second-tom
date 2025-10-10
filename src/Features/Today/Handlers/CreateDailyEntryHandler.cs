@@ -5,6 +5,7 @@ using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Today.Handlers;
@@ -73,7 +74,7 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
 
         // 3. Determine entry number for today
         DateTime today = DateTime.UtcNow.Date;
-        Result<int> countResult = await _storage.CountEntriesAsync("today", today, cancellationToken).ConfigureAwait(false);
+    Result<int> countResult = await _storage.CountEntriesAsync(CommandNames.Today, today, cancellationToken).ConfigureAwait(false);
         if (!countResult.IsSuccess)
         {
             return Result<DailyEntry>.Failure($"Failed to determine entry number: {countResult.Error}");
@@ -94,7 +95,7 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
         string prompt = RenderPrompt(templateResult.Value, userInput);
 
         // 6. Call LLM provider
-        string provider = request.LlmProviderOverride ?? "OpenAI"; // Default to OpenAI if not specified
+    string provider = request.LlmProviderOverride ?? LlmProviders.OpenAI; // Default to OpenAI if not specified
         ILlmProvider llmProvider;
         try
         {
@@ -119,8 +120,8 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
         // 8. Create DailyEntry
         var entry = new DailyEntry
         {
-            EntryId = $"today-{today:MM-dd-yyyy}-{entryNumber}",
-            Command = "today",
+            EntryId = $"{CommandNames.Today}-{today:MM-dd-yyyy}-{entryNumber}",
+            Command = CommandNames.Today,
             Timestamp = DateTimeOffset.UtcNow,
             EntryNumber = entryNumber,
             UserInput = userInput,
@@ -174,10 +175,12 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
 
         if (!string.IsNullOrWhiteSpace(request.LlmProviderOverride))
         {
-            string provider = request.LlmProviderOverride.Trim().ToUpperInvariant();
-            if (provider != "OPENAI" && provider != "ANTHROPIC")
+            string provider = request.LlmProviderOverride.Trim();
+            // Accept canonical lowercase constants but present user-friendly capitalized names in error message
+            if (!provider.Equals(LlmProviders.OpenAI, StringComparison.OrdinalIgnoreCase) &&
+                !provider.Equals(LlmProviders.Anthropic, StringComparison.OrdinalIgnoreCase))
             {
-                return Result<DailyEntry>.Failure("Invalid LLM provider. Use 'OpenAI' or 'Anthropic'");
+                return Result<DailyEntry>.Failure("Invalid LLM provider. Use 'OpenAI' or 'Anthropic'.");
             }
         }
 
@@ -209,8 +212,8 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
         {
             var partialEntry = new DailyEntry
             {
-                EntryId = $"today-{date:MM-dd-yyyy}-{entryNumber}",
-                Command = "today",
+                EntryId = $"{CommandNames.Today}-{date:MM-dd-yyyy}-{entryNumber}",
+                Command = CommandNames.Today,
                 Timestamp = DateTimeOffset.UtcNow,
                 EntryNumber = entryNumber,
                 UserInput = userInput,

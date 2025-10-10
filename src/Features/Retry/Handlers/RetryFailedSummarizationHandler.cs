@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Retry.Commands;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Storage;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 
@@ -130,7 +131,7 @@ public sealed class RetryFailedSummarizationHandler
         DateTime endDate = DateTime.UtcNow;
 
         var todayResult = await _storageProvider
-            .GetEntriesAsync("today", startDate, endDate, cancellationToken)
+            .GetEntriesAsync(CommandNames.Today, startDate, endDate, cancellationToken)
             .ConfigureAwait(false);
 
         if (!todayResult.IsSuccess)

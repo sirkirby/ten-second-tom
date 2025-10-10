@@ -110,8 +110,9 @@ public sealed class UserSecretsStorageServiceTests
 
         // Assert
         result.Should().NotBeNull();
-        // Result can be success or failure depending on whether previous tests saved config
-        // The important thing is that it doesn't throw
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeNull();
+        result.Value.Storage.MemoryDirectory.Should().NotBeNullOrEmpty();
     }
 
     [Fact]

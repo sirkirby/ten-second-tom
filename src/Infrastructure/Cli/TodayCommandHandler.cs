@@ -3,6 +3,7 @@ using TenSecondTom.Features.Today.Commands;
 using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.OutputFormatters;
 using TenSecondTom.Shared.Results;
 
@@ -45,40 +46,14 @@ public static class TodayCommandHandler
         }
 
         // Authenticate first (before collecting user input)
-        try
+        var authResult = await AuthenticationHelper.EnsureAuthenticatedAsync(
+            authService,
+            CommandNames.Today,
+            jsonOutput,
+            CancellationToken.None).ConfigureAwait(false);
+
+        if (!authResult.IsSuccess)
         {
-            bool isAuthenticated = await authService.IsAuthenticatedAsync(CancellationToken.None).ConfigureAwait(false);
-            if (!isAuthenticated)
-            {
-                Result<UserSession> authResult = await authService.AuthenticateAsync(CancellationToken.None).ConfigureAwait(false);
-                if (!authResult.IsSuccess)
-                {
-                    if (jsonOutput)
-                    {
-                        string json = JsonOutputFormatter.FormatFailure("today", authResult.Error ?? "Authentication failed", DateTimeOffset.UtcNow);
-                        Console.WriteLine(json);
-                    }
-                    else
-                    {
-                        AuthenticationErrorFormatter.DisplayAuthenticationError(authResult.Error ?? "Unknown authentication error");
-                    }
-                    return;
-                }
-            }
-        }
-#pragma warning disable CA1031 // Do not catch general exception types - top-level handler for user-facing error display
-        catch (Exception ex)
-#pragma warning restore CA1031
-        {
-            if (jsonOutput)
-            {
-                string json = JsonOutputFormatter.FormatFailure("today", $"Authentication error: {ex.Message}", DateTimeOffset.UtcNow);
-                Console.WriteLine(json);
-            }
-            else
-            {
-                AuthenticationErrorFormatter.DisplayAuthenticationError(ex.Message);
-            }
             return;
         }
 
@@ -198,8 +173,8 @@ public static class TodayCommandHandler
             }
 
             string json = commandResult.IsSuccess
-                ? JsonOutputFormatter.FormatSuccess("today", jsonData, DateTimeOffset.UtcNow)
-                : JsonOutputFormatter.FormatFailure("today", commandResult.Error, DateTimeOffset.UtcNow);
+                ? JsonOutputFormatter.FormatSuccess(CommandNames.Today, jsonData, DateTimeOffset.UtcNow)
+                : JsonOutputFormatter.FormatFailure(CommandNames.Today, commandResult.Error, DateTimeOffset.UtcNow);
             Console.WriteLine(json);
         }
         else if (entry != null)
