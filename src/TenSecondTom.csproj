@@ -11,6 +11,8 @@
     <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>link</TrimMode>
     <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+    <!-- Enable JSON serialization reflection for Anthropic SDK compatibility -->
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
     <!-- Suppress specific trimming warnings -->
     <NoWarn>$(NoWarn);IL2026;IL2067;IL2070;IL2075;IL2077;IL3050</NoWarn>
   </PropertyGroup>
@@ -21,6 +23,7 @@
     <TrimmerRootAssembly Include="Serilog.Sinks.File" />
     <TrimmerRootAssembly Include="Serilog.Enrichers.Environment" />
     <TrimmerRootAssembly Include="Serilog.Settings.Configuration" />
+    <TrimmerRootAssembly Include="Anthropic.SDK" />
   </ItemGroup>
 
   <ItemGroup>

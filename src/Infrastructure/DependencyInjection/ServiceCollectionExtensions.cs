@@ -84,8 +84,8 @@ public static class ServiceCollectionExtensions
                 sshKeyLogger);
         });
 
-        // Register OpenAI ChatClient
-        services.AddSingleton<ChatClient>(serviceProvider =>
+        // Register OpenAI ChatClient (lazy - only instantiated when OpenAI provider is actually used)
+        services.AddTransient<ChatClient>(serviceProvider =>
         {
             var configuration = serviceProvider.GetRequiredService<IConfiguration>();
             string? apiKey = configuration["OPENAI_API_KEY"] ?? 
@@ -102,8 +102,8 @@ public static class ServiceCollectionExtensions
             return openAIClient.GetChatClient(model);
         });
 
-        // Register Anthropic AnthropicClient
-        services.AddSingleton<AnthropicClient>(serviceProvider =>
+        // Register Anthropic AnthropicClient (lazy - only instantiated when Anthropic provider is actually used)
+        services.AddTransient<AnthropicClient>(serviceProvider =>
         {
             var configuration = serviceProvider.GetRequiredService<IConfiguration>();
             string? apiKey = configuration["ANTHROPIC_API_KEY"] ?? 

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Today.Commands;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
@@ -16,12 +17,14 @@ namespace TenSecondTom.Features.Today.Handlers;
 /// </summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2254:Template should be a static expression", Justification = "Structured logging pattern")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates", Justification = "Simple logging calls, delegate overhead not justified")]
 public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCommand, Result<DailyEntry>>
 {
     private readonly IMemoryStorageProvider _storage;
     private readonly ILlmProviderFactory _llmFactory;
     private readonly IPromptTemplateLoader _promptLoader;
     private readonly IAuthenticationService _authService;
+    private readonly IConfigurationStorageService _configService;
     private readonly ILogger<CreateDailyEntryHandler> _logger;
 
     /// <summary>
@@ -31,18 +34,21 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
     /// <param name="llmFactory">The LLM provider factory.</param>
     /// <param name="promptLoader">The prompt template loader.</param>
     /// <param name="authService">The authentication service.</param>
+    /// <param name="configService">The configuration storage service.</param>
     /// <param name="logger">The logger instance.</param>
     public CreateDailyEntryHandler(
         IMemoryStorageProvider storage,
         ILlmProviderFactory llmFactory,
         IPromptTemplateLoader promptLoader,
         IAuthenticationService authService,
+        IConfigurationStorageService configService,
         ILogger<CreateDailyEntryHandler> logger)
     {
         _storage = storage;
         _llmFactory = llmFactory;
         _promptLoader = promptLoader;
         _authService = authService;
+        _configService = configService;
         _logger = logger;
     }
 
@@ -94,8 +100,32 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
 
         string prompt = RenderPrompt(templateResult.Value, userInput);
 
-        // 6. Call LLM provider
-    string provider = request.LlmProviderOverride ?? LlmProviders.OpenAI; // Default to OpenAI if not specified
+        // 6. Determine LLM provider (use override, or load from config, or default to OpenAI)
+        string provider;
+        if (!string.IsNullOrWhiteSpace(request.LlmProviderOverride))
+        {
+            provider = request.LlmProviderOverride;
+        }
+        else
+        {
+            // Load from configuration
+            Result<Features.Setup.Models.ConfigurationSettings> configResult = await _configService.LoadAsync(cancellationToken).ConfigureAwait(false);
+            if (configResult.IsSuccess && configResult.Value.Llm.Provider != Features.Setup.Models.LlmProvider.OpenAI)
+            {
+                // Convert enum to string
+                provider = configResult.Value.Llm.Provider.ToString();
+            }
+            else
+            {
+                // Default to OpenAI
+                provider = LlmProviders.OpenAI;
+                if (!configResult.IsSuccess)
+                {
+                    _logger.LogDebug("Could not load configuration, defaulting to OpenAI: {Error}", configResult.Error);
+                }
+            }
+        }
+
         ILlmProvider llmProvider;
         try
         {
@@ -103,7 +133,11 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
         }
         catch (ArgumentException ex)
         {
-            return Result<DailyEntry>.Failure($"Invalid LLM provider. Use 'OpenAI' or 'Anthropic'. Error: {ex.Message}");
+            return Result<DailyEntry>.Failure($"Invalid LLM provider '{provider}'. Use 'OpenAI' or 'Anthropic'. Error: {ex.Message}");
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Result<DailyEntry>.Failure($"Failed to create LLM provider '{provider}': {ex.Message}");
         }
 
         Result<string> llmResult = await llmProvider.GenerateCompletionAsync(prompt, cancellationToken).ConfigureAwait(false);

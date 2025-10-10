@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.ThisWeek.Commands;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
@@ -21,6 +22,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
     private readonly ILlmProviderFactory _llmFactory;
     private readonly IPromptTemplateLoader _promptLoader;
     private readonly IAuthenticationService _authService;
+    private readonly IConfigurationStorageService _configService;
     private readonly ILogger<CreateWeeklyReviewHandler> _logger;
 
     /// <summary>
@@ -30,18 +32,21 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
     /// <param name="llmFactory">The LLM provider factory.</param>
     /// <param name="promptLoader">The prompt template loader.</param>
     /// <param name="authService">The authentication service.</param>
+    /// <param name="configService">The configuration storage service.</param>
     /// <param name="logger">The logger instance.</param>
     public CreateWeeklyReviewHandler(
         IMemoryStorageProvider storage,
         ILlmProviderFactory llmFactory,
         IPromptTemplateLoader promptLoader,
         IAuthenticationService authService,
+        IConfigurationStorageService configService,
         ILogger<CreateWeeklyReviewHandler> logger)
     {
         _storage = storage;
         _llmFactory = llmFactory;
         _promptLoader = promptLoader;
         _authService = authService;
+        _configService = configService;
         _logger = logger;
     }
 
@@ -109,16 +114,44 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
 
         string prompt = RenderPrompt(templateResult.Value, aggregatedContent, dateRange, entriesResult.Value.Count);
 
-        // 8. Call LLM provider
-    string provider = request.LlmProviderOverride ?? LlmProviders.OpenAI;
+        // 8. Determine LLM provider (use override, or load from config, or default to OpenAI)
+        string provider;
+        if (!string.IsNullOrWhiteSpace(request.LlmProviderOverride))
+        {
+            provider = request.LlmProviderOverride;
+        }
+        else
+        {
+            // Load from configuration
+            Result<Features.Setup.Models.ConfigurationSettings> configResult = await _configService.LoadAsync(cancellationToken).ConfigureAwait(false);
+            if (configResult.IsSuccess && configResult.Value.Llm.Provider != Features.Setup.Models.LlmProvider.OpenAI)
+            {
+                // Convert enum to string
+                provider = configResult.Value.Llm.Provider.ToString();
+            }
+            else
+            {
+                // Default to OpenAI
+                provider = LlmProviders.OpenAI;
+                if (!configResult.IsSuccess)
+                {
+                    _logger.LogDebug("Could not load configuration, defaulting to OpenAI: {Error}", configResult.Error);
+                }
+            }
+        }
+
         ILlmProvider llmProvider;
         try
         {
             llmProvider = _llmFactory.CreateProvider(provider);
         }
-        catch (Exception ex)
+        catch (ArgumentException ex)
         {
             return Result<WeeklyEntry>.Failure($"Invalid LLM provider '{provider}'. Use 'OpenAI' or 'Anthropic'. Error: {ex.Message}");
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Result<WeeklyEntry>.Failure($"Failed to create LLM provider '{provider}': {ex.Message}");
         }
 
         _logger.LogDebug("Calling LLM provider {Provider} for weekly review", provider);
