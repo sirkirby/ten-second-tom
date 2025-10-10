@@ -91,6 +91,43 @@ export TenSecondTom__OpenAI__ApiKey="sk-your-openai-key"
 export TenSecondTom__Anthropic__ApiKey="sk-ant-your-anthropic-key"
 ```
 
+**Option 3: Interactive Setup Wizard** (recommended for end users)
+
+On first run, Ten Second Tom will automatically launch a guided setup wizard:
+
+```bash
+tom today
+# → Setup wizard launches automatically if not configured
+```
+
+Or manually run the setup wizard:
+
+```bash
+tom setup
+```
+
+The setup wizard will guide you through:
+1. SSH key selection (auto-detected from your system)
+2. LLM provider selection (OpenAI or Anthropic)
+3. API key configuration with validation
+4. Memory storage location
+5. Optional settings (logging, data retention)
+
+**Configuration Management:**
+
+View your current configuration:
+```bash
+tom config show
+```
+
+Update individual settings:
+```bash
+tom config set llm-provider Anthropic
+tom config set api-key "your-new-key"
+```
+
+See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for complete configuration guide.
+
 **Option 3: Configuration File**
 
 You can also use an `appsettings.json` file for non-sensitive configuration. **API keys should not be stored here.**
@@ -147,12 +184,12 @@ Configure automatic cleanup of old entries:
 
 ## 📖 Usage
 
-### First Run - Authentication
+### First Run - Automatic Setup
 
-When you run Ten Second Tom for the first time, it will prompt for SSH authentication:
+When you run Ten Second Tom for the first time, it will automatically launch the setup wizard:
 
 ```bash
-$ tom login
+$ tom today
 
  _____               ____                          _   _____
 |_   _|__ _ __      / ___|  ___  ___ ___  _ __   __| | |_   _|__  _ __ ___
@@ -162,11 +199,36 @@ $ tom login
 
                     Your personal memory assistant
 
-→ Authenticating with SSH key...
+Welcome to Ten Second Tom! Let's get you set up.
 
-✓ Successfully authenticated!
+Step 1 of 5: SSH Key Configuration
+...
+```
 
-Session will remain active until you logout.
+The setup wizard will guide you through:
+- SSH key selection (auto-detected from your system, 1Password, Secretive, etc.)
+- LLM provider selection (OpenAI or Anthropic)
+- API key configuration with validation
+- Memory storage location
+- Optional settings (logging level, data retention)
+
+Once setup is complete, you can start using Ten Second Tom immediately!
+
+For detailed authentication configuration (SSH agents, key management, etc.), see [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md).
+
+### Re-running Setup
+
+To reconfigure your settings at any time:
+
+```bash
+tom setup
+```
+
+Or view/update individual settings:
+
+```bash
+tom config show               # View current configuration
+tom config set api-key "..."  # Update specific setting
 ```
 
 ### Daily Reflection
@@ -464,15 +526,24 @@ dotnet run --project src -- today
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are welcome! To contribute:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Follow the coding guidelines in [AGENTS.md](AGENTS.md)
+4. Write tests for your changes (maintain 80%+ coverage)
+5. Commit your changes using conventional commits
+6. Push to your branch
+7. Open a Pull Request
 
 ### Development Guidelines
 
-1. Follow the [AI Agent Instructions](AGENTS.md) and [Project Constitution](.github/copilot-instructions.md)
-2. Write tests first (TDD approach)
-3. Maintain 80%+ code coverage
-4. Use conventional commits
-5. Update documentation for user-facing changes
+- Follow the [AI Agent Instructions](AGENTS.md) and [Project Constitution](.github/copilot-instructions.md)
+- Write tests first (TDD approach)
+- Maintain 80%+ code coverage
+- Use conventional commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`)
+- Update documentation for user-facing changes
+- Follow C# and .NET 9 best practices
 
 ### Reporting Issues
 
@@ -496,7 +567,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **Documentation**: [GitHub Wiki](https://github.com/sirkirby/ten-second-tom/wiki)
+- **Documentation**: 
+  - [Configuration Guide](docs/CONFIGURATION.md)
+  - [Authentication Setup](docs/AUTHENTICATION.md)
+  - [Security Policy](SECURITY.md)
+  - [CI/CD Documentation](docs/CICD.md)
+  - [Environment Setup](docs/ENVIRONMENT.md)
+  - [Code Coverage](docs/COVERAGE.md)
 - **Issues**: [GitHub Issues](https://github.com/sirkirby/ten-second-tom/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/sirkirby/ten-second-tom/discussions)
 
