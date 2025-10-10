@@ -123,11 +123,19 @@ internal static class Program
             
             using var serviceProvider = services.BuildServiceProvider();
             
-            // Check if first-run setup is needed (unless running setup command explicitly)
+            // Check if help is requested - bypass setup for help commands
+            // This allows --help to work even when the app is not configured
+            bool isHelpRequested = args.Any(arg => 
+                arg.Equals("--help", StringComparison.OrdinalIgnoreCase) ||
+                arg.Equals("-h", StringComparison.OrdinalIgnoreCase) ||
+                arg.Equals("-?", StringComparison.OrdinalIgnoreCase) ||
+                arg.Equals("/?", StringComparison.OrdinalIgnoreCase));
+            
+            // Check if first-run setup is needed (unless running setup command explicitly or requesting help)
             bool isSetupCommand = args.Length > 0 && args[0].Equals("setup", StringComparison.OrdinalIgnoreCase);
             bool isConfigured = ConfigurationChecker.IsConfigured(configuration, logger);
             
-            if (!isConfigured && !isSetupCommand)
+            if (!isConfigured && !isSetupCommand && !isHelpRequested)
             {
                 logger.LogInformation("First-run detected. Launching setup wizard...");
                 Console.WriteLine();
