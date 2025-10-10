@@ -91,6 +91,7 @@ public sealed class SetupCommandCliTests : IDisposable
                 FileName = executablePath,
                 Arguments = arguments,
                 WorkingDirectory = _projectRoot,
+                RedirectStandardInput = true,  // Prevent blocking on stdin
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
