@@ -4,6 +4,7 @@ using Moq;
 using TenSecondTom.Features.Today.Commands;
 using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
@@ -24,6 +25,7 @@ public sealed class CreateDailyEntryHandlerTests
     private readonly Mock<ILlmProvider> _mockLlmProvider;
     private readonly Mock<IPromptTemplateLoader> _mockPromptLoader;
     private readonly Mock<IAuthenticationService> _mockAuthService;
+    private readonly Mock<IConfigurationStorageService> _mockConfigService;
     private readonly Mock<ILogger<CreateDailyEntryHandler>> _mockLogger;
     private readonly CreateDailyEntryHandler _handler;
 
@@ -34,6 +36,7 @@ public sealed class CreateDailyEntryHandlerTests
         _mockLlmProvider = new Mock<ILlmProvider>();
         _mockPromptLoader = new Mock<IPromptTemplateLoader>();
         _mockAuthService = new Mock<IAuthenticationService>();
+        _mockConfigService = new Mock<IConfigurationStorageService>();
         _mockLogger = new Mock<ILogger<CreateDailyEntryHandler>>();
 
         // Setup default successful behaviors
@@ -72,6 +75,7 @@ public sealed class CreateDailyEntryHandlerTests
             _mockLlmFactory.Object,
             _mockPromptLoader.Object,
             _mockAuthService.Object,
+            _mockConfigService.Object,
             _mockLogger.Object);
     }
 
