@@ -1,0 +1,132 @@
+using Microsoft.Extensions.Logging;
+using TenSecondTom.Features.Setup.Models;
+using TenSecondTom.Features.Setup.Queries;
+
+namespace TenSecondTom.Infrastructure.Auth.SshProviders;
+
+/// <summary>
+/// Detects SSH keys from Secretive SSH agent
+/// Connects to Secretive agent socket on macOS
+/// </summary>
+public sealed class SecretiveSshAgentDetector : ISshKeyDetector
+{
+    private readonly ILogger<SecretiveSshAgentDetector> _logger;
+
+    public SecretiveSshAgentDetector(ILogger<SecretiveSshAgentDetector> logger)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    public SshKeySource Source => SshKeySource.SecretiveAgent;
+
+    public async Task<IReadOnlyList<SshKeyInfo>> DetectKeysAsync(TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        var keys = new List<SshKeyInfo>();
+
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(timeout);
+
+            await Task.Run(() =>
+            {
+                var socketPath = GetSecretiveSocketPath();
+                if (string.IsNullOrEmpty(socketPath) || !File.Exists(socketPath))
+                {
+                    _logger.LogDebug("Secretive SSH agent socket not found");
+                    return;
+                }
+
+                _logger.LogDebug("Connecting to Secretive SSH agent at {SocketPath}", socketPath);
+
+                try
+                {
+                    // Use SSH_AUTH_SOCK temporarily pointing to Secretive
+                    var originalAuthSock = Environment.GetEnvironmentVariable("SSH_AUTH_SOCK");
+                    Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", socketPath);
+
+                    try
+                    {
+                        var process = new System.Diagnostics.Process
+                        {
+                            StartInfo = new System.Diagnostics.ProcessStartInfo
+                            {
+                                FileName = "ssh-add",
+                                Arguments = "-L",
+                                RedirectStandardOutput = true,
+                                RedirectStandardError = true,
+                                UseShellExecute = false,
+                                CreateNoWindow = true
+                            }
+                        };
+
+                        process.Start();
+                        var output = process.StandardOutput.ReadToEnd();
+                        process.WaitForExit(timeout);
+
+                        if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(output))
+                        {
+                            var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                            foreach (var line in lines)
+                            {
+                                if (line.StartsWith("ssh-ed25519"))
+                                {
+                                    var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                                    if (parts.Length >= 2)
+                                    {
+                                        var comment = parts.Length > 2 ? parts[2] : "secretive-key";
+                                        keys.Add(new SshKeyInfo
+                                        {
+                                            DisplayName = $"[Secretive] {comment}",
+                                            Source = SshKeySource.SecretiveAgent,
+                                            PublicKey = line,
+                                            AgentName = "Secretive",
+                                            IsEd25519 = true,
+                                            DetectedAt = DateTime.UtcNow,
+                                            ValidationResult = ValidationResult.Valid
+                                        });
+                                    }
+                                }
+                            }
+                        }
+
+                        _logger.LogDebug("Detected {Count} ED25519 keys from Secretive SSH agent", keys.Count);
+                    }
+                    finally
+                    {
+                        // Restore original SSH_AUTH_SOCK
+                        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", originalAuthSock);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to query Secretive SSH agent");
+                }
+            }, cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("Secretive SSH agent detection timed out after {Timeout}", timeout);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error detecting keys from Secretive SSH agent");
+        }
+
+        return keys;
+    }
+
+    private static string? GetSecretiveSocketPath()
+    {
+        if (!OperatingSystem.IsMacOS())
+            return null;
+
+        var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var socketPath = Path.Combine(
+            homeDir,
+            "Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh"
+        );
+
+        return socketPath;
+    }
+}

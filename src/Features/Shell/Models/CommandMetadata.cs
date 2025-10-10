@@ -46,6 +46,8 @@ public sealed record CommandMetadata
         new() { Name = "/thisweek", HelpText = "Generate a weekly review from recent daily entries", RequiresAuthentication = true },
         new() { Name = "/search", HelpText = "Search memory entries by text query", RequiresAuthentication = true },
         new() { Name = "/retry", HelpText = "Retry the last failed command", RequiresAuthentication = true },
+        new() { Name = "/setup", HelpText = "Run guided setup wizard to configure Ten Second Tom", RequiresAuthentication = false },
+        new() { Name = "/config", HelpText = "View and manage configuration settings", RequiresAuthentication = false },
         new() { Name = "/login", HelpText = "Authenticate with SSH key and create a session", RequiresAuthentication = false },
         new() { Name = "/logout", HelpText = "Log out and invalidate the current session", RequiresAuthentication = true },
         new() { Name = "/quit", HelpText = "Exit the shell", RequiresAuthentication = false, Aliases = ["/exit"] },

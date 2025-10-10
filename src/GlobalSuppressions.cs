@@ -48,6 +48,46 @@ using System.Runtime.CompilerServices;
 [assembly: SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates", Scope = "type", Target = "~T:TenSecondTom.Infrastructure.Auth.AuthenticationServiceFactory", Justification = "Logging clarity preferred for factory decisions")]
 [assembly: SuppressMessage("Design", "CA1031:Do not catch general exception types", Scope = "member", Target = "~M:TenSecondTom.Infrastructure.Auth.SshAgentAuthenticationService.AuthenticateAsync(System.Threading.CancellationToken)~System.Threading.Tasks.Task{TenSecondTom.Shared.Results.Result{TenSecondTom.Shared.Models.UserSession}}", Justification = "Must handle all exceptions to return Result<T> instead of throwing")]
 [assembly: SuppressMessage("Design", "CA1031:Do not catch general exception types", Scope = "member", Target = "~M:TenSecondTom.Infrastructure.Auth.SshAgentClient.ConnectAsync(System.Threading.CancellationToken)~System.Threading.Tasks.Task{System.Boolean}", Justification = "Must handle all connection errors gracefully")]
+
+// Setup Feature - Public API suppressions
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Features.Setup", Justification = "Setup feature types need to be public for DI and testing")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Infrastructure.Configuration", Justification = "Configuration types need to be public for DI")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Infrastructure.Auth.SshProviders", Justification = "SSH provider types need to be public for DI")]
+
+// Setup Feature - Logging suppressions (simple logging calls preferred over delegates in setup/config code)
+[assembly: SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Features.Setup", Justification = "Simple logging preferred in setup wizard for clarity")]
+[assembly: SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Infrastructure.Configuration", Justification = "Simple logging preferred in configuration code")]
+[assembly: SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Infrastructure.Auth.SshProviders", Justification = "Simple logging preferred in SSH detection")]
+
+// Setup Feature - Exception handling (must catch all to return Result<T>)
+[assembly: SuppressMessage("Design", "CA1031:Do not catch general exception types", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Features.Setup", Justification = "Setup operations must handle all exceptions and return Result<T>")]
+[assembly: SuppressMessage("Design", "CA1031:Do not catch general exception types", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Infrastructure.Configuration", Justification = "Configuration operations must handle all exceptions gracefully")]
+[assembly: SuppressMessage("Design", "CA1031:Do not catch general exception types", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Infrastructure.Auth.SshProviders", Justification = "SSH detection must handle all exceptions gracefully")]
+
+// Setup Feature - ConfigureAwait suppressions (not needed in console app)
+[assembly: SuppressMessage("Reliability", "CA2007:Consider calling ConfigureAwait on the awaited task", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Features.Setup", Justification = "Console application - no synchronization context")]
+[assembly: SuppressMessage("Reliability", "CA2007:Consider calling ConfigureAwait on the awaited task", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Infrastructure.Configuration", Justification = "Console application - no synchronization context")]
+[assembly: SuppressMessage("Reliability", "CA2007:Consider calling ConfigureAwait on the awaited task", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Infrastructure.Auth.SshProviders", Justification = "Console application - no synchronization context")]
+
+// Setup Feature - Parameter validation (validated by FluentValidation at handler level)
+[assembly: SuppressMessage("Design", "CA1062:Validate arguments of public methods", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Features.Setup", Justification = "Validated by FluentValidation pipeline")]
+[assembly: SuppressMessage("Design", "CA1062:Validate arguments of public methods", Scope = "type", Target = "~T:TenSecondTom.Infrastructure.Configuration.ConfigurationChecker", Justification = "Parameters validated by caller")]
+[assembly: SuppressMessage("Design", "CA1062:Validate arguments of public methods", Scope = "type", Target = "~T:TenSecondTom.Infrastructure.Configuration.UserSecretsStorageService", Justification = "Parameters validated by caller")]
+
+// Setup Feature - Globalization (not applicable for CLI tools)
+[assembly: SuppressMessage("Globalization", "CA1305:Specify IFormatProvider", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Features.Setup", Justification = "CLI tool - globalization not required")]
+[assembly: SuppressMessage("Globalization", "CA1305:Specify IFormatProvider", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Infrastructure.Configuration", Justification = "CLI tool - globalization not required")]
+[assembly: SuppressMessage("Globalization", "CA1307:Specify StringComparison for clarity", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Features.Setup", Justification = "Ordinal comparison is implicit for paths")]
+[assembly: SuppressMessage("Globalization", "CA1308:Normalize strings to uppercase", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Features.Setup", Justification = "Lowercase normalization appropriate for settings keys")]
+[assembly: SuppressMessage("Globalization", "CA1308:Normalize strings to uppercase", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Infrastructure.Configuration", Justification = "Lowercase normalization appropriate for config keys")]
+[assembly: SuppressMessage("Globalization", "CA1310:Specify StringComparison for correctness", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Infrastructure.Auth.SshProviders", Justification = "Ordinal comparison is implicit for SSH keys")]
+
+// Setup Feature - Minor suppressions
+[assembly: SuppressMessage("Design", "CA1805:Do not initialize unnecessarily", Scope = "member", Target = "~P:TenSecondTom.Features.Setup.Models.OptionalConfiguration.EnableTelemetry", Justification = "Explicit false initialization for clarity")]
+[assembly: SuppressMessage("Usage", "CA2263:Prefer generic overload", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Features.Setup", Justification = "Both overloads are equivalent")]
+[assembly: SuppressMessage("Performance", "CA1861:Avoid constant arrays as arguments", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Features.Setup", Justification = "Performance difference negligible in UI code")]
+[assembly: SuppressMessage("Performance", "CA1849:Call async methods when in an async method", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Features.Setup", Justification = "Spectre.Console uses synchronous prompts")]
+[assembly: SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Features.Setup", Justification = "HTTP clients managed by HttpClientFactory, other resources have correct lifetime")]
 [assembly: SuppressMessage("Design", "CA1031:Do not catch general exception types", Scope = "member", Target = "~M:TenSecondTom.Infrastructure.Auth.SshAgentClient.SignDataAsync(System.Byte[],System.Byte[],System.Threading.CancellationToken)~System.Threading.Tasks.Task{System.Byte[]}", Justification = "Must handle all signing errors gracefully")]
 [assembly: SuppressMessage("Design", "CA1031:Do not catch general exception types", Scope = "member", Target = "~M:TenSecondTom.Infrastructure.Auth.SshAgentClient.Dispose", Justification = "Dispose must not throw exceptions")]
 [assembly: SuppressMessage("Design", "CA1062:Validate arguments of public methods", Scope = "member", Target = "~M:TenSecondTom.Infrastructure.Auth.SshAgentClient.SignDataAsync(System.Byte[],System.Byte[],System.Threading.CancellationToken)~System.Threading.Tasks.Task{System.Byte[]}", Justification = "Null validation handled by conditional checks")]

@@ -1,63 +1,302 @@
-# Configuration Setup
+# Configuration Guide
 
-This document explains how to configure Ten Second Tom with your API keys and secrets.
+This document explains how to configure Ten Second Tom using the built-in setup wizard and configuration commands.
 
-## User Secrets (Development)
+## Quick Start
 
-For local development, use .NET User Secrets to store sensitive configuration like API keys. User Secrets are stored outside the repository in your user profile directory.
-
-### Setting Up User Secrets
-
-1. **Navigate to the source directory:**
-   ```bash
-   cd src
-   ```
-
-2. **Set your OpenAI API key:**
-   ```bash
-   dotnet user-secrets set "TenSecondTom:OpenAI:ApiKey" "your-openai-api-key-here"
-   ```
-
-3. **Set your Anthropic API key:**
-   ```bash
-   dotnet user-secrets set "TenSecondTom:Anthropic:ApiKey" "your-anthropic-api-key-here"
-   ```
-
-4. **Verify your secrets (optional):**
-   ```bash
-   dotnet user-secrets list
-   ```
-
-### Configuration Hierarchy
-
-Ten Second Tom uses the following configuration priority (highest to lowest):
-
-1. **Command-line arguments** (highest priority)
-   ```bash
-   tom today --llm-provider Anthropic
-   ```
-
-2. **Environment variables**
-   ```bash
-   export TenSecondTom__OpenAI__ApiKey="your-key"
-   ```
-   Note: Use double underscores (`__`) to represent nested configuration sections.
-
-3. **User Secrets** (development only)
-   ```bash
-   dotnet user-secrets set "TenSecondTom:OpenAI:ApiKey" "your-key"
-   ```
-
-4. **appsettings.Development.json** (development environment)
-
-5. **appsettings.json** (defaults, lowest priority)
-
-## Environment Variables (Production & Installed Applications)
-
-For production deployments or for users who have installed the application via a package manager (Homebrew, Winget, etc.), use environment variables. This is the most secure and flexible method.
+The first time you run Ten Second Tom, it will automatically launch a guided setup wizard that walks you through all configuration steps:
 
 ```bash
-# Linux/macOS
+tom today
+# → Setup wizard launches automatically
+```
+
+Or manually start the setup wizard:
+
+```bash
+tom setup
+```
+
+## Setup Wizard
+
+The setup wizard is an interactive, 8-step process that collects all necessary configuration:
+
+### Step 1: SSH Key Configuration
+
+The wizard automatically detects ED25519 SSH keys from:
+- System SSH agent (`ssh-agent`)
+- 1Password SSH agent (macOS)
+- Secretive SSH agent (macOS)
+- File system (`~/.ssh/*.pub`)
+
+**What you'll see:**
+```
+Step 1 of 8: SSH Key Configuration
+
+Detecting SSH keys...
+✓ Found 3 SSH keys:
+
+1. [System Agent] id_ed25519
+2. [1Password] work_key
+3. [File] ~/.ssh/personal_ed25519
+
+Select SSH key to use: _
+```
+
+**If no keys are found:**
+The wizard provides guidance on how to generate a new SSH key or add an existing one to your SSH agent.
+
+**Generate a new SSH key:**
+```bash
+ssh-keygen -t ed25519 -C "your-email@example.com"
+```
+
+Learn more: [GitHub SSH Documentation](https://docs.github.com/en/authentication/connecting-to-github-with-ssh)
+
+### Step 2: LLM Provider Selection
+
+Choose between OpenAI (GPT-4, GPT-3.5) or Anthropic (Claude 3.5).
+
+```
+Step 2 of 8: LLM Provider Selection
+
+Choose your AI provider:
+
+1. OpenAI (GPT-4, GPT-3.5)
+2. Anthropic (Claude 3.5)
+
+Select provider: _
+```
+
+### Step 3: API Key Configuration
+
+Enter your API key for the selected provider. The key is masked as you type for security.
+
+```
+Step 3 of 8: API Key Configuration
+
+Enter your OpenAI API key: ****************************************
+
+Validating API key...
+✓ Format valid
+✓ Network validation successful
+```
+
+**Get your API keys:**
+- OpenAI: [https://platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+- Anthropic: [https://console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
+
+### Step 4: Memory Storage Location
+
+Specify where Ten Second Tom should store your daily entries and memories.
+
+```
+Step 4 of 8: Memory Storage Location
+
+Where should I store your memories?
+Default: ~/.memory/ten-second-tom
+
+Directory path [default]: _
+```
+
+Press Enter to accept the default, or provide a custom path.
+
+### Step 5: Logging Level (Optional)
+
+Choose how verbose you want the application logs to be:
+
+- **Debug**: Verbose output for troubleshooting
+- **Information**: Standard output (recommended)
+- **Warning**: Quiet mode, only warnings and errors
+- **Error**: Silent mode, only errors
+
+### Step 6: Data Retention (Optional)
+
+Choose how long to keep your memories before automatic deletion:
+
+- **Unlimited**: Keep all memories forever (recommended)
+- **Custom days**: Automatically delete memories older than X days
+
+```
+Step 6 of 8: Data Retention
+
+How long should memories be kept? (enter 'unlimited' or number of days)
+Default: unlimited
+```
+
+### Step 7: Configuration Summary
+
+Review all your settings before saving:
+
+```
+Step 7 of 8: Configuration Summary
+
+┌─────────────────────┬──────────────────────────────────────────┐
+│ Setting             │ Value                                     │
+├─────────────────────┼──────────────────────────────────────────┤
+│ SSH Key             │ id_ed25519                               │
+│ LLM Provider        │ OpenAI                                   │
+│ API Key             │ ****************************************7890 │
+│ Memory Directory    │ /Users/you/.memory/ten-second-tom        │
+│ Log Level           │ Information                              │
+│ Retention Days      │ Unlimited (never delete)                 │
+└─────────────────────┴──────────────────────────────────────────┘
+
+Save this configuration? (Y/n): _
+```
+
+### Step 8: Save Configuration
+
+Your configuration is securely saved to .NET User Secrets (or `appsettings.json` as a fallback).
+
+```
+Step 8 of 8: Saving Configuration
+
+Saving configuration...
+✓ Setup complete!
+Configuration saved to: /Users/you/.microsoft/usersecrets/...
+
+You can view your configuration anytime with: tom config --show
+To change individual settings, use: tom config --set <setting-name> <value>
+```
+
+## Configuration Commands
+
+### View Current Configuration
+
+Display all current settings (API keys are masked):
+
+```bash
+tom config --show
+```
+
+**Output:**
+```
+Current Configuration:
+
+┌─────────────────────┬──────────────────────────────────────────┐
+│ Setting             │ Value                                     │
+├─────────────────────┼──────────────────────────────────────────┤
+│ SSH Key             │ id_ed25519                               │
+│ LLM Provider        │ OpenAI                                   │
+│ API Key             │ ****************************************7890 │
+│ Memory Directory    │ /Users/you/.memory/ten-second-tom        │
+│ Log Level           │ Information                              │
+│ Retention Days      │ Unlimited                                │
+└─────────────────────┴──────────────────────────────────────────┘
+```
+
+**Show API keys (unmasked):**
+```bash
+tom config --show --show-secrets
+```
+
+### Update Individual Settings
+
+Change a single configuration setting without running the full setup wizard:
+
+#### Change LLM Provider
+
+```bash
+tom config --set llm-provider Anthropic
+# Valid values: OpenAI, Anthropic
+```
+
+#### Update API Key
+
+```bash
+tom config --set api-key "sk-ant-your-new-key-here"
+# Format is validated before saving
+```
+
+#### Change Memory Directory
+
+```bash
+tom config --set memory-directory "~/Documents/tom-memories"
+# Path is resolved and validated
+```
+
+#### Update SSH Key Path
+
+```bash
+tom config --set ssh-key-path "~/.ssh/id_ed25519.pub"
+# File must exist, validated before saving
+```
+
+#### Change Log Level
+
+```bash
+tom config --set log-level Debug
+# Valid values: Debug, Information, Warning, Error
+```
+
+#### Update Data Retention
+
+```bash
+tom config --set retention-days 90
+# Must be a positive integer (days)
+```
+
+### Validate Configuration
+
+Check if your current configuration is valid:
+
+```bash
+tom config --validate
+```
+
+**Output on success:**
+```
+✓ Configuration is valid
+```
+
+**Output on failure:**
+```
+✗ Configuration validation failed: Required fields are missing or invalid
+Run 'tom setup' to reconfigure.
+```
+
+### Reconfigure Everything
+
+Run the setup wizard again to walk through all settings with current values as defaults:
+
+```bash
+tom setup
+# or
+tom setup --force
+```
+
+The wizard will show your current values and allow you to change any setting.
+
+## Configuration Storage
+
+### .NET User Secrets (Primary)
+
+Ten Second Tom uses [.NET User Secrets](https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets) to securely store sensitive configuration like API keys. User Secrets are stored outside the repository in your user profile directory.
+
+**User Secrets location:**
+
+- **macOS/Linux**: `~/.microsoft/usersecrets/<user-secrets-id>/secrets.json`
+- **Windows**: `%APPDATA%\Microsoft\UserSecrets\<user-secrets-id>\secrets.json`
+
+**Advantages:**
+- ✅ Secrets are stored outside the project directory
+- ✅ Not accidentally committed to version control
+- ✅ Per-user configuration on shared machines
+- ✅ Encrypted by the operating system
+
+### appsettings.json (Fallback)
+
+If .NET User Secrets cannot be written (e.g., permissions issues), configuration is saved to `appsettings.json` in the application directory.
+
+**Security warning:** The fallback method stores API keys in plain text. Use User Secrets whenever possible.
+
+### Environment Variables (Advanced)
+
+For production deployments or CI/CD pipelines, you can use environment variables:
+
+```bash
+# macOS/Linux
 export TenSecondTom__OpenAI__ApiKey="your-openai-api-key"
 export TenSecondTom__Anthropic__ApiKey="your-anthropic-api-key"
 export TenSecondTom__MemoryDirectory="/var/tom/memory"
@@ -68,154 +307,249 @@ $env:TenSecondTom__Anthropic__ApiKey="your-anthropic-api-key"
 $env:TenSecondTom__MemoryDirectory="C:\tom\memory"
 ```
 
-## Configuration Options
+**Note:** Use double underscores (`__`) to represent nested configuration sections.
 
-### Application Settings
+## Configuration Hierarchy
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `TenSecondTom:MemoryDirectory` | `./.memory` | Directory where memory entries are stored |
-| `TenSecondTom:LlmProvider` | `OpenAI` | Default LLM provider (`OpenAI` or `Anthropic`) |
+Ten Second Tom uses the following configuration priority (highest to lowest):
 
-### OpenAI Settings
+1. **Command-line arguments** (highest priority)
+2. **Environment variables**
+3. **User Secrets** (development/local)
+4. **appsettings.Development.json** (development environment)
+5. **appsettings.json** (defaults, lowest priority)
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `TenSecondTom:OpenAI:ApiKey` | *(required)* | Your OpenAI API key |
-| `TenSecondTom:OpenAI:Model` | `gpt-4` | Model to use for completions |
-| `TenSecondTom:OpenAI:MaxTokens` | `2000` | Maximum tokens for responses |
+## Timeout Configuration
 
-### Anthropic Settings
+SSH key detection and API validation operations have configurable timeouts to prevent the setup wizard from hanging.
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `TenSecondTom:Anthropic:ApiKey` | *(required)* | Your Anthropic API key |
-| `TenSecondTom:Anthropic:Model` | `claude-3-sonnet-20240229` | Model to use for completions |
-| `TenSecondTom:Anthropic:MaxTokens` | `2000` | Maximum tokens for responses |
+**Default timeouts (in `appsettings.json`):**
 
-### Data Retention Settings
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `TenSecondTom:DataRetention:DefaultPolicy` | `Indefinite` | Retention policy: `Indefinite`, `Days30`, `Days90`, `OneYear`, `TwoYears` |
-| `TenSecondTom:DataRetention:AutoPurgeEnabled` | `false` | Automatically purge old entries on startup |
-
-## Shell Mode Configuration
-
-### Terminal Requirements
-
-Ten Second Tom's shell mode uses Spectre.Console for rich terminal formatting, which requires terminal support for:
-
-- **ANSI color codes**: Most modern terminals support this
-- **Unicode characters**: Required for the banner and UI elements
-- **Terminal width**: Minimum 80 characters recommended for optimal display
-
-### Supported Terminals
-
-✅ **Fully Supported:**
-
-- macOS: Terminal.app, iTerm2, Warp
-- Linux: GNOME Terminal, Konsole, Alacritty, Kitty
-- Windows: Windows Terminal, PowerShell 7+
-
-⚠️ **Limited Support:**
-
-- Windows PowerShell 5.x: Colors supported, but limited Unicode
-- Git Bash (Windows): May have color/Unicode rendering issues
-- PuTTY: Limited color palette
-
-❌ **Not Supported:**
-
-- Windows Command Prompt (cmd.exe): No ANSI color support
-
-### Exit Codes
-
-Shell mode uses the following exit codes:
-
-| Code | Meaning | Description |
-|------|---------|-------------|
-| `0` | Success | Shell exited normally or command completed successfully |
-| `1` | General Error | Command execution failed or unexpected error occurred |
-| `2` | Authentication Error | SSH authentication failed or user is not logged in |
-
-### Environment Variables
-
-No shell-specific environment variables are required. Shell mode uses the same configuration as single-command mode.
-
-### Color Customization
-
-Shell mode automatically detects terminal capabilities:
-
-- **Color support**: Automatically detected via Spectre.Console
-- **No-color mode**: Respects `NO_COLOR` environment variable (see <https://no-color.org/>)
-- **Accessibility**: Output remains readable with colors disabled
-
-To disable colors globally:
-
-```bash
-# Disable colors for all applications that respect NO_COLOR
-export NO_COLOR=1
-tom  # Launches shell with no colors
+```json
+{
+  "Setup": {
+    "SshKeyDetectionTimeoutSeconds": 5,
+    "ApiValidationTimeoutSeconds": 10,
+    "TotalSetupTimeoutSeconds": 120
+  }
+}
 ```
 
-### Cross-Platform Considerations
+**Adjust timeouts:**
 
-**macOS:**
+Edit `appsettings.json` in the application directory:
 
-- Full support for all features
-- Terminal.app has excellent Unicode and color support
-- Recommended for optimal experience
-
-**Linux:**
-
-- Full support in modern terminal emulators
-- Ensure `TERM` environment variable is set correctly (e.g., `xterm-256color`)
-- Some older terminals may have limited Unicode support
-
-**Windows:**
-
-- Use Windows Terminal or PowerShell 7+ for best experience
-- Avoid Windows Command Prompt (cmd.exe)
-- Windows Terminal supports full Unicode and ANSI colors
-
-## Security Best Practices
-
-- ✅ **DO** use User Secrets for local development
-- ✅ **DO** use environment variables for production
-- ✅ **DO** use a secrets manager (Azure Key Vault, AWS Secrets Manager, etc.) for production deployments
-- ❌ **DO NOT** commit API keys to version control
-- ❌ **DO NOT** put secrets in `appsettings.json` or `appsettings.Development.json`
+```json
+{
+  "Setup": {
+    "SshKeyDetectionTimeoutSeconds": 10,  // Increase if SSH detection times out
+    "ApiValidationTimeoutSeconds": 20,    // Increase for slow networks
+    "TotalSetupTimeoutSeconds": 180       // Overall setup timeout
+  }
+}
+```
 
 ## Troubleshooting
 
-### User Secrets Not Found
+### Setup Wizard Doesn't Launch
 
-If you get an error about missing User Secrets:
+**Problem:** Running `tom today` doesn't trigger the setup wizard.
 
-1. Verify User Secrets are initialized:
+**Solution:** Configuration already exists. To reconfigure, run:
+```bash
+tom setup --force
+```
 
+### No SSH Keys Detected
+
+**Problem:** Setup wizard reports "No SSH keys detected."
+
+**Solutions:**
+
+1. **Generate a new ED25519 key:**
    ```bash
-   cd src
-   dotnet user-secrets list
+   ssh-keygen -t ed25519 -C "your-email@example.com"
    ```
 
-2. If empty, set your API keys as shown above.
+2. **Add existing key to SSH agent:**
+   ```bash
+   # macOS/Linux
+   eval "$(ssh-agent -s)"
+   ssh-add ~/.ssh/id_ed25519
+   ```
 
-### API Key Not Working
+3. **Manually specify key path:**
+   During setup, when no keys are detected, you can exit and later set the path manually:
+   ```bash
+   tom config --set ssh-key-path "~/.ssh/id_ed25519.pub"
+   ```
 
-1. Check your configuration priority - a higher-priority source may be overriding your key
-2. Verify the key format matches your provider's requirements
-3. Check the application logs in `.logs/` for authentication errors
+4. **Check SSH agent is running:**
+   ```bash
+   # macOS/Linux
+   echo $SSH_AUTH_SOCK
+   # Should output a path like /tmp/ssh-xxxx/agent.12345
+   ```
 
-### Configuration Not Loading
+### API Key Validation Fails
 
-Ensure `appsettings.json` is copied to the output directory:
+**Problem:** Setup wizard reports "Invalid API key format" or "Network validation failed."
+
+**Solutions:**
+
+1. **Verify key format:**
+   - OpenAI: `sk-[a-zA-Z0-9]{48,}` (starts with `sk-`)
+   - Anthropic: `sk-ant-[a-zA-Z0-9\-]{32,}` (starts with `sk-ant-`)
+
+2. **Check network connectivity:**
+   ```bash
+   # Test OpenAI connectivity
+   curl https://api.openai.com/v1/models
+   
+   # Test Anthropic connectivity
+   curl https://api.anthropic.com/v1/messages
+   ```
+
+3. **Increase timeout:**
+   Edit `appsettings.json` and increase `ApiValidationTimeoutSeconds`.
+
+4. **Generate a new key:**
+   - OpenAI: [https://platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+   - Anthropic: [https://console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
+
+### Configuration Not Saved
+
+**Problem:** Setup completes but running commands says "No configuration found."
+
+**Solutions:**
+
+1. **Check User Secrets location:**
+   ```bash
+   # The setup wizard shows the save location at the end
+   # Verify the file exists:
+   ls ~/.microsoft/usersecrets/*/secrets.json
+   ```
+
+2. **Check file permissions:**
+   ```bash
+   # Ensure you have write permissions
+   ls -la ~/.microsoft/usersecrets/
+   ```
+
+3. **Use fallback storage:**
+   If User Secrets fails, configuration falls back to `appsettings.json`. Check for warnings in the setup output.
+
+4. **Re-run setup:**
+   ```bash
+   tom setup --force
+   ```
+
+### Can't Find Configuration File
+
+**Problem:** Want to manually edit or backup configuration but can't find the file.
+
+**Solutions:**
+
+1. **Show configuration:**
+   ```bash
+   tom config --show
+   # The output includes the storage location
+   ```
+
+2. **Find User Secrets directory:**
+   ```bash
+   # macOS/Linux
+   find ~/.microsoft/usersecrets -name "secrets.json"
+   
+   # Windows (PowerShell)
+   Get-ChildItem -Path $env:APPDATA\Microsoft\UserSecrets -Recurse -Filter secrets.json
+   ```
+
+3. **Check appsettings.json fallback:**
+   If User Secrets failed, check the application directory:
+   ```bash
+   # macOS/Linux (Homebrew install)
+   cat /usr/local/bin/TenSecondTom/appsettings.json
+   
+   # Windows (default install)
+   type "C:\Program Files\TenSecondTom\appsettings.json"
+   ```
+
+## Rollback and Recovery
+
+### View Current Configuration
+
+Before making changes, always view the current configuration:
+
+```bash
+tom config --show --show-secrets > config-backup.txt
+```
+
+### Restore from Backup
+
+If you need to restore a previous configuration:
+
+1. **Re-run setup wizard:**
+   ```bash
+   tom setup --force
+   ```
+   Enter values from your backup.
+
+2. **Update individual settings:**
+   ```bash
+   tom config --set llm-provider OpenAI
+   tom config --set api-key "sk-your-old-key"
+   # ... etc.
+   ```
+
+3. **Manual User Secrets restore:**
+   ```bash
+   # Find User Secrets location
+   tom config --show  # Shows path at bottom
+   
+   # Copy backup over existing file
+   cp config-backup.json ~/.microsoft/usersecrets/<id>/secrets.json
+   ```
+
+### Start Fresh
+
+To completely reset configuration and start over:
+
+1. **Delete User Secrets file:**
+   ```bash
+   # macOS/Linux
+   rm ~/.microsoft/usersecrets/*/secrets.json
+   
+   # Windows (PowerShell)
+   Remove-Item -Path $env:APPDATA\Microsoft\UserSecrets\*\secrets.json
+   ```
+
+2. **Re-run setup:**
+   ```bash
+   tom setup
+   ```
+
+## Advanced Configuration
+
+### Manual User Secrets Management (For Developers)
+
+If you're developing Ten Second Tom, you can use `dotnet user-secrets` commands directly:
 
 ```bash
 cd src
-dotnet build
-# Check that bin/Debug/net9.0/appsettings.json exists
+
+# Set secrets
+dotnet user-secrets set "TenSecondTom:OpenAI:ApiKey" "your-key"
+dotnet user-secrets set "TenSecondTom:Anthropic:ApiKey" "your-key"
+
+# List secrets
+dotnet user-secrets list
+
+# Clear all secrets
+dotnet user-secrets clear
 ```
+
+**Note:** For regular users, always use `tom setup` and `tom config` instead of manual commands.
 
 ## Related Documentation
 
@@ -223,3 +557,25 @@ dotnet build
 - [.NET Configuration Documentation](https://learn.microsoft.com/en-us/dotnet/core/extensions/configuration)
 - [OpenAI API Keys](https://platform.openai.com/api-keys)
 - [Anthropic API Keys](https://console.anthropic.com/settings/keys)
+- [GitHub SSH Documentation](https://docs.github.com/en/authentication/connecting-to-github-with-ssh)
+
+## Security Best Practices
+
+- ✅ **DO** use the built-in setup wizard (`tom setup`)
+- ✅ **DO** use User Secrets for local development
+- ✅ **DO** use environment variables for production/CI/CD
+- ✅ **DO** regularly rotate API keys
+- ✅ **DO** back up configuration before making changes
+- ❌ **DO NOT** commit API keys to version control
+- ❌ **DO NOT** share User Secrets files
+- ❌ **DO NOT** store secrets in plain text files
+- ❌ **DO NOT** put secrets in `appsettings.json` (use as fallback only)
+
+---
+
+**Need Help?**
+
+If you encounter issues not covered in this guide, please:
+1. Check the logs in `.logs/` directory
+2. Run `tom config --validate` to check configuration validity
+3. Report issues at: [https://github.com/sirkirby/ten-second-tom/issues](https://github.com/sirkirby/ten-second-tom/issues)

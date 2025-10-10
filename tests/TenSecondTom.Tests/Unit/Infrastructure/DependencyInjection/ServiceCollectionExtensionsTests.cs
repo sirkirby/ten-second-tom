@@ -192,16 +192,19 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
 
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
-        // Note: NOT adding logging
+        // Note: NOT adding logging explicitly - AddHttpClient() should add it
         services.AddTenSecondTomServices();
 
         // Act
         using var serviceProvider = services.BuildServiceProvider();
-        var resolveStorageProvider = () => serviceProvider.GetRequiredService<IMemoryStorageProvider>();
-
-        // Assert - Should throw because ILoggerFactory is missing
-        resolveStorageProvider.Should().Throw<InvalidOperationException>()
-            .WithMessage("*ILoggerFactory*");
+        
+        // Assert - Should succeed because AddHttpClient() registers logging infrastructure
+        var storageProvider = serviceProvider.GetRequiredService<IMemoryStorageProvider>();
+        storageProvider.Should().NotBeNull();
+        
+        // Verify logging is available
+        var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+        loggerFactory.Should().NotBeNull("AddHttpClient should register logging infrastructure");
     }
 
     [Fact]
