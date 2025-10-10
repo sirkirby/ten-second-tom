@@ -522,7 +522,7 @@ jobs:
           
           # Create ARM64 bottle
           BOTTLE_TAG_ARM64="arm64_${MACOS_TAG}"
-          BOTTLE_NAME_ARM64="ten-second-tom--${VERSION}.${BOTTLE_TAG_ARM64}.bottle.tar.gz"
+          BOTTLE_NAME_ARM64="ten-second-tom-${VERSION}.${BOTTLE_TAG_ARM64}.bottle.tar.gz"
           BOTTLE_DIR_ARM64="ten-second-tom/${VERSION}/bin"
           
           mkdir -p "$BOTTLE_DIR_ARM64"
@@ -539,7 +539,7 @@ jobs:
           
           # Create x64 bottle
           BOTTLE_TAG_X64="${MACOS_TAG}"
-          BOTTLE_NAME_X64="ten-second-tom--${VERSION}.${BOTTLE_TAG_X64}.bottle.tar.gz"
+          BOTTLE_NAME_X64="ten-second-tom-${VERSION}.${BOTTLE_TAG_X64}.bottle.tar.gz"
           BOTTLE_DIR_X64="ten-second-tom/${VERSION}/bin"
           
           mkdir -p "$BOTTLE_DIR_X64"
