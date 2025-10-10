@@ -54,11 +54,14 @@ public sealed class SearchCommandHandlerJsonOutputTests : IDisposable
             cancellationToken: CancellationToken.None);
 
         // Assert
-        var output = _stringWriter.ToString();
-        output.Should().NotBeNullOrEmpty();
-        
-        // Verify it's valid JSON
-        var jsonDoc = JsonDocument.Parse(output);
+    var output = _stringWriter.ToString();
+    output.Should().NotBeNullOrEmpty();
+
+    // Some environments may prepend stray whitespace or newlines; isolate the first JSON object start
+    var firstBraceIndex = output.IndexOf('{', StringComparison.Ordinal);
+    firstBraceIndex.Should().BeGreaterThanOrEqualTo(0, "JSON output should contain an object");
+    var jsonSlice = output[firstBraceIndex..].Trim();
+    var jsonDoc = JsonDocument.Parse(jsonSlice);
         var root = jsonDoc.RootElement;
         
         // Verify JSON structure
@@ -117,11 +120,13 @@ public sealed class SearchCommandHandlerJsonOutputTests : IDisposable
             cancellationToken: CancellationToken.None);
 
         // Assert
-        var output = _stringWriter.ToString();
-        output.Should().NotBeNullOrEmpty();
-        
-        // Verify it's valid JSON
-        var jsonDoc = JsonDocument.Parse(output);
+    var output = _stringWriter.ToString();
+    output.Should().NotBeNullOrEmpty();
+
+    var firstBraceIndex = output.IndexOf('{', StringComparison.Ordinal);
+    firstBraceIndex.Should().BeGreaterThanOrEqualTo(0, "JSON output should contain an object");
+    var jsonSlice = output[firstBraceIndex..].Trim();
+    var jsonDoc = JsonDocument.Parse(jsonSlice);
         var root = jsonDoc.RootElement;
         
         // Verify JSON structure

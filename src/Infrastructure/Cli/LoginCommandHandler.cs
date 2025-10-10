@@ -1,6 +1,7 @@
 using Spectre.Console;
 using TenSecondTom.Features.Auth.Commands;
 using TenSecondTom.Shared.OutputFormatters;
+using TenSecondTom.Shared.Constants;
 using AuthHandler = TenSecondTom.Features.Auth.Handlers.LoginCommandHandler;
 
 namespace TenSecondTom.Infrastructure.Cli;
@@ -42,8 +43,8 @@ public static class LoginCommandHandler
                     : null;
                     
                 string json = result.IsSuccess
-                    ? JsonOutputFormatter.FormatSuccess("login", jsonData, DateTimeOffset.UtcNow)
-                    : JsonOutputFormatter.FormatFailure("login", result.Error, DateTimeOffset.UtcNow);
+                    ? JsonOutputFormatter.FormatSuccess(CommandNames.Login, jsonData, DateTimeOffset.UtcNow)
+                    : JsonOutputFormatter.FormatFailure(CommandNames.Login, result.Error, DateTimeOffset.UtcNow);
                 Console.WriteLine(json);
             }
             else if (result.IsSuccess)
@@ -75,7 +76,7 @@ public static class LoginCommandHandler
         {
             if (jsonOutput)
             {
-                string json = JsonOutputFormatter.FormatFailure("login", $"Authentication error: {ex.Message}", DateTimeOffset.UtcNow);
+                string json = JsonOutputFormatter.FormatFailure(CommandNames.Login, $"Authentication error: {ex.Message}", DateTimeOffset.UtcNow);
                 Console.WriteLine(json);
             }
             else

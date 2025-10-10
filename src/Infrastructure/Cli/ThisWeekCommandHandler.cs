@@ -3,6 +3,7 @@ using TenSecondTom.Features.ThisWeek.Commands;
 using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.OutputFormatters;
 using TenSecondTom.Shared.Results;
 
@@ -38,36 +39,29 @@ public static class ThisWeekCommandHandler
         ArgumentNullException.ThrowIfNull(authService);
 
         // Show warning if using mock authentication
-        if (authService is MockAuthenticationService)
+        if (!jsonOutput && authService is MockAuthenticationService)
         {
             AnsiConsole.MarkupLine("[yellow]⚠ Development Mode: Authentication bypassed[/]");
             AnsiConsole.WriteLine();
         }
 
         // Authenticate first
-        try
+        var authResult = await AuthenticationHelper.EnsureAuthenticatedAsync(
+            authService,
+            CommandNames.ThisWeek,
+            jsonOutput,
+            CancellationToken.None).ConfigureAwait(false);
+
+        if (!authResult.IsSuccess)
         {
-            bool isAuthenticated = await authService.IsAuthenticatedAsync(CancellationToken.None).ConfigureAwait(false);
-            if (!isAuthenticated)
-            {
-                Result<UserSession> authResult = await authService.AuthenticateAsync(CancellationToken.None).ConfigureAwait(false);
-                if (!authResult.IsSuccess)
-                {
-                    AuthenticationErrorFormatter.DisplayAuthenticationError(authResult.Error ?? "Unknown authentication error");
-                    return;
-                }
-            }
-        }
-#pragma warning disable CA1031 // Do not catch general exception types - top-level handler for user-facing error display
-        catch (Exception ex)
-#pragma warning restore CA1031
-        {
-            AuthenticationErrorFormatter.DisplayAuthenticationError(ex.Message);
             return;
         }
 
-        AnsiConsole.MarkupLine("[bold magenta]📅 This Week's Review[/]");
-        AnsiConsole.WriteLine();
+        if (!jsonOutput)
+        {
+            AnsiConsole.MarkupLine("[bold magenta]📅 This Week's Review[/]");
+            AnsiConsole.WriteLine();
+        }
 
         // Build command
         DateRange? customDateRange = null;
@@ -199,6 +193,6 @@ public static class ThisWeekCommandHandler
         }
 
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"[dim]Entry saved to: .memory/thisweek/[/]");
+    AnsiConsole.MarkupLine($"[dim]Entry saved to: .memory/{CommandNames.ThisWeek}/[/]");
     }
 }

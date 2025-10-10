@@ -3,6 +3,7 @@ using TenSecondTom.Features.Search.Handlers;
 using TenSecondTom.Features.Search.Queries;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Shared.OutputFormatters;
+using TenSecondTom.Shared.Constants;
 
 namespace TenSecondTom.Infrastructure.Cli;
 
@@ -40,27 +41,15 @@ public static class SearchCommandHandler
         try
         {
             // Check authentication first
-            var isAuthenticated = await authService.IsAuthenticatedAsync(cancellationToken).ConfigureAwait(false);
-            if (!isAuthenticated)
+            var authResult = await AuthenticationHelper.EnsureAuthenticatedAsync(
+                authService,
+                CommandNames.Search,
+                jsonOutput,
+                cancellationToken).ConfigureAwait(false);
+
+            if (!authResult.IsSuccess)
             {
-                if (jsonOutput)
-                {
-                    Console.WriteLine(JsonOutputFormatter.FormatFailure("search", 
-                        "Authentication required. Please authenticate first.", 
-                        DateTimeOffset.UtcNow));
-                    return;
-                }
-
-                AnsiConsole.MarkupLine("[red]Authentication required. Please authenticate first.[/]");
-                
-                var authResult = await authService.AuthenticateAsync(cancellationToken).ConfigureAwait(false);
-                if (!authResult.IsSuccess)
-                {
-                    AnsiConsole.MarkupLine($"[red]Authentication failed: {Markup.Escape(authResult.Error ?? "Unknown error")}[/]");
-                    return;
-                }
-
-                AnsiConsole.MarkupLine("[green]Authentication successful![/]");
+                return;
             }
 
             // Execute search
@@ -71,7 +60,7 @@ public static class SearchCommandHandler
             {
                 if (jsonOutput)
                 {
-                    Console.WriteLine(JsonOutputFormatter.FormatFailure("search", 
+                    Console.WriteLine(JsonOutputFormatter.FormatFailure(CommandNames.Search, 
                         result.Error ?? "Unknown error", 
                         DateTimeOffset.UtcNow));
                 }
@@ -105,7 +94,7 @@ public static class SearchCommandHandler
                         .ToList()
                 };
 
-                Console.WriteLine(JsonOutputFormatter.FormatSuccess("search", searchResultData, DateTimeOffset.UtcNow));
+                Console.WriteLine(JsonOutputFormatter.FormatSuccess(CommandNames.Search, searchResultData, DateTimeOffset.UtcNow));
             }
             else
             {
@@ -173,7 +162,7 @@ public static class SearchCommandHandler
         {
             if (jsonOutput)
             {
-                Console.WriteLine(JsonOutputFormatter.FormatFailure("search", ex.Message, DateTimeOffset.UtcNow));
+                Console.WriteLine(JsonOutputFormatter.FormatFailure(CommandNames.Search, ex.Message, DateTimeOffset.UtcNow));
             }
             else
             {

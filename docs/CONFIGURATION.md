@@ -2,6 +2,11 @@
 
 This document explains how to configure Ten Second Tom using the built-in setup wizard and configuration commands.
 
+> **Related Documentation:**
+> - [Authentication Setup](AUTHENTICATION.md) - SSH key configuration and agent setup
+> - [Security Policy](../SECURITY.md) - Security best practices and key management
+> - [Environment Setup](ENVIRONMENT.md) - Environment variables and deployment configuration
+
 ## Quick Start
 
 The first time you run Ten Second Tom, it will automatically launch a guided setup wizard that walks you through all configuration steps:
@@ -156,8 +161,8 @@ Saving configuration...
 ✓ Setup complete!
 Configuration saved to: /Users/you/.microsoft/usersecrets/...
 
-You can view your configuration anytime with: tom config --show
-To change individual settings, use: tom config --set <setting-name> <value>
+You can view your configuration anytime with: tom config show
+To change individual settings, use: tom config set <setting-name> <value>
 ```
 
 ## Configuration Commands
@@ -167,7 +172,7 @@ To change individual settings, use: tom config --set <setting-name> <value>
 Display all current settings (API keys are masked):
 
 ```bash
-tom config --show
+tom config show
 ```
 
 **Output:**
@@ -188,7 +193,7 @@ Current Configuration:
 
 **Show API keys (unmasked):**
 ```bash
-tom config --show --show-secrets
+tom config show --show-secrets
 ```
 
 ### Update Individual Settings
@@ -198,42 +203,42 @@ Change a single configuration setting without running the full setup wizard:
 #### Change LLM Provider
 
 ```bash
-tom config --set llm-provider Anthropic
+tom config set llm-provider Anthropic
 # Valid values: OpenAI, Anthropic
 ```
 
 #### Update API Key
 
 ```bash
-tom config --set api-key "sk-ant-your-new-key-here"
+tom config set api-key "sk-ant-your-new-key-here"
 # Format is validated before saving
 ```
 
 #### Change Memory Directory
 
 ```bash
-tom config --set memory-directory "~/Documents/tom-memories"
+tom config set memory-directory "~/Documents/tom-memories"
 # Path is resolved and validated
 ```
 
 #### Update SSH Key Path
 
 ```bash
-tom config --set ssh-key-path "~/.ssh/id_ed25519.pub"
+tom config set ssh-key-path "~/.ssh/id_ed25519.pub"
 # File must exist, validated before saving
 ```
 
 #### Change Log Level
 
 ```bash
-tom config --set log-level Debug
+tom config set log-level Debug
 # Valid values: Debug, Information, Warning, Error
 ```
 
 #### Update Data Retention
 
 ```bash
-tom config --set retention-days 90
+tom config set retention-days 90
 # Must be a positive integer (days)
 ```
 
@@ -242,8 +247,34 @@ tom config --set retention-days 90
 Check if your current configuration is valid:
 
 ```bash
-tom config --validate
+tom config validate
 ```
+
+**Output on success:**
+```
+✓ Configuration is valid
+```
+
+**Output on failure:**
+```
+✗ Configuration validation failed: Required fields are missing or invalid
+Run 'tom setup' to reconfigure.
+```
+
+### Reset Configuration
+
+**Note:** The `reset` action is implemented in the backend but not currently exposed as a CLI command. To reset your configuration, you can:
+
+1. Delete the User Secrets file manually and re-run setup:
+   ```bash
+   # Find and delete User Secrets
+   rm ~/.microsoft/usersecrets/*/secrets.json
+   
+   # Re-run setup wizard
+   tom setup
+   ```
+
+2. Or use `tom setup --force` to reconfigure all settings.
 
 **Output on success:**
 ```
@@ -381,7 +412,7 @@ tom setup --force
 3. **Manually specify key path:**
    During setup, when no keys are detected, you can exit and later set the path manually:
    ```bash
-   tom config --set ssh-key-path "~/.ssh/id_ed25519.pub"
+   tom config set ssh-key-path "~/.ssh/id_ed25519.pub"
    ```
 
 4. **Check SSH agent is running:**
@@ -452,7 +483,7 @@ tom setup --force
 
 1. **Show configuration:**
    ```bash
-   tom config --show
+   tom config show
    # The output includes the storage location
    ```
 
@@ -497,15 +528,15 @@ If you need to restore a previous configuration:
 
 2. **Update individual settings:**
    ```bash
-   tom config --set llm-provider OpenAI
-   tom config --set api-key "sk-your-old-key"
+   tom config set llm-provider OpenAI
+   tom config set api-key "sk-your-old-key"
    # ... etc.
    ```
 
 3. **Manual User Secrets restore:**
    ```bash
    # Find User Secrets location
-   tom config --show  # Shows path at bottom
+   tom config show  # Shows path at bottom
    
    # Copy backup over existing file
    cp config-backup.json ~/.microsoft/usersecrets/<id>/secrets.json
@@ -577,5 +608,5 @@ dotnet user-secrets clear
 
 If you encounter issues not covered in this guide, please:
 1. Check the logs in `.logs/` directory
-2. Run `tom config --validate` to check configuration validity
+2. Run `tom config validate` to check configuration validity
 3. Report issues at: [https://github.com/sirkirby/ten-second-tom/issues](https://github.com/sirkirby/ten-second-tom/issues)

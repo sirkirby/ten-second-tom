@@ -1,6 +1,7 @@
 using Spectre.Console;
 using TenSecondTom.Features.Auth.Commands;
 using TenSecondTom.Shared.OutputFormatters;
+using TenSecondTom.Shared.Constants;
 using AuthHandler = TenSecondTom.Features.Auth.Handlers.LogoutCommandHandler;
 
 namespace TenSecondTom.Infrastructure.Cli;
@@ -32,8 +33,8 @@ public static class LogoutCommandHandler
             {
                 // JSON output mode
                 string json = result.IsSuccess
-                    ? JsonOutputFormatter.FormatSuccess("logout", new { message = "Successfully logged out" }, DateTimeOffset.UtcNow)
-                    : JsonOutputFormatter.FormatFailure("logout", result.Error, DateTimeOffset.UtcNow);
+                    ? JsonOutputFormatter.FormatSuccess(CommandNames.Logout, new { message = "Successfully logged out" }, DateTimeOffset.UtcNow)
+                    : JsonOutputFormatter.FormatFailure(CommandNames.Logout, result.Error, DateTimeOffset.UtcNow);
                 Console.WriteLine(json);
             }
             else if (result.IsSuccess)
@@ -52,7 +53,7 @@ public static class LogoutCommandHandler
         {
             if (jsonOutput)
             {
-                string json = JsonOutputFormatter.FormatFailure("logout", $"Logout error: {ex.Message}", DateTimeOffset.UtcNow);
+                string json = JsonOutputFormatter.FormatFailure(CommandNames.Logout, $"Logout error: {ex.Message}", DateTimeOffset.UtcNow);
                 Console.WriteLine(json);
             }
             else

@@ -252,8 +252,8 @@ public static class CommandRegistry
 
         searchCommand.Arguments.Add(queryArgument);
 
-        // Set action
-        searchCommand.SetAction(async (parseResult) =>
+        // Set action (void) - use Environment.ExitCode to communicate failure
+        searchCommand.SetAction((parseResult) =>
         {
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
             string[] queryWords = parseResult.GetValue(queryArgument) ?? [];
@@ -263,8 +263,8 @@ public static class CommandRegistry
             {
                 if (jsonOutput)
                 {
-                    Console.WriteLine(JsonOutputFormatter.FormatFailure("search", 
-                        "Query is required. Usage: search <query> [options]", 
+                    Console.WriteLine(JsonOutputFormatter.FormatFailure("search",
+                        "Query is required. Usage: search <query> [options]",
                         DateTimeOffset.UtcNow));
                 }
                 else
@@ -272,6 +272,26 @@ public static class CommandRegistry
                     AnsiConsole.MarkupLine("[red]Error:[/] Query is required.");
                     AnsiConsole.MarkupLine("[dim]Usage: search <query> [--from-date YYYY-MM-DD] [--to-date YYYY-MM-DD] [--output-json][/]");
                 }
+                Environment.ExitCode = 1; // failure exit code
+                return;
+            }
+
+            // Treat any token starting with '--' (that wasn't parsed as an option) as invalid argument usage
+            if (queryWords.Any(w => w.StartsWith("--", StringComparison.Ordinal)))
+            {
+                string invalidToken = queryWords.First(w => w.StartsWith("--", StringComparison.Ordinal));
+                if (jsonOutput)
+                {
+                    Console.WriteLine(JsonOutputFormatter.FormatFailure("search",
+                        $"Invalid search query token '{invalidToken}'. Options must precede the query.",
+                        DateTimeOffset.UtcNow));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]Invalid argument:[/] '{invalidToken}' cannot appear in query text. Specify options before the query.");
+                    AnsiConsole.MarkupLine("[dim]Usage: search [--from-date YYYY-MM-DD] [--to-date YYYY-MM-DD] <query words>[/]");
+                }
+                Environment.ExitCode = 1; // failure exit code
                 return;
             }
             
@@ -279,9 +299,42 @@ public static class CommandRegistry
             DateTime? fromDate = parseResult.GetValue(fromDateOption);
             DateTime? toDate = parseResult.GetValue(toDateOption);
 
-            var handler = serviceProvider.GetRequiredService<SearchMemoriesQueryHandler>();
-            var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
-            await SearchCommandHandler.ExecuteAsync(handler, authService, query, fromDate, toDate, jsonOutput).ConfigureAwait(false);
+            // Resolve required services. If not registered (e.g., minimal custom test host) fail gracefully.
+            var handler = serviceProvider.GetService<SearchMemoriesQueryHandler>();
+            if (handler is null)
+            {
+                if (jsonOutput)
+                {
+                    Console.WriteLine(JsonOutputFormatter.FormatFailure("search",
+                        "Search functionality is unavailable - handler not registered in DI container.",
+                        DateTimeOffset.UtcNow));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine("[red]Search unavailable:[/] handler not registered. Ensure AddTenSecondTomServices() was called.");
+                }
+                return;
+            }
+
+            var authService = serviceProvider.GetService<IAuthenticationService>();
+            if (authService is null)
+            {
+                if (jsonOutput)
+                {
+                    Console.WriteLine(JsonOutputFormatter.FormatFailure("search",
+                        "Authentication service not registered - cannot verify session.",
+                        DateTimeOffset.UtcNow));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine("[red]Authentication unavailable:[/] service not registered. Ensure AddTenSecondTomServices() was called.");
+                }
+                return;
+            }
+
+            SearchCommandHandler.ExecuteAsync(handler, authService, query, fromDate, toDate, jsonOutput)
+                .GetAwaiter().GetResult();
+            Environment.ExitCode = 0; // success
         });
 
         return searchCommand;

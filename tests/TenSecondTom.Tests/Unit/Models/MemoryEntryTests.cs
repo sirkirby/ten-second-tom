@@ -1,5 +1,6 @@
 using FluentAssertions;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Constants;
 
 namespace TenSecondTom.Tests.Unit.Models;
 
@@ -16,7 +17,7 @@ public sealed class MemoryEntryTests
         var timestamp = DateTimeOffset.UtcNow;
         var metadata = new MemoryEntryMetadata
         {
-            LlmProvider = "OpenAI",
+            LlmProvider = LlmProviders.OpenAI,
             LlmModel = "gpt-4",
             TokensUsed = 1500,
             ProcessingDuration = TimeSpan.FromSeconds(3.2),
@@ -38,7 +39,7 @@ public sealed class MemoryEntryTests
         // Assert
         entry.Should().NotBeNull();
         entry.EntryId.Should().Be("today-10-01-2025-1");
-        entry.Command.Should().Be("today");
+    entry.Command.Should().Be(CommandNames.Today);
         entry.Timestamp.Should().Be(timestamp);
         entry.EntryNumber.Should().Be(1);
         entry.UserInput.Should().Be("Had a productive day working on the project.");
@@ -66,8 +67,8 @@ public sealed class MemoryEntryTests
     }
 
     [Theory]
-    [InlineData("today")]
-    [InlineData("thisweek")]
+    [InlineData(CommandNames.Today)]
+    [InlineData(CommandNames.ThisWeek)]
     public void Command_WithValidValues_ShouldAccept(string command)
     {
         // Arrange & Act
@@ -163,7 +164,7 @@ public sealed class MemoryEntryTests
         // Arrange
         var openAiMetadata = new MemoryEntryMetadata
         {
-            LlmProvider = "OpenAI",
+            LlmProvider = LlmProviders.OpenAI,
             LlmModel = "gpt-4",
             TokensUsed = 1500,
             ProcessingDuration = TimeSpan.FromSeconds(3)
@@ -171,15 +172,15 @@ public sealed class MemoryEntryTests
 
         var anthropicMetadata = new MemoryEntryMetadata
         {
-            LlmProvider = "Anthropic",
+            LlmProvider = LlmProviders.Anthropic,
             LlmModel = "claude-3-sonnet-20240229",
             TokensUsed = 2000,
             ProcessingDuration = TimeSpan.FromSeconds(5)
         };
 
         // Assert
-        openAiMetadata.LlmProvider.Should().Be("OpenAI");
-        anthropicMetadata.LlmProvider.Should().Be("Anthropic");
+    openAiMetadata.LlmProvider.Should().Be(LlmProviders.OpenAI);
+    anthropicMetadata.LlmProvider.Should().Be(LlmProviders.Anthropic);
     }
 
     [Fact]
@@ -208,7 +209,7 @@ public sealed class MemoryEntryTests
         // Arrange & Act
         var metadata = new MemoryEntryMetadata
         {
-            LlmProvider = "OpenAI",
+            LlmProvider = LlmProviders.OpenAI,
             LlmModel = "gpt-4",
             TokensUsed = 1500,
             ProcessingDuration = TimeSpan.FromSeconds(3)
@@ -248,7 +249,7 @@ public sealed class MemoryEntryTests
     {
         return new MemoryEntryMetadata
         {
-            LlmProvider = "OpenAI",
+            LlmProvider = LlmProviders.OpenAI,
             LlmModel = "gpt-4",
             TokensUsed = 1500,
             ProcessingDuration = TimeSpan.FromSeconds(3.2)
@@ -260,7 +261,7 @@ public sealed class MemoryEntryTests
         return new MemoryEntry
         {
             EntryId = "today-10-01-2025-1",
-            Command = "today",
+            Command = CommandNames.Today,
             Timestamp = DateTimeOffset.UtcNow,
             EntryNumber = 1,
             UserInput = "Test input",

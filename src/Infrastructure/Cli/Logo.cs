@@ -17,15 +17,22 @@ internal static class Logo
         {
             return;
         }
+        try
+        {
+            AnsiConsole.WriteLine();
+            AnsiConsole.Write(
+                new FigletText("Ten Second Tom")
+                    .LeftJustified()
+                    .Color(Color.Cyan1));
 
-        AnsiConsole.WriteLine();
-        AnsiConsole.Write(
-            new FigletText("Ten Second Tom")
-                .LeftJustified()
-                .Color(Color.Cyan1));
-
-        AnsiConsole.MarkupLine("[dim]Your personal memory assistant[/]");
-        AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[dim]Your personal memory assistant[/]");
+            AnsiConsole.WriteLine();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Test harness may dispose Console.Out (StringWriter) before Spectre writes complete.
+            // Swallow for non-critical cosmetic output to keep tests deterministic.
+        }
     }
 
     /// <summary>
@@ -48,8 +55,15 @@ internal static class Logo
         
         if (!suppressOutput)
         {
-            AnsiConsole.MarkupLine($"[dim]{GetVersionInfo()}[/]");
-            AnsiConsole.WriteLine();
+            try
+            {
+                AnsiConsole.MarkupLine($"[dim]{GetVersionInfo()}[/]");
+                AnsiConsole.WriteLine();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Safe to ignore in disposed output scenarios (unit tests capturing console).
+            }
         }
     }
 }

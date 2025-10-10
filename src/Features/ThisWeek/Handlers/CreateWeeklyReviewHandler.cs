@@ -5,6 +5,7 @@ using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.ThisWeek.Handlers;
@@ -75,7 +76,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
 
         // 4. Retrieve daily entries from storage
         Result<IReadOnlyList<MemoryEntry>> entriesResult = await _storage.GetEntriesAsync(
-            "today",
+            CommandNames.Today,
             dateRange.StartDate.DateTime,
             dateRange.EndDate.DateTime,
             cancellationToken).ConfigureAwait(false);
@@ -109,7 +110,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
         string prompt = RenderPrompt(templateResult.Value, aggregatedContent, dateRange, entriesResult.Value.Count);
 
         // 8. Call LLM provider
-        string provider = request.LlmProviderOverride ?? "OpenAI";
+    string provider = request.LlmProviderOverride ?? LlmProviders.OpenAI;
         ILlmProvider llmProvider;
         try
         {
@@ -117,7 +118,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
         }
         catch (Exception ex)
         {
-            return Result<WeeklyEntry>.Failure($"Invalid LLM provider '{provider}': {ex.Message}");
+            return Result<WeeklyEntry>.Failure($"Invalid LLM provider '{provider}'. Use 'OpenAI' or 'Anthropic'. Error: {ex.Message}");
         }
 
         _logger.LogDebug("Calling LLM provider {Provider} for weekly review", provider);
@@ -168,8 +169,8 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
 
         WeeklyEntry weeklyEntry = new()
         {
-            EntryId = $"thisweek-{dateRange.StartDate:yyyy-MM-dd}-{entryNumber}",
-            Command = "thisweek",
+            EntryId = $"{CommandNames.ThisWeek}-{dateRange.StartDate:yyyy-MM-dd}-{entryNumber}",
+            Command = CommandNames.ThisWeek,
             Timestamp = DateTimeOffset.UtcNow,
             EntryNumber = entryNumber,
             UserInput = $"Weekly review for {dateRange.StartDate:yyyy-MM-dd} to {dateRange.EndDate:yyyy-MM-dd} ({entriesResult.Value.Count} daily entries)",
@@ -177,7 +178,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
             Metadata = new MemoryEntryMetadata
             {
                 LlmProvider = llmProvider.ProviderName,
-                LlmModel = provider == "OpenAI" ? "gpt-4" : "claude-3-sonnet-20240229",
+                LlmModel = provider == LlmProviders.OpenAI ? "gpt-4" : "claude-3-sonnet-20240229",
                 TokensUsed = completionResult.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length
             },
             Summary = summaryResult.Value
@@ -236,9 +237,10 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
         if (!string.IsNullOrWhiteSpace(request.LlmProviderOverride))
         {
             string provider = request.LlmProviderOverride.Trim();
-            if (provider != "OpenAI" && provider != "Anthropic")
+            if (!provider.Equals(LlmProviders.OpenAI, StringComparison.OrdinalIgnoreCase) &&
+                !provider.Equals(LlmProviders.Anthropic, StringComparison.OrdinalIgnoreCase))
             {
-                return Result<WeeklyEntry>.Failure($"Invalid LLM provider '{provider}'. Must be 'OpenAI' or 'Anthropic'");
+                return Result<WeeklyEntry>.Failure($"Invalid LLM provider '{provider}'. Must be 'OpenAI' or 'Anthropic'.");
             }
         }
 
@@ -294,7 +296,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
     private async Task<int> GetNextEntryNumber(DateRange dateRange, CancellationToken cancellationToken)
     {
         Result<int> countResult = await _storage.CountEntriesAsync(
-            "thisweek",
+            CommandNames.ThisWeek,
             dateRange.StartDate.DateTime,
             cancellationToken).ConfigureAwait(false);
 

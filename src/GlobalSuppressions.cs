@@ -11,6 +11,7 @@ using System.Runtime.CompilerServices;
 [assembly: SuppressMessage("Naming", "CA1716:Identifiers should not match keywords", Scope = "namespace", Target = "~N:TenSecondTom.Shared.Results", Justification = "Shared is a standard namespace pattern in .NET")]
 [assembly: SuppressMessage("Naming", "CA1716:Identifiers should not match keywords", Scope = "namespace", Target = "~N:TenSecondTom.Shared.Models", Justification = "Shared is a standard namespace pattern in .NET")]
 [assembly: SuppressMessage("Naming", "CA1716:Identifiers should not match keywords", Scope = "namespace", Target = "~N:TenSecondTom.Shared.OutputFormatters", Justification = "Shared is a standard namespace pattern in .NET")]
+[assembly: SuppressMessage("Naming", "CA1716:Identifiers should not match keywords", Scope = "namespace", Target = "~N:TenSecondTom.Shared.Constants", Justification = "Shared is a standard namespace pattern in .NET")] 
 
 // Public API - these types are designed to be public for CLI use
 [assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Shared.Models.MemoryEntry", Justification = "Public API for domain models")]
@@ -29,6 +30,10 @@ using System.Runtime.CompilerServices;
 
 // Output formatters
 [assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Shared.OutputFormatters.JsonOutputFormatter", Justification = "Public API for CLI JSON output")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Shared.Constants.CommandNames", Justification = "Public constants consumed by external CLI integrations/tests")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Shared.Constants.ConfigurationKeys", Justification = "Public constants for configuration keys referenced across features")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Shared.Constants.EnvironmentNames", Justification = "Public constants for environment names used in multiple assemblies")]
+[assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Shared.Constants.LlmProviders", Justification = "Public constants for provider identifiers used in plugins & tests")]
 
 // Infrastructure interfaces
 [assembly: SuppressMessage("Design", "CA1515:Consider making public types internal", Scope = "type", Target = "~T:TenSecondTom.Infrastructure.Prompts.IPromptTemplateLoader", Justification = "Public interface for DI registration")]

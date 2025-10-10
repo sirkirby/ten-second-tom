@@ -1,4 +1,5 @@
 using System.Globalization;
+using TenSecondTom.Shared.Constants;
 
 namespace TenSecondTom.Shared.Models;
 
@@ -15,7 +16,7 @@ public record MemoryEntry
     public required string EntryId { get; init; }
 
     /// <summary>
-    /// Gets the command that created this entry ("today" or "thisweek").
+    /// Gets the command that created this entry (see <see cref="CommandNames"/>).
     /// </summary>
     public required string Command { get; init; }
 
@@ -53,21 +54,23 @@ public record MemoryEntry
     {
         get
         {
-            if (Command == "today")
+            return Command switch
             {
-                return $".memory/today/{Timestamp:MM-dd-yyyy}_{EntryNumber}.md";
-            }
-            else // thisweek
-            {
-                var calendar = CultureInfo.InvariantCulture.Calendar;
-                var weekNumber = calendar.GetWeekOfYear(
-                    Timestamp.DateTime,
-                    CalendarWeekRule.FirstFourDayWeek,
-                    DayOfWeek.Monday);
-                
-                return $".memory/thisweek/{Timestamp.Year:0000}-{weekNumber:00}_{EntryNumber}.md";
-            }
+                CommandNames.Today => $".memory/{CommandNames.Today}/{Timestamp:MM-dd-yyyy}_{EntryNumber}.md",
+                CommandNames.ThisWeek => GetWeeklyPath(),
+                _ => throw new InvalidOperationException($"Unknown command: {Command}")
+            };
         }
+    }
+
+    private string GetWeeklyPath()
+    {
+        var calendar = CultureInfo.InvariantCulture.Calendar;
+        var weekNumber = calendar.GetWeekOfYear(
+            Timestamp.DateTime,
+            CalendarWeekRule.FirstFourDayWeek,
+            DayOfWeek.Monday);
+        return $".memory/{CommandNames.ThisWeek}/{Timestamp.Year:0000}-{weekNumber:00}_{EntryNumber}.md";
     }
 }
 
