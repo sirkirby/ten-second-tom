@@ -1,0 +1,207 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tensecondtom.dev/schemas/model-selection.schema.json",
+  "title": "Model Selection Schema",
+  "description": "JSON schema for model selection and configuration in Ten Second Tom",
+  "definitions": {
+    "LlmProvider": {
+      "type": "string",
+      "enum": ["OpenAI", "Anthropic"],
+      "description": "Supported LLM providers"
+    },
+    "CostTier": {
+      "type": "string",
+      "enum": ["Budget", "Balanced", "Premium"],
+      "description": "Cost tier categorization for models"
+    },
+    "SupportedModel": {
+      "type": "object",
+      "required": ["id", "displayName", "provider", "costTier", "description"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique model identifier used by provider API",
+          "minLength": 1,
+          "examples": ["gpt-4o-mini", "claude-3-5-haiku-20241022"]
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable model name for UI display",
+          "minLength": 1,
+          "examples": ["GPT-4o Mini", "Claude 3.5 Haiku"]
+        },
+        "provider": {
+          "$ref": "#/definitions/LlmProvider"
+        },
+        "costTier": {
+          "$ref": "#/definitions/CostTier"
+        },
+        "description": {
+          "type": "string",
+          "description": "Brief description of model capabilities",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "isDefault": {
+          "type": "boolean",
+          "description": "Whether this is the default model for its provider",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "ModelRegistry": {
+      "type": "object",
+      "required": ["openAIModels", "anthropicModels"],
+      "properties": {
+        "openAIModels": {
+          "type": "array",
+          "description": "List of supported OpenAI models",
+          "items": {
+            "$ref": "#/definitions/SupportedModel"
+          },
+          "minItems": 1
+        },
+        "anthropicModels": {
+          "type": "array",
+          "description": "List of supported Anthropic models",
+          "items": {
+            "$ref": "#/definitions/SupportedModel"
+          },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "LlmConfiguration": {
+      "type": "object",
+      "required": ["provider", "apiKey"],
+      "properties": {
+        "provider": {
+          "$ref": "#/definitions/LlmProvider"
+        },
+        "apiKey": {
+          "type": "string",
+          "description": "API key for the LLM provider",
+          "minLength": 1,
+          "pattern": "^(sk-|sk_live_|sk_test_|anthropic_).*"
+        },
+        "model": {
+          "type": "string",
+          "description": "Selected model identifier (must be valid for provider)",
+          "minLength": 1,
+          "examples": ["gpt-4o-mini", "claude-3-5-sonnet-20241022"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConfigCommand": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["Show", "Set", "Reset", "Validate"],
+          "description": "Action to perform on configuration"
+        },
+        "settingName": {
+          "type": "string",
+          "description": "Name of setting to modify",
+          "enum": [
+            "llm",
+            "llm-provider",
+            "llm-model",
+            "api-key",
+            "memory-directory",
+            "ssh-key-path",
+            "log-level",
+            "retention-days"
+          ]
+        },
+        "settingValue": {
+          "type": "string",
+          "description": "New value for the setting"
+        },
+        "showSecrets": {
+          "type": "boolean",
+          "description": "Whether to display last 4 characters of secrets",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "ModelSelectionRequest": {
+      "type": "object",
+      "required": ["provider"],
+      "properties": {
+        "provider": {
+          "$ref": "#/definitions/LlmProvider"
+        },
+        "currentModelId": {
+          "type": "string",
+          "description": "Currently configured model ID (for highlighting)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ModelSelectionResponse": {
+      "type": "object",
+      "required": ["selectedModel"],
+      "properties": {
+        "selectedModel": {
+          "$ref": "#/definitions/SupportedModel"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ModelValidationError": {
+      "type": "object",
+      "required": ["errorCode", "message", "validModels"],
+      "properties": {
+        "errorCode": {
+          "type": "string",
+          "enum": [
+            "MODEL_NOT_FOUND",
+            "INVALID_FOR_PROVIDER",
+            "MODEL_MISSING",
+            "PROVIDER_MISMATCH"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable error message"
+        },
+        "invalidModel": {
+          "type": "string",
+          "description": "The invalid model identifier"
+        },
+        "provider": {
+          "$ref": "#/definitions/LlmProvider"
+        },
+        "validModels": {
+          "type": "array",
+          "description": "List of valid models for the provider",
+          "items": {
+            "$ref": "#/definitions/SupportedModel"
+          }
+        },
+        "suggestedFix": {
+          "type": "string",
+          "description": "Suggested command to fix the error"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "properties": {
+    "modelRegistry": {
+      "$ref": "#/definitions/ModelRegistry"
+    },
+    "llmConfiguration": {
+      "$ref": "#/definitions/LlmConfiguration"
+    },
+    "configCommand": {
+      "$ref": "#/definitions/ConfigCommand"
+    }
+  }
+}
