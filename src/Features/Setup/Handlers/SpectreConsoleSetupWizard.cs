@@ -85,6 +85,58 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         return Task.FromResult<LlmProvider?>(provider);
     }
 
+    public Task<SupportedModel?> PromptForModelAsync(
+        LlmProvider provider,
+        string? currentModelId,
+        CancellationToken cancellationToken)
+    {
+        // Get models for the selected provider
+        var models = ModelRegistry.GetByProvider(provider);
+        
+        if (!models.Any())
+        {
+            ShowWarning($"No models found for {provider}");
+            return Task.FromResult<SupportedModel?>(null);
+        }
+
+        // Create choices with formatted display: "DisplayName (CostTier) - Description"
+        // Use parentheses instead of square brackets to avoid Spectre.Console markup parsing
+        var choices = models.Select(m => 
+            $"{m.DisplayName} ({m.CostTier}) - {m.Description}"
+        ).ToList();
+
+        var prompt = new SelectionPrompt<string>()
+            .Title($"Select a model for {provider}:")
+            .PageSize(10)
+            .AddChoices(choices);
+
+        // Highlight current model if one is configured
+        if (!string.IsNullOrEmpty(currentModelId))
+        {
+            var currentModel = ModelRegistry.GetById(currentModelId);
+            if (currentModel != null && currentModel.Provider == provider)
+            {
+                prompt.HighlightStyle(new Style(Color.Green));
+            }
+        }
+
+        var selected = _console.Prompt(prompt);
+        
+        // Find the model by matching the formatted choice back to the model
+        // Extract DisplayName from the choice (everything before the first '(')
+        var displayNameEnd = selected.IndexOf('(');
+        if (displayNameEnd > 0)
+        {
+            var displayName = selected[..displayNameEnd].Trim();
+            var model = models.FirstOrDefault(m => m.DisplayName == displayName);
+            return Task.FromResult(model);
+        }
+
+        // Fallback: shouldn't happen, but return first model if parsing fails
+        _logger.LogWarning("Failed to parse model selection: {Selection}", selected);
+        return Task.FromResult<SupportedModel?>(models[0]);
+    }
+
     public Task<string?> PromptForApiKeyAsync(
         LlmProvider provider,
         string? currentApiKey,

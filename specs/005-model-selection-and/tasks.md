@@ -23,8 +23,8 @@
 
 **Purpose**: Create model-related infrastructure shared by all user stories
 
-- [ ] T001 [P] Create `src/Shared/Constants/LlmConstants.cs` with cost tier constants and model identifiers
-- [ ] T002 [P] Create `src/Features/Setup/Models/SupportedModel.cs` record with Id, DisplayName, Provider, CostTier, Description, IsDefault properties
+- [X] T001 [P] Create `src/Shared/Constants/LlmConstants.cs` with cost tier constants and model identifiers
+- [X] T002 [P] Create `src/Features/Setup/Models/SupportedModel.cs` record with Id, DisplayName, Provider, CostTier, Description, IsDefault properties
 
 ---
 
@@ -34,14 +34,14 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T003 Create `src/Features/Setup/Models/ModelRegistry.cs` static class with OpenAIModels, AnthropicModels collections
-- [ ] T004 Populate `ModelRegistry` with 3-4 OpenAI models (gpt-4o, gpt-4o-mini, gpt-3.5-turbo) with metadata
-- [ ] T005 Populate `ModelRegistry` with 3-4 Anthropic models (claude-3-5-sonnet, claude-3-5-haiku, claude-3-opus) with metadata
-- [ ] T006 Add `GetDefault(LlmProvider)` method to `ModelRegistry` returning default model per provider
-- [ ] T007 Add `IsValid(string modelId, LlmProvider provider)` method to `ModelRegistry` for validation
-- [ ] T008 Add `GetById(string modelId)` method to `ModelRegistry` returning SupportedModel or null
-- [ ] T009 Add `GetByProvider(LlmProvider provider)` method to `ModelRegistry` returning filtered model list
-- [ ] T010 Create `src/Features/Setup/Validation/ModelValidator.cs` class using ModelRegistry for validation
+- [X] T003 Create `src/Features/Setup/Models/ModelRegistry.cs` static class with OpenAIModels, AnthropicModels collections
+- [X] T004 Populate `ModelRegistry` with 3-4 OpenAI models (gpt-4o, gpt-4o-mini, gpt-3.5-turbo) with metadata
+- [X] T005 Populate `ModelRegistry` with 3-4 Anthropic models (claude-3-5-sonnet, claude-3-5-haiku, claude-3-opus) with metadata
+- [X] T006 Add `GetDefault(LlmProvider)` method to `ModelRegistry` returning default model per provider
+- [X] T007 Add `IsValid(string modelId, LlmProvider provider)` method to `ModelRegistry` for validation
+- [X] T008 Add `GetById(string modelId)` method to `ModelRegistry` returning SupportedModel or null
+- [X] T009 Add `GetByProvider(LlmProvider provider)` method to `ModelRegistry` returning filtered model list
+- [X] T010 Create `src/Features/Setup/Validation/ModelValidator.cs` class using ModelRegistry for validation
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -57,26 +57,26 @@
 
 **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T011 [P] [US1] Unit test for `SupportedModel` record validation in `tests/TenSecondTom.Tests/Unit/Features/Setup/Models/SupportedModelTests.cs`
-- [ ] T012 [P] [US1] Unit tests for `ModelRegistry` static methods in `tests/TenSecondTom.Tests/Unit/Features/Setup/Models/ModelRegistryTests.cs`
-- [ ] T013 [P] [US1] Unit tests for `ModelValidator` validation logic in `tests/TenSecondTom.Tests/Unit/Features/Setup/Validation/ModelValidatorTests.cs`
-- [ ] T014 [P] [US1] Unit tests for `PromptForModelAsync` method in `tests/TenSecondTom.Tests/Unit/Features/Setup/Handlers/SpectreConsoleSetupWizardTests.cs`
-- [ ] T015 [US1] Integration test for end-to-end setup with model selection in `tests/TenSecondTom.IntegrationTests/Integration/Features/Setup/ModelSelectionFlowTests.cs`
+- [X] T011 [P] [US1] Unit test for `SupportedModel` record validation in `tests/TenSecondTom.Tests/Unit/Features/Setup/Models/SupportedModelTests.cs`
+- [X] T012 [P] [US1] Unit tests for `ModelRegistry` static methods in `tests/TenSecondTom.Tests/Unit/Features/Setup/Models/ModelRegistryTests.cs`
+- [X] T013 [P] [US1] Unit tests for `ModelValidator` validation logic in `tests/TenSecondTom.Tests/Unit/Features/Setup/Validation/ModelValidatorTests.cs`
+- [X] T014 [P] [US1] Unit tests for `PromptForModelAsync` method in `tests/TenSecondTom.Tests/Unit/Features/Setup/Handlers/SpectreConsoleSetupWizardTests.cs`
+- [X] T015 [US1] Integration test for end-to-end setup with model selection in `tests/TenSecondTom.IntegrationTests/Integration/Features/Setup/ModelSelectionFlowTests.cs`
 
 ### Implementation for User Story 1
 
-- [ ] T016 [US1] Add `PromptForModelAsync(LlmProvider, string? currentModelId, CancellationToken)` method to `src/Features/Setup/Handlers/SpectreConsoleSetupWizard.cs`
-- [ ] T017 [US1] Implement Spectre.Console SelectionPrompt for model selection with cost tier and description display in `SpectreConsoleSetupWizard.PromptForModelAsync`
-- [ ] T018 [US1] Integrate model selection into Step 3 (LLM Configuration) in `SpectreConsoleSetupWizard.RunAsync` after provider selection
-- [ ] T019 [US1] Update `SetupCommandHandler.Handle` to ensure model is passed to `UserSecretsStorageService.SaveAsync` in `src/Features/Setup/Handlers/SetupCommandHandler.cs`
-- [ ] T020 [US1] Verify `src/Infrastructure/Configuration/UserSecretsStorageService.cs` correctly saves Llm.Model to user secrets
-- [ ] T021 [US1] Verify `src/Infrastructure/Configuration/ConfigurationSettings.cs` LlmConfiguration.Model property binds from configuration hierarchy
-- [ ] T022 [US1] Add model validation to `src/Features/Setup/Validation/ConfigCommandValidator.cs` using ModelValidator
-- [ ] T023 [US1] Update `src/Infrastructure/Llm/LlmProviderFactory.cs` to pass configured model to provider constructors
-- [ ] T024 [US1] Update `src/Infrastructure/Llm/OpenAILlmProvider.cs` constructor to accept and use model parameter
-- [ ] T025 [US1] Update `src/Infrastructure/Llm/AnthropicLlmProvider.cs` constructor to accept and use model parameter
-- [ ] T026 [US1] Add default model fallback logic in `LlmProviderFactory.Create` using `ModelRegistry.GetDefault` when model is null/empty
-- [ ] T027 [US1] Add startup validation in `Program.cs` to validate configured model against ModelRegistry and fail with clear error if invalid
+- [X] T016 [US1] Add `PromptForModelAsync(LlmProvider, string? currentModelId, CancellationToken)` method to `src/Features/Setup/Handlers/SpectreConsoleSetupWizard.cs`
+- [X] T017 [US1] Implement Spectre.Console SelectionPrompt for model selection with cost tier and description display in `SpectreConsoleSetupWizard.PromptForModelAsync`
+- [X] T018 [US1] Integrate model selection into Step 3 (LLM Configuration) in `SpectreConsoleSetupWizard.RunAsync` after provider selection
+- [X] T019 [US1] Update `SetupCommandHandler.Handle` to ensure model is passed to `UserSecretsStorageService.SaveAsync` in `src/Features/Setup/Handlers/SetupCommandHandler.cs`
+- [X] T020 [US1] Verify `src/Infrastructure/Configuration/UserSecretsStorageService.cs` correctly saves Llm.Model to user secrets
+- [X] T021 [US1] Verify `src/Infrastructure/Configuration/ConfigurationSettings.cs` LlmConfiguration.Model property binds from configuration hierarchy
+- [X] T022 [US1] Add model validation to `src/Features/Setup/Validation/ConfigCommandValidator.cs` using ModelValidator
+- [X] T023 [US1] Update `src/Infrastructure/Llm/LlmProviderFactory.cs` to pass configured model to provider constructors
+- [X] T024 [US1] Update `src/Infrastructure/Llm/OpenAILlmProvider.cs` constructor to accept and use model parameter
+- [X] T025 [US1] Update `src/Infrastructure/Llm/AnthropicLlmProvider.cs` constructor to accept and use model parameter
+- [X] T026 [US1] Add default model fallback logic in `LlmProviderFactory.Create` using `ModelRegistry.GetDefault` when model is null/empty
+- [X] T027 [US1] Add startup validation in `Program.cs` to validate configured model against ModelRegistry and fail with clear error if invalid
 
 **Checkpoint**: At this point, User Story 1 should be fully functional - users can select models during setup and use them in AI operations
 

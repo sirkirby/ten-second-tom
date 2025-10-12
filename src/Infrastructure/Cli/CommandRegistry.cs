@@ -636,6 +636,17 @@ public static class CommandRegistry
         // LLM Configuration
         table.AddRow("LLM Provider", config.Llm.Provider.ToString());
         
+        // Model - show friendly name if available
+        string modelDisplay = "[dim]Not set[/]";
+        if (!string.IsNullOrEmpty(config.Llm.Model))
+        {
+            var model = ModelRegistry.GetById(config.Llm.Model);
+            modelDisplay = model != null 
+                ? $"{model.DisplayName} ({model.CostTier})"
+                : config.Llm.Model;
+        }
+        table.AddRow("Model", modelDisplay);
+        
         string apiKeyDisplay = showSecrets 
             ? config.Llm.ApiKey ?? "[dim]Not set[/]"
             : MaskApiKey(config.Llm.ApiKey);

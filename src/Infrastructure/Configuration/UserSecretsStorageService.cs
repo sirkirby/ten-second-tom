@@ -23,10 +23,17 @@ public sealed class UserSecretsStorageService : IConfigurationStorageService
         TypeInfoResolver = ConfigurationJsonContext.Default
     };
 
-    public UserSecretsStorageService(ILogger<UserSecretsStorageService> logger)
+    /// <summary>
+    /// Creates a new instance of UserSecretsStorageService.
+    /// </summary>
+    /// <param name="logger">Logger instance</param>
+    /// <param name="userSecretsId">Optional User Secrets ID. Defaults to "ten-second-tom-secrets"</param>
+    public UserSecretsStorageService(
+        ILogger<UserSecretsStorageService> logger,
+        string? userSecretsId = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _userSecretsId = "ten-second-tom-secrets";
+        _userSecretsId = userSecretsId ?? "ten-second-tom-secrets";
     }
 
     public async Task<Result<string>> SaveAsync(

@@ -101,6 +101,17 @@ internal static class Program
             // Commands like help, config, setup, version should always work without configuration
             bool isConfigured = ConfigurationChecker.IsConfigured(configuration, logger);
             
+            // Validate model configuration if configured
+            if (isConfigured && !ConfigurationChecker.ValidateModel(configuration, logger))
+            {
+                string? errorMessage = ConfigurationChecker.GetModelValidationError(configuration);
+                if (errorMessage != null)
+                {
+                    await Console.Error.WriteLineAsync(errorMessage).ConfigureAwait(false);
+                }
+                return 1; // Exit with error code
+            }
+            
             if (!isConfigured && args.Length == 0)
             {
                 // No arguments and not configured = first-run setup wizard

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,6 +26,45 @@ public sealed class UserSecretsPersistenceTests : IDisposable
         _testDirectory = new TemporaryTestDirectory();
         // Use a unique ID for each test instance to avoid interference
         _testUserSecretsId = $"TenSecondTom-Test-{Guid.NewGuid()}";
+    }
+
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Cleanup must not throw")]
+    public void Dispose()
+    {
+        // Clean up temporary test directory
+        _testDirectory.Dispose();
+        
+        // Clean up test UserSecrets directory
+        var userSecretsPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Microsoft",
+            "UserSecrets",
+            _testUserSecretsId);
+
+        if (Directory.Exists(userSecretsPath))
+        {
+            try
+            {
+                Directory.Delete(userSecretsPath, recursive: true);
+            }
+            catch (IOException)
+            {
+                // Retry after delay if directory is locked
+                Thread.Sleep(100);
+                try
+                {
+                    Directory.Delete(userSecretsPath, recursive: true);
+                }
+                catch
+                {
+                    // Ignore - cleanup script can handle orphaned directories
+                }
+            }
+            catch
+            {
+                // Ignore cleanup errors - don't fail tests because of cleanup
+            }
+        }
     }
 
     [Fact]
@@ -291,40 +331,13 @@ public sealed class UserSecretsPersistenceTests : IDisposable
             .AddConsole()
             .SetMinimumLevel(LogLevel.Warning));
 
-        // Add real User Secrets storage service (no mocking)
-        // Note: Using test-specific UserSecretsId to avoid conflicts
-        var configBuilder = new ConfigurationBuilder()
-            .AddUserSecrets(_testUserSecretsId);
-        
-        services.AddSingleton<IConfiguration>(configBuilder.Build());
-        services.AddSingleton<IConfigurationStorageService, UserSecretsStorageService>();
+        // Add real User Secrets storage service with test-specific ID
+        services.AddSingleton<IConfigurationStorageService>(sp =>
+        {
+            var logger = sp.GetRequiredService<ILogger<UserSecretsStorageService>>();
+            return new UserSecretsStorageService(logger, _testUserSecretsId);
+        });
 
         return services.BuildServiceProvider();
-    }
-
-    public void Dispose()
-    {
-        _testDirectory?.Dispose();
-        
-        // Cleanup: Remove test User Secrets if they exist
-        try
-        {
-            var userSecretsPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Microsoft", "UserSecrets", _testUserSecretsId);
-            
-            if (Directory.Exists(userSecretsPath))
-            {
-                Directory.Delete(userSecretsPath, recursive: true);
-            }
-        }
-        catch (IOException)
-        {
-            // Ignore cleanup errors
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // Ignore cleanup errors
-        }
     }
 }

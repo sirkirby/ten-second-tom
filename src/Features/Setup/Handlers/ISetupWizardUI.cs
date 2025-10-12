@@ -24,6 +24,18 @@ public interface ISetupWizardUI
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Prompts user to select a model for the given provider
+    /// </summary>
+    /// <param name="provider">The LLM provider to select a model for</param>
+    /// <param name="currentModelId">The currently configured model ID, if any</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The selected model, or null if cancelled</returns>
+    Task<SupportedModel?> PromptForModelAsync(
+        LlmProvider provider,
+        string? currentModelId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Prompts user to enter an API key (masked input)
     /// </summary>
     Task<string?> PromptForApiKeyAsync(

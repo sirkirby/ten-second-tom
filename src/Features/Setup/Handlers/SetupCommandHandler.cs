@@ -86,6 +86,22 @@ public sealed class SetupCommandHandler
                 return Result<ConfigurationSettings>.Failure("Setup cancelled: No LLM provider selected. Run 'tom setup' to try again.");
             }
 
+            // Step 2.5: Model Selection (new step)
+            _wizardUI.ShowStatus("Selecting model for the chosen provider...");
+            var selectedModel = await _wizardUI.PromptForModelAsync(
+                selectedProvider.Value,
+                command.ExistingConfiguration?.Llm.Model,
+                cancellationToken);
+
+            // If no model selected, use the default for the provider
+            string? modelId = selectedModel?.Id;
+            if (string.IsNullOrEmpty(modelId))
+            {
+                var defaultModel = ModelRegistry.GetDefault(selectedProvider.Value);
+                modelId = defaultModel.Id;
+                _wizardUI.ShowStatus($"Using default model: {defaultModel.DisplayName}");
+            }
+
             // Step 3: API Key Configuration
             _wizardUI.ShowStepHeader(3, 8, "API Key Configuration");
             var apiKey = await _wizardUI.PromptForApiKeyAsync(
@@ -147,7 +163,7 @@ public sealed class SetupCommandHandler
                 {
                     Provider = selectedProvider.Value,
                     ApiKey = apiKey,
-                    Model = null // Will be set by default based on provider
+                    Model = modelId // Set the selected or default model
                 },
                 Storage = new StorageConfiguration
                 {
