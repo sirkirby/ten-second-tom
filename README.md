@@ -118,18 +118,24 @@ Environment variable values take precedence over user secrets and `appsettings.j
 
 #### Supported Providers & Models
 
-| Provider   | Model ID                    | Display Name            | Cost Tier | Default | Description |
-|------------|-----------------------------|-------------------------|-----------|---------|-------------|
-| OpenAI     | `gpt-4o`                    | GPT‑4o                  | Premium   | ✅       | Flagship general reasoning model |
-| OpenAI     | `gpt-4o-mini`               | GPT‑4o Mini             | Standard  |         | Balanced quality vs. cost |
-| OpenAI     | `gpt-3.5-turbo`             | GPT‑3.5 Turbo           | Economy   |         | Legacy fast / inexpensive |
-| Anthropic  | `claude-3-5-sonnet`         | Claude 3.5 Sonnet       | Premium   | ✅       | Advanced reasoning & balanced speed |
-| Anthropic  | `claude-3-5-haiku`          | Claude 3.5 Haiku        | Standard  |         | Fast & cost-efficient |
-| Anthropic  | `claude-3-opus`             | Claude 3 Opus           | Premium   |         | High-complexity reasoning |
+| Provider   | Model ID                        | Display Name             | Cost Tier | Default | Description |
+|------------|----------------------------------|--------------------------|-----------|---------|-------------|
+| OpenAI     | `gpt-4o-mini`                   | GPT-4o Mini              | Budget    | ✅       | Fast, cost-effective model |
+| OpenAI     | `gpt-4o`                        | GPT-4o                   | Balanced  |         | High capability, reasonable cost |
+| OpenAI     | `chatgpt-4o-latest`             | ChatGPT-4o Latest        | Balanced  |         | Latest ChatGPT-4 Omni, continuously updated |
+| Anthropic  | `claude-3-haiku-20240307`       | Claude 3 Haiku           | Budget    | ✅       | Fast and cost-effective, version 3.0 |
+| Anthropic  | `claude-3-5-haiku-20241022`     | Claude 3.5 Haiku         | Budget    |         | Improved performance, version 3.5 |
+| Anthropic  | `claude-sonnet-4-20250514`      | Claude Sonnet 4          | Balanced  |         | Balanced capability, Claude 4.0 |
+| Anthropic  | `claude-sonnet-4-5-20250611`    | Claude Sonnet 4.5        | Balanced  |         | Enhanced version, Claude 4.5 |
+| Anthropic  | `claude-opus-4-20250514`        | Claude Opus 4            | Premium   |         | Highest capability, Claude 4.0 |
+| Anthropic  | `claude-opus-4-1-20250619`      | Claude Opus 4.1          | Premium   |         | Top-tier model, Claude 4.1 |
 
-Notes:
+**Notes:**
+
 - Default model (per provider) is used automatically if you leave the model blank during setup.
 - Validation occurs at startup; an invalid provider/model combination produces a clear error with valid suggestions.
+- Model IDs must match the configured provider (e.g., GPT models require OpenAI provider).
+- Deprecated models from previous versions are no longer supported - use `tom config llm` to select from current models.
 - Additional models may be added over time; run `tom config llm` to view the current curated list.
 
 #### Viewing Current Configuration

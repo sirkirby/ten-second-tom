@@ -19,7 +19,7 @@ public sealed class ConfigurationTests
 
         // Act
         string? memoryDirectory = configuration["TenSecondTom:MemoryDirectory"];
-        string? llmProvider = configuration["TenSecondTom:LlmProvider"];
+        string? llmProvider = configuration["TenSecondTom:Llm:Provider"];
 
         // Assert
         memoryDirectory.Should().NotBeNullOrEmpty("default memory directory should be configured");
@@ -72,23 +72,23 @@ public sealed class ConfigurationTests
     public void Configuration_CommandLineArgsOverrideEverything()
     {
         // Arrange - Simulate full configuration hierarchy
-        string[] args = ["--TenSecondTom:LlmProvider=OpenAI"];
+        string[] args = ["--TenSecondTom:Llm:Provider=OpenAI"];
         
         var configuration = new ConfigurationBuilder()
             .AddJsonFile("appsettings.json", optional: false)
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["TenSecondTom:LlmProvider"] = "OpenAI" // User secrets
+                ["TenSecondTom:Llm:Provider"] = "OpenAI" // User secrets
             })
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["TenSecondTom:LlmProvider"] = "Anthropic" // Environment variables
+                ["TenSecondTom:Llm:Provider"] = "Anthropic" // Environment variables
             })
             .AddCommandLine(args) // Command line
             .Build();
 
         // Act
-        string? provider = configuration["TenSecondTom:LlmProvider"];
+        string? provider = configuration["TenSecondTom:Llm:Provider"];
 
         // Assert
         provider.Should().Be("OpenAI", "command-line arguments should override everything");
@@ -107,7 +107,7 @@ public sealed class ConfigurationTests
 
         // Act
         string? memoryDirectory = configuration["TenSecondTom:MemoryDirectory"];
-        string? llmProvider = configuration["TenSecondTom:LlmProvider"];
+        string? llmProvider = configuration["TenSecondTom:Llm:Provider"];
 
         // Assert
         memoryDirectory.Should().BeNull("missing required settings should be null");
@@ -123,12 +123,12 @@ public sealed class ConfigurationTests
             .Build();
 
         // Act
-        string? model = configuration["TenSecondTom:OpenAI:Model"];
-        string? maxTokens = configuration["TenSecondTom:OpenAI:MaxTokens"];
+        string? maxTokens = configuration["TenSecondTom:Llm:MaxTokens"];
+        string? provider = configuration["TenSecondTom:Llm:Provider"];
 
         // Assert
-        model.Should().NotBeNullOrEmpty("OpenAI model should be configured");
-        maxTokens.Should().NotBeNullOrEmpty("OpenAI max tokens should be configured");
+        provider.Should().NotBeNullOrEmpty("LLM provider should be configured");
+        maxTokens.Should().NotBeNullOrEmpty("LLM max tokens should be configured");
         
         // Validate max tokens is a valid integer
         bool isValidInt = int.TryParse(maxTokens, out int tokens);
@@ -137,7 +137,7 @@ public sealed class ConfigurationTests
     }
 
     [Fact]
-    public void Configuration_LoadsAnthropicSettings()
+    public void Configuration_SupportsOptionalModelSetting()
     {
         // Arrange
         var configuration = new ConfigurationBuilder()
@@ -145,17 +145,14 @@ public sealed class ConfigurationTests
             .Build();
 
         // Act
-        string? model = configuration["TenSecondTom:Anthropic:Model"];
-        string? maxTokens = configuration["TenSecondTom:Anthropic:MaxTokens"];
+        string? model = configuration["TenSecondTom:Llm:Model"];
 
-        // Assert
-        model.Should().NotBeNullOrEmpty("Anthropic model should be configured");
-        maxTokens.Should().NotBeNullOrEmpty("Anthropic max tokens should be configured");
-        
-        // Validate max tokens is a valid integer
-        bool isValidInt = int.TryParse(maxTokens, out int tokens);
-        isValidInt.Should().BeTrue("max tokens should be a valid integer");
-        tokens.Should().BeGreaterThan(0, "max tokens should be positive");
+        // Assert - Model is optional and can be null (defaults will be used)
+        // If model is set, verify it's a non-empty string
+        if (!string.IsNullOrEmpty(model))
+        {
+            model.Should().NotBeNullOrWhiteSpace("if model is specified, it should not be whitespace");
+        }
     }
 
     [Fact]

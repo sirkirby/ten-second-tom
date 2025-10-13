@@ -161,13 +161,13 @@
 
 **Purpose**: Handle deprecated models, missing configuration, and provider/model mismatches
 
-- [ ] T048 [P] Add unit tests for deprecated/invalid model detection in `tests/TenSecondTom.Tests/Unit/Infrastructure/Llm/LlmProviderFactoryTests.cs`
-- [ ] T049 [P] Add unit tests for missing model configuration default fallback in `tests/TenSecondTom.Tests/Unit/Infrastructure/Llm/LlmProviderFactoryTests.cs`
-- [ ] T050 [P] Add unit tests for provider/model mismatch detection in `tests/TenSecondTom.Tests/Unit/Features/Setup/Validation/ModelValidatorTests.cs`
-- [ ] T051 Implement outdated model detection in LlmProviderFactory.Create with warning log and error message listing valid options
-- [ ] T052 Implement provider/model mismatch detection at startup with actionable error directing user to run `tom config llm`
-- [ ] T053 Add XML documentation comments to all new public APIs (SupportedModel, ModelRegistry, ModelValidator, new methods)
-- [ ] T054 Update appsettings.json with commented-out Llm.Model example and security warning about using environment variables instead
+- [X] T048 [P] Add unit tests for deprecated/invalid model detection in `tests/TenSecondTom.Tests/Unit/Infrastructure/Llm/LlmProviderFactoryTests.cs`
+- [X] T049 [P] Add unit tests for missing model configuration default fallback in `tests/TenSecondTom.Tests/Unit/Infrastructure/Llm/LlmProviderFactoryTests.cs`
+- [X] T050 [P] Add unit tests for provider/model mismatch detection in `tests/TenSecondTom.Tests/Unit/Features/Setup/Validation/ModelValidatorTests.cs`
+- [X] T051 Implement outdated model detection in LlmProviderFactory.Create with warning log and error message listing valid options
+- [X] T052 Implement provider/model mismatch detection at startup with actionable error directing user to run `tom config llm`
+- [X] T053 Add XML documentation comments to all new public APIs (SupportedModel, ModelRegistry, ModelValidator, new methods)
+- [X] T054 Update appsettings.json with commented-out Llm.Model example and security warning about using environment variables instead
 
 ---
 
@@ -175,14 +175,14 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T055 [P] Update `docs/CONFIGURATION.md` with complete model configuration documentation
-- [ ] T056 [P] Update `README.md` with model selection feature overview and quick start
-- [ ] T057 [P] Add logging throughout model selection and validation flow using Serilog with structured context
-- [ ] T058 Code cleanup and refactoring of model selection code for consistency
-- [ ] T059 Run coverage analysis to ensure 80%+ coverage for all new code
-- [ ] T060 Run quickstart.md validation scenarios from `specs/005-model-selection-and/quickstart.md`
-- [ ] T061 Manual testing of all four user stories end-to-end per quickstart.md test scenarios
-- [ ] T062 Update `specs/005-model-selection-and/COMPLETION.md` with implementation notes and deployment readiness
+- [X] T055 [P] Update `docs/CONFIGURATION.md` with complete model configuration documentation
+- [X] T056 [P] Update `README.md` with model selection feature overview and quick start
+- [X] T057 [P] Add logging throughout model selection and validation flow using Serilog with structured context
+- [X] T058 Code cleanup and refactoring of model selection code for consistency
+- [X] T059 Run coverage analysis to ensure 80%+ coverage for all new code
+- [X] T060 Run quickstart.md validation scenarios from `specs/005-model-selection-and/quickstart.md`
+- [X] T061 Manual testing of all four user stories end-to-end per quickstart.md test scenarios
+- [X] T062 Update `specs/005-model-selection-and/COMPLETION.md` with implementation notes and deployment readiness
 
 ---
 

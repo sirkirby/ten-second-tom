@@ -212,4 +212,64 @@ public sealed class ModelValidatorTests
         // Assert
         act.Should().Throw<InvalidOperationException>();
     }
+
+    [Fact]
+    public void Validate_WithDeprecatedOpenAIModel_ShouldReturnFailure()
+    {
+        // Arrange - Test with a deprecated OpenAI model
+        const string deprecatedModel = "gpt-3.5-turbo-0301";
+
+        // Act
+        var (isValid, errorMessage) = ModelValidator.Validate(deprecatedModel, LlmProvider.OpenAI);
+
+        // Assert
+        isValid.Should().BeFalse();
+        errorMessage.Should().Contain("not recognized");
+        errorMessage.Should().Contain("Valid models for OpenAI");
+    }
+
+    [Fact]
+    public void Validate_WithDeprecatedAnthropicModel_ShouldReturnFailure()
+    {
+        // Arrange - Test with a deprecated Anthropic model
+        const string deprecatedModel = "claude-2.1";
+
+        // Act
+        var (isValid, errorMessage) = ModelValidator.Validate(deprecatedModel, LlmProvider.Anthropic);
+
+        // Assert
+        isValid.Should().BeFalse();
+        errorMessage.Should().Contain("not recognized");
+        errorMessage.Should().Contain("Valid models for Anthropic");
+    }
+
+    [Fact]
+    public void Validate_WithProviderMismatch_ShouldSuggestConfigCommand()
+    {
+        // Arrange - OpenAI model with Anthropic provider
+        const string openAiModel = LlmConstants.OpenAIModels.Gpt4oMini;
+
+        // Act
+        var (isValid, errorMessage) = ModelValidator.Validate(openAiModel, LlmProvider.Anthropic);
+
+        // Assert
+        isValid.Should().BeFalse();
+        errorMessage.Should().Contain("tom config llm");
+    }
+
+    [Fact]
+    public void Validate_WithAnthropicModelForOpenAI_ShouldProvideActionableError()
+    {
+        // Arrange - Anthropic model with OpenAI provider
+        const string anthropicModel = LlmConstants.AnthropicModels.Claude35Haiku;
+
+        // Act
+        var (isValid, errorMessage) = ModelValidator.Validate(anthropicModel, LlmProvider.OpenAI);
+
+        // Assert
+        isValid.Should().BeFalse();
+        errorMessage.Should().Contain("belongs to Anthropic");
+        errorMessage.Should().Contain("provider is set to OpenAI");
+        errorMessage.Should().Contain("tom config llm");
+    }
 }

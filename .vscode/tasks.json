@@ -42,7 +42,8 @@
       "presentation": {
         "reveal": "always",
         "panel": "dedicated"
-      }
+      },
+      "isBackground": false
     }
   ]
 }
