@@ -1,0 +1,104 @@
+{
+    // Ten Second Tom debugging configurations.
+    // Modern .NET 9 CLI: we always launch the project (build on debug) and supply useful environment variables.
+    // DOTNET_ENVIRONMENT drives loading of appsettings.{Environment}.json via EnvironmentHelper.
+    // You can override LLM provider/model per configuration without changing persisted config.
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "TenSecondTom: Shell (Development)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/bin/Debug/net9.0/TenSecondTom.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src",
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development",
+                // Override or inject ephemeral LLM settings here for local testing (values intentionally blank)
+                "Llm__Provider": "",
+                "Llm__Model": "",
+                // Serilog minimum level override example (uncomment to increase verbosity)
+                // "Serilog__MinimumLevel__Default": "Debug"
+                // Add any secret values through .env or user secrets; never commit real secrets here.
+                "NO_COLOR": "1" // Ensures consistent, test-friendly output; remove if you prefer color.
+            },
+            "stopAtEntry": false
+        },
+        {
+            "name": "TenSecondTom: Run 'today' (Dev)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/bin/Debug/net9.0/TenSecondTom.dll",
+            "args": ["today"],
+            "cwd": "${workspaceFolder}/src",
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development",
+                "NO_COLOR": "1"
+            },
+            "stopAtEntry": false
+        },
+        {
+            "name": "TenSecondTom: Run 'this-week' (Verbose)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/bin/Debug/net9.0/TenSecondTom.dll",
+            "args": ["this-week", "--json"],
+            "cwd": "${workspaceFolder}/src",
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development",
+                "Serilog__MinimumLevel__Default": "Debug",
+                "Serilog__MinimumLevel__Override__Microsoft": "Warning",
+                "Serilog__MinimumLevel__Override__System": "Warning",
+                "NO_COLOR": "1"
+            },
+            "stopAtEntry": false
+        },
+        {
+            "name": "TenSecondTom: Setup Wizard (Force)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/bin/Debug/net9.0/TenSecondTom.dll",
+            "args": ["setup", "--force"],
+            "cwd": "${workspaceFolder}/src",
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development",
+                "NO_COLOR": "1"
+            },
+            "stopAtEntry": false
+        },
+        {
+            "name": "TenSecondTom: Production Simulation",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/bin/Debug/net9.0/TenSecondTom.dll",
+            "args": ["today"],
+            "cwd": "${workspaceFolder}/src",
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "env": {
+                "DOTNET_ENVIRONMENT": "Production"
+            },
+            "stopAtEntry": false
+        },
+        {
+            "name": "TenSecondTom: Attach (Running Process)",
+            "type": "coreclr",
+            "request": "attach",
+            "processId": "${command:pickProcess}",
+            "justMyCode": true
+        }
+    ]
+}
