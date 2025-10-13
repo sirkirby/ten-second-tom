@@ -207,6 +207,57 @@ tom config set llm-provider Anthropic
 # Valid values: OpenAI, Anthropic
 ```
 
+#### Configure LLM Model
+
+You can select or change the specific AI model used by Ten Second Tom:
+
+```bash
+# Interactive model selection (recommended)
+tom config llm
+# → Shows provider and model selection prompts with descriptions
+```
+
+**Via environment variables:**
+
+```bash
+# macOS/Linux
+export TenSecondTom__Llm__Model="gpt-4o-mini"
+export TenSecondTom__Llm__Model="claude-3-haiku-20240307"
+
+# Windows (PowerShell)
+$env:TenSecondTom__Llm__Model="gpt-4o-mini"
+$env:TenSecondTom__Llm__Model="claude-3-haiku-20240307"
+```
+
+**Supported models:**
+
+**OpenAI (Budget):**
+- `gpt-4o-mini` - Fast, cost-effective model optimized for speed and value (default)
+
+**OpenAI (Balanced):**
+- `gpt-4o` - GPT-4 Omni, high capability with reasonable cost
+- `chatgpt-4o-latest` - Latest ChatGPT-4 Omni, continuously updated
+
+**Anthropic (Budget):**
+- `claude-3-haiku-20240307` - Fast and cost-effective, version 3.0 (default)
+- `claude-3-5-haiku-20241022` - Improved version, better performance, version 3.5
+
+**Anthropic (Balanced):**
+- `claude-sonnet-4-20250514` - Balanced capability and cost, Claude 4.0 Sonnet
+- `claude-sonnet-4-5-20250611` - Enhanced version, Claude 4.5 Sonnet
+
+**Anthropic (Premium):**
+- `claude-opus-4-20250514` - Highest capability, premium cost, Claude 4.0 Opus
+- `claude-opus-4-1-20250619` - Top-tier model, Claude 4.1 Opus
+
+**Notes:**
+
+- If no model is specified, a default model for your provider is automatically used
+- Model validation occurs at startup - invalid models will trigger an error with suggestions
+- Model IDs must match the configured provider (e.g., GPT models require OpenAI provider)
+- Use `tom config llm` for an interactive selection with descriptions and cost tiers
+- Deprecated models from previous versions are no longer supported - the CLI will suggest alternatives
+
 #### Update API Key
 
 ```bash

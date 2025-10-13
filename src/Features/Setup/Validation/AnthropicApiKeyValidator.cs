@@ -9,7 +9,7 @@ namespace TenSecondTom.Features.Setup.Validation;
 
 /// <summary>
 /// Validates Anthropic API keys
-/// Format: ^sk-ant-[a-zA-Z0-9\-]{32,}$
+/// Format: ^sk-ant-[a-zA-Z0-9\-_]{32,}$
 /// Network: Minimal API call to verify key works
 /// </summary>
 public sealed partial class AnthropicApiKeyValidator : IApiKeyValidator
@@ -17,7 +17,7 @@ public sealed partial class AnthropicApiKeyValidator : IApiKeyValidator
     private readonly ILogger<AnthropicApiKeyValidator> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
 
-    [GeneratedRegex(@"^sk-ant-[a-zA-Z0-9\-]{32,}$", RegexOptions.Compiled)]
+    [GeneratedRegex(@"^sk-ant-[a-zA-Z0-9\-_]{32,}$", RegexOptions.Compiled)]
     private static partial Regex AnthropicKeyPattern();
 
     public AnthropicApiKeyValidator(
@@ -43,7 +43,7 @@ public sealed partial class AnthropicApiKeyValidator : IApiKeyValidator
         {
             _logger.LogWarning("Anthropic API key format validation failed");
             return Task.FromResult(ApiValidationResult.FormatFailure(
-                "Invalid Anthropic API key format. Expected format: sk-ant-[32+ alphanumeric/hyphen characters]"));
+                "Invalid Anthropic API key format. Expected format: sk-ant-[32+ alphanumeric/hyphen/underscore characters]"));
         }
 
         _logger.LogDebug("Anthropic API key format validation passed");

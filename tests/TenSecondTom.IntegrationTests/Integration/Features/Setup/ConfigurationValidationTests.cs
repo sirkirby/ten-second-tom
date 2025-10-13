@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -256,6 +257,14 @@ public sealed class ConfigurationValidationTests : IDisposable
         // Mock configuration storage
         var mockStorage = new Mock<IConfigurationStorageService>();
         services.AddSingleton(mockStorage.Object);
+        
+        // Add IConfiguration with empty configuration (no overrides)
+        var configBuilder = new ConfigurationBuilder();
+        services.AddSingleton<IConfiguration>(configBuilder.Build());
+        
+        // Mock ISetupWizardUI (required by ConfigCommandHandler)
+        var mockWizard = new Mock<ISetupWizardUI>();
+        services.AddSingleton(mockWizard.Object);
 
         // Mock API key validators (empty collection for now)
         services.AddSingleton<IEnumerable<IApiKeyValidator>>(

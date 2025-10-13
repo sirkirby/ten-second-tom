@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using TenSecondTom.Features.Setup.Commands;
@@ -18,6 +19,8 @@ namespace TenSecondTom.Tests.Unit.Features.Setup.Handlers;
 public sealed class ConfigCommandHandlerTests
 {
     private readonly Mock<IConfigurationStorageService> _mockStorageService;
+    private readonly Mock<IConfiguration> _mockConfiguration;
+    private readonly Mock<ISetupWizardUI> _mockSetupWizard;
     private readonly Mock<IApiKeyValidator> _mockOpenAIValidator;
     private readonly Mock<IApiKeyValidator> _mockAnthropicValidator;
     private readonly Mock<ILogger<ConfigCommandHandler>> _mockLogger;
@@ -26,6 +29,8 @@ public sealed class ConfigCommandHandlerTests
     public ConfigCommandHandlerTests()
     {
         _mockStorageService = new Mock<IConfigurationStorageService>();
+        _mockConfiguration = new Mock<IConfiguration>();
+        _mockSetupWizard = new Mock<ISetupWizardUI>();
         _mockOpenAIValidator = new Mock<IApiKeyValidator>();
         _mockAnthropicValidator = new Mock<IApiKeyValidator>();
         _mockLogger = new Mock<ILogger<ConfigCommandHandler>>();
@@ -33,9 +38,19 @@ public sealed class ConfigCommandHandlerTests
         _mockOpenAIValidator.Setup(v => v.Provider).Returns(LlmProvider.OpenAI);
         _mockAnthropicValidator.Setup(v => v.Provider).Returns(LlmProvider.Anthropic);
 
+        // Setup default configuration values
+        _mockConfiguration.Setup(c => c["Llm:Provider"]).Returns((string?)null);
+        _mockConfiguration.Setup(c => c["Llm:ApiKey"]).Returns((string?)null);
+        _mockConfiguration.Setup(c => c["Llm:Model"]).Returns((string?)null);
+
         var validators = new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object };
 
-        _handler = new ConfigCommandHandler(_mockStorageService.Object, validators, _mockLogger.Object);
+        _handler = new ConfigCommandHandler(
+            _mockStorageService.Object,
+            _mockConfiguration.Object,
+            _mockSetupWizard.Object,
+            validators, 
+            _mockLogger.Object);
     }
 
     #region Constructor Tests
@@ -46,6 +61,8 @@ public sealed class ConfigCommandHandlerTests
         // Arrange, Act & Assert
         var act = () => new ConfigCommandHandler(
             null!,
+            _mockConfiguration.Object,
+            _mockSetupWizard.Object,
             new[] { _mockOpenAIValidator.Object },
             _mockLogger.Object);
 
@@ -54,11 +71,28 @@ public sealed class ConfigCommandHandlerTests
     }
 
     [Fact]
+    public void Constructor_WithNullSetupWizard_ShouldThrowArgumentNullException()
+    {
+        // Arrange, Act & Assert
+        var act = () => new ConfigCommandHandler(
+            _mockStorageService.Object,
+            _mockConfiguration.Object,
+            null!,
+            new[] { _mockOpenAIValidator.Object },
+            _mockLogger.Object);
+
+        act.Should().Throw<ArgumentNullException>()
+            .WithParameterName("setupWizard");
+    }
+
+    [Fact]
     public void Constructor_WithNullValidators_ShouldThrowArgumentNullException()
     {
         // Arrange, Act & Assert
         var act = () => new ConfigCommandHandler(
             _mockStorageService.Object,
+            _mockConfiguration.Object,
+            _mockSetupWizard.Object,
             null!,
             _mockLogger.Object);
 
@@ -72,6 +106,8 @@ public sealed class ConfigCommandHandlerTests
         // Arrange, Act & Assert
         var act = () => new ConfigCommandHandler(
             _mockStorageService.Object,
+            _mockConfiguration.Object,
+            _mockSetupWizard.Object,
             new[] { _mockOpenAIValidator.Object },
             null!);
 
@@ -932,6 +968,79 @@ public sealed class ConfigCommandHandlerTests
                 null,
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
+    }
+
+    #endregion
+
+    #region Set Action Tests - LLM Interactive Configuration
+
+    [Fact]
+    public async Task HandleSet_WithLlmSettingName_ShouldTriggerInteractiveConfiguration()
+    {
+        // Arrange
+        var config = CreateValidConfiguration();
+        _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<ConfigurationSettings>.Success(config));
+
+        // Setup wizard to return null (cancel)
+        _mockSetupWizard.Setup(w => w.PromptForLlmProviderAsync(
+                It.IsAny<LlmProvider?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((LlmProvider?)null);
+
+        var command = new ConfigCommand
+        {
+            Action = ConfigAction.Set,
+            SettingName = "llm",
+            SettingValue = null // Interactive mode - no value provided
+        };
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("LLM configuration cancelled");
+        
+        // Verify wizard was called
+        _mockSetupWizard.Verify(w => w.PromptForLlmProviderAsync(
+            It.IsAny<LlmProvider?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task HandleSet_WithLlmSettingNameAndValue_ShouldStillUseInteractiveMode()
+    {
+        // Arrange
+        var config = CreateValidConfiguration();
+        _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<ConfigurationSettings>.Success(config));
+
+        // Setup wizard to return null (cancel)
+        _mockSetupWizard.Setup(w => w.PromptForLlmProviderAsync(
+                It.IsAny<LlmProvider?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((LlmProvider?)null);
+
+        var command = new ConfigCommand
+        {
+            Action = ConfigAction.Set,
+            SettingName = "llm",
+            SettingValue = "some-value" // Value is ignored for llm setting
+        };
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        // LLM configuration uses interactive mode regardless of value
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("LLM configuration cancelled");
+        
+        // Verify wizard was called even though value was provided
+        _mockSetupWizard.Verify(w => w.PromptForLlmProviderAsync(
+            It.IsAny<LlmProvider?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion

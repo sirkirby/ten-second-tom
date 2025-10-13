@@ -34,4 +34,9 @@ public static class ConfigurationKeys
     /// Configuration section root for TenSecondTom specific settings.
     /// </summary>
     public const string Root = "TenSecondTom";
+
+    /// <summary>
+    /// Configuration key for the memory storage directory.
+    /// </summary>
+    public const string UserSecretsId = "ten-second-tom-secrets";
 }

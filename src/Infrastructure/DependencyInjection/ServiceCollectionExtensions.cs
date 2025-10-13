@@ -134,9 +134,13 @@ public static class ServiceCollectionExtensions
             var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger<OpenAILlmProvider>();
             
-            string model = configuration["Llm:Model"] ?? 
-                          configuration["TenSecondTom:OpenAI:Model"] ?? 
-                          "gpt-4o";
+            // Get configured model or use default from ModelRegistry
+            string? configuredModel = configuration["Llm:Model"];
+            string model = !string.IsNullOrWhiteSpace(configuredModel)
+                ? configuredModel
+                : TenSecondTom.Features.Setup.Models.ModelRegistry.GetDefault(
+                    TenSecondTom.Features.Setup.Models.LlmProvider.OpenAI).Id;
+            
             return new OpenAILlmProvider(chatClient, logger, model);
         });
 
@@ -147,9 +151,13 @@ public static class ServiceCollectionExtensions
             var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger<AnthropicLlmProvider>();
             
-            string model = configuration["Llm:Model"] ?? 
-                          configuration["TenSecondTom:Anthropic:Model"] ?? 
-                          "claude-3-5-sonnet-20241022";
+            // Get configured model or use default from ModelRegistry
+            string? configuredModel = configuration["Llm:Model"];
+            string model = !string.IsNullOrWhiteSpace(configuredModel)
+                ? configuredModel
+                : TenSecondTom.Features.Setup.Models.ModelRegistry.GetDefault(
+                    TenSecondTom.Features.Setup.Models.LlmProvider.Anthropic).Id;
+            
             return new AnthropicLlmProvider(client, logger, model);
         });
 

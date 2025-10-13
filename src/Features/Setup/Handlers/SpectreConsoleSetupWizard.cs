@@ -85,6 +85,65 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         return Task.FromResult<LlmProvider?>(provider);
     }
 
+    public Task<SupportedModel?> PromptForModelAsync(
+        LlmProvider provider,
+        string? currentModelId,
+        CancellationToken cancellationToken)
+    {
+        // Get models for the selected provider
+        var models = ModelRegistry.GetByProvider(provider);
+        
+        if (!models.Any())
+        {
+            ShowWarning($"No models found for {provider}");
+            return Task.FromResult<SupportedModel?>(null);
+        }
+
+    // Create choices with formatted display: "DisplayName [CostTier] - Description"
+    // Using square brackets now that we ensure escaping of markup-sensitive content.
+    // Dictionary maps the formatted choice back to the model instance.
+        var choiceToModel = new Dictionary<string, SupportedModel>();
+        var choices = new List<string>();
+        
+        foreach (var model in models)
+        {
+            // Escape any markup in description/display name to avoid Spectre parsing issues
+            var displayName = model.DisplayName.EscapeMarkup();
+            var costTier = model.CostTier.EscapeMarkup();
+            var description = model.Description.EscapeMarkup();
+            var choice = $"{displayName} [{costTier}] - {description}";
+            choices.Add(choice);
+            choiceToModel[choice] = model;
+        }
+
+        var prompt = new SelectionPrompt<string>()
+            .Title($"Select a model for {provider}:")
+            .PageSize(10)
+            .AddChoices(choices);
+
+        // Highlight current model if one is configured
+        if (!string.IsNullOrEmpty(currentModelId))
+        {
+            var currentModel = ModelRegistry.GetById(currentModelId);
+            if (currentModel != null && currentModel.Provider == provider)
+            {
+                prompt.HighlightStyle(new Style(Color.Green));
+            }
+        }
+
+        var selected = _console.Prompt(prompt);
+        
+        // Find the model using the dictionary mapping
+        if (choiceToModel.TryGetValue(selected, out var selectedModel))
+        {
+            return Task.FromResult<SupportedModel?>(selectedModel);
+        }
+
+        // Fallback: shouldn't happen, but log and return null if mapping fails
+        _logger.LogError("Failed to map model selection to model object: {Selection}", selected);
+        return Task.FromResult<SupportedModel?>(null);
+    }
+
     public Task<string?> PromptForApiKeyAsync(
         LlmProvider provider,
         string? currentApiKey,
@@ -226,17 +285,17 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
 
     public void ShowSuccess(string message)
     {
-        _console.MarkupLine($"[green]✓ {message}[/]");
+        _console.MarkupLine($"[green]✓ {message.EscapeMarkup()}[/]");
     }
 
     public void ShowError(string message)
     {
-        _console.MarkupLine($"[red]✗ {message}[/]");
+        _console.MarkupLine($"[red]✗ {message.EscapeMarkup()}[/]");
     }
 
     public void ShowWarning(string message)
     {
-        _console.MarkupLine($"[yellow]⚠️  {message}[/]");
+        _console.MarkupLine($"[yellow]⚠️  {message.EscapeMarkup()}[/]");
     }
 
     private static string MaskApiKey(string? apiKey)

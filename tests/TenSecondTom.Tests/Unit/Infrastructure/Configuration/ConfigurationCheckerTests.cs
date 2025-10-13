@@ -457,6 +457,278 @@ public sealed class ConfigurationCheckerTests
 
     #endregion
 
+    #region Model Validation Tests
+
+    [Fact]
+    public void ValidateModel_WithValidOpenAIModel_ReturnsTrue()
+    {
+        // Arrange
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Llm:Provider"] = "OpenAI",
+            ["Llm:Model"] = "gpt-4o-mini-2024-07-18"
+        });
+
+        // Act
+        var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
+
+        // Assert
+        result.Should().BeTrue("gpt-4o-mini-2024-07-18 is a valid OpenAI model");
+    }
+
+    [Fact]
+    public void ValidateModel_WithValidAnthropicModel_ReturnsTrue()
+    {
+        // Arrange
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Llm:Provider"] = "Anthropic",
+            ["Llm:Model"] = "claude-3-5-haiku-20241022"
+        });
+
+        // Act
+        var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
+
+        // Assert
+        result.Should().BeTrue("claude-3-5-haiku-20241022 is a valid Anthropic model");
+    }
+
+    [Fact]
+    public void ValidateModel_WithInvalidModelForProvider_ReturnsFalse()
+    {
+        // Arrange
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Llm:Provider"] = "OpenAI",
+            ["Llm:Model"] = "claude-3-5-haiku-20241022" // Anthropic model with OpenAI provider
+        });
+
+        // Act
+        var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
+
+        // Assert
+        result.Should().BeFalse("claude model should not be valid for OpenAI provider");
+        VerifyLogContains(LogLevel.Error, "Invalid model 'claude-3-5-haiku-20241022' configured for provider OpenAI");
+    }
+
+    [Fact]
+    public void ValidateModel_WithNoModelConfigured_ReturnsTrue()
+    {
+        // Arrange
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Llm:Provider"] = "OpenAI"
+            // No model configured
+        });
+
+        // Act
+        var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
+
+        // Assert
+        result.Should().BeTrue("validation should pass when no model is configured");
+    }
+
+    [Fact]
+    public void ValidateModel_WithNoProviderConfigured_ReturnsTrue()
+    {
+        // Arrange
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Llm:Model"] = "gpt-4o-mini"
+            // No provider configured
+        });
+
+        // Act
+        var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
+
+        // Assert
+        result.Should().BeTrue("validation should pass when no provider is configured");
+    }
+
+    [Fact]
+    public void ValidateModel_WithInvalidProvider_ReturnsFalse()
+    {
+        // Arrange
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Llm:Provider"] = "InvalidProvider",
+            ["Llm:Model"] = "some-model"
+        });
+
+        // Act
+        var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
+
+        // Assert
+        result.Should().BeFalse("invalid provider should fail validation");
+        VerifyLogContains(LogLevel.Error, "Invalid LLM provider configured");
+    }
+
+    [Fact]
+    public void ValidateModel_WithNonExistentModel_ReturnsFalse()
+    {
+        // Arrange
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Llm:Provider"] = "OpenAI",
+            ["Llm:Model"] = "gpt-999-nonexistent"
+        });
+
+        // Act
+        var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
+
+        // Assert
+        result.Should().BeFalse("non-existent model should fail validation");
+    }
+
+    [Fact]
+    public void ValidateModel_WithEmptyModel_ReturnsTrue()
+    {
+        // Arrange
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Llm:Provider"] = "OpenAI",
+            ["Llm:Model"] = ""
+        });
+
+        // Act
+        var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
+
+        // Assert
+        result.Should().BeTrue("empty model should be treated as not configured");
+    }
+
+    [Fact]
+    public void ValidateModel_WithWhitespaceModel_ReturnsTrue()
+    {
+        // Arrange
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Llm:Provider"] = "OpenAI",
+            ["Llm:Model"] = "   "
+        });
+
+        // Act
+        var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
+
+        // Assert
+        result.Should().BeTrue("whitespace model should be treated as not configured");
+    }
+
+    #endregion
+
+    #region GetModelValidationError Tests
+
+    [Fact]
+    public void GetModelValidationError_WithValidModel_ReturnsNull()
+    {
+        // Arrange
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Llm:Provider"] = "OpenAI",
+            ["Llm:Model"] = "gpt-4o-mini-2024-07-18"
+        });
+
+        // Act
+        var result = ConfigurationChecker.GetModelValidationError(configuration);
+
+        // Assert
+        result.Should().BeNull("valid model should not return an error message");
+    }
+
+    [Fact]
+    public void GetModelValidationError_WithInvalidModel_ReturnsErrorMessage()
+    {
+        // Arrange
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Llm:Provider"] = "OpenAI",
+            ["Llm:Model"] = "claude-3-5-haiku-20241022" // Anthropic model
+        });
+
+        // Act
+        var result = ConfigurationChecker.GetModelValidationError(configuration);
+
+        // Assert
+        result.Should().NotBeNullOrEmpty("invalid model should return an error message");
+        result.Should().Contain("not valid for provider OpenAI");
+        result.Should().Contain("Valid models for OpenAI:");
+        result.Should().Contain("tom setup");
+    }
+
+    [Fact]
+    public void GetModelValidationError_WithNoModel_ReturnsNull()
+    {
+        // Arrange
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Llm:Provider"] = "OpenAI"
+            // No model configured
+        });
+
+        // Act
+        var result = ConfigurationChecker.GetModelValidationError(configuration);
+
+        // Assert
+        result.Should().BeNull("no model configured should not return an error");
+    }
+
+    [Fact]
+    public void GetModelValidationError_WithNoProvider_ReturnsNull()
+    {
+        // Arrange
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Llm:Model"] = "gpt-4o-mini"
+            // No provider configured
+        });
+
+        // Act
+        var result = ConfigurationChecker.GetModelValidationError(configuration);
+
+        // Assert
+        result.Should().BeNull("no provider configured should not return an error");
+    }
+
+    [Fact]
+    public void GetModelValidationError_WithInvalidProvider_ReturnsErrorMessage()
+    {
+        // Arrange
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Llm:Provider"] = "InvalidProvider",
+            ["Llm:Model"] = "some-model"
+        });
+
+        // Act
+        var result = ConfigurationChecker.GetModelValidationError(configuration);
+
+        // Assert
+        result.Should().NotBeNullOrEmpty("invalid provider should return an error message");
+        result.Should().Contain("Invalid LLM provider configured");
+    }
+
+    [Fact]
+    public void GetModelValidationError_MessageContainsAllValidModels()
+    {
+        // Arrange
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Llm:Provider"] = "OpenAI",
+            ["Llm:Model"] = "invalid-model"
+        });
+
+        // Act
+        var result = ConfigurationChecker.GetModelValidationError(configuration);
+
+        // Assert
+        result.Should().NotBeNullOrEmpty();
+        result.Should().Contain("gpt-4o-mini-2024-07-18");
+        result.Should().Contain("gpt-4o-2024-11-20");
+        result.Should().Contain("chatgpt-4o-latest");
+    }
+
+    #endregion
+
     #region Helper Methods
 
     private static IConfiguration BuildConfiguration(Dictionary<string, string?> values)

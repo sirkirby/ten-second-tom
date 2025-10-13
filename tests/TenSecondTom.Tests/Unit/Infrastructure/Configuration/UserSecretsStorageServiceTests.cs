@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -10,14 +11,55 @@ namespace TenSecondTom.Tests.Unit.Infrastructure.Configuration;
 /// <summary>
 /// Unit tests for UserSecretsStorageService
 /// Tests User Secrets write/read, fallback to appsettings.json, and error handling
+/// Note: These are actually integration tests as they perform real I/O operations.
+/// Each test uses a unique User Secrets ID to avoid polluting production configuration.
 /// </summary>
-public sealed class UserSecretsStorageServiceTests
+public sealed class UserSecretsStorageServiceTests : IDisposable
 {
     private readonly Mock<ILogger<UserSecretsStorageService>> _loggerMock;
+    private readonly string _testUserSecretsId;
 
     public UserSecretsStorageServiceTests()
     {
         _loggerMock = new Mock<ILogger<UserSecretsStorageService>>();
+        // Use a unique ID for each test instance to avoid polluting production UserSecrets
+        _testUserSecretsId = $"TenSecondTom-Test-{Guid.NewGuid()}";
+    }
+
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Cleanup must not throw")]
+    public void Dispose()
+    {
+        // Clean up test UserSecrets directory
+        var userSecretsPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Microsoft",
+            "UserSecrets",
+            _testUserSecretsId);
+
+        if (Directory.Exists(userSecretsPath))
+        {
+            try
+            {
+                Directory.Delete(userSecretsPath, recursive: true);
+            }
+            catch (IOException)
+            {
+                // Retry after delay if directory is locked
+                Thread.Sleep(100);
+                try
+                {
+                    Directory.Delete(userSecretsPath, recursive: true);
+                }
+                catch
+                {
+                    // Ignore - cleanup script can handle orphaned directories
+                }
+            }
+            catch
+            {
+                // Ignore cleanup errors - don't fail tests because of cleanup
+            }
+        }
     }
 
     [Fact]
@@ -35,7 +77,7 @@ public sealed class UserSecretsStorageServiceTests
     public async Task SaveAsync_WithValidSettings_SavesSuccessfully()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
         var settings = CreateValidConfigurationSettings();
 
         // Act
@@ -51,7 +93,7 @@ public sealed class UserSecretsStorageServiceTests
     public async Task SaveAsync_WithCancellationToken_RespectsCancellation()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
         var settings = CreateValidConfigurationSettings();
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
@@ -76,7 +118,7 @@ public sealed class UserSecretsStorageServiceTests
     public async Task LoadAsync_AfterSave_ReturnsConfigurationSettings()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
         var originalSettings = CreateValidConfigurationSettings();
 
         // Save first
@@ -99,7 +141,7 @@ public sealed class UserSecretsStorageServiceTests
     public async Task LoadAsync_WithNoConfiguration_ReturnsFailure()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
 
         // Note: This test assumes a clean state where no configuration exists
         // In practice, if configuration exists from previous tests, this may succeed
@@ -119,7 +161,7 @@ public sealed class UserSecretsStorageServiceTests
     public async Task SaveAsync_WithNullSettings_ReturnsFailure()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
 
         // Act
         var act = async () => await service.SaveAsync(null!, CancellationToken.None);
@@ -132,7 +174,7 @@ public sealed class UserSecretsStorageServiceTests
     public async Task SaveAsync_LogsStorageLocation()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
         var settings = CreateValidConfigurationSettings();
 
         // Act
@@ -157,7 +199,7 @@ public sealed class UserSecretsStorageServiceTests
     public async Task SaveAsync_WithComplexConfiguration_PreservesAllFields()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
         var settings = new ConfigurationSettings
         {
             Ssh = new SshConfiguration
@@ -207,7 +249,7 @@ public sealed class UserSecretsStorageServiceTests
     public async Task LoadAsync_WithCancellationToken_RespectsCancellation()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
@@ -229,7 +271,7 @@ public sealed class UserSecretsStorageServiceTests
     public async Task SaveAsync_CreatesDirectoryIfNotExists()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
         var settings = CreateValidConfigurationSettings();
 
         // Act
@@ -252,7 +294,7 @@ public sealed class UserSecretsStorageServiceTests
     public async Task GetStorageLocation_AfterSave_ReturnsUserSecretsPath()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
         var settings = CreateValidConfigurationSettings();
 
         // Act
@@ -270,7 +312,7 @@ public sealed class UserSecretsStorageServiceTests
     public void GetStorageLocation_BeforeSave_ReturnsDefaultPath()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
 
         // Act
         var location = service.GetStorageLocation();
@@ -285,7 +327,7 @@ public sealed class UserSecretsStorageServiceTests
     public async Task LoadAsync_WithPartialConfiguration_ReturnsDefaults()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
         
         // Save a minimal configuration with only required fields
         var minimalSettings = new ConfigurationSettings
@@ -329,7 +371,7 @@ public sealed class UserSecretsStorageServiceTests
     public async Task SaveAsync_WithNullOptionalFields_HandlesGracefully()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
         var settings = new ConfigurationSettings
         {
             Ssh = new SshConfiguration
@@ -373,7 +415,7 @@ public sealed class UserSecretsStorageServiceTests
     public async Task SaveAsync_WithDifferentProviders_PreservesProviderChoice()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
 
         // Test OpenAI
         var openAiSettings = CreateValidConfigurationSettings() with
@@ -408,7 +450,7 @@ public sealed class UserSecretsStorageServiceTests
     public async Task SaveAsync_WithDifferentSshKeySources_PreservesSource()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
 
         // Test each SSH key source
         var sources = new[]
@@ -444,7 +486,7 @@ public sealed class UserSecretsStorageServiceTests
     public async Task SaveAsync_WithTimestamps_PreservesTimestamps()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
         var createdAt = DateTime.UtcNow.AddDays(-7);
         var modifiedAt = DateTime.UtcNow;
         
@@ -472,7 +514,7 @@ public sealed class UserSecretsStorageServiceTests
     public async Task SaveAsync_WithUnlimitedRetention_PreservesNegativeValue()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
         var settings = CreateValidConfigurationSettings() with
         {
             Optional = new OptionalConfiguration
@@ -499,7 +541,7 @@ public sealed class UserSecretsStorageServiceTests
         // warning logging behavior is set up correctly.
         
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
         var settings = CreateValidConfigurationSettings();
 
         // Act
@@ -521,7 +563,7 @@ public sealed class UserSecretsStorageServiceTests
     public async Task LoadAsync_WithCorruptedData_ReturnsFailure()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
         
         // Write corrupted JSON directly to User Secrets path
         var location = service.GetStorageLocation();
@@ -550,7 +592,7 @@ public sealed class UserSecretsStorageServiceTests
     public async Task SaveAsync_MultipleTimesSequentially_UpdatesConfiguration()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object);
+        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
         
         var settings1 = CreateValidConfigurationSettings() with
         {

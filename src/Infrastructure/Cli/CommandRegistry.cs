@@ -445,7 +445,7 @@ public static class CommandRegistry
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[red]✗[/] Setup failed: {result.Error}");
+                    AnsiConsole.MarkupLine($"[red]✗[/] Setup failed: {result.Error.EscapeMarkup()}");
                 }
                 return 1;
             }
@@ -504,13 +504,13 @@ public static class CommandRegistry
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error}");
+                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error.EscapeMarkup()}");
                 }
                 return 1;
             }
         });
 
-        // Set subcommand
+        // LLM subcommand - interactive configuration for LLM provider and model
         var setCommand = new Command("set", "Update a configuration setting");
         var settingNameArg = new Argument<string>("setting")
         {
@@ -563,13 +563,62 @@ public static class CommandRegistry
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error}");
+                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error.EscapeMarkup()}");
                 }
                 return 1;
             }
         });
 
-        // Validate subcommand
+        // LLM subcommand - interactive configuration for LLM provider and model
+        var llmCommand = new Command("llm", "Configure LLM provider and model interactively");
+        llmCommand.Options.Add(jsonOutputOption);
+
+        llmCommand.SetAction(async (parseResult) =>
+        {
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
+
+            var handler = serviceProvider.GetRequiredService<ConfigCommandHandler>();
+            
+            var command = new ConfigCommand
+            {
+                Action = ConfigAction.Set,
+                SettingName = "llm",
+                SettingValue = null,
+                ShowSecrets = false
+            };
+
+            var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
+
+            if (result.IsSuccess)
+            {
+                if (jsonOutput)
+                {
+                    var config = result.Value!;
+                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new 
+                    { 
+                        success = true, 
+                        provider = config.Llm.Provider.ToString(),
+                        model = config.Llm.Model
+                    }));
+                }
+                // Success message already displayed by handler
+                return 0;
+            }
+            else
+            {
+                if (jsonOutput)
+                {
+                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { success = false, error = result.Error }));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error.EscapeMarkup()}");
+                }
+                return 1;
+            }
+        });
+
+        // Reset subcommand
         var validateCommand = new Command("validate", "Validate current configuration");
         validateCommand.Options.Add(jsonOutputOption);
 
@@ -617,6 +666,7 @@ public static class CommandRegistry
 
         configCommand.Subcommands.Add(showCommand);
         configCommand.Subcommands.Add(setCommand);
+        configCommand.Subcommands.Add(llmCommand);
         configCommand.Subcommands.Add(validateCommand);
 
         return configCommand;
@@ -630,11 +680,22 @@ public static class CommandRegistry
             .AddColumn("[yellow]Value[/]");
 
         // SSH Configuration
-        table.AddRow("SSH Key Path", config.Ssh.KeyPath ?? "[dim]Not set[/]");
+        table.AddRow("SSH Key Path", config.Ssh.KeyPath?.EscapeMarkup() ?? "[dim]Not set[/]");
         table.AddRow("SSH Key Source", config.Ssh.KeySource?.ToString() ?? "[dim]Not set[/]");
 
         // LLM Configuration
         table.AddRow("LLM Provider", config.Llm.Provider.ToString());
+        
+        // Model - show friendly name if available
+        string modelDisplay = "[dim]Not set[/]";
+        if (!string.IsNullOrEmpty(config.Llm.Model))
+        {
+            var model = ModelRegistry.GetById(config.Llm.Model);
+            modelDisplay = model != null 
+                ? $"{model.DisplayName.EscapeMarkup()} ({model.CostTier})"
+                : config.Llm.Model.EscapeMarkup();
+        }
+        table.AddRow("Model", modelDisplay);
         
         string apiKeyDisplay = showSecrets 
             ? config.Llm.ApiKey ?? "[dim]Not set[/]"
@@ -642,7 +703,7 @@ public static class CommandRegistry
         table.AddRow("API Key", apiKeyDisplay);
 
         // Storage Configuration
-        table.AddRow("Memory Directory", config.Storage.MemoryDirectory ?? "[dim]Not set[/]");
+        table.AddRow("Memory Directory", config.Storage.MemoryDirectory?.EscapeMarkup() ?? "[dim]Not set[/]");
 
         // Optional Configuration
         table.AddRow("Log Level", config.Optional.LogLevel.ToString());

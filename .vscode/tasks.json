@@ -1,0 +1,49 @@
+{
+  // VS Code task definitions for Ten Second Tom (.NET 9 CLI)
+  // Provides an explicit 'build' task referenced by launch.json.
+  // Additional tasks (test, publish) can be added later.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "TenSecondTom.sln",
+        "-c",
+        "Debug",
+        "/nologo",
+        "/clp:NoSummary;ErrorsOnly;WarningsOnly"
+      ],
+      "problemMatcher": ["$msCompile"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "test",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "test",
+        "TenSecondTom.sln",
+        "-c",
+        "Debug",
+        "--no-build",
+        "--nologo"
+      ],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "isBackground": false
+    }
+  ]
+}

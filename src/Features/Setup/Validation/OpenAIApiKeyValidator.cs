@@ -9,15 +9,18 @@ namespace TenSecondTom.Features.Setup.Validation;
 
 /// <summary>
 /// Validates OpenAI API keys
-/// Format: ^sk-[a-zA-Z0-9]{48,}$
-/// Network: GET /v1/models endpoint
+/// Formats supported:
+/// - Legacy: sk-[48+ alphanumeric characters]
+/// - Project: sk-proj-[alphanumeric/hyphen/underscore characters]
+/// - Service Account: sk-svcacct-[alphanumeric/hyphen/underscore characters]
+/// Network: Minimal chat completion request
 /// </summary>
 public sealed partial class OpenAIApiKeyValidator : IApiKeyValidator
 {
     private readonly ILogger<OpenAIApiKeyValidator> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
 
-    [GeneratedRegex(@"^sk-[a-zA-Z0-9]{48,}$", RegexOptions.Compiled)]
+    [GeneratedRegex(@"^sk-(?:proj-|svcacct-)?[a-zA-Z0-9\-_]{20,}$", RegexOptions.Compiled)]
     private static partial Regex OpenAIKeyPattern();
 
     public OpenAIApiKeyValidator(
@@ -43,7 +46,7 @@ public sealed partial class OpenAIApiKeyValidator : IApiKeyValidator
         {
             _logger.LogWarning("OpenAI API key format validation failed");
             return Task.FromResult(ApiValidationResult.FormatFailure(
-                "Invalid OpenAI API key format. Expected format: sk-[48+ alphanumeric characters]"));
+                "Invalid OpenAI API key format. Expected format: sk-[alphanumeric] or sk-proj-[alphanumeric/hyphen/underscore] or sk-svcacct-[alphanumeric/hyphen/underscore]"));
         }
 
         _logger.LogDebug("OpenAI API key format validation passed");

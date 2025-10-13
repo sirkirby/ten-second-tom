@@ -113,11 +113,10 @@ public sealed class OpenAIApiKeyValidatorTests
     [Theory]
     [InlineData("sk-")]
     [InlineData("sk-abc")]
-    [InlineData("sk-1234567890123456789012345678901234567890")]  // Too short (40 chars)
-    [InlineData("sk-12345678901234567890123456789012345678901234567")]  // 47 chars (need 48+)
+    [InlineData("sk-12345678901234567")]  // Too short (19 chars, need 20+)
     [InlineData("invalid-key")]
-    [InlineData("sk_proj_123456789012345678901234567890123456789012345678")]  // Wrong prefix
     [InlineData("not-an-api-key")]
+    [InlineData("sk-with-special-chars!@#$%^&*()1234567890")]  // Invalid special chars
     public async Task ValidateFormatAsync_WithInvalidFormat_ReturnsFormatFailure(string invalidKey)
     {
         // Arrange
@@ -131,13 +130,12 @@ public sealed class OpenAIApiKeyValidatorTests
         result.FormatValid.Should().BeFalse();
         result.NetworkValid.Should().BeFalse();
         result.ErrorMessage.Should().Contain("Invalid OpenAI API key format");
-        result.ErrorMessage.Should().Contain("sk-[48+ alphanumeric characters]");
+        result.ErrorMessage.Should().Contain("sk-[alphanumeric]");
     }
 
     [Theory]
-    [InlineData("sk-with-special-chars!@#$%^&*()123456789012345678901234567")]
-    [InlineData("sk-with spaces 123456789012345678901234567890123456789")]
-    [InlineData("sk-with-dashes-123456789012345678901234567890123456789")]
+    [InlineData("sk-with-special-chars!@#$%^&*()1234567890")]  // Special chars not allowed
+    [InlineData("sk-with spaces 123456789012345678901234567890")]  // Spaces not allowed
     public async Task ValidateFormatAsync_WithSpecialCharacters_ReturnsFormatFailure(string invalidKey)
     {
         // Arrange
@@ -156,10 +154,18 @@ public sealed class OpenAIApiKeyValidatorTests
     #region Format Validation Tests - Valid Formats
 
     [Theory]
-    [InlineData("sk-123456789012345678901234567890123456789012345678")]  // Exactly 48 chars after sk-
-    [InlineData("sk-1234567890123456789012345678901234567890123456789")]  // 49 chars
+    [InlineData("sk-12345678901234567890")]  // Exactly 20 chars after sk- (legacy format)
+    [InlineData("sk-123456789012345678901234567890123456789012345678")]  // 48 chars (legacy)
+    [InlineData("sk-1234567890123456789012345678901234567890123456789")]  // 49 chars (legacy)
     [InlineData("sk-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")]  // Mixed case + numbers
     [InlineData("sk-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012345678901234567890")]  // 80+ chars
+    [InlineData("sk-proj-1234567890123456789012345678901234567890")]  // Project key format
+    [InlineData("sk-proj-abc_def-ghi_jkl-1234567890")]  // Project key with underscores and hyphens
+    [InlineData("sk-proj-abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ-extra123")]  // Long project key (realistic 161 chars)
+    [InlineData("sk-svcacct-1234567890123456789012345678901234567890")]  // Service account key
+    [InlineData("sk-svcacct-abc_def-ghi_jkl-1234567890")]  // Service account with underscores and hyphens
+    [InlineData("sk-svcacct-zb4_XyZ123AbCdEf-GhIjKlMnOp_QrStUvWxYz0123456789_ABCDEFGHIJKLMNOP_qrstuvwxyz-ABCD_efgh_ijkl_mnop_qrst_uvwxyz_0123456789_ABCDEF-xyz")]  // Realistic service account key format (151 chars) - SYNTHETIC
+    [InlineData("sk-with-dashes-and_underscores_123456")]  // Legacy format with hyphens/underscores
     public async Task ValidateFormatAsync_WithValidFormat_ReturnsFormatSuccess(string validKey)
     {
         // Arrange

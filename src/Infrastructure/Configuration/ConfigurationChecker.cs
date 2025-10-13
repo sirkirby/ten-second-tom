@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using TenSecondTom.Features.Setup.Models;
 
 namespace TenSecondTom.Infrastructure.Configuration;
 
@@ -50,5 +51,100 @@ public static class ConfigurationChecker
         }
 
         return isConfigured;
+    }
+
+    /// <summary>
+    /// Validates that the configured model is valid for the provider
+    /// </summary>
+    /// <param name="configuration">Application configuration</param>
+    /// <param name="logger">Logger for diagnostics</param>
+    /// <returns>True if model is valid or not configured, false if invalid</returns>
+    public static bool ValidateModel(IConfiguration configuration, ILogger logger)
+    {
+        string? provider = configuration["Llm:Provider"];
+        string? model = configuration["Llm:Model"];
+        
+        // If no model is configured, validation passes (model is optional in some scenarios)
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            logger.LogDebug("No model configured, validation skipped");
+            return true;
+        }
+        
+        // If provider is not configured, we can't validate
+        if (string.IsNullOrWhiteSpace(provider))
+        {
+            logger.LogDebug("No provider configured, model validation skipped");
+            return true;
+        }
+        
+        // Parse provider enum
+        if (!Enum.TryParse<LlmProvider>(provider, out var llmProvider))
+        {
+            logger.LogError("Invalid LLM provider configured: {Provider}", provider);
+            return false;
+        }
+        
+        // Validate model against registry
+        bool isValid = ModelRegistry.IsValid(model, llmProvider);
+        
+        if (!isValid)
+        {
+            var validModels = ModelRegistry.GetByProvider(llmProvider);
+            var validModelsList = string.Join(", ", validModels.Select(m => $"'{m.Id}'"));
+            
+            logger.LogError(
+                "Invalid model '{Model}' configured for provider {Provider}. Valid models: {ValidModels}",
+                model, llmProvider, validModelsList);
+            
+            return false;
+        }
+        
+        logger.LogDebug("Model validation passed: {Model} is valid for {Provider}", model, llmProvider);
+        return true;
+    }
+
+    /// <summary>
+    /// Gets a user-friendly error message when model validation fails
+    /// </summary>
+    /// <param name="configuration">Application configuration</param>
+    /// <returns>Error message string, or null if validation would pass</returns>
+    public static string? GetModelValidationError(IConfiguration configuration)
+    {
+        string? provider = configuration["Llm:Provider"];
+        string? model = configuration["Llm:Model"];
+        
+        // If no model is configured, no error
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            return null;
+        }
+        
+        // If provider is not configured, no error (will be caught by IsConfigured)
+        if (string.IsNullOrWhiteSpace(provider))
+        {
+            return null;
+        }
+        
+        // Parse provider enum
+        if (!Enum.TryParse<LlmProvider>(provider, out var llmProvider))
+        {
+            return $"Invalid LLM provider configured: '{provider}'.";
+        }
+        
+        // Validate model against registry
+        bool isValid = ModelRegistry.IsValid(model, llmProvider);
+        
+        if (!isValid)
+        {
+            var validModels = ModelRegistry.GetByProvider(llmProvider);
+            var validModelsList = string.Join(", ", validModels.Select(m => $"'{m.Id}'"));
+            
+            return $"Configuration error: Model '{model}' is not valid for provider {llmProvider}.\n" +
+                   $"Valid models for {llmProvider}: {validModelsList}\n" +
+                   "Run 'tom setup' to reconfigure with a valid model.";
+        }
+        
+        return null; // Validation passed
     }
 }
