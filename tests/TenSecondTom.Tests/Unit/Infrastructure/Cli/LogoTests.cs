@@ -1,5 +1,6 @@
 namespace TenSecondTom.Tests.Unit.Infrastructure.Cli;
 
+using System.Text.RegularExpressions;
 using Xunit;
 using FluentAssertions;
 using TenSecondTom.Infrastructure.Cli;
@@ -39,7 +40,7 @@ public sealed class LogoTests
         // Assert
         versionInfo.Should().NotBeNullOrEmpty();
         versionInfo.Should().StartWith(ApplicationConstants.ApplicationNameWithVersionPrefix);
-        versionInfo.Should().MatchRegex(@$"{ApplicationConstants.ApplicationNameWithVersionPrefix}\d+\.\d+\.\d+");
+        versionInfo.Should().MatchRegex(@$"{Regex.Escape(ApplicationConstants.ApplicationNameWithVersionPrefix)}\d+\.\d+\.\d+");
     }
 
     [Fact]
