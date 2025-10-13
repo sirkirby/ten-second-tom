@@ -1,6 +1,7 @@
 using FluentAssertions;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Setup.Validation;
+using TenSecondTom.Shared.Constants;
 using Xunit;
 
 namespace TenSecondTom.Tests.Unit.Features.Setup.Validation;
@@ -11,9 +12,9 @@ namespace TenSecondTom.Tests.Unit.Features.Setup.Validation;
 public sealed class ModelValidatorTests
 {
     [Theory]
-    [InlineData("gpt-4o-mini", LlmProvider.OpenAI)]
-    [InlineData("gpt-4o", LlmProvider.OpenAI)]
-    [InlineData("gpt-3.5-turbo", LlmProvider.OpenAI)]
+    [InlineData(LlmConstants.OpenAIModels.Gpt4oMini, LlmProvider.OpenAI)]
+    [InlineData(LlmConstants.OpenAIModels.Gpt4o, LlmProvider.OpenAI)]
+    [InlineData(LlmConstants.OpenAIModels.ChatGpt4oLatest, LlmProvider.OpenAI)]
     public void Validate_WithValidOpenAIModel_ShouldReturnSuccess(string modelId, LlmProvider provider)
     {
         // Act
@@ -25,9 +26,9 @@ public sealed class ModelValidatorTests
     }
 
     [Theory]
-    [InlineData("claude-3-5-haiku-20241022", LlmProvider.Anthropic)]
-    [InlineData("claude-3-5-sonnet-20241022", LlmProvider.Anthropic)]
-    [InlineData("claude-3-opus-20240229", LlmProvider.Anthropic)]
+    [InlineData(LlmConstants.AnthropicModels.Claude35Haiku, LlmProvider.Anthropic)]
+    [InlineData(LlmConstants.AnthropicModels.ClaudeSonnet4, LlmProvider.Anthropic)]
+    [InlineData(LlmConstants.AnthropicModels.ClaudeOpus4, LlmProvider.Anthropic)]
     public void Validate_WithValidAnthropicModel_ShouldReturnSuccess(string modelId, LlmProvider provider)
     {
         // Act
@@ -87,7 +88,7 @@ public sealed class ModelValidatorTests
     public void Validate_WithWrongProviderForModel_ShouldReturnFailure()
     {
         // Arrange - Use a valid OpenAI model with Anthropic provider
-        const string openAiModelId = "gpt-4o-mini";
+        const string openAiModelId = LlmConstants.OpenAIModels.Gpt4oMini;
 
         // Act
         var (isValid, errorMessage) = ModelValidator.Validate(openAiModelId, LlmProvider.Anthropic);
@@ -118,7 +119,10 @@ public sealed class ModelValidatorTests
         // Assert
         isValid.Should().BeFalse();
         // Error should contain at least one known OpenAI model
-        errorMessage.Should().ContainAny("gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo");
+        errorMessage.Should().ContainAny(
+            LlmConstants.OpenAIModels.Gpt4oMini, 
+            LlmConstants.OpenAIModels.Gpt4o, 
+            LlmConstants.OpenAIModels.ChatGpt4oLatest);
     }
 
     [Theory]
@@ -138,7 +142,7 @@ public sealed class ModelValidatorTests
     public void ValidateOrThrow_WithValidModel_ShouldNotThrow()
     {
         // Arrange
-        const string validModel = "gpt-4o-mini";
+        const string validModel = LlmConstants.OpenAIModels.Gpt4oMini;
 
         // Act
         var act = () => ModelValidator.ValidateOrThrow(validModel, LlmProvider.OpenAI);
@@ -165,7 +169,7 @@ public sealed class ModelValidatorTests
     public void GetEffectiveModel_WithValidModel_ShouldReturnProvidedModel()
     {
         // Arrange
-        const string validModel = "gpt-4o-mini";
+        const string validModel = LlmConstants.OpenAIModels.Gpt4oMini;
 
         // Act
         var effectiveModel = ModelValidator.GetEffectiveModel(validModel, LlmProvider.OpenAI);

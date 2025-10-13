@@ -445,7 +445,7 @@ public static class CommandRegistry
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[red]✗[/] Setup failed: {result.Error}");
+                    AnsiConsole.MarkupLine($"[red]✗[/] Setup failed: {result.Error.EscapeMarkup()}");
                 }
                 return 1;
             }
@@ -504,13 +504,13 @@ public static class CommandRegistry
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error}");
+                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error.EscapeMarkup()}");
                 }
                 return 1;
             }
         });
 
-        // Set subcommand
+        // LLM subcommand - interactive configuration for LLM provider and model
         var setCommand = new Command("set", "Update a configuration setting");
         var settingNameArg = new Argument<string>("setting")
         {
@@ -563,7 +563,7 @@ public static class CommandRegistry
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error}");
+                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error.EscapeMarkup()}");
                 }
                 return 1;
             }
@@ -612,13 +612,13 @@ public static class CommandRegistry
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error}");
+                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error.EscapeMarkup()}");
                 }
                 return 1;
             }
         });
 
-        // Validate subcommand
+        // Reset subcommand
         var validateCommand = new Command("validate", "Validate current configuration");
         validateCommand.Options.Add(jsonOutputOption);
 

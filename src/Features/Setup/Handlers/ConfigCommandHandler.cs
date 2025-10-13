@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Setup.Commands;
 using TenSecondTom.Features.Setup.Models;
@@ -14,17 +15,20 @@ namespace TenSecondTom.Features.Setup.Handlers;
 public sealed class ConfigCommandHandler
 {
     private readonly IConfigurationStorageService _storageService;
+    private readonly IConfiguration _configuration;
     private readonly ISetupWizardUI _setupWizard;
     private readonly IEnumerable<IApiKeyValidator> _apiKeyValidators;
     private readonly ILogger<ConfigCommandHandler> _logger;
 
     public ConfigCommandHandler(
         IConfigurationStorageService storageService,
+        IConfiguration configuration,
         ISetupWizardUI setupWizard,
         IEnumerable<IApiKeyValidator> apiKeyValidators,
         ILogger<ConfigCommandHandler> logger)
     {
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _setupWizard = setupWizard ?? throw new ArgumentNullException(nameof(setupWizard));
         _apiKeyValidators = apiKeyValidators ?? throw new ArgumentNullException(nameof(apiKeyValidators));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -59,6 +63,7 @@ public sealed class ConfigCommandHandler
         ConfigCommand command,
         CancellationToken cancellationToken)
     {
+        // Load base configuration from user secrets
         var loadResult = await _storageService.LoadAsync(cancellationToken);
         
         if (!loadResult.IsSuccess)
@@ -66,10 +71,38 @@ public sealed class ConfigCommandHandler
             return Result<ConfigurationSettings>.Failure("No configuration found. Run 'tom setup' first to configure Ten Second Tom.");
         }
 
+        var config = loadResult.Value!;
+
+        // Apply environment variable overrides from IConfiguration
+        // This shows the effective configuration that will be used at runtime
+        string? envProvider = _configuration["Llm:Provider"];
+        string? envApiKey = _configuration["Llm:ApiKey"];
+        string? envModel = _configuration["Llm:Model"];
+
+        // If environment variables are set, they override user secrets
+        if (!string.IsNullOrWhiteSpace(envProvider) || 
+            !string.IsNullOrWhiteSpace(envApiKey) || 
+            !string.IsNullOrWhiteSpace(envModel))
+        {
+            config = config with
+            {
+                Llm = config.Llm with
+                {
+                    Provider = Enum.TryParse<LlmProvider>(envProvider, true, out var provider) 
+                        ? provider 
+                        : config.Llm.Provider,
+                    ApiKey = envApiKey ?? config.Llm.ApiKey,
+                    Model = envModel ?? config.Llm.Model
+                }
+            };
+
+            _logger.LogDebug("Configuration overrides applied from environment variables");
+        }
+
         _logger.LogInformation("Displaying current configuration (ShowSecrets: {ShowSecrets})", 
             command.ShowSecrets);
 
-        return loadResult;
+        return Result<ConfigurationSettings>.Success(config);
     }
 
     private async Task<Result<ConfigurationSettings>> HandleSetAsync(
@@ -398,9 +431,9 @@ public sealed class ConfigCommandHandler
             selectedProvider.Value, 
             selectedModel.Id);
 
-        // Display success message (escape square brackets for Spectre.Console markup)
+        // Display success message
         var providerName = selectedProvider.Value == LlmProvider.OpenAI ? "OpenAI" : "Anthropic";
-        _setupWizard.ShowSuccess($"✓ LLM configuration updated: {providerName} - {selectedModel.DisplayName} [[{selectedModel.CostTier}]]");
+        _setupWizard.ShowSuccess($"✓ LLM configuration updated: {providerName} - {selectedModel.DisplayName} [{selectedModel.CostTier}]");
 
         return Result<ConfigurationSettings>.Success(markedConfig);
     }

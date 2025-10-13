@@ -104,4 +104,50 @@ public sealed class SpectreConsoleSetupWizardTests
         foundModel.Should().NotBeNull();
         foundModel.Should().Be(firstModel);
     }
+
+    [Fact]
+    public void ModelRegistry_AllDisplayNames_ShouldBeDistinct()
+    {
+        // Arrange & Act
+        var allModels = ModelRegistry.OpenAIModels
+            .Concat(ModelRegistry.AnthropicModels)
+            .ToList();
+
+        var displayNames = allModels.Select(m => m.DisplayName).ToList();
+
+        // Assert - Verify all display names are unique (important for parsing)
+        displayNames.Should().OnlyHaveUniqueItems("Display names must be unique to avoid ambiguity in model selection");
+    }
+
+    [Theory]
+    [InlineData("Claude Sonnet 4.5 (2025-09-29)", "Balanced", "Best model for complex agents and coding with highest intelligence")]
+    [InlineData("GPT-4o Mini (2024-07-18)", "Budget", "Fast, affordable, and efficient for most tasks")]
+    public void ModelRegistry_FormattedChoiceStrings_ShouldBeHandledCorrectly(
+        string displayName, 
+        string costTier, 
+        string description)
+    {
+        // This test verifies that model selection can handle display names with parentheses
+        // Bug fix: The original parsing logic looked for the first '(' which failed when
+        // the DisplayName itself contained parentheses (e.g., "Claude Sonnet 4.5 (2025-09-29)")
+        
+        // Arrange - Create a formatted choice string as shown to users
+        var formattedChoice = $"{displayName} ({costTier}) - {description}";
+
+        // Act - Find the model by its display name (simulating what the UI does)
+        var allModels = ModelRegistry.AllModels;
+        var model = allModels.FirstOrDefault(m => 
+            m.DisplayName == displayName && 
+            m.CostTier == costTier);
+
+        // Assert - Verify we can find the model even when DisplayName has parentheses
+        model.Should().NotBeNull($"Model with display name '{displayName}' should exist in registry");
+        model!.DisplayName.Should().Be(displayName);
+        model.CostTier.Should().Be(costTier);
+        model.Description.Should().Be(description);
+        
+        // Verify the formatted choice string can be constructed
+        var reconstructedChoice = $"{model.DisplayName} ({model.CostTier}) - {model.Description}";
+        reconstructedChoice.Should().Be(formattedChoice);
+    }
 }

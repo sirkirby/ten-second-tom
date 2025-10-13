@@ -207,6 +207,48 @@ tom config set llm-provider Anthropic
 # Valid values: OpenAI, Anthropic
 ```
 
+#### Configure LLM Model
+
+You can select or change the specific AI model used by Ten Second Tom:
+
+```bash
+# Interactive model selection (recommended)
+tom config llm
+# → Shows provider and model selection prompts with descriptions
+```
+
+**Via environment variables:**
+
+```bash
+# macOS/Linux
+export TenSecondTom__Llm__Model="gpt-4o"
+export TenSecondTom__Llm__Model="claude-3-5-sonnet-20241022"
+
+# Windows (PowerShell)
+$env:TenSecondTom__Llm__Model="gpt-4o"
+$env:TenSecondTom__Llm__Model="claude-3-5-sonnet-20241022"
+```
+
+**Supported models:**
+
+**OpenAI:**
+
+- `gpt-4o` - Most capable, higher cost (default)
+- `gpt-4o-mini` - Fast, cost-effective
+- `gpt-3.5-turbo` - Legacy, lowest cost
+
+**Anthropic:**
+
+- `claude-3-5-sonnet-20241022` - Most capable, balanced cost (default)
+- `claude-3-5-haiku-20241022` - Fastest, most cost-effective
+- `claude-3-opus-20240229` - Highest capability, highest cost
+
+**Notes:**
+
+- If no model is specified, a default model for your provider is automatically used
+- Model validation occurs at startup - invalid models will trigger an error with suggestions
+- Use `tom config llm` for an interactive selection with descriptions and cost tiers
+
 #### Update API Key
 
 ```bash

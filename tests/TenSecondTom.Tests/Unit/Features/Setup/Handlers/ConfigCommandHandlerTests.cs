@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using TenSecondTom.Features.Setup.Commands;
@@ -18,6 +19,7 @@ namespace TenSecondTom.Tests.Unit.Features.Setup.Handlers;
 public sealed class ConfigCommandHandlerTests
 {
     private readonly Mock<IConfigurationStorageService> _mockStorageService;
+    private readonly Mock<IConfiguration> _mockConfiguration;
     private readonly Mock<ISetupWizardUI> _mockSetupWizard;
     private readonly Mock<IApiKeyValidator> _mockOpenAIValidator;
     private readonly Mock<IApiKeyValidator> _mockAnthropicValidator;
@@ -27,6 +29,7 @@ public sealed class ConfigCommandHandlerTests
     public ConfigCommandHandlerTests()
     {
         _mockStorageService = new Mock<IConfigurationStorageService>();
+        _mockConfiguration = new Mock<IConfiguration>();
         _mockSetupWizard = new Mock<ISetupWizardUI>();
         _mockOpenAIValidator = new Mock<IApiKeyValidator>();
         _mockAnthropicValidator = new Mock<IApiKeyValidator>();
@@ -35,10 +38,16 @@ public sealed class ConfigCommandHandlerTests
         _mockOpenAIValidator.Setup(v => v.Provider).Returns(LlmProvider.OpenAI);
         _mockAnthropicValidator.Setup(v => v.Provider).Returns(LlmProvider.Anthropic);
 
+        // Setup default configuration values
+        _mockConfiguration.Setup(c => c["Llm:Provider"]).Returns((string?)null);
+        _mockConfiguration.Setup(c => c["Llm:ApiKey"]).Returns((string?)null);
+        _mockConfiguration.Setup(c => c["Llm:Model"]).Returns((string?)null);
+
         var validators = new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object };
 
         _handler = new ConfigCommandHandler(
-            _mockStorageService.Object, 
+            _mockStorageService.Object,
+            _mockConfiguration.Object,
             _mockSetupWizard.Object,
             validators, 
             _mockLogger.Object);
@@ -52,6 +61,7 @@ public sealed class ConfigCommandHandlerTests
         // Arrange, Act & Assert
         var act = () => new ConfigCommandHandler(
             null!,
+            _mockConfiguration.Object,
             _mockSetupWizard.Object,
             new[] { _mockOpenAIValidator.Object },
             _mockLogger.Object);
@@ -66,6 +76,7 @@ public sealed class ConfigCommandHandlerTests
         // Arrange, Act & Assert
         var act = () => new ConfigCommandHandler(
             _mockStorageService.Object,
+            _mockConfiguration.Object,
             null!,
             new[] { _mockOpenAIValidator.Object },
             _mockLogger.Object);
@@ -80,6 +91,7 @@ public sealed class ConfigCommandHandlerTests
         // Arrange, Act & Assert
         var act = () => new ConfigCommandHandler(
             _mockStorageService.Object,
+            _mockConfiguration.Object,
             _mockSetupWizard.Object,
             null!,
             _mockLogger.Object);
@@ -94,6 +106,7 @@ public sealed class ConfigCommandHandlerTests
         // Arrange, Act & Assert
         var act = () => new ConfigCommandHandler(
             _mockStorageService.Object,
+            _mockConfiguration.Object,
             _mockSetupWizard.Object,
             new[] { _mockOpenAIValidator.Object },
             null!);

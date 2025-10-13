@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.ThisWeek.Commands;
 using TenSecondTom.Infrastructure.Auth;
@@ -22,7 +23,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
     private readonly ILlmProviderFactory _llmFactory;
     private readonly IPromptTemplateLoader _promptLoader;
     private readonly IAuthenticationService _authService;
-    private readonly IConfigurationStorageService _configService;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<CreateWeeklyReviewHandler> _logger;
 
     /// <summary>
@@ -32,21 +33,22 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
     /// <param name="llmFactory">The LLM provider factory.</param>
     /// <param name="promptLoader">The prompt template loader.</param>
     /// <param name="authService">The authentication service.</param>
-    /// <param name="configService">The configuration storage service.</param>
+    /// <param name="configuration">The application configuration (includes user secrets + environment variable overrides).</param>
     /// <param name="logger">The logger instance.</param>
     public CreateWeeklyReviewHandler(
         IMemoryStorageProvider storage,
         ILlmProviderFactory llmFactory,
         IPromptTemplateLoader promptLoader,
         IAuthenticationService authService,
-        IConfigurationStorageService configService,
+        IConfiguration configuration,
         ILogger<CreateWeeklyReviewHandler> logger)
     {
         _storage = storage;
         _llmFactory = llmFactory;
         _promptLoader = promptLoader;
         _authService = authService;
-        _configService = configService;
+        _configuration = configuration;
+        _logger = logger;
         _logger = logger;
     }
 
@@ -122,21 +124,18 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
         }
         else
         {
-            // Load from configuration
-            Result<Features.Setup.Models.ConfigurationSettings> configResult = await _configService.LoadAsync(cancellationToken).ConfigureAwait(false);
-            if (configResult.IsSuccess && configResult.Value.Llm.Provider != Features.Setup.Models.LlmProvider.OpenAI)
+            // Read from IConfiguration which includes environment variable overrides
+            string? configuredProvider = _configuration["Llm:Provider"];
+            if (!string.IsNullOrWhiteSpace(configuredProvider))
             {
-                // Convert enum to string
-                provider = configResult.Value.Llm.Provider.ToString();
+                provider = configuredProvider;
+                _logger.LogDebug("Using LLM provider from configuration: {Provider}", provider);
             }
             else
             {
-                // Default to OpenAI
+                // Default to OpenAI if not configured
                 provider = LlmProviders.OpenAI;
-                if (!configResult.IsSuccess)
-                {
-                    _logger.LogDebug("Could not load configuration, defaulting to OpenAI: {Error}", configResult.Error);
-                }
+                _logger.LogDebug("No LLM provider configured, defaulting to OpenAI");
             }
         }
 

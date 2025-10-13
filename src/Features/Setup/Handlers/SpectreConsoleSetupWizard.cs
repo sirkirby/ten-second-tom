@@ -101,9 +101,16 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
 
         // Create choices with formatted display: "DisplayName (CostTier) - Description"
         // Use parentheses instead of square brackets to avoid Spectre.Console markup parsing
-        var choices = models.Select(m => 
-            $"{m.DisplayName} ({m.CostTier}) - {m.Description}"
-        ).ToList();
+        // Create a dictionary to map the formatted choice back to the model
+        var choiceToModel = new Dictionary<string, SupportedModel>();
+        var choices = new List<string>();
+        
+        foreach (var model in models)
+        {
+            var choice = $"{model.DisplayName} ({model.CostTier}) - {model.Description}";
+            choices.Add(choice);
+            choiceToModel[choice] = model;
+        }
 
         var prompt = new SelectionPrompt<string>()
             .Title($"Select a model for {provider}:")
@@ -122,19 +129,15 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
 
         var selected = _console.Prompt(prompt);
         
-        // Find the model by matching the formatted choice back to the model
-        // Extract DisplayName from the choice (everything before the first '(')
-        var displayNameEnd = selected.IndexOf('(');
-        if (displayNameEnd > 0)
+        // Find the model using the dictionary mapping
+        if (choiceToModel.TryGetValue(selected, out var selectedModel))
         {
-            var displayName = selected[..displayNameEnd].Trim();
-            var model = models.FirstOrDefault(m => m.DisplayName == displayName);
-            return Task.FromResult(model);
+            return Task.FromResult<SupportedModel?>(selectedModel);
         }
 
-        // Fallback: shouldn't happen, but return first model if parsing fails
-        _logger.LogWarning("Failed to parse model selection: {Selection}", selected);
-        return Task.FromResult<SupportedModel?>(models[0]);
+        // Fallback: shouldn't happen, but log and return null if mapping fails
+        _logger.LogError("Failed to map model selection to model object: {Selection}", selected);
+        return Task.FromResult<SupportedModel?>(null);
     }
 
     public Task<string?> PromptForApiKeyAsync(
@@ -278,17 +281,17 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
 
     public void ShowSuccess(string message)
     {
-        _console.MarkupLine($"[green]✓ {message}[/]");
+        _console.MarkupLine($"[green]✓ {message.EscapeMarkup()}[/]");
     }
 
     public void ShowError(string message)
     {
-        _console.MarkupLine($"[red]✗ {message}[/]");
+        _console.MarkupLine($"[red]✗ {message.EscapeMarkup()}[/]");
     }
 
     public void ShowWarning(string message)
     {
-        _console.MarkupLine($"[yellow]⚠️  {message}[/]");
+        _console.MarkupLine($"[yellow]⚠️  {message.EscapeMarkup()}[/]");
     }
 
     private static string MaskApiKey(string? apiKey)

@@ -106,6 +106,12 @@
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work - users can configure models via setup or config command
 
+**Bugfixes Applied (2025-10-13)**:
+- **Model Selection Parsing Bug**: Fixed `PromptForModelAsync` in `SpectreConsoleSetupWizard.cs` where model names containing parentheses (e.g., "Claude Sonnet 4.5 (2025-09-29)") were incorrectly parsed, causing selection to fail and return null. Solution: Replaced string parsing with dictionary-based mapping of formatted choices to model objects for robust, O(1) lookup.
+- **Spectre.Console Markup Injection**: Fixed `ShowSuccess`, `ShowError`, and `ShowWarning` methods in `SpectreConsoleSetupWizard.cs` to escape user-provided content using `.EscapeMarkup()` to prevent API keys or model names with special characters from being interpreted as markup codes, which caused `InvalidOperationException` errors.
+- **CommandRegistry Error Display**: Fixed all error message displays in `CommandRegistry.cs` (lines 448, 507, 566, 615, 661) to escape `result.Error` content before displaying. This prevents validation error messages (e.g., "Expected format: [32+ characters]") from being interpreted as Spectre.Console markup, which caused crashes when displaying API key validation failures.
+- **Anthropic API Key Validation Regex**: Fixed `AnthropicApiKeyValidator.cs` regex pattern to accept underscores in API keys. Changed from `[a-zA-Z0-9\-]{32,}` to `[a-zA-Z0-9\-_]{32,}`. Real Anthropic keys contain underscores in their format, and the overly restrictive regex was rejecting valid keys. Updated tests to verify underscores are accepted.
+
 ---
 
 ## Phase 5: User Story 3 - Model Configuration via Environment Variables (Priority: P3)
@@ -116,14 +122,14 @@
 
 ### Tests for User Story 3
 
-- [ ] T037 [P] [US3] Unit tests for environment variable model configuration in `tests/TenSecondTom.Tests/Unit/Infrastructure/Configuration/ConfigurationSettingsTests.cs`
-- [ ] T038 [US3] Integration test for environment variable precedence over user secrets in `tests/TenSecondTom.IntegrationTests/Integration/Features/Setup/EnvironmentVariableConfigTests.cs`
+- [X] T037 [P] [US3] Unit tests for environment variable model configuration in `tests/TenSecondTom.Tests/Unit/Infrastructure/Configuration/ConfigurationSettingsTests.cs`
+- [X] T038 [US3] Integration test for environment variable precedence over user secrets in `tests/TenSecondTom.IntegrationTests/Integration/Features/Setup/EnvironmentVariableConfigTests.cs`
 
 ### Implementation for User Story 3
 
-- [ ] T039 [US3] Verify environment variable model is validated at startup by existing validation logic from US1 (no code changes needed)
-- [ ] T040 [US3] Add clear error message when invalid model is set via environment variable, suggesting valid options for current provider
-- [ ] T041 [US3] Update documentation in `docs/CONFIGURATION.md` with environment variable format and examples
+- [X] T039 [US3] Verify environment variable model is validated at startup by existing validation logic from US1 (no code changes needed)
+- [X] T040 [US3] Add clear error message when invalid model is set via environment variable, suggesting valid options for current provider
+- [X] T041 [US3] Update documentation in `docs/CONFIGURATION.md` with environment variable format and examples
 
 **Checkpoint**: All three configuration methods now work - setup wizard, config command, and environment variables
 

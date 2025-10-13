@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -35,6 +36,10 @@ public sealed class ConfigLlmCommandTests : IDisposable
             new UserSecretsStorageService(
                 sp.GetRequiredService<ILogger<UserSecretsStorageService>>(),
                 _testSecretsId));
+        
+        // Add IConfiguration with empty configuration (no overrides)
+        var configBuilder = new ConfigurationBuilder();
+        services.AddSingleton<IConfiguration>(configBuilder.Build());
         
         // Add required validators for ConfigCommandHandler
         services.AddTransient<IApiKeyValidator, OpenAIApiKeyValidator>();

@@ -138,7 +138,6 @@ public sealed class AnthropicApiKeyValidatorTests
     [Theory]
     [InlineData("sk-ant-with!special@chars#12345678901234567890")]
     [InlineData("sk-ant-with spaces 12345678901234567890")]
-    [InlineData("sk-ant_with_underscores_123456789012345")]  // Underscores not allowed
     public async Task ValidateFormatAsync_WithInvalidCharacters_ReturnsFormatFailure(string invalidKey)
     {
         // Arrange
@@ -162,6 +161,8 @@ public sealed class AnthropicApiKeyValidatorTests
     [InlineData("sk-ant-api03-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")]  // Mixed case + numbers
     [InlineData("sk-ant-abcd-1234-EFGH-5678-ijkl-9012-mnop")]  // With hyphens (38 chars after prefix)
     [InlineData("sk-ant-ABCDEFGHIJKLMNOPQRSTUVWXYZ12345678901234567890abcdefghijklmnopqrstuvwxyz")]  // Long key
+    [InlineData("sk-ant-with_underscores_123456789012345")]  // With underscores - allowed
+    [InlineData("sk-ant-api03-XyZ_AbC123DeF_GhI456JkL_MnO789PqR_StU012VwX_YzA345BcD_EfG678HiJ_KlM901NoPqRsTuVwXyZaBcDeFgHiJkLmNoPqRsTuVwXyZ")]  // Realistic format with underscores (120 chars) - SYNTHETIC
     public async Task ValidateFormatAsync_WithValidFormat_ReturnsFormatSuccess(string validKey)
     {
         // Arrange

@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using TenSecondTom.Features.ThisWeek.Commands;
@@ -24,7 +25,7 @@ public sealed class CreateWeeklyReviewHandlerTests
     private readonly Mock<ILlmProvider> _mockLlmProvider;
     private readonly Mock<IPromptTemplateLoader> _mockPromptLoader;
     private readonly Mock<IAuthenticationService> _mockAuthService;
-    private readonly Mock<IConfigurationStorageService> _mockConfigService;
+    private readonly Mock<IConfiguration> _mockConfiguration;
     private readonly Mock<ILogger<CreateWeeklyReviewHandler>> _mockLogger;
     private readonly CreateWeeklyReviewHandler _handler;
 
@@ -35,8 +36,12 @@ public sealed class CreateWeeklyReviewHandlerTests
         _mockLlmProvider = new Mock<ILlmProvider>();
         _mockPromptLoader = new Mock<IPromptTemplateLoader>();
         _mockAuthService = new Mock<IAuthenticationService>();
-        _mockConfigService = new Mock<IConfigurationStorageService>();
+        _mockConfiguration = new Mock<IConfiguration>();
         _mockLogger = new Mock<ILogger<CreateWeeklyReviewHandler>>();
+
+        // Setup default configuration values
+        _mockConfiguration.Setup(c => c["Llm:Provider"]).Returns("OpenAI");
+        _mockConfiguration.Setup(c => c["Llm:Model"]).Returns("gpt-4o");
 
         // Setup default successful behaviors
         _mockLlmFactory.Setup(f => f.CreateProvider(It.IsAny<string>()))
@@ -82,7 +87,7 @@ Noticed pattern of afternoon productivity dips.
             _mockLlmFactory.Object,
             _mockPromptLoader.Object,
             _mockAuthService.Object,
-            _mockConfigService.Object,
+            _mockConfiguration.Object,
             _mockLogger.Object);
     }
 
