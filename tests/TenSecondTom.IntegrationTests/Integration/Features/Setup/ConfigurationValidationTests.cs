@@ -256,6 +256,10 @@ public sealed class ConfigurationValidationTests : IDisposable
         // Mock configuration storage
         var mockStorage = new Mock<IConfigurationStorageService>();
         services.AddSingleton(mockStorage.Object);
+        
+        // Mock ISetupWizardUI (required by ConfigCommandHandler)
+        var mockWizard = new Mock<ISetupWizardUI>();
+        services.AddSingleton(mockWizard.Object);
 
         // Mock API key validators (empty collection for now)
         services.AddSingleton<IEnumerable<IApiKeyValidator>>(

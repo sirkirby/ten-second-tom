@@ -14,15 +14,18 @@ namespace TenSecondTom.Features.Setup.Handlers;
 public sealed class ConfigCommandHandler
 {
     private readonly IConfigurationStorageService _storageService;
+    private readonly ISetupWizardUI _setupWizard;
     private readonly IEnumerable<IApiKeyValidator> _apiKeyValidators;
     private readonly ILogger<ConfigCommandHandler> _logger;
 
     public ConfigCommandHandler(
         IConfigurationStorageService storageService,
+        ISetupWizardUI setupWizard,
         IEnumerable<IApiKeyValidator> apiKeyValidators,
         ILogger<ConfigCommandHandler> logger)
     {
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
+        _setupWizard = setupWizard ?? throw new ArgumentNullException(nameof(setupWizard));
         _apiKeyValidators = apiKeyValidators ?? throw new ArgumentNullException(nameof(apiKeyValidators));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -77,6 +80,12 @@ public sealed class ConfigCommandHandler
         if (string.IsNullOrWhiteSpace(command.SettingName))
         {
             return Result<ConfigurationSettings>.Failure("Setting name is required. Example: tom config --set llm-provider OpenAI");
+        }
+
+        // Special handling for "llm" - interactive configuration
+        if (command.SettingName.Equals("llm", StringComparison.OrdinalIgnoreCase))
+        {
+            return await HandleInteractiveLlmConfigurationAsync(cancellationToken);
         }
 
         if (string.IsNullOrWhiteSpace(command.SettingValue))
@@ -271,6 +280,129 @@ public sealed class ConfigCommandHandler
         };
 
         return Result<ConfigurationSettings>.Success(newConfig);
+    }
+
+    /// <summary>
+    /// Handles interactive LLM configuration via 'tom config llm'
+    /// Prompts for provider and model selection, updates configuration
+    /// </summary>
+    private async Task<Result<ConfigurationSettings>> HandleInteractiveLlmConfigurationAsync(
+        CancellationToken cancellationToken)
+    {
+        // Load current configuration
+        var loadResult = await _storageService.LoadAsync(cancellationToken);
+        
+        if (!loadResult.IsSuccess)
+        {
+            return Result<ConfigurationSettings>.Failure("No configuration found. Run 'tom setup' first to create initial configuration, then use 'tom config llm' to update LLM settings.");
+        }
+
+        var currentConfig = loadResult.Value!;
+
+        _logger.LogInformation("Starting interactive LLM configuration");
+        
+        // Determine total steps (3 if provider changes, 2 if same provider)
+        bool willChangeProvider = false;
+        
+        // Step 1: Prompt for LLM provider
+        _setupWizard.ShowStepHeader(1, 3, "LLM Provider Selection");
+        var selectedProvider = await _setupWizard.PromptForLlmProviderAsync(
+            currentConfig.Llm.Provider,
+            cancellationToken);
+
+        if (!selectedProvider.HasValue)
+        {
+            _logger.LogInformation("LLM configuration cancelled by user");
+            return Result<ConfigurationSettings>.Failure("LLM configuration cancelled. No changes were made.");
+        }
+
+        willChangeProvider = selectedProvider.Value != currentConfig.Llm.Provider;
+        int totalSteps = willChangeProvider ? 3 : 2;
+
+        // Step 2: Prompt for model selection
+        _setupWizard.ShowStepHeader(2, totalSteps, "Model Selection");
+        
+        // Pass current model only if staying with same provider
+        var currentModelId = selectedProvider.Value == currentConfig.Llm.Provider 
+            ? currentConfig.Llm.Model 
+            : null;
+
+        var selectedModel = await _setupWizard.PromptForModelAsync(
+            selectedProvider.Value,
+            currentModelId,
+            cancellationToken);
+
+        if (selectedModel == null)
+        {
+            _logger.LogInformation("Model selection cancelled by user");
+            return Result<ConfigurationSettings>.Failure("Model selection cancelled. No changes were made.");
+        }
+
+        // Step 3: If provider changed, prompt for new API key
+        string? apiKey = currentConfig.Llm.ApiKey;
+        bool providerChanged = selectedProvider.Value != currentConfig.Llm.Provider;
+        
+        if (providerChanged)
+        {
+            _setupWizard.ShowStepHeader(3, 3, "API Key Configuration");
+            _setupWizard.ShowWarning($"Provider changed from {currentConfig.Llm.Provider} to {selectedProvider.Value}. A new API key is required.");
+            
+            var newApiKey = await _setupWizard.PromptForApiKeyAsync(
+                selectedProvider.Value,
+                null, // Don't show current key from different provider
+                cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(newApiKey))
+            {
+                _logger.LogInformation("API key entry cancelled by user");
+                return Result<ConfigurationSettings>.Failure("API key is required when changing providers. Configuration not updated.");
+            }
+
+            // Validate the API key format
+            var validator = _apiKeyValidators.FirstOrDefault(v => v.Provider == selectedProvider.Value);
+            if (validator != null)
+            {
+                var validationResult = await validator.ValidateFormatAsync(newApiKey);
+                if (!validationResult.IsValid)
+                {
+                    return Result<ConfigurationSettings>.Failure($"Invalid API key format: {validationResult.ErrorMessage}");
+                }
+            }
+
+            apiKey = newApiKey;
+        }
+
+        // Update configuration
+        var updatedConfig = currentConfig with
+        {
+            Llm = currentConfig.Llm with 
+            { 
+                Provider = selectedProvider.Value,
+                Model = selectedModel.Id,
+                ApiKey = apiKey
+            }
+        };
+
+        var markedConfig = updatedConfig.MarkAsModified();
+
+        // Save updated configuration
+        var saveResult = await _storageService.SaveAsync(markedConfig, cancellationToken).ConfigureAwait(false);
+        
+        if (!saveResult.IsSuccess)
+        {
+            return Result<ConfigurationSettings>.Failure($"Failed to save configuration: {saveResult.Error}. Changes were not applied. Try again or check file permissions.");
+        }
+
+        _logger.LogInformation(
+            "LLM configuration updated successfully: Provider={Provider}, Model={Model}", 
+            selectedProvider.Value, 
+            selectedModel.Id);
+
+        // Display success message (escape square brackets for Spectre.Console markup)
+        var providerName = selectedProvider.Value == LlmProvider.OpenAI ? "OpenAI" : "Anthropic";
+        _setupWizard.ShowSuccess($"✓ LLM configuration updated: {providerName} - {selectedModel.DisplayName} [[{selectedModel.CostTier}]]");
+
+        return Result<ConfigurationSettings>.Success(markedConfig);
     }
 
     private Task<Result<ConfigurationSettings>> HandleResetAsync(CancellationToken cancellationToken)

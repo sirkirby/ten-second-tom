@@ -162,6 +162,9 @@ using System.Runtime.CompilerServices;
 // Shell feature - cancellation token propagation
 [assembly: SuppressMessage("Reliability", "CA2016:Forward the CancellationToken parameter", Scope = "member", Target = "~M:TenSecondTom.Features.Shell.Services.CommandRouter.RouteAsync(System.String,System.Threading.CancellationToken)~System.Threading.Tasks.Task{TenSecondTom.Features.Shell.Models.CommandResult}", Justification = "System.CommandLine InvokeAsync handles cancellation internally via Console.CancelKeyPress")]
 
+// Globalization - CLI tool doesn't require localization
+[assembly: SuppressMessage("Globalization", "CA1303:Do not pass literals as localized parameters", Scope = "member", Target = "~M:Program.PromptForSetupAsync(System.Threading.CancellationToken)~System.Threading.Tasks.Task{System.Boolean}", Justification = "CLI tool - localization not required for user prompts")]
+
 
 
 

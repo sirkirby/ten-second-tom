@@ -90,18 +90,19 @@
 
 ### Tests for User Story 2
 
-- [ ] T028 [P] [US2] Unit tests for ConfigCommand llm action handling in `tests/TenSecondTom.Tests/Unit/Features/Setup/Handlers/ConfigCommandHandlerTests.cs`
-- [ ] T029 [US2] Integration test for end-to-end `tom config llm` command flow in `tests/TenSecondTom.IntegrationTests/Integration/Features/Setup/ConfigLlmCommandTests.cs`
+- [X] T028 [P] [US2] Unit tests for ConfigCommand llm action handling in `tests/TenSecondTom.Tests/Unit/Features/Setup/Handlers/ConfigCommandHandlerTests.cs`
+- [X] T029 [US2] Integration test for end-to-end `tom config llm` command flow in `tests/TenSecondTom.IntegrationTests/Integration/Features/Setup/ConfigLlmCommandTests.cs`
 
 ### Implementation for User Story 2
 
-- [ ] T030 [US2] Extend `src/Features/Setup/Commands/ConfigCommand.cs` to support "llm" as SettingName for interactive model selection
-- [ ] T031 [US2] Extend `src/Features/Setup/Handlers/ConfigCommandHandler.cs` to handle SettingName == "llm" action
-- [ ] T032 [US2] Implement interactive provider selection in ConfigCommandHandler when SettingName is "llm" (reuse SpectreConsoleSetupWizard.PromptForLlmProviderAsync)
-- [ ] T033 [US2] Implement interactive model selection in ConfigCommandHandler after provider selection (reuse SpectreConsoleSetupWizard.PromptForModelAsync)
-- [ ] T034 [US2] Update model configuration in user secrets via UserSecretsStorageService in ConfigCommandHandler
-- [ ] T035 [US2] Display success message with selected provider and model after update
-- [ ] T036 [US2] Add current model highlighting in SelectionPrompt when model is already configured
+- [X] T030 [US2] Extend `src/Features/Setup/Commands/ConfigCommand.cs` to support "llm" as SettingName for interactive model selection
+- [X] T031 [US2] Extend `src/Features/Setup/Handlers/ConfigCommandHandler.cs` to handle SettingName == "llm" action
+- [X] T032 [US2] Implement interactive provider selection in ConfigCommandHandler when SettingName is "llm" (reuse SpectreConsoleSetupWizard.PromptForLlmProviderAsync)
+- [X] T033 [US2] Implement interactive model selection in ConfigCommandHandler after provider selection (reuse SpectreConsoleSetupWizard.PromptForModelAsync)
+- [X] T034 [US2] Update model configuration in user secrets via UserSecretsStorageService in ConfigCommandHandler
+- [X] T035 [US2] Display success message with selected provider and model after update
+- [X] T036 [US2] Add current model highlighting in SelectionPrompt when model is already configured
+- [X] T037 [US2] Add CLI subcommand `tom config llm` in `src/Infrastructure/Cli/CommandRegistry.cs` for easy access
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work - users can configure models via setup or config command
 

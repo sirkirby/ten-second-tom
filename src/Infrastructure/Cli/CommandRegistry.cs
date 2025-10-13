@@ -569,6 +569,55 @@ public static class CommandRegistry
             }
         });
 
+        // LLM subcommand - interactive configuration for LLM provider and model
+        var llmCommand = new Command("llm", "Configure LLM provider and model interactively");
+        llmCommand.Options.Add(jsonOutputOption);
+
+        llmCommand.SetAction(async (parseResult) =>
+        {
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
+
+            var handler = serviceProvider.GetRequiredService<ConfigCommandHandler>();
+            
+            var command = new ConfigCommand
+            {
+                Action = ConfigAction.Set,
+                SettingName = "llm",
+                SettingValue = null,
+                ShowSecrets = false
+            };
+
+            var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
+
+            if (result.IsSuccess)
+            {
+                if (jsonOutput)
+                {
+                    var config = result.Value!;
+                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new 
+                    { 
+                        success = true, 
+                        provider = config.Llm.Provider.ToString(),
+                        model = config.Llm.Model
+                    }));
+                }
+                // Success message already displayed by handler
+                return 0;
+            }
+            else
+            {
+                if (jsonOutput)
+                {
+                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { success = false, error = result.Error }));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error}");
+                }
+                return 1;
+            }
+        });
+
         // Validate subcommand
         var validateCommand = new Command("validate", "Validate current configuration");
         validateCommand.Options.Add(jsonOutputOption);
@@ -617,6 +666,7 @@ public static class CommandRegistry
 
         configCommand.Subcommands.Add(showCommand);
         configCommand.Subcommands.Add(setCommand);
+        configCommand.Subcommands.Add(llmCommand);
         configCommand.Subcommands.Add(validateCommand);
 
         return configCommand;

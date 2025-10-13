@@ -466,14 +466,14 @@ public sealed class ConfigurationCheckerTests
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             ["Llm:Provider"] = "OpenAI",
-            ["Llm:Model"] = "gpt-4o-mini"
+            ["Llm:Model"] = "gpt-4o-mini-2024-07-18"
         });
 
         // Act
         var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
 
         // Assert
-        result.Should().BeTrue("gpt-4o-mini is a valid OpenAI model");
+        result.Should().BeTrue("gpt-4o-mini-2024-07-18 is a valid OpenAI model");
     }
 
     [Fact]
@@ -625,7 +625,7 @@ public sealed class ConfigurationCheckerTests
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             ["Llm:Provider"] = "OpenAI",
-            ["Llm:Model"] = "gpt-4o-mini"
+            ["Llm:Model"] = "gpt-4o-mini-2024-07-18"
         });
 
         // Act
@@ -722,9 +722,9 @@ public sealed class ConfigurationCheckerTests
 
         // Assert
         result.Should().NotBeNullOrEmpty();
-        result.Should().Contain("gpt-4o-mini");
-        result.Should().Contain("gpt-4o");
-        result.Should().Contain("gpt-3.5-turbo");
+        result.Should().Contain("gpt-4o-mini-2024-07-18");
+        result.Should().Contain("gpt-4o-2024-11-20");
+        result.Should().Contain("chatgpt-4o-latest");
     }
 
     #endregion
