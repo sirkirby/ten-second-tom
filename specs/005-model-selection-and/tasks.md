@@ -143,15 +143,15 @@
 
 ### Tests for User Story 4
 
-- [ ] T042 [P] [US4] Unit tests for model display formatting in `tests/TenSecondTom.Tests/Unit/Features/Setup/Models/ModelRegistryTests.cs`
-- [ ] T043 [US4] Integration test verifying model list display includes all required metadata in `tests/TenSecondTom.IntegrationTests/Integration/Features/Setup/ConfigLlmCommandTests.cs`
+- [X] T042 [P] [US4] Unit tests for model display formatting in `tests/TenSecondTom.Tests/Unit/Features/Setup/Models/ModelRegistryTests.cs`
+- [X] T043 [US4] Integration test verifying model list display includes all required metadata in `tests/TenSecondTom.IntegrationTests/Integration/Features/Setup/ConfigLlmCommandTests.cs`
 
 ### Implementation for User Story 4
 
-- [ ] T044 [US4] Ensure SelectionPrompt converter in SpectreConsoleSetupWizard.PromptForModelAsync displays format: "DisplayName [CostTier] - Description"
-- [ ] T045 [US4] Update `tom config show` command to display currently configured model in LLM section in `src/Features/Setup/Handlers/ConfigCommandHandler.cs`
-- [ ] T046 [US4] Add model information to config show output format with provider, model name, and cost tier
-- [ ] T047 [US4] Update README.md with model selection feature and available models documentation
+- [X] T044 [US4] Ensure SelectionPrompt converter in SpectreConsoleSetupWizard.PromptForModelAsync displays format: "DisplayName [CostTier] - Description"
+- [X] T045 [US4] Update `tom config show` command to display currently configured model in LLM section in `src/Features/Setup/Handlers/ConfigCommandHandler.cs`
+- [X] T046 [US4] Add model information to config show output format with provider, model name, and cost tier
+- [X] T047 [US4] Update README.md with model selection feature and available models documentation
 
 **Checkpoint**: All user stories should now be independently functional with complete documentation
 

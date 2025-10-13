@@ -10,6 +10,29 @@ namespace TenSecondTom.Tests.Unit.Features.Setup.Models;
 /// </summary>
 public sealed class ModelRegistryTests
 {
+    /// <summary>
+    /// Verifies that the formatted display strings for models follow the expected pattern
+    /// "DisplayName (CostTier) - Description" to be consumed by the selection prompt.
+    /// (T042)
+    /// </summary>
+    [Fact]
+    public void ModelDisplayFormatting_ShouldFollowExpectedPattern()
+    {
+        var allModels = ModelRegistry.OpenAIModels.Concat(ModelRegistry.AnthropicModels).ToList();
+
+        allModels.Should().NotBeEmpty();
+
+        foreach (var model in allModels)
+        {
+            var formatted = $"{model.DisplayName} ({model.CostTier}) - {model.Description}";
+            formatted.Should().Contain(model.DisplayName);
+            formatted.Should().Contain($"({model.CostTier})");
+            formatted.Should().Contain(" - ");
+            formatted.Should().EndWith(model.Description);
+            // Ensure no Spectre markup characters slipped in unexpectedly
+            formatted.Should().NotContain("[", "Square brackets would be parsed as Spectre.Console markup");
+        }
+    }
     [Fact]
     public void OpenAIModels_ShouldContainAtLeastThreeModels()
     {

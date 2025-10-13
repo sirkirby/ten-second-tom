@@ -9,6 +9,7 @@ using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.DependencyInjection;
 using TenSecondTom.Infrastructure.Logging;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Secrets;
 
 namespace TenSecondTom;
@@ -70,8 +71,7 @@ internal static class Program
             
             // Add User Secrets explicitly (for self-contained/trimmed binaries)
             // This doesn't rely on assembly reflection like AddUserSecrets<T>()
-            string userSecretsId = "ten-second-tom-secrets";
-            string userSecretsPath = SecretsHelper.GetUserSecretsPath(userSecretsId);
+            string userSecretsPath = SecretsHelper.GetUserSecretsPath(ConfigurationKeys.UserSecretsId);
             if (File.Exists(userSecretsPath))
             {
                 configurationBuilder.AddJsonFile(userSecretsPath, optional: true, reloadOnChange: true);

@@ -27,6 +27,10 @@ public sealed class ConfigLlmCommandTests : IDisposable
         _testSecretsId = $"tom-test-{Guid.NewGuid()}";
         _mockWizard = new Mock<ISetupWizardUI>();
 
+        // Setup common UI methods that don't affect test outcomes
+        _mockWizard.Setup(w => w.ShowStepHeader(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>()));
+        _mockWizard.Setup(w => w.ShowWarning(It.IsAny<string>()));
+
         var services = new ServiceCollection();
         
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Debug));
@@ -112,18 +116,21 @@ public sealed class ConfigLlmCommandTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(selectedModel);
 
+        // Provider is changing from OpenAI to Anthropic, so API key prompt is required
+        _mockWizard.Setup(w => w.PromptForApiKeyAsync(
+                LlmProvider.Anthropic,
+                null, // New provider, no current key shown
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync("sk-ant-test_key_1234567890abcdefghijklmnopqrstuvwxyz");
+
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        // Note: This test will fail until implementation is complete
-        // Once implemented, should verify:
-        // result.IsSuccess.Should().BeTrue();
-        // result.Value!.Llm.Provider.Should().Be(LlmProvider.Anthropic);
-        // result.Value!.Llm.Model.Should().Be("claude-3-5-sonnet-20241022");
-        
-        // For now, this documents the expected behavior
-        result.IsSuccess.Should().BeFalse(); // Until implemented
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Llm.Provider.Should().Be(LlmProvider.Anthropic);
+        result.Value!.Llm.Model.Should().Be("claude-3-5-sonnet-20241022");
+        result.Value!.Llm.ApiKey.Should().Be("sk-ant-test_key_1234567890abcdefghijklmnopqrstuvwxyz");
     }
 
     [Fact]
@@ -234,19 +241,27 @@ public sealed class ConfigLlmCommandTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(anthropicModel);
 
+        // Provider is changing, so API key prompt is required
+        _mockWizard.Setup(w => w.PromptForApiKeyAsync(
+                LlmProvider.Anthropic,
+                null, // New provider, no current key shown
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync("sk-ant-test_api_key_567890abcdefghijklmnopqrstuvwxyz");
+
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        // Once implemented, should verify:
-        // result.IsSuccess.Should().BeTrue();
-        // result.Value!.Llm.Provider.Should().Be(LlmProvider.Anthropic);
-        // result.Value!.Llm.Model.Should().Be("claude-3-5-haiku-20241022");
-        
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Llm.Provider.Should().Be(LlmProvider.Anthropic);
+        result.Value!.Llm.Model.Should().Be("claude-3-5-haiku-20241022");
+        result.Value!.Llm.ApiKey.Should().Be("sk-ant-test_api_key_567890abcdefghijklmnopqrstuvwxyz");
+
         // Verify persistence
         var reloadedConfig = await storageService.LoadAsync(CancellationToken.None);
-        // reloadedConfig.Value!.Llm.Provider.Should().Be(LlmProvider.Anthropic);
-        // reloadedConfig.Value!.Llm.Model.Should().Be("claude-3-5-haiku-20241022");
+        reloadedConfig.Value!.Llm.Provider.Should().Be(LlmProvider.Anthropic);
+        reloadedConfig.Value!.Llm.Model.Should().Be("claude-3-5-haiku-20241022");
+        reloadedConfig.Value!.Llm.ApiKey.Should().Be("sk-ant-test_api_key_567890abcdefghijklmnopqrstuvwxyz");
     }
 
     [Fact]

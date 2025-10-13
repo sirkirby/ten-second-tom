@@ -73,6 +73,89 @@ dotnet publish -c Release -o /usr/local/bin/tom
 
 ### API Keys Setup
 
+### LLM Provider & Model Selection
+
+Ten Second Tom supports multiple Large Language Model (LLM) providers and a curated list of production-ready models. You can configure both the provider and model using any of these methods:
+
+1. Interactive setup wizard (`tom setup`)
+2. Configuration command (`tom config llm`)
+3. Environment variables (advanced / CI)
+
+#### Interactive Selection (Recommended)
+
+Run either the setup wizard or the config command:
+
+```bash
+tom setup         # Guided initial configuration (includes provider + model selection)
+tom config llm    # Re-run provider/model selection any time
+```
+
+You'll first select a provider, then a curated list of models is displayed with cost tier and description:
+
+```
+Select an LLM provider:
+  ▸ OpenAI
+    Anthropic
+
+Select a model (OpenAI):
+  ▸ GPT‑4o (gpt-4o) [Premium] - Flagship reasoning & synthesis model
+    GPT‑4o Mini (gpt-4o-mini) [Standard] - Balanced cost & quality
+    GPT‑3.5 Turbo (gpt-3.5-turbo) [Economy] - Legacy fast inexpensive model
+```
+
+Current selection is highlighted when reconfiguring so you can easily compare or switch.
+
+#### Environment Variable Configuration
+
+You can override the configured model (and/or provider) at runtime without modifying user secrets:
+
+```bash
+export TenSecondTom__LlmProvider="Anthropic"
+export TenSecondTom__Llm__Model="claude-3-5-sonnet"
+```
+
+Environment variable values take precedence over user secrets and `appsettings.json`.
+
+#### Supported Providers & Models
+
+| Provider   | Model ID                    | Display Name            | Cost Tier | Default | Description |
+|------------|-----------------------------|-------------------------|-----------|---------|-------------|
+| OpenAI     | `gpt-4o`                    | GPT‑4o                  | Premium   | ✅       | Flagship general reasoning model |
+| OpenAI     | `gpt-4o-mini`               | GPT‑4o Mini             | Standard  |         | Balanced quality vs. cost |
+| OpenAI     | `gpt-3.5-turbo`             | GPT‑3.5 Turbo           | Economy   |         | Legacy fast / inexpensive |
+| Anthropic  | `claude-3-5-sonnet`         | Claude 3.5 Sonnet       | Premium   | ✅       | Advanced reasoning & balanced speed |
+| Anthropic  | `claude-3-5-haiku`          | Claude 3.5 Haiku        | Standard  |         | Fast & cost-efficient |
+| Anthropic  | `claude-3-opus`             | Claude 3 Opus           | Premium   |         | High-complexity reasoning |
+
+Notes:
+- Default model (per provider) is used automatically if you leave the model blank during setup.
+- Validation occurs at startup; an invalid provider/model combination produces a clear error with valid suggestions.
+- Additional models may be added over time; run `tom config llm` to view the current curated list.
+
+#### Viewing Current Configuration
+
+```bash
+tom config show
+```
+
+Example LLM section in output:
+
+```
+LLM Configuration
+  Provider : OpenAI
+  Model    : gpt-4o (Premium)
+```
+
+#### Changing Just the Model Quickly
+
+```bash
+tom config llm
+```
+
+This re-runs only the provider/model selection flow—other settings remain unchanged.
+
+---
+
 **Option 1: .NET User Secrets** (recommended for development)
 
 ```bash

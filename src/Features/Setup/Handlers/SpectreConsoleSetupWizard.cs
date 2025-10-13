@@ -99,15 +99,19 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             return Task.FromResult<SupportedModel?>(null);
         }
 
-        // Create choices with formatted display: "DisplayName (CostTier) - Description"
-        // Use parentheses instead of square brackets to avoid Spectre.Console markup parsing
-        // Create a dictionary to map the formatted choice back to the model
+    // Create choices with formatted display: "DisplayName [CostTier] - Description"
+    // Using square brackets now that we ensure escaping of markup-sensitive content.
+    // Dictionary maps the formatted choice back to the model instance.
         var choiceToModel = new Dictionary<string, SupportedModel>();
         var choices = new List<string>();
         
         foreach (var model in models)
         {
-            var choice = $"{model.DisplayName} ({model.CostTier}) - {model.Description}";
+            // Escape any markup in description/display name to avoid Spectre parsing issues
+            var displayName = model.DisplayName.EscapeMarkup();
+            var costTier = model.CostTier.EscapeMarkup();
+            var description = model.Description.EscapeMarkup();
+            var choice = $"{displayName} [{costTier}] - {description}";
             choices.Add(choice);
             choiceToModel[choice] = model;
         }

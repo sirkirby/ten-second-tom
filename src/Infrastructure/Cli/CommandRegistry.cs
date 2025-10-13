@@ -680,7 +680,7 @@ public static class CommandRegistry
             .AddColumn("[yellow]Value[/]");
 
         // SSH Configuration
-        table.AddRow("SSH Key Path", config.Ssh.KeyPath ?? "[dim]Not set[/]");
+        table.AddRow("SSH Key Path", config.Ssh.KeyPath?.EscapeMarkup() ?? "[dim]Not set[/]");
         table.AddRow("SSH Key Source", config.Ssh.KeySource?.ToString() ?? "[dim]Not set[/]");
 
         // LLM Configuration
@@ -692,8 +692,8 @@ public static class CommandRegistry
         {
             var model = ModelRegistry.GetById(config.Llm.Model);
             modelDisplay = model != null 
-                ? $"{model.DisplayName} ({model.CostTier})"
-                : config.Llm.Model;
+                ? $"{model.DisplayName.EscapeMarkup()} ({model.CostTier})"
+                : config.Llm.Model.EscapeMarkup();
         }
         table.AddRow("Model", modelDisplay);
         
@@ -703,7 +703,7 @@ public static class CommandRegistry
         table.AddRow("API Key", apiKeyDisplay);
 
         // Storage Configuration
-        table.AddRow("Memory Directory", config.Storage.MemoryDirectory ?? "[dim]Not set[/]");
+        table.AddRow("Memory Directory", config.Storage.MemoryDirectory?.EscapeMarkup() ?? "[dim]Not set[/]");
 
         // Optional Configuration
         table.AddRow("Log Level", config.Optional.LogLevel.ToString());
