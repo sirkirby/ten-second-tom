@@ -9,6 +9,7 @@ using TenSecondTom.Features.Shell.Services;
 using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.OutputFormatters;
 using AuthLoginHandler = TenSecondTom.Features.Auth.Handlers.LoginCommandHandler;
 using AuthLogoutHandler = TenSecondTom.Features.Auth.Handlers.LogoutCommandHandler;
@@ -76,7 +77,7 @@ public static class CommandRegistry
             
             // Simple version output (no logo in shell mode to avoid duplication)
             var version = typeof(Logo).Assembly.GetName().Version;
-            var versionString = $"Ten Second Tom v{version?.Major}.{version?.Minor}.{version?.Build ?? 0}";
+            var versionString = $"{ApplicationConstants.ApplicationNameWithVersionPrefix}{version?.Major}.{version?.Minor}.{version?.Build ?? 0}";
             
             if (jsonOutput)
             {

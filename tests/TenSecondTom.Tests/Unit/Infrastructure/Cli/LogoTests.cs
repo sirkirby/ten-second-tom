@@ -3,6 +3,7 @@ namespace TenSecondTom.Tests.Unit.Infrastructure.Cli;
 using Xunit;
 using FluentAssertions;
 using TenSecondTom.Infrastructure.Cli;
+using TenSecondTom.Shared.Constants;
 
 /// <summary>
 /// Unit tests for the <see cref="Logo"/> class.
@@ -37,8 +38,8 @@ public sealed class LogoTests
 
         // Assert
         versionInfo.Should().NotBeNullOrEmpty();
-        versionInfo.Should().StartWith("Ten Second Tom v");
-        versionInfo.Should().MatchRegex(@"Ten Second Tom v\d+\.\d+\.\d+");
+        versionInfo.Should().StartWith(ApplicationConstants.ApplicationNameWithVersionPrefix);
+        versionInfo.Should().MatchRegex(@$"{ApplicationConstants.ApplicationNameWithVersionPrefix}\d+\.\d+\.\d+");
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 namespace TenSecondTom.Infrastructure.Cli;
 
 using Spectre.Console;
+using TenSecondTom.Shared.Constants;
 
 /// <summary>
 /// Provides ASCII art logo and branding for the Ten Second Tom CLI application.
@@ -21,7 +22,7 @@ internal static class Logo
         {
             AnsiConsole.WriteLine();
             AnsiConsole.Write(
-                new FigletText("Ten Second Tom")
+                new FigletText(ApplicationConstants.ApplicationName)
                     .LeftJustified()
                     .Color(Color.Cyan1));
 
@@ -42,7 +43,7 @@ internal static class Logo
     public static string GetVersionInfo()
     {
         var version = typeof(Logo).Assembly.GetName().Version;
-        return $"Ten Second Tom v{version?.Major}.{version?.Minor}.{version?.Build ?? 0}";
+        return $"{ApplicationConstants.ApplicationNameWithVersionPrefix}{version?.Major}.{version?.Minor}.{version?.Build ?? 0}";
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
 using TenSecondTom.Features.Shell.Models;
+using TenSecondTom.Shared.Constants;
 using ShellCommandResult = TenSecondTom.Features.Shell.Models.CommandResult;
 
 namespace TenSecondTom.Features.Shell.Services;
@@ -131,7 +132,7 @@ public sealed class ReplLoop : IReplLoop
     {
         AnsiConsole.WriteLine();
         AnsiConsole.Write(
-            new FigletText("Ten Second Tom")
+            new FigletText(ApplicationConstants.ApplicationName)
                 .LeftJustified()
                 .Color(Color.Cyan1));
 
