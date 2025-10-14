@@ -15,6 +15,8 @@
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
     <!-- Suppress specific trimming warnings -->
     <NoWarn>$(NoWarn);IL2026;IL2067;IL2070;IL2075;IL2077;IL3050</NoWarn>
+    <!-- Suppress code analysis warnings for reusable shared components -->
+    <NoWarn>$(NoWarn);CA1515;CA1716</NoWarn>
   </PropertyGroup>
 
   <!-- Preserve assemblies that are loaded via reflection (e.g., Serilog sinks) -->
@@ -64,6 +66,7 @@
     <PackageReference Include="Spectre.Console" Version="0.51.1" />
     <PackageReference Include="SSH.NET" Version="2025.0.0" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-rc.1.25451.107" />
+    <PackageReference Include="Terminal.Gui" Version="1.*" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
   </ItemGroup>
 
