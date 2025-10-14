@@ -18,6 +18,7 @@ using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
+using TenSecondTom.Shared.TextEditing.Services;
 
 namespace TenSecondTom.Infrastructure.DependencyInjection;
 
@@ -199,6 +200,66 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAutocompleteEngine, AutocompleteEngine>();
         services.AddSingleton<IOutputPaginator, OutputPaginator>();
 
+        // Text editing services (T028)
+        services.AddSingleton<InputSanitizer>();
+        
+        // Register both editor implementations
+        services.AddTransient<TerminalGuiTextEditor>();
+        services.AddTransient<StreamBasedTextEditor>();
+        
+        services.AddTransient<IInteractiveTextEditor>(serviceProvider =>
+        {
+            var sanitizer = serviceProvider.GetRequiredService<InputSanitizer>();
+            var logger = serviceProvider.GetRequiredService<ILoggerFactory>();
+
+            // Check if we should use fallback editor directly (skip Terminal.Gui attempt)
+            bool useStreamBased = Console.IsInputRedirected 
+                || Environment.GetEnvironmentVariable("TERM") == "dumb"
+                || !IsInteractiveTerminal();
+
+            if (useStreamBased)
+            {
+                var streamLogger = logger.CreateLogger<StreamBasedTextEditor>();
+                #pragma warning disable CA1848 // Use LoggerMessage delegates for performance
+                var generalLogger = logger.CreateLogger("EditorSelection");
+                generalLogger.LogInformation(
+                    "Using StreamBasedTextEditor directly (IsInputRedirected={IsRedirected}, TERM={Term})",
+                    Console.IsInputRedirected,
+                    Environment.GetEnvironmentVariable("TERM") ?? "not set"
+                );
+                #pragma warning restore CA1848
+                return new StreamBasedTextEditor(sanitizer, streamLogger);
+            }
+
+            // Use FallbackTextEditor wrapper - tries Terminal.Gui, falls back to StreamBased on failure
+            #pragma warning disable CA1848 // Use LoggerMessage delegates for performance
+            var selectionLogger = logger.CreateLogger("EditorSelection");
+            selectionLogger.LogInformation(
+                "Using FallbackTextEditor (will try Terminal.Gui, fallback to StreamBased if needed)"
+            );
+            #pragma warning restore CA1848
+            
+            var primaryEditor = serviceProvider.GetRequiredService<TerminalGuiTextEditor>();
+            var fallbackEditor = serviceProvider.GetRequiredService<StreamBasedTextEditor>();
+            var fallbackLogger = logger.CreateLogger<FallbackTextEditor>();
+            
+            return new FallbackTextEditor(primaryEditor, fallbackEditor, fallbackLogger);
+        });
+
         return services;
+    }
+
+    /// <summary>
+    /// Checks if the current terminal supports interactive TUI applications.
+    /// </summary>
+    private static bool IsInteractiveTerminal()
+    {
+        // Check if stdin/stdout are both console
+        if (!Console.IsInputRedirected && !Console.IsOutputRedirected)
+        {
+            return true;
+        }
+
+        return false;
     }
 }

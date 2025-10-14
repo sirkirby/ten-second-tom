@@ -175,7 +175,8 @@ public static class CommandRegistry
             string? provider = parseResult.GetValue(providerOption);
             var handler = serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
             var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
-            await TodayCommandHandler.ExecuteAsync(handler, authService, provider, jsonOutput).ConfigureAwait(false);
+            var textEditor = serviceProvider.GetRequiredService<TenSecondTom.Shared.TextEditing.Services.IInteractiveTextEditor>();
+            await TodayCommandHandler.ExecuteAsync(handler, authService, textEditor, provider, jsonOutput).ConfigureAwait(false);
         });
 
         return todayCommand;

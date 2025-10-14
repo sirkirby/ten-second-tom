@@ -6,6 +6,8 @@ using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.OutputFormatters;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Shared.TextEditing.Services;
+using TenSecondTom.Shared.TextEditing.Models;
 
 namespace TenSecondTom.Infrastructure.Cli;
 
@@ -28,15 +30,17 @@ public static class TodayCommandHandler
     /// </summary>
     /// <param name="handler">The command handler.</param>
     /// <param name="authService">The authentication service.</param>
+    /// <param name="textEditor">The interactive text editor for multi-line input.</param>
     /// <param name="providerOverride">Optional LLM provider override.</param>
     /// <param name="jsonOutput">Whether to output results in JSON format.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2007:Consider calling ConfigureAwait on the awaited task", Justification = "Console application, no synchronization context")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA1849:Call async methods when in an async method", Justification = "Spectre.Console Ask/Confirm are synchronous by design")]
-    public static async Task ExecuteAsync(CreateDailyEntryHandler handler, IAuthenticationService authService, string? providerOverride, bool jsonOutput = false)
+    public static async Task ExecuteAsync(IRequestHandler<CreateDailyEntryCommand, Result<DailyEntry>> handler, IAuthenticationService authService, IInteractiveTextEditor textEditor, string? providerOverride, bool jsonOutput = false)
     {
         ArgumentNullException.ThrowIfNull(handler);
         ArgumentNullException.ThrowIfNull(authService);
+        ArgumentNullException.ThrowIfNull(textEditor);
 
         // Show warning if using mock authentication (only in non-JSON mode)
         if (!jsonOutput && authService is MockAuthenticationService)
@@ -68,24 +72,63 @@ public static class TodayCommandHandler
 
         var responses = new Dictionary<string, string>();
 
-        // Collect responses
+        // Collect responses using the interactive text editor
         for (int i = 0; i < DefaultPrompts.Length; i++)
         {
             string question = DefaultPrompts[i];
-            string answer = AnsiConsole.Ask<string>($"[yellow]{question}[/]");
-
-            if (string.IsNullOrWhiteSpace(answer))
+            
+            if (!jsonOutput)
             {
-                AnsiConsole.MarkupLine("[red]Answer cannot be empty. Please try again.[/]");
-                i--; // Retry this question
+                AnsiConsole.MarkupLine($"[yellow]{question}[/]");
+                AnsiConsole.MarkupLine("[dim](Press Ctrl+D when done, Ctrl+C to cancel)[/]");
+                AnsiConsole.WriteLine();
+            }
+
+            // Use the text editor for multi-line input
+            var editorConfig = EditorConfiguration.Default with { Title = question };
+            EditorResult editorResult = await textEditor.EditAsync(
+                initialContent: null,
+                configuration: editorConfig,
+                cancellationToken: CancellationToken.None).ConfigureAwait(false);
+
+            if (editorResult.IsCancelled)
+            {
+                if (!jsonOutput)
+                {
+                    AnsiConsole.MarkupLine("[yellow]Entry creation cancelled.[/]");
+                }
+                return;
+            }
+
+            if (editorResult.IsError)
+            {
+                if (!jsonOutput)
+                {
+                    AnsiConsole.MarkupLine($"[red]Editor error: {editorResult.ErrorMessage}[/]");
+                }
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(editorResult.Content))
+            {
+                if (!jsonOutput)
+                {
+                    AnsiConsole.MarkupLine("[red]Answer cannot be empty. Please try again.[/]");
+                    i--; // Retry this question
+                }
                 continue;
             }
 
-            responses[question] = answer.Trim();
+            responses[question] = editorResult.Content.Trim();
+
+            if (!jsonOutput)
+            {
+                AnsiConsole.WriteLine();
+            }
         }
 
         // Ask if user wants to add more responses (up to 5 total)
-        while (responses.Count < 5)
+        while (responses.Count < 5 && !jsonOutput)
         {
             if (!AnsiConsole.Confirm($"[dim]Add another response? ({responses.Count}/5)[/]", defaultValue: false))
             {
@@ -99,14 +142,29 @@ public static class TodayCommandHandler
                 continue;
             }
 
-            string customAnswer = AnsiConsole.Ask<string>($"[yellow]{customQuestion}[/]");
-            if (string.IsNullOrWhiteSpace(customAnswer))
+            AnsiConsole.MarkupLine("[dim](Press Ctrl+D when done, Ctrl+C to cancel)[/]");
+            AnsiConsole.WriteLine();
+
+            var editorConfig = EditorConfiguration.Default with { Title = "Add another response?" };
+            EditorResult editorResult = await textEditor.EditAsync(
+                initialContent: null,
+                configuration: editorConfig,
+                cancellationToken: CancellationToken.None).ConfigureAwait(false);
+
+            if (editorResult.IsCancelled || editorResult.IsError)
+            {
+                AnsiConsole.MarkupLine("[yellow]Skipping custom question.[/]");
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(editorResult.Content))
             {
                 AnsiConsole.MarkupLine("[red]Answer cannot be empty.[/]");
                 continue;
             }
 
-            responses[customQuestion.Trim()] = customAnswer.Trim();
+            responses[customQuestion.Trim()] = editorResult.Content.Trim();
+            AnsiConsole.WriteLine();
         }
 
         // Create command

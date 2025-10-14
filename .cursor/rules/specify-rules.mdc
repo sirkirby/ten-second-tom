@@ -1,0 +1,25 @@
+# ten-second-tom Development Guidelines
+
+Auto-generated from all feature plans. Last updated: 2025-10-13
+
+## Active Technologies
+- C# (modern features) on .NET 9 + System.CommandLine (existing), Spectre.Console (existing), Serilog (existing), Terminal.Gui (new, pinned), FluentValidation (existing) (006-improved-text-editing)
+
+## Project Structure
+```
+src/
+tests/
+```
+
+## Commands
+# Add commands for C# (modern features) on .NET 9
+
+## Code Style
+C# (modern features) on .NET 9: Follow standard conventions
+
+## Recent Changes
+- 006-improved-text-editing: Added C# (modern features) on .NET 9 + System.CommandLine (existing), Spectre.Console (existing), Serilog (existing), Terminal.Gui (new, pinned), FluentValidation (existing)
+
+<!-- MANUAL ADDITIONS START -->
+For questions about architectural decisions or edge cases, consult `.specify/memory/constitution.md`.
+<!-- MANUAL ADDITIONS END -->
