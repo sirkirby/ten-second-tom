@@ -1,3 +1,5 @@
+using TenSecondTom.Shared.Constants;
+
 namespace TenSecondTom.Shared.Models;
 
 /// <summary>
@@ -146,24 +148,24 @@ public sealed class TemplateMetadata
         // Required field validation
         if (string.IsNullOrWhiteSpace(Title))
             errors.Add("Title is required");
-        else if (Title.Length > 200)
-            errors.Add("Title must be 200 characters or less");
+        else if (Title.Length > TemplateConstants.MaxTitleLength)
+            errors.Add($"Title must be {TemplateConstants.MaxTitleLength} characters or less");
 
         if (!Enum.IsDefined(TemplateType))
             errors.Add($"Invalid template type: {TemplateType}");
 
         // Optional field validation
-        if (Description?.Length > 500)
-            errors.Add("Description must be 500 characters or less");
+        if (Description?.Length > TemplateConstants.MaxDescriptionLength)
+            errors.Add($"Description must be {TemplateConstants.MaxDescriptionLength} characters or less");
 
-        if (Author?.Length > 100)
-            errors.Add("Author must be 100 characters or less");
+        if (Author?.Length > TemplateConstants.MaxAuthorLength)
+            errors.Add($"Author must be {TemplateConstants.MaxAuthorLength} characters or less");
 
-        if (Tags?.Length > 20)
-            errors.Add("Maximum 20 tags allowed");
+        if (Tags?.Length > TemplateConstants.MaxTagsCount)
+            errors.Add($"Maximum {TemplateConstants.MaxTagsCount} tags allowed");
 
-        if (Tags?.Any(tag => tag.Length > 50) == true)
-            errors.Add("Each tag must be 50 characters or less");
+        if (Tags?.Any(tag => tag.Length > TemplateConstants.MaxTagLength) == true)
+            errors.Add($"Each tag must be {TemplateConstants.MaxTagLength} characters or less");
 
         return errors.AsReadOnly();
     }

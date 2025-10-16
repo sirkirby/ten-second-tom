@@ -21,6 +21,7 @@ public static class TemplatesFeatureExtensions
         services.AddTransient<InstallDefaultTemplatesHandler>();
         services.AddTransient<IRequestHandler<InstallDefaultTemplatesCommand, Result<InstallDefaultTemplatesResult>>>(
             sp => sp.GetRequiredService<InstallDefaultTemplatesHandler>());
+        services.AddTransient<ListTemplatesQueryHandler>();
         services.AddTransient<TemplateMigrationService>();
         return services;
     }

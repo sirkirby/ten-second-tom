@@ -72,6 +72,16 @@ public sealed class EmbeddedPromptTemplateLoader : IPromptTemplateLoader
         }
     }
 
+    /// <summary>
+    /// Attempts to load a user override template from the filesystem.
+    /// User overrides take precedence over embedded resources.
+    /// </summary>
+    /// <param name="templateId">The template ID to load.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>
+    /// A successful result containing the user override template if found,
+    /// or null if no override exists or loading fails (to trigger fallback to embedded).
+    /// </returns>
     private async Task<Result<PromptTemplate>?> TryLoadUserOverrideAsync(
         string templateId,
         CancellationToken cancellationToken)
@@ -114,6 +124,16 @@ public sealed class EmbeddedPromptTemplateLoader : IPromptTemplateLoader
         }
     }
 
+    /// <summary>
+    /// Loads a template from embedded assembly resources.
+    /// Parses YAML front matter if present to extract metadata.
+    /// </summary>
+    /// <param name="templateId">The template ID to load.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>
+    /// A result containing the embedded template,
+    /// or a failure result if the template is not found in embedded resources.
+    /// </returns>
     private async Task<Result<PromptTemplate>> LoadEmbeddedTemplateAsync(
         string templateId,
         CancellationToken cancellationToken)
@@ -247,6 +267,15 @@ public sealed class EmbeddedPromptTemplateLoader : IPromptTemplateLoader
         }
     }
 
+    /// <summary>
+    /// Determines the template type from a template ID.
+    /// Maps known template IDs to their corresponding types.
+    /// </summary>
+    /// <param name="templateId">The template ID to analyze.</param>
+    /// <returns>
+    /// The template type: Daily for "daily-summary", Weekly for "weekly-review",
+    /// or SystemPrompt for all other templates.
+    /// </returns>
     private static TemplateType DetermineTemplateType(string templateId)
     {
 #pragma warning disable CA1308 // Normalize strings to uppercase - template IDs are conventionally lowercase

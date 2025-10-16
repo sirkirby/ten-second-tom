@@ -1,3 +1,4 @@
+using System.IO.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -48,6 +49,19 @@ public sealed class ApplicationBootstrapper
             var migrationService = _serviceProvider.GetRequiredService<TemplateMigrationService>();
             await migrationService.RunAutomaticMigrationAsync(_configuration, cancellationToken)
                 .ConfigureAwait(false);
+
+            // Perform self-healing: check for missing templates directory and restore if needed
+            var fileSystem = _serviceProvider.GetRequiredService<IFileSystem>();
+            bool healingPerformed = await ConfigurationChecker.PerformSelfHealingAsync(
+                _configuration,
+                fileSystem,
+                _logger,
+                cancellationToken).ConfigureAwait(false);
+
+            if (healingPerformed)
+            {
+                _logger.LogInformation("Self-healing completed: Templates directory and defaults restored");
+            }
         }
 
         // Validate model configuration if configured

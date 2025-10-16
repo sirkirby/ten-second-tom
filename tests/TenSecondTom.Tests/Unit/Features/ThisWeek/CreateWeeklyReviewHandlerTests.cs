@@ -5,6 +5,7 @@ using Moq;
 using TenSecondTom.Features.ThisWeek.Commands;
 using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
@@ -27,6 +28,8 @@ public sealed class CreateWeeklyReviewHandlerTests
     private readonly Mock<IAuthenticationService> _mockAuthService;
     private readonly Mock<IConfiguration> _mockConfiguration;
     private readonly Mock<ILogger<CreateWeeklyReviewHandler>> _mockLogger;
+    private readonly TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler _listTemplatesHandler;
+    private readonly Mock<ITemplateSelectionUI> _mockTemplateSelectionUI;
     private readonly CreateWeeklyReviewHandler _handler;
 
     public CreateWeeklyReviewHandlerTests()
@@ -38,6 +41,11 @@ public sealed class CreateWeeklyReviewHandlerTests
         _mockAuthService = new Mock<IAuthenticationService>();
         _mockConfiguration = new Mock<IConfiguration>();
         _mockLogger = new Mock<ILogger<CreateWeeklyReviewHandler>>();
+        var mockListTemplatesLogger = new Mock<ILogger<TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler>>();
+        _listTemplatesHandler = new TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler(
+            _mockPromptLoader.Object,
+            mockListTemplatesLogger.Object);
+        _mockTemplateSelectionUI = new Mock<ITemplateSelectionUI>();
 
         // Setup default configuration values
         _mockConfiguration.Setup(c => c["Llm:Provider"]).Returns("OpenAI");
@@ -89,7 +97,9 @@ Noticed pattern of afternoon productivity dips.
             _mockPromptLoader.Object,
             _mockAuthService.Object,
             _mockConfiguration.Object,
-            _mockLogger.Object);
+            _mockLogger.Object,
+            _listTemplatesHandler,
+            _mockTemplateSelectionUI.Object);
     }
 
     [Fact]

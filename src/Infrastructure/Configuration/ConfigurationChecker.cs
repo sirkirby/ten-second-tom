@@ -1,12 +1,15 @@
+using System.IO.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Setup.Models;
+using TenSecondTom.Features.Templates.Commands;
+using TenSecondTom.Features.Templates.Handlers;
 
 namespace TenSecondTom.Infrastructure.Configuration;
 
 /// <summary>
-/// Checks whether Ten Second Tom is configured
-/// Used to trigger first-run setup wizard
+/// Checks whether Ten Second Tom is configured.
+/// Provides self-healing capabilities for missing or corrupted configuration.
 /// </summary>
 public static class ConfigurationChecker
 {
@@ -146,5 +149,154 @@ public static class ConfigurationChecker
         }
 
         return null; // Validation passed
+    }
+
+    /// <summary>
+    /// Performs self-healing checks for templates directory and default templates.
+    /// Automatically recreates missing directories and reinstalls default templates if needed.
+    /// This method is idempotent and safe to call on every command execution.
+    /// </summary>
+    /// <param name="configuration">Application configuration</param>
+    /// <param name="fileSystem">File system abstraction for testability</param>
+    /// <param name="logger">Logger for diagnostics</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True if self-healing was performed, false if no action was needed</returns>
+    public static async Task<bool> PerformSelfHealingAsync(
+        IConfiguration configuration,
+        IFileSystem fileSystem,
+        ILogger logger,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(fileSystem);
+        ArgumentNullException.ThrowIfNull(logger);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Get templates directory from configuration
+        string memoryDirectory = configuration["Storage:MemoryDirectory"] ??
+                               configuration["TenSecondTom:MemoryDirectory"] ??
+                               "./.memory";
+
+        string templatesDirectory = fileSystem.Path.Combine(memoryDirectory, "templates");
+
+        bool healingPerformed = false;
+
+        // Check if templates directory exists
+        if (!fileSystem.Directory.Exists(templatesDirectory))
+        {
+            logger.LogWarning(
+                "Templates directory not found at {TemplatesDirectory}. Performing self-healing...",
+                templatesDirectory);
+
+            try
+            {
+                // Recreate templates directory
+                fileSystem.Directory.CreateDirectory(templatesDirectory);
+                logger.LogInformation("Recreated templates directory: {TemplatesDirectory}", templatesDirectory);
+                healingPerformed = true;
+
+                // Reinstall default templates
+                bool templatesRestored = await RestoreDefaultTemplatesAsync(
+                    templatesDirectory,
+                    fileSystem,
+                    logger,
+                    cancellationToken).ConfigureAwait(false);
+
+                if (templatesRestored)
+                {
+                    logger.LogInformation("Self-healing complete: Templates directory and default templates restored");
+                }
+                else
+                {
+                    logger.LogWarning("Self-healing partial: Templates directory created but template restoration encountered issues");
+                }
+            }
+#pragma warning disable CA1031 // Do not catch general exception types - self-healing should be resilient
+            catch (Exception ex)
+#pragma warning restore CA1031
+            {
+                logger.LogError(ex, "Self-healing failed: Unable to recreate templates directory at {TemplatesDirectory}", templatesDirectory);
+                // Don't throw - allow app to continue with embedded templates as fallback
+            }
+        }
+        else
+        {
+            // Directory exists - check if it has templates
+            string[] templateFiles = fileSystem.Directory.GetFiles(templatesDirectory, "*.md", SearchOption.TopDirectoryOnly);
+
+            if (templateFiles.Length == 0)
+            {
+                logger.LogWarning(
+                    "Templates directory exists but contains no templates. Restoring defaults...");
+
+                bool templatesRestored = await RestoreDefaultTemplatesAsync(
+                    templatesDirectory,
+                    fileSystem,
+                    logger,
+                    cancellationToken).ConfigureAwait(false);
+
+                if (templatesRestored)
+                {
+                    logger.LogInformation("Self-healing complete: Default templates restored to empty directory");
+                    healingPerformed = true;
+                }
+            }
+        }
+
+        return healingPerformed;
+    }
+
+    /// <summary>
+    /// Restores default templates to the specified directory.
+    /// </summary>
+    /// <param name="templatesDirectory">Target directory for templates</param>
+    /// <param name="fileSystem">File system abstraction</param>
+    /// <param name="logger">Logger for diagnostics</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True if restoration was successful, false otherwise</returns>
+    private static async Task<bool> RestoreDefaultTemplatesAsync(
+        string templatesDirectory,
+        IFileSystem fileSystem,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Create a temporary logger for the handler that logs through the main logger
+            using var loggerFactory = LoggerFactory.Create(builder => { });
+            var handlerLogger = loggerFactory.CreateLogger<InstallDefaultTemplatesHandler>();
+
+            var handler = new InstallDefaultTemplatesHandler(fileSystem, handlerLogger);
+
+            var command = new InstallDefaultTemplatesCommand
+            {
+                TargetDirectory = templatesDirectory,
+                OverwriteExisting = false // Don't overwrite any existing customizations
+            };
+
+            var result = await handler.Handle(command, cancellationToken).ConfigureAwait(false);
+
+            if (result.IsSuccess)
+            {
+                logger.LogInformation(
+                    "Restored {Count} default templates to {Directory}",
+                    result.Value.TemplatesInstalled,
+                    templatesDirectory);
+                return true;
+            }
+
+            logger.LogWarning(
+                "Failed to restore default templates: {Error}",
+                result.Error);
+            return false;
+        }
+#pragma warning disable CA1031 // Do not catch general exception types - self-healing should be resilient
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            logger.LogError(ex, "Exception during template restoration");
+            return false;
+        }
     }
 }

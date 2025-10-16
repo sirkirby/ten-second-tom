@@ -7,6 +7,7 @@ using OpenAI;
 using OpenAI.Chat;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Auth.SshProviders;
+using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
@@ -50,11 +51,38 @@ public static class ServiceCollectionExtensions
         // Register YAML parser for template metadata
         services.AddSingleton<YamlFrontMatterParser>();
 
-        // Register template loader with YAML parser dependency
+        // Register template loaders with fallback chain: FileSystem → Embedded
+        // This provides resilient template loading with graceful degradation
         services.AddSingleton<IPromptTemplateLoader>(serviceProvider =>
         {
+            var configuration = serviceProvider.GetRequiredService<IConfiguration>();
             var yamlParser = serviceProvider.GetRequiredService<YamlFrontMatterParser>();
-            return new EmbeddedPromptTemplateLoader(baseDirectory: null, yamlParser: yamlParser);
+            var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+
+            // Determine templates directory from configuration
+            string memoryDirectory = configuration["Storage:MemoryDirectory"] ??
+                                   configuration["TenSecondTom:MemoryDirectory"] ??
+                                   "./.memory";
+            string templatesDirectory = Path.Combine(memoryDirectory, "templates");
+
+            // Create FileSystem loader (primary)
+            var fileSystemLogger = loggerFactory.CreateLogger<FileSystemTemplateLoader>();
+            var fileSystemLoader = new FileSystemTemplateLoader(
+                templatesDirectory,
+                yamlParser,
+                fileSystemLogger);
+
+            // Create Embedded loader (fallback)
+            var embeddedLoader = new EmbeddedPromptTemplateLoader(
+                baseDirectory: memoryDirectory,
+                yamlParser: yamlParser);
+
+            // Create Composite loader with fallback chain
+            var compositeLogger = loggerFactory.CreateLogger<CompositeTemplateLoader>();
+            return new CompositeTemplateLoader(
+                fileSystemLoader,
+                embeddedLoader,
+                compositeLogger);
         });
         
         // Register SSH agent client
@@ -168,6 +196,9 @@ public static class ServiceCollectionExtensions
 
         // Spectre.Console AnsiConsole for rich terminal UI
         services.AddSingleton<Spectre.Console.IAnsiConsole>(Spectre.Console.AnsiConsole.Console);
+
+        // Template selection UI (T045/T046)
+        services.AddTransient<ITemplateSelectionUI, TemplateSelectionUI>();
 
         // Text editing services (T028)
         services.AddSingleton<InputSanitizer>();

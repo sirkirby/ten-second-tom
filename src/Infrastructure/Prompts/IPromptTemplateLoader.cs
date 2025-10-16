@@ -24,14 +24,20 @@ public interface IPromptTemplateLoader
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Loads all embedded prompt templates.
-    /// Used during template installation/migration to copy embedded templates to filesystem.
+    /// Loads all available prompt templates.
+    /// For embedded loaders, returns all embedded templates.
+    /// For filesystem loaders, returns all templates from the templates directory.
     /// </summary>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>
-    /// A <see cref="Result{T}"/> containing a list of all embedded templates on success,
+    /// A <see cref="Result{T}"/> containing a list of all templates on success,
     /// or a failure result with an error message if templates cannot be loaded.
     /// </returns>
+    /// <remarks>
+    /// The specific behavior depends on the implementation:
+    /// - <see cref="EmbeddedPromptTemplateLoader"/>: Returns embedded resources only
+    /// - <see cref="FileSystemTemplateLoader"/>: Returns filesystem templates with optional filtering
+    /// </remarks>
     Task<Result<List<PromptTemplate>>> LoadAllTemplatesAsync(
         CancellationToken cancellationToken = default);
 }

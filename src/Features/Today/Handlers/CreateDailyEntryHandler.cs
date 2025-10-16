@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Today.Commands;
+using TenSecondTom.Features.Templates.Queries;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
@@ -25,6 +27,8 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
     private readonly IAuthenticationService _authService;
     private readonly IConfiguration _configuration;
     private readonly ILogger<CreateDailyEntryHandler> _logger;
+    private readonly TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler _listTemplatesHandler;
+    private readonly ITemplateSelectionUI _templateSelectionUI;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CreateDailyEntryHandler"/> class.
@@ -35,13 +39,17 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
     /// <param name="authService">The authentication service.</param>
     /// <param name="configuration">The application configuration (includes user secrets + environment variable overrides).</param>
     /// <param name="logger">The logger instance.</param>
+    /// <param name="listTemplatesHandler">Handler for listing available templates.</param>
+    /// <param name="templateSelectionUI">UI for interactive template selection.</param>
     public CreateDailyEntryHandler(
         IMemoryStorageProvider storage,
         ILlmProviderFactory llmFactory,
         IPromptTemplateLoader promptLoader,
         IAuthenticationService authService,
         IConfiguration configuration,
-        ILogger<CreateDailyEntryHandler> logger)
+        ILogger<CreateDailyEntryHandler> logger,
+        TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler listTemplatesHandler,
+        ITemplateSelectionUI templateSelectionUI)
     {
         _storage = storage;
         _llmFactory = llmFactory;
@@ -49,7 +57,8 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
         _authService = authService;
         _configuration = configuration;
         _logger = logger;
-        _logger = logger;
+        _listTemplatesHandler = listTemplatesHandler;
+        _templateSelectionUI = templateSelectionUI;
     }
 
     /// <summary>
@@ -91,8 +100,52 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
         // 4. Format user input for LLM
         string userInput = FormatUserInput(request.Responses);
 
-        // 5. Load prompt template
-        Result<PromptTemplate> templateResult = await _promptLoader.LoadTemplateAsync("daily-summary", cancellationToken).ConfigureAwait(false);
+        // 5. Select prompt template
+        string selectedTemplateId;
+        Result<ListTemplatesQueryResult> templatesResult = await _listTemplatesHandler.Handle(
+            new ListTemplatesQuery(FilterByType: TemplateType.Daily),
+            cancellationToken).ConfigureAwait(false);
+
+        if (!templatesResult.IsSuccess || templatesResult.Value.Templates.Count == 0)
+        {
+            // Fall back to embedded default template
+            _logger.LogWarning("No daily templates found, falling back to embedded default template");
+            // Note: User notification is handled by CompositeTemplateLoader logging
+            // Console output would break separation of concerns - CLI handlers should display warnings
+            selectedTemplateId = "daily-summary";
+        }
+        else if (templatesResult.Value.Templates.Count == 1)
+        {
+            // Auto-select single template
+            selectedTemplateId = templatesResult.Value.Templates[0].TemplateId;
+            _logger.LogDebug("Auto-selected single daily template: {TemplateId}", selectedTemplateId);
+        }
+        else
+        {
+            // Multiple templates - prompt user to select
+            try
+            {
+                string? userSelectedId = await _templateSelectionUI.SelectTemplateAsync(
+                    templatesResult.Value.Templates,
+                    "today",
+                    cancellationToken).ConfigureAwait(false);
+
+                if (string.IsNullOrWhiteSpace(userSelectedId))
+                {
+                    return Result<DailyEntry>.Failure("Template selection cancelled");
+                }
+
+                selectedTemplateId = userSelectedId;
+                _logger.LogInformation("User selected daily template: {TemplateId}", selectedTemplateId);
+            }
+            catch (OperationCanceledException)
+            {
+                return Result<DailyEntry>.Failure("Template selection cancelled by user");
+            }
+        }
+
+        // 6. Load selected prompt template
+        Result<PromptTemplate> templateResult = await _promptLoader.LoadTemplateAsync(selectedTemplateId, cancellationToken).ConfigureAwait(false);
         if (!templateResult.IsSuccess)
         {
             return Result<DailyEntry>.Failure($"Failed to load prompt template: {templateResult.Error}");
@@ -100,7 +153,7 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
 
         string prompt = RenderPrompt(templateResult.Value, userInput);
 
-        // 6. Determine LLM provider (use override, or load from config, or default to OpenAI)
+        // 7. Determine LLM provider (use override, or load from config, or default to OpenAI)
         string provider;
         if (!string.IsNullOrWhiteSpace(request.LlmProviderOverride))
         {
@@ -145,10 +198,10 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
             return Result<DailyEntry>.Failure($"LLM provider error: {llmResult.Error}. User input saved for retry.");
         }
 
-        // 7. Parse LLM response into DailySummary
+        // 8. Parse LLM response into DailySummary
         DailySummary summary = ParseDailySummary(llmResult.Value);
 
-        // 8. Create DailyEntry
+        // 9. Create DailyEntry
         var entry = new DailyEntry
         {
             EntryId = $"{CommandNames.Today}-{today:MM-dd-yyyy}-{entryNumber}",
@@ -161,7 +214,7 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
             Summary = summary
         };
 
-        // 9. Save to storage
+        // 10. Save to storage
         Result<MemoryEntry> saveResult = await _storage.SaveAsync(entry, cancellationToken).ConfigureAwait(false);
         if (!saveResult.IsSuccess)
         {

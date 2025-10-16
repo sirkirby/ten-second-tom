@@ -8,27 +8,51 @@ using TenSecondTom.Shared.Results;
 namespace TenSecondTom.Features.Templates.Handlers;
 
 /// <summary>
-/// Handler interface for processing requests.
+/// Handler interface for processing requests and returning responses.
+/// Defines the contract for command and query handlers in the application.
 /// </summary>
+/// <typeparam name="TRequest">The type of request to handle.</typeparam>
+/// <typeparam name="TResponse">The type of response to return.</typeparam>
 public interface IRequestHandler<in TRequest, TResponse>
 {
     /// <summary>
-    /// Handles the request.
+    /// Handles the request and returns the appropriate response.
     /// </summary>
+    /// <param name="request">The request to process.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>The response from processing the request.</returns>
     Task<TResponse> Handle(TRequest request, CancellationToken cancellationToken);
 }
 
 /// <summary>
 /// Handler for installing default prompt templates to the filesystem.
+/// Copies embedded template resources to the user's templates directory.
 /// </summary>
+/// <remarks>
+/// This handler:
+/// - Creates the templates directory if it doesn't exist
+/// - Loads embedded template resources from the assembly
+/// - Writes templates to disk with YAML front matter intact
+/// - Respects the OverwriteExisting flag to preserve user customizations
+/// - Logs detailed information about the installation process
+/// </remarks>
 public sealed class InstallDefaultTemplatesHandler(
     IFileSystem fileSystem,
     ILogger<InstallDefaultTemplatesHandler> logger)
     : IRequestHandler<InstallDefaultTemplatesCommand, Result<InstallDefaultTemplatesResult>>
 {
     /// <summary>
-    /// Handles the installation of default templates.
+    /// Handles the installation of default templates to the filesystem.
+    /// Creates the target directory if needed and copies embedded templates.
     /// </summary>
+    /// <param name="request">The installation command with target directory and options.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>
+    /// A result containing installation statistics (installed, skipped, failed counts)
+    /// or a failure result with an error message.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">Thrown when request is null.</exception>
+    /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled.</exception>
     public async Task<Result<InstallDefaultTemplatesResult>> Handle(
         InstallDefaultTemplatesCommand request,
         CancellationToken cancellationToken)

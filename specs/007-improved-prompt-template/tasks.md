@@ -111,38 +111,38 @@
 
 ### Tests for User Story 2
 
-- [ ] T029 [P] [US2] Test: Create `FileSystemTemplateLoaderTests.cs` in `tests/Unit/Infrastructure/Prompts/` with tests for: loading valid template, handling invalid YAML, file size limits, concurrent access retry, filtering by type
-- [ ] T030 [P] [US2] Test: Create `ListTemplatesQueryHandlerTests.cs` in `tests/Unit/Features/Templates/` with tests for: filtering by type, sorting (defaults first then alphabetical), handling invalid templates, empty results
-- [ ] T031 [P] [US2] Test: Create `TemplateSelectionUITests.cs` in `tests/Unit/Infrastructure/Cli/` with tests for: single template auto-selection, multiple template display, user selection handling, cancellation
-- [ ] T032 [P] [US2] Test: Create `CreateDailyEntryCommandTests.cs` in `tests/Integration/Features/Today/` with end-to-end test including template selection
-- [ ] T033 [P] [US2] Test: Create `CreateWeeklyReviewCommandTests.cs` in `tests/Integration/Features/ThisWeek/` with end-to-end test including template selection
+- [x] T029 [P] [US2] Test: Create `FileSystemTemplateLoaderTests.cs` in `tests/Unit/Infrastructure/Prompts/` with tests for: loading valid template, handling invalid YAML, file size limits, concurrent access retry, filtering by type
+- [x] T030 [P] [US2] Test: Create `ListTemplatesQueryHandlerTests.cs` in `tests/Unit/Features/Templates/` with tests for: filtering by type, sorting (defaults first then alphabetical), handling invalid templates, empty results
+- [x] T031 [P] [US2] Test: Create `TemplateSelectionUITests.cs` in `tests/Unit/Infrastructure/Cli/` with tests for: single template auto-selection, multiple template display, user selection handling, cancellation
+- [x] T032 [P] [US2] Test: Create `CreateDailyEntryCommandTests.cs` in `tests/Integration/Features/Today/` with end-to-end test including template selection
+- [x] T033 [P] [US2] Test: Create `CreateWeeklyReviewCommandTests.cs` in `tests/Integration/Features/ThisWeek/` with end-to-end test including template selection
 
 ### Implementation for User Story 2
 
 #### File System Template Loader
 
-- [ ] T034 [US2] Create `FileSystemTemplateLoader` class in `src/Infrastructure/Prompts/FileSystemTemplateLoader.cs` implementing IPromptTemplateLoader
-- [ ] T035 [US2] Implement LoadTemplateAsync() with: file reading using FileShare.Read, YAML parsing via YamlFrontMatterParser, validation via TemplateValidator, retry logic for transient locks (2 attempts, 100ms delay)
-- [ ] T036 [US2] Implement LoadAllTemplatesAsync() to: discover all .md files in templates directory, parse each file, filter by TemplateType, skip invalid templates with logging, return sorted list (defaults first, then alphabetical)
-- [ ] T037 [US2] Implement TemplatesDirectoryExistsAsync() to check directory existence and readability
+- [x] T034 [US2] Create `FileSystemTemplateLoader` class in `src/Infrastructure/Prompts/FileSystemTemplateLoader.cs` implementing IPromptTemplateLoader
+- [x] T035 [US2] Implement LoadTemplateAsync() with: file reading using FileShare.Read, YAML parsing via YamlFrontMatterParser, validation via TemplateValidator, retry logic for transient locks (2 attempts, 100ms delay)
+- [x] T036 [US2] Implement LoadAllTemplatesAsync() to: discover all .md files in templates directory, parse each file, filter by TemplateType, skip invalid templates with logging, return sorted list (defaults first, then alphabetical)
+- [x] T037 [US2] Implement TemplatesDirectoryExistsAsync() to check directory existence and readability
 
 #### Template Query and Selection
 
-- [ ] T038 [US2] Create `ListTemplatesQuery` record in `src/Features/Templates/Queries/ListTemplatesQuery.cs` with TemplateType and IncludeInvalid parameters
-- [ ] T039 [US2] Create `ListTemplatesQueryResult` record in same file with Templates list, TotalFound, InvalidCount
-- [ ] T040 [US2] Create `ListTemplatesQueryHandler` in `src/Features/Templates/Handlers/ListTemplatesQueryHandler.cs` implementing IRequestHandler
-- [ ] T041 [US2] Implement handler to: call LoadAllTemplatesAsync() on template loader, map to TemplateListItem models, sort appropriately, return result with counts
+- [x] T038 [US2] Create `ListTemplatesQuery` record in `src/Features/Templates/Queries/ListTemplatesQuery.cs` with TemplateType and IncludeInvalid parameters
+- [x] T039 [US2] Create `ListTemplatesQueryResult` record in same file with Templates list, TotalFound, InvalidCount
+- [x] T040 [US2] Create `ListTemplatesQueryHandler` in `src/Features/Templates/Handlers/ListTemplatesQueryHandler.cs` implementing IRequestHandler
+- [x] T041 [US2] Implement handler to: call LoadAllTemplatesAsync() on template loader, map to TemplateListItem models, sort appropriately, return result with counts
 
 #### Selection UI
 
-- [ ] T042 [US2] Create `ITemplateSelectionUI` interface in `src/Infrastructure/Cli/TemplateSelectionUI.cs` with SelectTemplateAsync() method
-- [ ] T043 [US2] Create `TemplateSelectionUI` implementation in same file using Spectre.Console
-- [ ] T044 [US2] Implement SelectTemplateAsync() to: auto-select if only one template, display SelectionPrompt with formatted template list (Title - Description [Default]), handle cancellation, return selected template ID
+- [x] T042 [US2] Create `ITemplateSelectionUI` interface in `src/Infrastructure/Cli/TemplateSelectionUI.cs` with SelectTemplateAsync() method
+- [x] T043 [US2] Create `TemplateSelectionUI` implementation in same file using Spectre.Console
+- [x] T044 [US2] Implement SelectTemplateAsync() to: auto-select if only one template, display SelectionPrompt with formatted template list (Title - Description [Default]), handle cancellation, return selected template ID
 
 #### Command Integration
 
-- [ ] T045 [US2] Update `CreateDailyEntryCommand` handler in `src/Features/Today/Commands/CreateDailyEntryCommand.cs` to: add template selection step after data collection, call ListTemplatesQuery with TemplateType.Daily, call TemplateSelectionUI, load selected template, use template content for LLM prompt
-- [ ] T046 [US2] Update `CreateWeeklyReviewCommand` handler in `src/Features/ThisWeek/Commands/CreateWeeklyReviewCommand.cs` to: add template selection step after data collection, call ListTemplatesQuery with TemplateType.Weekly, call TemplateSelectionUI, load selected template, use template content for LLM prompt
+- [x] T045 [US2] Update `CreateDailyEntryCommand` handler in `src/Features/Today/Commands/CreateDailyEntryCommand.cs` to: add template selection step after data collection, call ListTemplatesQuery with TemplateType.Daily, call TemplateSelectionUI, load selected template, use template content for LLM prompt
+- [x] T046 [US2] Update `CreateWeeklyReviewCommand` handler in `src/Features/ThisWeek/Commands/CreateWeeklyReviewCommand.cs` to: add template selection step after data collection, call ListTemplatesQuery with TemplateType.Weekly, call TemplateSelectionUI, load selected template, use template content for LLM prompt
 
 **Checkpoint**: Template selection fully integrated into both commands, filtered by type, with tests confirming independent functionality
 
@@ -178,17 +178,17 @@
 
 ### Tests for User Story 4
 
-- [ ] T053 [P] [US4] Test: Add tests to `ListTemplatesQueryHandlerTests.cs` for: custom templates appearing alongside defaults, custom templates sorted alphabetically, multiple custom templates handling
-- [ ] T054 [P] [US4] Test: Add tests to `FileSystemTemplateLoaderTests.cs` for: loading custom templates, handling malformed custom templates, validating custom template metadata
-- [ ] T055 [P] [US4] Test: Create `TemplateWorkflowTests.cs` in `tests/Integration/Features/Templates/` with end-to-end test for: creating custom template file, running command, selecting custom template, verifying it works
+- [x] T053 [P] [US4] Test: Add tests to `ListTemplatesQueryHandlerTests.cs` for: custom templates appearing alongside defaults, custom templates sorted alphabetically, multiple custom templates handling
+- [x] T054 [P] [US4] Test: Add tests to `FileSystemTemplateLoaderTests.cs` for: loading custom templates, handling malformed custom templates, validating custom template metadata
+- [x] T055 [P] [US4] Test: Create `TemplateWorkflowTests.cs` in `tests/Integration/Features/Templates/` with end-to-end test for: creating custom template file, running command, selecting custom template, verifying it works
 
 ### Implementation for User Story 4
 
 **NOTE**: Core implementation already complete in US2 (FileSystemTemplateLoader discovers all .md files)
 
-- [ ] T056 [US4] Add validation rules for custom templates in `TemplateValidator` to ensure: valid filename (kebab-case, no path separators), proper YAML structure, required metadata fields present
-- [ ] T057 [US4] Enhance `ListTemplatesQueryHandler` sorting logic to ensure: default templates marked with IsDefault=true, defaults appear first, custom templates sorted alphabetically after defaults
-- [ ] T058 [US4] Add logging in `FileSystemTemplateLoader` to log information when: new custom templates are discovered, custom templates fail validation (with reason), custom templates load successfully
+- [x] T056 [US4] Add validation rules for custom templates in `TemplateValidator` to ensure: valid filename (kebab-case, no path separators), proper YAML structure, required metadata fields present
+- [x] T057 [US4] Enhance `ListTemplatesQueryHandler` sorting logic to ensure: default templates marked with IsDefault=true, defaults appear first, custom templates sorted alphabetically after defaults
+- [x] T058 [US4] Add logging in `FileSystemTemplateLoader` to log information when: new custom templates are discovered, custom templates fail validation (with reason), custom templates load successfully
 
 **Checkpoint**: Custom templates fully supported, discoverable, and sorted appropriately in selection UI
 
@@ -202,17 +202,17 @@
 
 ### Tests for User Story 5
 
-- [ ] T059 [P] [US5] Test: Create `TemplateEditingTests.cs` in `tests/Integration/Features/Templates/` with tests for: editing template content reflects in next run, changing template type moves it to correct filter, editing metadata updates display in selection
-- [ ] T060 [P] [US5] Test: Add tests to `FileSystemTemplateLoaderTests.cs` for: loading edited template shows new content, no caching of old content, concurrent edit handling
+- [x] T059 [P] [US5] Test: Create `TemplateEditingTests.cs` in `tests/Integration/Features/Templates/` with tests for: editing template content reflects in next run, changing template type moves it to correct filter, editing metadata updates display in selection
+- [x] T060 [P] [US5] Test: Add tests to `FileSystemTemplateLoaderTests.cs` for: loading edited template shows new content, no caching of old content, concurrent edit handling
 
 ### Implementation for User Story 5
 
 **NOTE**: Core implementation already complete - templates loaded fresh on each command execution
 
-- [ ] T061 [US5] Verify `FileSystemTemplateLoader` does NOT cache templates across command invocations (each command execution loads fresh)
-- [ ] T062 [US5] Ensure `ListTemplatesQueryHandler` and `FileSystemTemplateLoader` reload templates on each query (no persistent caching)
-- [ ] T063 [US5] Add integration test to verify: edit template file, run command immediately after, verify new content used
-- [ ] T063a [US5] Test: Add test case to `TemplateEditingTests.cs` for end-to-end immediate recognition: create new template file in filesystem, run command within same process instance, verify new template appears in selection list without restart (validates FR-012)
+- [x] T061 [US5] Verify `FileSystemTemplateLoader` does NOT cache templates across command invocations (each command execution loads fresh)
+- [x] T062 [US5] Ensure `ListTemplatesQueryHandler` and `FileSystemTemplateLoader` reload templates on each query (no persistent caching)
+- [x] T063 [US5] Add integration test to verify: edit template file, run command immediately after, verify new content used
+- [x] T063a [US5] Test: Add test case to `TemplateEditingTests.cs` for end-to-end immediate recognition: create new template file in filesystem, run command within same process instance, verify new template appears in selection list without restart (validates FR-012)
 
 **Checkpoint**: Template changes immediately effective, no restart required, tested end-to-end including new file creation (T063a validates FR-012)
 
@@ -224,39 +224,39 @@
 
 ### Error Handling and Fallbacks
 
-- [ ] T064 [P] Implement fallback mechanism in command handlers: if no valid filesystem templates found, fall back to embedded templates from `EmbeddedPromptTemplateLoader`
-- [ ] T065 [P] Add user notification when fallback occurs (e.g., "No custom templates found, using default embedded template")
-- [ ] T066 [P] Test fallback scenarios: deleted templates directory, all templates invalid, corrupted template files
+- [x] T064 [P] Implement fallback mechanism in command handlers: if no valid filesystem templates found, fall back to embedded templates from `EmbeddedPromptTemplateLoader`
+- [x] T065 [P] Add user notification when fallback occurs (e.g., "No custom templates found, using default embedded template")
+- [x] T066 [P] Test fallback scenarios: deleted templates directory, all templates invalid, corrupted template files
 
 ### Self-Healing Features
 
-- [ ] T067 [P] Test: Create `SelfHealingTests.cs` in `tests/Integration/Infrastructure/` with tests for: deleted directory recreated, missing defaults restored, recovery notifications shown
-- [ ] T068 Implement self-healing in `ConfigurationChecker` to: detect deleted templates directory on command execution, automatically recreate and reinstall defaults, log recovery actions
+- [x] T067 [P] Test: Create `SelfHealingTests.cs` in `tests/Integration/Infrastructure/` with tests for: deleted directory recreated, missing defaults restored, recovery notifications shown
+- [x] T068 Implement self-healing in `ConfigurationChecker` to: detect deleted templates directory on command execution, automatically recreate and reinstall defaults, log recovery actions
 
 ### XML Documentation
 
-- [ ] T069 [P] Add XML documentation to all public APIs in `src/Features/Templates/Models/` (TemplateMetadata, TemplateListItem)
-- [ ] T070 [P] Add XML documentation to all public APIs in `src/Features/Templates/Commands/` and `src/Features/Templates/Queries/`
-- [ ] T071 [P] Add XML documentation to all handlers in `src/Features/Templates/Handlers/`
-- [ ] T072 [P] Add XML documentation to `ITemplateSelectionUI` and implementation
-- [ ] T073 [P] Add XML documentation to updated methods in `IPromptTemplateLoader` and implementations
+- [x] T069 [P] Add XML documentation to all public APIs in `src/Features/Templates/Models/` (TemplateMetadata, TemplateListItem)
+- [x] T070 [P] Add XML documentation to all public APIs in `src/Features/Templates/Commands/` and `src/Features/Templates/Queries/`
+- [x] T071 [P] Add XML documentation to all handlers in `src/Features/Templates/Handlers/`
+- [x] T072 [P] Add XML documentation to `ITemplateSelectionUI` and implementation
+- [x] T073 [P] Add XML documentation to updated methods in `IPromptTemplateLoader` and implementations
 
 ### Testing and Quality
 
-- [ ] T074 Run full test suite and verify 80%+ code coverage for Templates feature
-- [ ] T075 [P] Add additional edge case tests for: concurrent template access, very large templates (near 1MB limit), templates with special characters in filenames
-- [ ] T076 Run quickstart.md validation scenarios to ensure all steps work end-to-end
+- [x] T074 Run full test suite and verify 80%+ code coverage for Templates feature
+- [x] T075 [P] Add additional edge case tests for: concurrent template access, very large templates (near 1MB limit), templates with special characters in filenames
+- [x] T076 Run quickstart.md validation scenarios to ensure all steps work end-to-end
 
 ### Performance Optimization
 
-- [ ] T077 [P] Profile template loading performance, ensure LoadAllTemplatesAsync() completes in <100ms for 20 templates
-- [ ] T078 [P] Profile template selection UI, ensure display and selection completes in <10s
+- [x] T077 [P] Profile template loading performance, ensure LoadAllTemplatesAsync() completes in <100ms for 20 templates
+- [x] T078 [P] Profile template selection UI, ensure display and selection completes in <10s
 
 ### Code Quality
 
-- [ ] T079 [P] Code cleanup: remove any TODO comments, unused imports, debug logging
-- [ ] T080 [P] Refactoring: DRY check across template loading implementations, extract common validation logic
-- [ ] T081 Security review: ensure no path traversal vulnerabilities, validate all user-provided template paths stay within configured directory
+- [x] T079 [P] Code cleanup: remove any TODO comments, unused imports, debug logging
+- [x] T080 [P] Refactoring: DRY check across template loading implementations, extract common validation logic
+- [x] T081 Security review: ensure no path traversal vulnerabilities, validate all user-provided template paths stay within configured directory
 
 ---
 
