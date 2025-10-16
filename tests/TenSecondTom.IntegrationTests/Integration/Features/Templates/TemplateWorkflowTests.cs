@@ -28,6 +28,8 @@ public sealed class TemplateWorkflowTests : IDisposable
     private readonly string _templatesDirectory;
     private readonly ServiceProvider _serviceProvider;
     private readonly Mock<ITemplateSelectionUI> _mockTemplateSelectionUI;
+    private readonly Mock<ILlmProvider> _mockLlmProvider;
+    private readonly Mock<IMemoryStorageProvider> _mockStorage;
 
     public TemplateWorkflowTests()
     {
@@ -36,13 +38,15 @@ public sealed class TemplateWorkflowTests : IDisposable
         Directory.CreateDirectory(_templatesDirectory);
 
         _mockTemplateSelectionUI = new Mock<ITemplateSelectionUI>();
+        _mockLlmProvider = new Mock<ILlmProvider>();
+        _mockStorage = new Mock<IMemoryStorageProvider>();
         _serviceProvider = BuildTestServiceProvider();
     }
 
     [Fact]
     public async Task EndToEnd_CreateCustomTemplate_SelectInCommand_GeneratesOutput()
     {
-        // Arrange - Create a custom template file in filesystem (T055)
+        // Arrange - Create multiple custom template files to trigger selection UI (T055)
         var customTemplateContent = @"---
 templateType: daily
 title: My Custom Daily Template
@@ -63,6 +67,21 @@ What will you tackle next?
 
         var customTemplatePath = Path.Combine(_templatesDirectory, "my-custom-daily.md");
         await File.WriteAllTextAsync(customTemplatePath, customTemplateContent);
+
+        // Create a second template to ensure SelectTemplateAsync is called
+        var secondTemplateContent = @"---
+templateType: daily
+title: Alternative Daily Template
+description: Another daily template
+version: 1.0
+---
+# Alternative Daily Reflection
+
+{{USER_INPUT}}
+";
+
+        var secondTemplatePath = Path.Combine(_templatesDirectory, "alternative-daily.md");
+        await File.WriteAllTextAsync(secondTemplatePath, secondTemplateContent);
 
         // Setup template selection to choose the custom template
         _mockTemplateSelectionUI
@@ -101,9 +120,11 @@ What will you tackle next?
             Times.Once,
             "custom template should appear in selection list");
 
-        // Verify the daily entry was created
-        var dailyEntries = _testDirectory.GetDailyEntries();
-        dailyEntries.Should().NotBeEmpty("daily entry should be created");
+        // Verify the daily entry was saved
+        _mockStorage.Verify(
+            s => s.SaveAsync(It.IsAny<DailyEntry>(), It.IsAny<CancellationToken>()),
+            Times.Once,
+            "daily entry should be saved");
     }
 
     [Fact]
@@ -211,13 +232,22 @@ A brief daily check-in.
     [Fact]
     public async Task EndToEnd_CustomTemplateWithInvalidYAML_SkippedGracefully()
     {
-        // Arrange - Create one valid and one invalid custom template (T055)
+        // Arrange - Create two valid and one invalid custom template (T055)
         var validTemplate = @"---
 templateType: daily
 title: Valid Custom Template
 ---
 # Valid Content
 This template is valid.
+{{USER_INPUT}}
+";
+
+        var validTemplate2 = @"---
+templateType: daily
+title: Another Valid Template
+---
+# Another Valid Template
+{{USER_INPUT}}
 ";
 
         var invalidTemplate = @"---
@@ -229,6 +259,7 @@ invalid: {unclosed
 ";
 
         await File.WriteAllTextAsync(Path.Combine(_templatesDirectory, "valid-custom.md"), validTemplate);
+        await File.WriteAllTextAsync(Path.Combine(_templatesDirectory, "valid-custom-2.md"), validTemplate2);
         await File.WriteAllTextAsync(Path.Combine(_templatesDirectory, "invalid-custom.md"), invalidTemplate);
 
         _mockTemplateSelectionUI
@@ -241,14 +272,19 @@ invalid: {unclosed
         var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string> { ["Test"] = "Test" }
+            Responses = new Dictionary<string, string>
+            {
+                ["What happened today?"] = "Worked on templates",
+                ["Plans for tomorrow?"] = "Test validation",
+                ["How are you feeling?"] = "Good"
+            }
         };
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        result.IsSuccess.Should().BeTrue("command should succeed despite invalid template being present");
+        result.IsSuccess.Should().BeTrue($"command should succeed despite invalid template being present, error: {result.Error}");
 
         // Verify invalid template was skipped, valid template was included
         _mockTemplateSelectionUI.Verify(
@@ -265,7 +301,7 @@ invalid: {unclosed
     [Fact]
     public async Task EndToEnd_CustomTemplateSelection_UsesCorrectPromptContent()
     {
-        // Arrange - Custom template with specific content markers (T055)
+        // Arrange - Create multiple templates to trigger selection UI
         var customTemplateContent = @"---
 templateType: daily
 title: Test Marker Template
@@ -281,6 +317,18 @@ This is custom template content.
             Path.Combine(_templatesDirectory, "marker-template.md"),
             customTemplateContent);
 
+        // Create a second template to ensure SelectTemplateAsync is called
+        var secondTemplateContent = @"---
+templateType: daily
+title: Another Template
+---
+{{USER_INPUT}}
+";
+
+        await File.WriteAllTextAsync(
+            Path.Combine(_templatesDirectory, "another-template.md"),
+            secondTemplateContent);
+
         _mockTemplateSelectionUI
             .Setup(ui => ui.SelectTemplateAsync(
                 It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
@@ -288,10 +336,10 @@ This is custom template content.
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync("marker-template");
 
-        // Mock LLM to capture the prompt that was sent
+        // Reconfigure the LLM provider mock to capture the prompt that was sent
         string? capturedPrompt = null;
-        var mockLlmProvider = new Mock<ILlmProvider>();
-        mockLlmProvider
+        _mockLlmProvider.Reset();
+        _mockLlmProvider
             .Setup(p => p.GenerateCompletionAsync(
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>(),
@@ -337,16 +385,14 @@ This is custom template content.
         services.AddSingleton(mockConfiguration.Object);
 
         // Mock storage
-        var mockStorage = new Mock<IMemoryStorageProvider>();
-        mockStorage.Setup(s => s.SaveAsync(It.IsAny<DailyEntry>(), It.IsAny<CancellationToken>()))
+        _mockStorage.Setup(s => s.SaveAsync(It.IsAny<DailyEntry>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((DailyEntry entry, CancellationToken _) => Result<MemoryEntry>.Success(entry));
-        mockStorage.Setup(s => s.CountEntriesAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        _mockStorage.Setup(s => s.CountEntriesAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<int>.Success(0));
-        services.AddSingleton(mockStorage.Object);
+        services.AddSingleton(_mockStorage.Object);
 
         // Mock LLM
-        var mockLlmProvider = new Mock<ILlmProvider>();
-        mockLlmProvider.Setup(p => p.GenerateCompletionAsync(
+        _mockLlmProvider.Setup(p => p.GenerateCompletionAsync(
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
@@ -355,7 +401,7 @@ This is custom template content.
 
         var mockLlmFactory = new Mock<ILlmProviderFactory>();
         mockLlmFactory.Setup(f => f.CreateProvider(It.IsAny<string>()))
-            .Returns(mockLlmProvider.Object);
+            .Returns(_mockLlmProvider.Object);
         services.AddSingleton(mockLlmFactory.Object);
 
         // Mock auth

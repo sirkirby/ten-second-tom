@@ -32,12 +32,14 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
     private readonly ServiceProvider _serviceProvider;
     private readonly Mock<ITemplateSelectionUI> _mockTemplateSelectionUI;
     private readonly Mock<IPromptTemplateLoader> _mockTemplateLoader;
+    private readonly Mock<ILlmProvider> _mockLlmProvider;
 
     public CreateWeeklyReviewWithTemplateSelectionTests()
     {
         _testDirectory = new TemporaryTestDirectory();
         _mockTemplateSelectionUI = new Mock<ITemplateSelectionUI>();
         _mockTemplateLoader = new Mock<IPromptTemplateLoader>();
+        _mockLlmProvider = new Mock<ILlmProvider>();
         _serviceProvider = BuildTestServiceProvider();
     }
 
@@ -245,18 +247,31 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
                 return "weekly-review";
             });
 
-        var mockLlmProvider = new Mock<ILlmProvider>();
-        mockLlmProvider
+        // Reconfigure LLM mock to add callback without losing the proper response format
+        _mockLlmProvider.Reset();
+        _mockLlmProvider
             .Setup(p => p.GenerateCompletionAsync(
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
-            .ReturnsAsync(() =>
-            {
-                callSequence.Add("LLMCall");
-                return Result<string>.Success("Weekly summary generated");
-            });
+            .Callback<string, CancellationToken, int?, double?>((_, _, _, _) => callSequence.Add("LLMCall"))
+            .ReturnsAsync(Result<string>.Success(@"## Top 3 Accomplishments
+1. First accomplishment
+2. Second accomplishment
+3. Third accomplishment
+
+## Top 3 Challenges
+1. First challenge
+2. Second challenge
+3. Third challenge
+
+## Key Insights
+Some insights here
+
+## Goals for Next Week
+- Goal 1
+- Goal 2"));
 
         var command = new CreateWeeklyReviewCommand();
 
@@ -309,7 +324,7 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
             new PromptTemplate
             {
                 TemplateId = "weekly-review",
-                Content = "Default weekly template",
+                Content = "Default weekly template {{USER_INPUT}}",
                 TemplateType = TemplateType.Weekly,
                 Source = TemplateSource.Embedded,
                 Metadata = new TemplateMetadata { Title = "Weekly Review", TemplateType = TemplateType.Weekly }
@@ -317,7 +332,7 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
             new PromptTemplate
             {
                 TemplateId = "custom-weekly",
-                Content = "Custom weekly template",
+                Content = "Custom weekly template {{USER_INPUT}}",
                 TemplateType = TemplateType.Weekly,
                 Source = TemplateSource.FileSystem,
                 Metadata = new TemplateMetadata { Title = "Custom Weekly", TemplateType = TemplateType.Weekly }
@@ -327,6 +342,17 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
         _mockTemplateLoader
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(templates));
+
+        // Mock LoadTemplateAsync for both templates
+        _mockTemplateLoader
+            .Setup(l => l.LoadTemplateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string templateId, CancellationToken _) => 
+            {
+                var template = templates.FirstOrDefault(t => t.TemplateId == templateId);
+                return template != null 
+                    ? Result<PromptTemplate>.Success(template)
+                    : Result<PromptTemplate>.Failure($"Template {templateId} not found");
+            });
     }
 
     private void SetupSingleWeeklyTemplate()
@@ -336,7 +362,7 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
             new PromptTemplate
             {
                 TemplateId = "weekly-review",
-                Content = "Default weekly template",
+                Content = "Default weekly template {{USER_INPUT}}",
                 TemplateType = TemplateType.Weekly,
                 Source = TemplateSource.Embedded,
                 Metadata = new TemplateMetadata { Title = "Weekly Review", TemplateType = TemplateType.Weekly }
@@ -346,6 +372,11 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
         _mockTemplateLoader
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(templates));
+
+        // Also mock LoadTemplateAsync for the template
+        _mockTemplateLoader
+            .Setup(l => l.LoadTemplateAsync("weekly-review", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<PromptTemplate>.Success(templates[0]));
     }
 
     private void SetupMixedDailyAndWeeklyTemplates()
@@ -355,7 +386,7 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
             new PromptTemplate
             {
                 TemplateId = "daily-summary",
-                Content = "Daily template",
+                Content = "Daily template {{USER_INPUT}}",
                 TemplateType = TemplateType.Daily,
                 Source = TemplateSource.Embedded,
                 Metadata = new TemplateMetadata { Title = "Daily Summary", TemplateType = TemplateType.Daily }
@@ -363,10 +394,18 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
             new PromptTemplate
             {
                 TemplateId = "weekly-review",
-                Content = "Weekly template",
+                Content = "Weekly template {{USER_INPUT}}",
                 TemplateType = TemplateType.Weekly,
                 Source = TemplateSource.Embedded,
                 Metadata = new TemplateMetadata { Title = "Weekly Review", TemplateType = TemplateType.Weekly }
+            },
+            new PromptTemplate
+            {
+                TemplateId = "weekly-detailed",
+                Content = "Detailed weekly template {{USER_INPUT}}",
+                TemplateType = TemplateType.Weekly,
+                Source = TemplateSource.FileSystem,
+                Metadata = new TemplateMetadata { Title = "Weekly Detailed", TemplateType = TemplateType.Weekly }
             }
         };
 
@@ -374,6 +413,17 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(
                 templates.Where(t => t.TemplateType == TemplateType.Weekly).ToList()));
+
+        // Mock LoadTemplateAsync for all templates
+        _mockTemplateLoader
+            .Setup(l => l.LoadTemplateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string templateId, CancellationToken _) => 
+            {
+                var template = templates.FirstOrDefault(t => t.TemplateId == templateId);
+                return template != null 
+                    ? Result<PromptTemplate>.Success(template)
+                    : Result<PromptTemplate>.Failure($"Template {templateId} not found");
+            });
     }
 
     private void SetupNoTemplates()
@@ -381,6 +431,26 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
         _mockTemplateLoader
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(new List<PromptTemplate>()));
+
+        // Mock LoadTemplateAsync to return success for embedded templates (fallback), failure otherwise
+        _mockTemplateLoader
+            .Setup(l => l.LoadTemplateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string templateId, CancellationToken _) =>
+            {
+                if (templateId == "weekly-review")
+                {
+                    // Return the embedded weekly template
+                    return Result<PromptTemplate>.Success(new PromptTemplate
+                    {
+                        TemplateId = "weekly-review",
+                        Content = "Default weekly template {{USER_INPUT}}",
+                        TemplateType = TemplateType.Weekly,
+                        Source = TemplateSource.Embedded,
+                        Metadata = new TemplateMetadata { Title = "Weekly Review", TemplateType = TemplateType.Weekly }
+                    });
+                }
+                return Result<PromptTemplate>.Failure($"Template {templateId} not found");
+            });
     }
 
     private ServiceProvider BuildTestServiceProvider()
@@ -430,8 +500,7 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
         services.AddSingleton(mockStorage.Object);
 
         // Mock LLM - return properly formatted weekly summary
-        var mockLlmProvider = new Mock<ILlmProvider>();
-        mockLlmProvider.Setup(p => p.GenerateCompletionAsync(
+        _mockLlmProvider.Setup(p => p.GenerateCompletionAsync(
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
@@ -455,7 +524,7 @@ Some insights here
 
         var mockLlmFactory = new Mock<ILlmProviderFactory>();
         mockLlmFactory.Setup(f => f.CreateProvider(It.IsAny<string>()))
-            .Returns(mockLlmProvider.Object);
+            .Returns(_mockLlmProvider.Object);
         services.AddSingleton(mockLlmFactory.Object);
 
         // Mock auth

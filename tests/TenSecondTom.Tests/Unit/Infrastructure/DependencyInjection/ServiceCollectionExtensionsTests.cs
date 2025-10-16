@@ -258,7 +258,7 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
             .Should().BeOfType<LlmProviderFactory>();
 
         _serviceProvider.GetRequiredService<IPromptTemplateLoader>()
-            .Should().BeOfType<EmbeddedPromptTemplateLoader>();
+            .Should().BeOfType<CompositeTemplateLoader>();
 
         _serviceProvider.GetRequiredService<IAuthenticationService>()
             .Should().BeOfType<SshKeyAuthenticationService>();

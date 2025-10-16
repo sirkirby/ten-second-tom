@@ -107,30 +107,10 @@ public sealed class ReleaseWorkflowTests
 
         // Assert
         hasJobs.Should().BeTrue("workflow should have jobs");
-        jobNames.Should().Contain("select-runner", "workflow should have a runner selection job");
         jobNames.Should().Contain("validate-version", "workflow should have a version validation job");
-        jobNames.Should().Contain("download-artifacts", "workflow should have a download artifacts job");
+        jobNames.Should().Contain("build-release-artifacts", "workflow should have a build release artifacts job");
         jobNames.Should().Contain("create-github-release", "workflow should have a GitHub release creation job");
         jobNames.Should().Contain("publish-homebrew", "workflow should have a Homebrew publication job");
-    }
-
-    [Fact]
-    public void SelectRunnerJob_Should_HaveCorrectConfiguration()
-    {
-        // Arrange
-        var workflow = LoadWorkflow();
-        var jobs = workflow["jobs"] as Dictionary<object, object>;
-        var selectRunnerJob = jobs?["select-runner"] as Dictionary<object, object>;
-
-        // Act & Assert
-        selectRunnerJob.Should().NotBeNull("select-runner job should exist");
-        
-        var runsOn = selectRunnerJob?["runs-on"]?.ToString();
-        runsOn.Should().Be("ubuntu-latest", "select-runner job should run on ubuntu-latest");
-        
-        var outputs = selectRunnerJob?["outputs"] as Dictionary<object, object>;
-        outputs.Should().NotBeNull("select-runner job should have outputs");
-        outputs.Should().ContainKey("linux", "select-runner job should output linux runner choice");
     }
 
     [Fact]
@@ -145,8 +125,8 @@ public sealed class ReleaseWorkflowTests
         var runsOn = validateJob?["runs-on"]?.ToString();
 
         // Assert
-        runsOn.Should().Be("${{ needs.select-runner.outputs.linux }}", 
-            "validate-version job should use dynamic runner selection with fallback to ubuntu-latest");
+        runsOn.Should().Be("ubuntu-latest", 
+            "validate-version job should run on ubuntu-latest");
     }
 
     [Fact]
@@ -347,7 +327,7 @@ public sealed class ReleaseWorkflowTests
     }
 
     [Fact]
-    public void CreateGitHubReleaseJob_Should_DependOnDownloadArtifacts()
+    public void CreateGitHubReleaseJob_Should_DependOnBuildReleaseArtifacts()
     {
         // Arrange
         var workflow = LoadWorkflow();
@@ -361,7 +341,7 @@ public sealed class ReleaseWorkflowTests
 
         // Assert
         releaseJob.Should().NotBeNull("create-github-release job should exist");
-        dependencies.Should().Contain("download-artifacts", "create-github-release job should depend on download-artifacts job");
+        dependencies.Should().Contain("build-release-artifacts", "create-github-release job should depend on build-release-artifacts job");
     }
 
     [Fact]

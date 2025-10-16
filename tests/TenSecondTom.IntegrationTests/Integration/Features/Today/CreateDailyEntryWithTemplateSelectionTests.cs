@@ -32,12 +32,14 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
     private readonly ServiceProvider _serviceProvider;
     private readonly Mock<ITemplateSelectionUI> _mockTemplateSelectionUI;
     private readonly Mock<IPromptTemplateLoader> _mockTemplateLoader;
+    private readonly Mock<ILlmProvider> _mockLlmProvider;
 
     public CreateDailyEntryWithTemplateSelectionTests()
     {
         _testDirectory = new TemporaryTestDirectory();
         _mockTemplateSelectionUI = new Mock<ITemplateSelectionUI>();
         _mockTemplateLoader = new Mock<IPromptTemplateLoader>();
+        _mockLlmProvider = new Mock<ILlmProvider>();
         _serviceProvider = BuildTestServiceProvider();
     }
 
@@ -293,8 +295,8 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
                 return "daily-summary";
             });
 
-        var mockLlmProvider = new Mock<ILlmProvider>();
-        mockLlmProvider
+        _mockLlmProvider.Reset();
+        _mockLlmProvider
             .Setup(p => p.GenerateCompletionAsync(
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>(),
@@ -333,7 +335,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
             new PromptTemplate
             {
                 TemplateId = "daily-summary",
-                Content = "Default daily template",
+                Content = "Default daily template {{USER_INPUT}}",
                 TemplateType = TemplateType.Daily,
                 Source = TemplateSource.Embedded,
                 Metadata = new TemplateMetadata { Title = "Daily Summary", TemplateType = TemplateType.Daily }
@@ -341,7 +343,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
             new PromptTemplate
             {
                 TemplateId = "custom-daily",
-                Content = "Custom daily template",
+                Content = "Custom daily template {{USER_INPUT}}",
                 TemplateType = TemplateType.Daily,
                 Source = TemplateSource.FileSystem,
                 Metadata = new TemplateMetadata { Title = "Custom Daily", TemplateType = TemplateType.Daily }
@@ -351,6 +353,14 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
         _mockTemplateLoader
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(templates));
+
+        // Also mock LoadTemplateAsync for each template
+        foreach (var template in templates)
+        {
+            _mockTemplateLoader
+                .Setup(l => l.LoadTemplateAsync(template.TemplateId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Result<PromptTemplate>.Success(template));
+        }
     }
 
     private void SetupSingleDailyTemplate()
@@ -360,7 +370,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
             new PromptTemplate
             {
                 TemplateId = "daily-summary",
-                Content = "Default daily template",
+                Content = "Default daily template {{USER_INPUT}}",
                 TemplateType = TemplateType.Daily,
                 Source = TemplateSource.Embedded,
                 Metadata = new TemplateMetadata { Title = "Daily Summary", TemplateType = TemplateType.Daily }
@@ -370,6 +380,11 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
         _mockTemplateLoader
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(templates));
+
+        // Also mock LoadTemplateAsync for the template
+        _mockTemplateLoader
+            .Setup(l => l.LoadTemplateAsync("daily-summary", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<PromptTemplate>.Success(templates[0]));
     }
 
     private void SetupMixedDailyAndWeeklyTemplates()
@@ -379,15 +394,23 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
             new PromptTemplate
             {
                 TemplateId = "daily-summary",
-                Content = "Daily template",
+                Content = "Daily template {{USER_INPUT}}",
                 TemplateType = TemplateType.Daily,
                 Source = TemplateSource.Embedded,
                 Metadata = new TemplateMetadata { Title = "Daily Summary", TemplateType = TemplateType.Daily }
             },
             new PromptTemplate
             {
+                TemplateId = "daily-detailed",
+                Content = "Detailed daily template {{USER_INPUT}}",
+                TemplateType = TemplateType.Daily,
+                Source = TemplateSource.FileSystem,
+                Metadata = new TemplateMetadata { Title = "Daily Detailed", TemplateType = TemplateType.Daily }
+            },
+            new PromptTemplate
+            {
                 TemplateId = "weekly-review",
-                Content = "Weekly template",
+                Content = "Weekly template {{USER_INPUT}}",
                 TemplateType = TemplateType.Weekly,
                 Source = TemplateSource.Embedded,
                 Metadata = new TemplateMetadata { Title = "Weekly Review", TemplateType = TemplateType.Weekly }
@@ -398,6 +421,17 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(
                 templates.Where(t => t.TemplateType == TemplateType.Daily).ToList()));
+
+        // Mock LoadTemplateAsync for all templates
+        _mockTemplateLoader
+            .Setup(l => l.LoadTemplateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string templateId, CancellationToken _) => 
+            {
+                var template = templates.FirstOrDefault(t => t.TemplateId == templateId);
+                return template != null 
+                    ? Result<PromptTemplate>.Success(template)
+                    : Result<PromptTemplate>.Failure($"Template {templateId} not found");
+            });
     }
 
     private void SetupNoTemplates()
@@ -405,6 +439,26 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
         _mockTemplateLoader
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(new List<PromptTemplate>()));
+
+        // Mock LoadTemplateAsync to return success for embedded templates (fallback), failure otherwise
+        _mockTemplateLoader
+            .Setup(l => l.LoadTemplateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string templateId, CancellationToken _) =>
+            {
+                if (templateId == "daily-summary")
+                {
+                    // Return the embedded daily template
+                    return Result<PromptTemplate>.Success(new PromptTemplate
+                    {
+                        TemplateId = "daily-summary",
+                        Content = "Default daily template {{USER_INPUT}}",
+                        TemplateType = TemplateType.Daily,
+                        Source = TemplateSource.Embedded,
+                        Metadata = new TemplateMetadata { Title = "Daily Summary", TemplateType = TemplateType.Daily }
+                    });
+                }
+                return Result<PromptTemplate>.Failure($"Template {templateId} not found");
+            });
     }
 
     private ServiceProvider BuildTestServiceProvider()
@@ -429,8 +483,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
         services.AddSingleton(mockStorage.Object);
 
         // Mock LLM
-        var mockLlmProvider = new Mock<ILlmProvider>();
-        mockLlmProvider.Setup(p => p.GenerateCompletionAsync(
+        _mockLlmProvider.Setup(p => p.GenerateCompletionAsync(
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
@@ -439,7 +492,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
 
         var mockLlmFactory = new Mock<ILlmProviderFactory>();
         mockLlmFactory.Setup(f => f.CreateProvider(It.IsAny<string>()))
-            .Returns(mockLlmProvider.Object);
+            .Returns(_mockLlmProvider.Object);
         services.AddSingleton(mockLlmFactory.Object);
 
         // Mock auth
