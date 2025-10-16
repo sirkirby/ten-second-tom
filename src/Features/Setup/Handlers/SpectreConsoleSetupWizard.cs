@@ -107,11 +107,9 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         
         foreach (var model in models)
         {
-            // Escape any markup in description/display name to avoid Spectre parsing issues
-            var displayName = model.DisplayName.EscapeMarkup();
-            var costTier = model.CostTier.EscapeMarkup();
-            var description = model.Description.EscapeMarkup();
-            var choice = $"{displayName} [{costTier}] - {description}";
+            // Build the choice string and escape the entire thing to prevent Spectre.Console
+            // from interpreting square brackets as markup (e.g., [Balanced] would be treated as a style)
+            var choice = $"{model.DisplayName} [{model.CostTier}] - {model.Description}".EscapeMarkup();
             choices.Add(choice);
             choiceToModel[choice] = model;
         }
