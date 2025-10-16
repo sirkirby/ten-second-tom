@@ -26,6 +26,15 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
     private readonly IDeserializer _yamlDeserializer;
 
     /// <summary>
+    /// Directories to exclude from memory entry enumeration.
+    /// These directories contain non-memory files (e.g., templates, configuration).
+    /// </summary>
+    private static readonly HashSet<string> ExcludedDirectories = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "templates"
+    };
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="FileSystemStorageProvider"/> class.
     /// </summary>
     /// <param name="baseDirectory">The base directory for storing memory files.</param>
@@ -197,6 +206,12 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
                     break;
                 }
 
+                // Skip files in excluded directories
+                if (IsExcludedPath(file))
+                {
+                    continue;
+                }
+
                 string content = await File.ReadAllTextAsync(file, cancellationToken).ConfigureAwait(false);
                 
                 if (content.Contains(query, StringComparison.OrdinalIgnoreCase))
@@ -257,6 +272,11 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
                 if (cancellationToken.IsCancellationRequested)
                 {
                     break;
+                }
+
+                if (IsExcludedPath(file))
+                {
+                    continue;
                 }
 
                 MemoryEntry? entry = await ParseMarkdownFileAsync(file, cancellationToken).ConfigureAwait(false);
@@ -323,6 +343,11 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
                 if (cancellationToken.IsCancellationRequested)
                 {
                     break;
+                }
+
+                if (IsExcludedPath(file))
+                {
+                    continue;
                 }
 
                 MemoryEntry? entry = await ParseMarkdownFileAsync(file, cancellationToken).ConfigureAwait(false);
@@ -559,4 +584,22 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
             CalendarWeekRule.FirstFourDayWeek,
             DayOfWeek.Monday);
     }
+
+    /// <summary>
+    /// Determines whether a file path is within an excluded directory.
+    /// </summary>
+    /// <param name="filePath">The file path to check.</param>
+    /// <returns>True if the file is in an excluded directory; otherwise, false.</returns>
+    private bool IsExcludedPath(string filePath)
+    {
+        // Get the relative path from the base directory
+        string relativePath = Path.GetRelativePath(_baseDirectory, filePath);
+        
+        // Split the path into segments
+        string[] pathSegments = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        
+        // Check if any segment matches an excluded directory
+        return pathSegments.Any(segment => ExcludedDirectories.Contains(segment));
+    }
 }
+
