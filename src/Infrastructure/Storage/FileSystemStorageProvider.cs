@@ -17,9 +17,6 @@ namespace TenSecondTom.Infrastructure.Storage;
 /// File system-based implementation of IMemoryStorageProvider.
 /// Stores memory entries as markdown files with YAML frontmatter in a directory structure.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Storage operations need to catch all exceptions and return Result")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates", Justification = "Simple logging for now, will optimize later")]
 public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
 {
     private readonly string _baseDirectory;

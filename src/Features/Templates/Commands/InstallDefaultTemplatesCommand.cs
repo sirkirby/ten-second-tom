@@ -6,8 +6,6 @@ namespace TenSecondTom.Features.Templates.Commands;
 /// Marker interface for request/response pattern.
 /// Indicates this command returns a specific response type.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1040:Avoid empty interfaces", Justification = "Marker interface for CQRS pattern")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public interface IRequest<out TResponse>
 {
 }
@@ -24,7 +22,6 @@ public interface IRequest<out TResponse>
 /// This command is idempotent - can be run multiple times safely.
 /// Existing templates are NOT overwritten to preserve user customizations.
 /// </remarks>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public sealed class InstallDefaultTemplatesCommand : IRequest<Result<InstallDefaultTemplatesResult>>
 {
     /// <summary>

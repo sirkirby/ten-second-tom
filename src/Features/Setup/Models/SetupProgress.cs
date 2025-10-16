@@ -73,7 +73,7 @@ public sealed record SetupProgress
         if (TotalSteps <= 0)
             return false;
 
-        if (SelectedProvider.HasValue && !Enum.IsDefined(typeof(LlmProvider), SelectedProvider.Value))
+        if (SelectedProvider.HasValue && !Enum.IsDefined(SelectedProvider.Value))
             return false;
 
         if (!string.IsNullOrEmpty(MemoryDirectory))

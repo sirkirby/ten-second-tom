@@ -8,7 +8,6 @@ namespace TenSecondTom.Infrastructure.Auth;
 /// Factory for creating authentication service instances.
 /// Intelligently selects between SSH agent and file-based authentication.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public factory for DI registration")]
 public static class AuthenticationServiceFactory
 {
     /// <summary>

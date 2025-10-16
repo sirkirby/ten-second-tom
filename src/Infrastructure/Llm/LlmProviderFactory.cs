@@ -6,7 +6,6 @@ namespace TenSecondTom.Infrastructure.Llm;
 /// <summary>
 /// Interface for creating ILlmProvider instances based on provider name.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public interface ILlmProviderFactory
 {
     /// <summary>
@@ -21,8 +20,6 @@ public interface ILlmProviderFactory
 /// <summary>
 /// Factory for creating appropriate ILlmProvider instances based on configuration.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Factory converts all instantiation errors to Result")]
 public sealed class LlmProviderFactory : ILlmProviderFactory
 {
     private readonly IServiceProvider _serviceProvider;

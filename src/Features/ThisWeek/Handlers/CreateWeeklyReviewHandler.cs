@@ -16,7 +16,6 @@ namespace TenSecondTom.Features.ThisWeek.Handlers;
 /// Handles the creation of weekly review entries by aggregating daily entries.
 /// Orchestrates validation, authentication, data retrieval, LLM interaction, and storage.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyReviewCommand, Result<WeeklyEntry>>
 {
     private readonly IMemoryStorageProvider _storage;

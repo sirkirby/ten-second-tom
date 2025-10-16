@@ -7,7 +7,6 @@ namespace TenSecondTom.Infrastructure.Configuration;
 /// Provides centralized environment detection logic.
 /// Eliminates duplicate environment checking code across the application.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API for use across features")]
 public static class EnvironmentHelper
 {
     /// <summary>

@@ -13,7 +13,6 @@ namespace TenSecondTom.Features.Setup.Services;
 /// Coordinates application startup, including configuration validation and first-time setup.
 /// This service encapsulates all setup-related startup logic to keep Program.cs thin.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1303:Do not pass literals as localized parameters", Justification = "CLI application, localization not required")]
 public sealed class ApplicationBootstrapper
 {
     private readonly IServiceProvider _serviceProvider;
@@ -165,7 +164,6 @@ public sealed class ApplicationBootstrapper
     /// <summary>
     /// Prompts the user to run setup to fix invalid or outdated configuration.
     /// </summary>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1303:Do not pass literals as localized parameters", Justification = "CLI tool - localization not required")]
     private static async Task<bool> PromptForSetupAsync(CancellationToken cancellationToken)
     {
         Console.WriteLine();

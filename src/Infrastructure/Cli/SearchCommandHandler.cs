@@ -11,8 +11,6 @@ namespace TenSecondTom.Infrastructure.Cli;
 /// CLI handler for the /search command.
 /// Provides interactive search functionality across memory entries.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public CLI command handler")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Top-level CLI handler must catch all exceptions for user-friendly error messages")]
 public static class SearchCommandHandler
 {
     /// <summary>

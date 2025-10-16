@@ -16,9 +16,7 @@ namespace TenSecondTom.Features.Today.Handlers;
 /// Handles the creation of daily reflection entries.
 /// Orchestrates validation, authentication, LLM interaction, and storage.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2254:Template should be a static expression", Justification = "Structured logging pattern")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates", Justification = "Simple logging calls, delegate overhead not justified")]
 public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCommand, Result<DailyEntry>>
 {
     private readonly IMemoryStorageProvider _storage;
@@ -174,7 +172,6 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
         return Result<DailyEntry>.Success(entry);
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA1848:Use the LoggerMessage delegates", Justification = "Simple logging call")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2254:Template should be a static expression", Justification = "Logging with structured properties")]
     private void LogEntryCreated(string entryId, string provider)
     {
@@ -238,7 +235,6 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
         return template.Content.Replace("{{USER_INPUT}}", userInput, StringComparison.Ordinal);
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Best effort logging on partial save")]
     private async Task SavePartialEntryAsync(string userInput, DateTime date, int entryNumber, CancellationToken cancellationToken)
     {
         try
@@ -275,14 +271,12 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
         }
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA1848:Use the LoggerMessage delegates", Justification = "Simple logging call")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2254:Template should be a static expression", Justification = "Logging with structured properties")]
     private void LogPartialEntrySaved(string entryId)
     {
         _logger.LogWarning("Saved partial entry {EntryId} due to LLM failure", entryId);
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA1848:Use the LoggerMessage delegates", Justification = "Simple logging call")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2254:Template should be a static expression", Justification = "Logging with structured properties")]
     private void LogPartialEntrySaveFailed(Exception ex, DateTime date)
     {
@@ -409,7 +403,6 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
 /// </summary>
 /// <typeparam name="TRequest">The request type.</typeparam>
 /// <typeparam name="TResponse">The response type.</typeparam>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public interface IRequestHandler<in TRequest, TResponse>
     where TRequest : IRequest<TResponse>
 {

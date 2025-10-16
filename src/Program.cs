@@ -23,10 +23,6 @@ internal static class Program
     /// </summary>
     /// <param name="args">Command-line arguments.</param>
     /// <returns>Exit code (0 for success, non-zero for errors).</returns>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1303:Do not pass literals as localized parameters", Justification = "CLI application, localization not required")]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates for improved performance", Justification = "Startup logging, performance not critical")]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Top-level exception handler")]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2007:Consider calling ConfigureAwait on the awaited task", Justification = "Console application, no synchronization context")]
     public static async Task<int> Main(string[] args)
     {
         ILoggerFactory? loggerFactory = null;

@@ -7,8 +7,6 @@ namespace TenSecondTom.Features.Today.Commands;
 /// Marker interface for request/response pattern.
 /// Indicates this command returns a specific response type.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1040:Avoid empty interfaces", Justification = "Marker interface for CQRS pattern")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public interface IRequest<out TResponse>
 {
 }
@@ -17,7 +15,6 @@ public interface IRequest<out TResponse>
 /// Command to create a daily reflection entry.
 /// Captures user responses to daily prompts and generates structured summary via LLM.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public sealed record CreateDailyEntryCommand : IRequest<Result<DailyEntry>>
 {
     /// <summary>

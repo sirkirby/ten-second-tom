@@ -8,10 +8,7 @@ namespace TenSecondTom.Features.Auth.Handlers;
 /// <summary>
 /// Handles the logout command to invalidate the current user session.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2254:Template should be a static expression", Justification = "Structured logging pattern")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates", Justification = "Simple logging calls sufficient")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Top-level handler must catch all exceptions")]
 public sealed class LogoutCommandHandler : IRequestHandler<LogoutCommand, Result<bool>>
 {
     private readonly IAuthenticationService _authService;

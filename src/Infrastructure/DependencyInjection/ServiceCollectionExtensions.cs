@@ -18,7 +18,6 @@ namespace TenSecondTom.Infrastructure.DependencyInjection;
 /// <summary>
 /// Extension methods for configuring services in the DI container.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API for dependency injection")]
 public static class ServiceCollectionExtensions
 {
     /// <summary>

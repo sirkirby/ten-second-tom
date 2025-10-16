@@ -8,7 +8,6 @@ namespace TenSecondTom.Infrastructure.Auth;
 /// Mock authentication service for development and testing.
 /// Always authenticates successfully without requiring SSH keys.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Referenced by DI container")]
 public sealed class MockAuthenticationService : IAuthenticationService
 {
     private readonly ILogger<MockAuthenticationService> _logger;

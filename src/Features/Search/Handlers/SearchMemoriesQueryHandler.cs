@@ -12,7 +12,6 @@ namespace TenSecondTom.Features.Search.Handlers;
 /// </summary>
 /// <typeparam name="TRequest">The type of request.</typeparam>
 /// <typeparam name="TResponse">The type of response.</typeparam>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public interface IRequestHandler<in TRequest, TResponse>
     where TRequest : IRequest<TResponse>
 {
@@ -29,7 +28,6 @@ public interface IRequestHandler<in TRequest, TResponse>
 /// Handler for SearchMemoriesQuery that performs text search across memory entries.
 /// Implements CQRS pattern with authentication and storage integration.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public sealed class SearchMemoriesQueryHandler : IRequestHandler<SearchMemoriesQuery, Result<IReadOnlyList<MemoryEntry>>>
 {
     private readonly IMemoryStorageProvider _storageProvider;

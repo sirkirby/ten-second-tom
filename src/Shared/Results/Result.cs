@@ -7,8 +7,6 @@ namespace TenSecondTom.Shared.Results;
 /// This type encourages explicit error handling instead of exceptions for expected failure cases.
 /// </summary>
 /// <typeparam name="T">The type of the value in case of success.</typeparam>
-[SuppressMessage("Design", "CA1716:Identifiers should not match keywords", Justification = "Results is a common namespace pattern")]
-[SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API for application use")]
 public readonly struct Result<T> : IEquatable<Result<T>>
 {
     private readonly T? _value;

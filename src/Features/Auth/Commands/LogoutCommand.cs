@@ -6,8 +6,6 @@ namespace TenSecondTom.Features.Auth.Commands;
 /// Marker interface for request/response pattern.
 /// Indicates this command returns a specific response type.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1040:Avoid empty interfaces", Justification = "Marker interface for CQRS pattern")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public interface IRequest<out TResponse>
 {
 }
@@ -16,7 +14,6 @@ public interface IRequest<out TResponse>
 /// Marker interface for command handlers.
 /// Handles a request and returns a response.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public interface IRequestHandler<in TRequest, TResponse>
     where TRequest : IRequest<TResponse>
 {
@@ -33,7 +30,6 @@ public interface IRequestHandler<in TRequest, TResponse>
 /// Command to log out the current authenticated user.
 /// Invalidates the active session and clears authentication state.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public sealed record LogoutCommand : IRequest<Result<bool>>
 {
     /// <summary>

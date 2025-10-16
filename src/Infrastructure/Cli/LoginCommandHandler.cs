@@ -10,8 +10,6 @@ namespace TenSecondTom.Infrastructure.Cli;
 /// Handles the login CLI command execution.
 /// Provides user-friendly output for login operations.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Top-level CLI handler must catch all exceptions")]
 public static class LoginCommandHandler
 {
     /// <summary>

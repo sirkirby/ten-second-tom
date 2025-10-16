@@ -7,8 +7,6 @@ namespace TenSecondTom.Shared.TextEditing.Services;
 /// Wrapper editor that tries Terminal.Gui first, then falls back to StreamBasedTextEditor on failure.
 /// This handles cases where terminal detection fails but Terminal.Gui can't actually initialize.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates", Justification = "Fallback path, performance not critical")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2007:Consider calling ConfigureAwait on the awaited task", Justification = "Console application, no synchronization context")]
 public sealed class FallbackTextEditor : IInteractiveTextEditor
 {
     private readonly TerminalGuiTextEditor _primaryEditor;

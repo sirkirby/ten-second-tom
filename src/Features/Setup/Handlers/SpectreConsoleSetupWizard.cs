@@ -10,6 +10,20 @@ namespace TenSecondTom.Features.Setup.Handlers;
 /// </summary>
 public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
 {
+    private static readonly string[] LlmProviderChoices =
+    [
+        "OpenAI (GPT)",
+        "Anthropic (Claude)"
+    ];
+
+    private static readonly string[] LogLevelChoices =
+    [
+        "Debug (verbose)",
+        "Information (recommended)",
+        "Warning (quiet)",
+        "Error (silent)"
+    ];
+
     private readonly IAnsiConsole _console;
     private readonly ILogger<SpectreConsoleSetupWizard> _logger;
 
@@ -65,11 +79,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
     {
         var prompt = new SelectionPrompt<string>()
             .Title("Choose your AI provider:")
-            .AddChoices(new[]
-            {
-                "OpenAI (GPT-4, GPT-3.5)",
-                "Anthropic (Claude 3.5)"
-            });
+            .AddChoices(LlmProviderChoices);
 
         if (currentProvider.HasValue)
         {
@@ -182,13 +192,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
     {
         var prompt = new SelectionPrompt<string>()
             .Title("Select logging level:")
-            .AddChoices(new[]
-            {
-                "Debug (verbose)",
-                "Information (recommended)",
-                "Warning (quiet)",
-                "Error (silent)"
-            });
+            .AddChoices(LogLevelChoices);
 
         var selected = _console.Prompt(prompt);
         

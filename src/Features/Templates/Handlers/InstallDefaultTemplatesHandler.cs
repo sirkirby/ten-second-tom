@@ -10,7 +10,6 @@ namespace TenSecondTom.Features.Templates.Handlers;
 /// <summary>
 /// Handler interface for processing requests.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public interface IRequestHandler<in TRequest, TResponse>
 {
     /// <summary>
@@ -22,7 +21,6 @@ public interface IRequestHandler<in TRequest, TResponse>
 /// <summary>
 /// Handler for installing default prompt templates to the filesystem.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public sealed class InstallDefaultTemplatesHandler(
     IFileSystem fileSystem,
     ILogger<InstallDefaultTemplatesHandler> logger)
@@ -31,7 +29,6 @@ public sealed class InstallDefaultTemplatesHandler(
     /// <summary>
     /// Handles the installation of default templates.
     /// </summary>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Request is validated at entry")]
     public async Task<Result<InstallDefaultTemplatesResult>> Handle(
         InstallDefaultTemplatesCommand request,
         CancellationToken cancellationToken)

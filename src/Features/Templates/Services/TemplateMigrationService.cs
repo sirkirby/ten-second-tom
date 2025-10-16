@@ -38,8 +38,6 @@ public sealed class TemplateMigrationService
     /// <param name="configuration">Application configuration</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Task representing the asynchronous operation</returns>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates for improved performance", Justification = "Migration logic, performance not critical")]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Non-critical migration operation, must not fail application startup")]
     public async Task RunAutomaticMigrationAsync(
         IConfiguration configuration,
         CancellationToken cancellationToken = default)
@@ -79,8 +77,6 @@ public sealed class TemplateMigrationService
     /// <param name="memoryDirectory">The memory directory path where templates should exist</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result indicating whether migration was needed and successful (true if migrated, false if not needed)</returns>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates for improved performance", Justification = "Migration logic, performance not critical")]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2007:Consider calling ConfigureAwait on the awaited task", Justification = "Console application, no synchronization context")]
     private async Task<Result<bool>> ValidateAndMigrateTemplatesAsync(
         string memoryDirectory,
         CancellationToken cancellationToken = default)

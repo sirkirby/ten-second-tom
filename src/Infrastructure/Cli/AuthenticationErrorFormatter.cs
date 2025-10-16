@@ -5,7 +5,6 @@ namespace TenSecondTom.Infrastructure.Cli;
 /// <summary>
 /// Provides formatted, helpful authentication error messages for CLI users.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public utility for CLI commands")]
 public static class AuthenticationErrorFormatter
 {
     /// <summary>

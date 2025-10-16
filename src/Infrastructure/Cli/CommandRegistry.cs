@@ -19,7 +19,6 @@ namespace TenSecondTom.Infrastructure.Cli;
 /// Registry for all CLI commands in the application.
 /// Builds the root command with all subcommands configured.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API for CLI commands")]
 public static class CommandRegistry
 {
     private static readonly string[] QuitAliases = ["exit"];
