@@ -2,6 +2,13 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
+using TenSecondTom.Features.Auth;
+using TenSecondTom.Features.Search;
+using TenSecondTom.Features.Setup;
+using TenSecondTom.Features.Shell;
+using TenSecondTom.Features.Templates;
+using TenSecondTom.Features.ThisWeek;
+using TenSecondTom.Features.Today;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.DependencyInjection;
 using TenSecondTom.Infrastructure.Llm;
@@ -101,8 +108,15 @@ public sealed class TestServiceProviderBuilder
             builder.AddConsole();
         });
 
-        // Add core services
-        _services.AddTenSecondTomServices();
+        // Add infrastructure and feature services
+        _services.AddInfrastructureServices();
+        _services.AddTodayFeature();
+        _services.AddThisWeekFeature();
+        _services.AddSearchFeature();
+        _services.AddAuthFeature();
+        _services.AddTemplatesFeature();
+        _services.AddSetupFeature();
+        _services.AddShellFeature();
 
         // Override with mocked services if provided
         if (_llmProvider != null)

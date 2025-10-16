@@ -2,7 +2,14 @@ using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using TenSecondTom.Features.Auth;
+using TenSecondTom.Features.Search;
+using TenSecondTom.Features.Setup;
+using TenSecondTom.Features.Shell;
+using TenSecondTom.Features.Templates;
+using TenSecondTom.Features.ThisWeek;
 using TenSecondTom.Features.ThisWeek.Handlers;
+using TenSecondTom.Features.Today;
 using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.DependencyInjection;
@@ -42,11 +49,29 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
         _serviceProvider?.Dispose();
     }
 
+    /// <summary>
+    /// Helper method to add all services (infrastructure + features) like Program.cs does.
+    /// </summary>
+    private static void AddAllServices(ServiceCollection services)
+    {
+        // Infrastructure (cross-cutting concerns)
+        services.AddInfrastructureServices();
+        
+        // Feature slices (vertical slice architecture)
+        services.AddTodayFeature();
+        services.AddThisWeekFeature();
+        services.AddSearchFeature();
+        services.AddAuthFeature();
+        services.AddTemplatesFeature();
+        services.AddSetupFeature();
+        services.AddShellFeature();
+    }
+
     [Fact]
     public void AddTenSecondTomServices_RegistersAllRequiredServices()
     {
         // Arrange & Act
-        _services.AddTenSecondTomServices();
+        AddAllServices(_services);
         _serviceProvider = _services.BuildServiceProvider();
 
         // Assert - Infrastructure services (can be resolved without additional dependencies)
@@ -67,7 +92,7 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_RegistersStorageProviderAsSingleton()
     {
         // Arrange & Act
-        _services.AddTenSecondTomServices();
+        AddAllServices(_services);
         _serviceProvider = _services.BuildServiceProvider();
 
         // Act
@@ -82,7 +107,7 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_RegistersHandlersAsTransient()
     {
         // Arrange & Act
-        _services.AddTenSecondTomServices();
+        AddAllServices(_services);
         _serviceProvider = _services.BuildServiceProvider();
 
         // Act
@@ -108,7 +133,7 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddLogging();
-        services.AddTenSecondTomServices();
+        AddAllServices(services);
 
         // Act
         using var serviceProvider = services.BuildServiceProvider();
@@ -130,7 +155,7 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddLogging();
-        services.AddTenSecondTomServices();
+        AddAllServices(services);
 
         // Act
         using var serviceProvider = services.BuildServiceProvider();
@@ -145,7 +170,7 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_CanResolveAllDependencies()
     {
         // Arrange & Act
-        _services.AddTenSecondTomServices();
+        AddAllServices(_services);
         _serviceProvider = _services.BuildServiceProvider();
 
         // Act & Assert - Core services should resolve without throwing
@@ -168,7 +193,7 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
         // Arrange - Services without IConfiguration registered
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddTenSecondTomServices();
+        AddAllServices(services);
 
         // Act
         using var serviceProvider = services.BuildServiceProvider();
@@ -193,7 +218,7 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
         // Note: NOT adding logging explicitly - AddHttpClient() should add it
-        services.AddTenSecondTomServices();
+        AddAllServices(services);
 
         // Act
         using var serviceProvider = services.BuildServiceProvider();
@@ -211,7 +236,8 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_ReturnsSameServiceCollection()
     {
         // Act
-        var result = _services.AddTenSecondTomServices();
+        AddAllServices(_services);
+        var result = _services;
 
         // Assert - Should return the same collection for chaining
         result.Should().BeSameAs(_services);
@@ -221,7 +247,7 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_RegistersCorrectImplementationTypes()
     {
         // Arrange & Act
-        _services.AddTenSecondTomServices();
+        AddAllServices(_services);
         _serviceProvider = _services.BuildServiceProvider();
 
         // Assert - Verify concrete types
@@ -242,7 +268,7 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_HandlersCanResolveTheirDependencies()
     {
         // Arrange & Act
-        _services.AddTenSecondTomServices();
+        AddAllServices(_services);
         _serviceProvider = _services.BuildServiceProvider();
 
         // Act & Assert - Handlers should successfully resolve all their constructor dependencies
@@ -262,7 +288,7 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_AuthenticationService_UsesFactoryMethod()
     {
         // Arrange & Act
-        _services.AddTenSecondTomServices();
+        AddAllServices(_services);
         _serviceProvider = _services.BuildServiceProvider();
 
         // Act
@@ -277,7 +303,7 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_AuthenticationService_RegisteredAsSingleton()
     {
         // Arrange & Act
-        _services.AddTenSecondTomServices();
+        AddAllServices(_services);
         _serviceProvider = _services.BuildServiceProvider();
 
         // Act
