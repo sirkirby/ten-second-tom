@@ -1,3 +1,4 @@
+using System.IO.Abstractions;
 using Anthropic.SDK;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,6 +11,9 @@ using TenSecondTom.Features.Setup.Handlers;
 using TenSecondTom.Features.Setup.Queries;
 using TenSecondTom.Features.Setup.Validation;
 using TenSecondTom.Features.Shell.Services;
+using TenSecondTom.Features.Templates.Commands;
+using TenSecondTom.Features.Templates.Handlers;
+using TenSecondTom.Features.Templates.Services;
 using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
@@ -18,6 +22,7 @@ using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
+using TenSecondTom.Shared.Results;
 using TenSecondTom.Shared.TextEditing.Services;
 
 namespace TenSecondTom.Infrastructure.DependencyInjection;
@@ -37,21 +42,32 @@ public static class ServiceCollectionExtensions
     {
         // Add HttpClient support for API validators
         services.AddHttpClient();
-        
+
         // Infrastructure services
+        services.AddSingleton<IFileSystem, FileSystem>();
+
         services.AddSingleton<IMemoryStorageProvider>(serviceProvider =>
         {
             var configuration = serviceProvider.GetRequiredService<IConfiguration>();
             var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger<FileSystemStorageProvider>();
-            
+
             string baseDirectory = configuration["TenSecondTom:MemoryDirectory"] ?? "./.memory";
-            
+
             return new FileSystemStorageProvider(baseDirectory, logger);
         });
-        
+
         services.AddSingleton<ILlmProviderFactory, LlmProviderFactory>();
-        services.AddSingleton<IPromptTemplateLoader, EmbeddedPromptTemplateLoader>();
+
+        // Register YAML parser for template metadata
+        services.AddSingleton<YamlFrontMatterParser>();
+
+        // Register template loader with YAML parser dependency
+        services.AddSingleton<IPromptTemplateLoader>(serviceProvider =>
+        {
+            var yamlParser = serviceProvider.GetRequiredService<YamlFrontMatterParser>();
+            return new EmbeddedPromptTemplateLoader(baseDirectory: null, yamlParser: yamlParser);
+        });
         
         // Register SSH agent client
         services.AddSingleton<ISshAgentClient>(serviceProvider =>
@@ -168,6 +184,12 @@ public static class ServiceCollectionExtensions
         services.AddTransient<SearchMemoriesQueryHandler>();
         services.AddTransient<LoginCommandHandler>();
         services.AddTransient<LogoutCommandHandler>();
+
+        // Templates feature
+        services.AddTransient<InstallDefaultTemplatesHandler>();
+        services.AddTransient<Features.Templates.Handlers.IRequestHandler<InstallDefaultTemplatesCommand, Result<InstallDefaultTemplatesResult>>>(
+            sp => sp.GetRequiredService<InstallDefaultTemplatesHandler>());
+        services.AddTransient<TemplateMigrationService>();
 
         // Setup feature services
         services.AddTransient<SetupCommandHandler>();

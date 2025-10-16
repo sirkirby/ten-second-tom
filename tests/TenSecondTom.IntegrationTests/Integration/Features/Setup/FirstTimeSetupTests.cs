@@ -206,6 +206,11 @@ public sealed class FirstTimeSetupTests : IDisposable
         // Add logging
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
 
+        // Mock IConfiguration
+        var mockConfiguration = new Mock<Microsoft.Extensions.Configuration.IConfiguration>();
+        mockConfiguration.Setup(c => c[It.IsAny<string>()]).Returns((string?)null);
+        services.AddSingleton(mockConfiguration.Object);
+
         // Mock configuration storage
         var mockStorage = new Mock<IConfigurationStorageService>();
         mockStorage.Setup(s => s.SaveAsync(It.IsAny<ConfigurationSettings>(), It.IsAny<CancellationToken>()))
@@ -244,7 +249,18 @@ public sealed class FirstTimeSetupTests : IDisposable
             It.IsAny<LlmProvider?>(),
             It.IsAny<CancellationToken>()))
             .ReturnsAsync(LlmProvider.OpenAI);
-        
+
+        mockWizardUI.Setup(w => w.PromptForModelAsync(
+            It.IsAny<LlmProvider>(),
+            It.IsAny<string?>(),
+            It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SupportedModel(
+                Id: "gpt-4o",
+                DisplayName: "GPT-4o",
+                Provider: LlmProvider.OpenAI,
+                CostTier: "Balanced",
+                Description: "Test model"));
+
         mockWizardUI.Setup(w => w.PromptForApiKeyAsync(
             It.IsAny<LlmProvider>(),
             It.IsAny<string?>(),
@@ -296,6 +312,24 @@ public sealed class FirstTimeSetupTests : IDisposable
                 SourcesChecked = new[] { SshKeySource.FileSystem }
             });
         services.AddSingleton(mockSshDetector.Object);
+
+        // Template infrastructure services (required by SetupCommandHandler)
+        services.AddSingleton<System.IO.Abstractions.IFileSystem, System.IO.Abstractions.FileSystem>();
+        services.AddSingleton<TenSecondTom.Infrastructure.Prompts.YamlFrontMatterParser>();
+        services.AddSingleton<TenSecondTom.Infrastructure.Prompts.IPromptTemplateLoader>(serviceProvider =>
+        {
+            var yamlParser = serviceProvider.GetRequiredService<TenSecondTom.Infrastructure.Prompts.YamlFrontMatterParser>();
+            return new TenSecondTom.Infrastructure.Prompts.EmbeddedPromptTemplateLoader(
+                baseDirectory: null,
+                yamlParser: yamlParser);
+        });
+
+        // Template handler registration (required by SetupCommandHandler)
+        services.AddTransient<
+            TenSecondTom.Features.Templates.Handlers.IRequestHandler<
+                TenSecondTom.Features.Templates.Commands.InstallDefaultTemplatesCommand,
+                TenSecondTom.Shared.Results.Result<TenSecondTom.Features.Templates.Commands.InstallDefaultTemplatesResult>>,
+            TenSecondTom.Features.Templates.Handlers.InstallDefaultTemplatesHandler>();
 
         // Add handler
         services.AddSingleton<SetupCommandHandler>();

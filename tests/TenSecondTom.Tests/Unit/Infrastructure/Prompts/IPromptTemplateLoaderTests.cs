@@ -28,8 +28,9 @@ public sealed class IPromptTemplateLoaderTests
         {
             TemplateId = templateId,
             Content = "Test template with {{USER_INPUT}} variable",
-            TemplateType = TemplateType.DailySummary,
-            Description = "Daily summary template"
+            TemplateType = TemplateType.Daily,
+            Description = "Daily summary template",
+            Source = TemplateSource.Embedded
         };
 
         _mockLoader
@@ -57,7 +58,8 @@ public sealed class IPromptTemplateLoaderTests
         {
             TemplateId = templateId,
             Content = "Embedded template content {{START_DATE}} to {{END_DATE}}",
-            TemplateType = TemplateType.WeeklySummary
+            TemplateType = TemplateType.Weekly,
+            Source = TemplateSource.Embedded
         };
 
         _mockLoader
@@ -84,8 +86,9 @@ public sealed class IPromptTemplateLoaderTests
         {
             TemplateId = templateId,
             Content = "User override template {{CUSTOM_VAR}}",
-            TemplateType = TemplateType.DailySummary,
-            Description = "User customized version"
+            TemplateType = TemplateType.Daily,
+            Description = "User customized version",
+            Source = TemplateSource.FileSystem
         };
 
         _mockLoader

@@ -144,7 +144,7 @@ public static class ConfigurationChecker
                    $"Valid models for {llmProvider}: {validModelsList}\n" +
                    "Run 'tom setup' to reconfigure with a valid model.";
         }
-        
+
         return null; // Validation passed
     }
 }

@@ -55,7 +55,8 @@ public sealed class CreateWeeklyReviewHandlerTests
             {
                 TemplateId = "weekly-review",
                 Content = "Review: {{DAILY_ENTRIES}}",
-                TemplateType = TemplateType.WeeklySummary
+                TemplateType = TemplateType.Weekly,
+                Source = TemplateSource.Embedded
             }));
 
         string mockLlmResponse = @"## Top 3 Accomplishments

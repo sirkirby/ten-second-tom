@@ -1,3 +1,11 @@
+---
+templateType: weekly
+title: Weekly Review
+description: Default template for weekly summaries
+version: 1.0
+author: Ten Second Tom
+---
+
 # Weekly Review Template
 
 You are an AI assistant helping to create a comprehensive weekly review from daily summaries.

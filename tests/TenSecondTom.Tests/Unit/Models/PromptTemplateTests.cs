@@ -17,14 +17,15 @@ public sealed class PromptTemplateTests
         {
             TemplateId = "daily-summary-v1",
             Content = "Summarize the following day: {{USER_INPUT}}",
-            TemplateType = TemplateType.DailySummary
+            TemplateType = TemplateType.Daily,
+            Source = TemplateSource.Embedded
         };
 
         // Assert
         template.Should().NotBeNull();
         template.TemplateId.Should().Be("daily-summary-v1");
         template.Content.Should().Contain("{{USER_INPUT}}");
-        template.TemplateType.Should().Be(TemplateType.DailySummary);
+        template.TemplateType.Should().Be(TemplateType.Daily);
     }
 
     [Fact]
@@ -35,7 +36,8 @@ public sealed class PromptTemplateTests
         {
             TemplateId = "weekly-review-v2",
             Content = "Content",
-            TemplateType = TemplateType.WeeklySummary
+            TemplateType = TemplateType.Weekly,
+            Source = TemplateSource.Embedded
         };
 
         // Assert
@@ -50,7 +52,8 @@ public sealed class PromptTemplateTests
         {
             TemplateId = "multi-var-template",
             Content = "User: {{USER_INPUT}}\nContext: {{CONTEXT}}\nDate: {{DATE}}",
-            TemplateType = TemplateType.DailySummary
+            TemplateType = TemplateType.Daily,
+            Source = TemplateSource.Embedded
         };
 
         // Assert
@@ -67,7 +70,8 @@ public sealed class PromptTemplateTests
         {
             TemplateId = "test-template",
             Content = "This is a test with {{VARIABLE_NAME}} and {{ANOTHER_VAR}}",
-            TemplateType = TemplateType.DailySummary
+            TemplateType = TemplateType.Daily,
+            Source = TemplateSource.Embedded
         };
 
         // Assert
@@ -79,20 +83,20 @@ public sealed class PromptTemplateTests
     public void TemplateType_DailySummary_ShouldBeValid()
     {
         // Arrange & Act
-        var templateType = TemplateType.DailySummary;
+        var templateType = TemplateType.Daily;
 
         // Assert
-        templateType.Should().Be(TemplateType.DailySummary);
+        templateType.Should().Be(TemplateType.Daily);
     }
 
     [Fact]
     public void TemplateType_WeeklySummary_ShouldBeValid()
     {
         // Arrange & Act
-        var templateType = TemplateType.WeeklySummary;
+        var templateType = TemplateType.Weekly;
 
         // Assert
-        templateType.Should().Be(TemplateType.WeeklySummary);
+        templateType.Should().Be(TemplateType.Weekly);
     }
 
     [Fact]
@@ -116,7 +120,8 @@ public sealed class PromptTemplateTests
         {
             TemplateId = "immutable-test",
             Content = "Original content",
-            TemplateType = TemplateType.DailySummary
+            TemplateType = TemplateType.Daily,
+            Source = TemplateSource.Embedded
         };
 
         // Act - Create a modified copy using 'with' expression
@@ -137,12 +142,13 @@ public sealed class PromptTemplateTests
             TemplateId = "multiline-template",
             Content = """
                 You are a helpful assistant.
-                
+
                 User input: {{USER_INPUT}}
-                
+
                 Please provide a summary.
                 """,
-            TemplateType = TemplateType.SystemPrompt
+            TemplateType = TemplateType.SystemPrompt,
+            Source = TemplateSource.Embedded
         };
 
         // Assert
@@ -158,7 +164,8 @@ public sealed class PromptTemplateTests
         {
             TemplateId = "no-vars-template",
             Content = "This is a static prompt with no variables.",
-            TemplateType = TemplateType.SystemPrompt
+            TemplateType = TemplateType.SystemPrompt,
+            Source = TemplateSource.Embedded
         };
 
         // Assert
@@ -193,8 +200,9 @@ public sealed class PromptTemplateTests
         {
             TemplateId = "with-description",
             Content = "Content",
-            TemplateType = TemplateType.DailySummary,
-            Description = "This template is used for daily summaries."
+            TemplateType = TemplateType.Daily,
+            Description = "This template is used for daily summaries.",
+            Source = TemplateSource.Embedded
         };
 
         // Assert
@@ -209,8 +217,9 @@ public sealed class PromptTemplateTests
         {
             TemplateId = "no-description",
             Content = "Content",
-            TemplateType = TemplateType.DailySummary,
-            Description = null
+            TemplateType = TemplateType.Daily,
+            Description = null,
+            Source = TemplateSource.Embedded
         };
 
         // Assert

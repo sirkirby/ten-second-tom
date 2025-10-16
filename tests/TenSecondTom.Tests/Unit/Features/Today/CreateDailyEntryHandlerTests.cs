@@ -56,7 +56,8 @@ public sealed class CreateDailyEntryHandlerTests
             {
                 TemplateId = "daily-summary",
                 Content = "Summarize: {{USER_INPUT}}",
-                TemplateType = TemplateType.DailySummary
+                TemplateType = TemplateType.Daily,
+                Source = TemplateSource.Embedded
             }));
 
         _mockLlmProvider.Setup(p => p.GenerateCompletionAsync(

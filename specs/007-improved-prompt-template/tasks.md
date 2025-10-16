@@ -8,6 +8,8 @@
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
+**Implementation Notes**: See `IMPLEMENTATION-NOTES.md` for deviations from spec, bug fixes, and additional enhancements applied during implementation.
+
 ## Format: `[ID] [P?] [Story] Description`
 - **[P]**: Can run in parallel (different files, no dependencies)
 - **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3)
@@ -154,15 +156,15 @@
 
 ### Tests for User Story 3
 
-- [ ] T047 [P] [US3] Test: Update `ConfigurationCheckerTests.cs` in `tests/Unit/Infrastructure/Configuration/` with tests for: detecting missing templates directory, auto-creating directory, auto-installing default templates, self-healing behavior, logging migration actions
-- [ ] T048 [P] [US3] Test: Create `ConfigurationMigrationTests.cs` in `tests/Integration/Infrastructure/Configuration/` with end-to-end migration scenarios
+- [x] T047 [P] [US3] Test: Update `ConfigurationCheckerTests.cs` in `tests/Unit/Infrastructure/Configuration/` with tests for: detecting missing templates directory, auto-creating directory, auto-installing default templates, self-healing behavior, logging migration actions
+- [x] T048 [P] [US3] Test: Create `ConfigurationMigrationTests.cs` in `tests/Integration/Infrastructure/Configuration/` with end-to-end migration scenarios
 
 ### Implementation for User Story 3
 
-- [ ] T049 [US3] Update `ConfigurationChecker` in `src/Infrastructure/Configuration/ConfigurationChecker.cs` to add ValidateTemplatesDirectory() method
-- [ ] T050 [US3] Implement template directory validation to: check if templates directory exists, check if default templates exist, determine if migration needed
-- [ ] T051 [US3] Add migration logic to: create templates directory if missing, call InstallDefaultTemplatesCommand to install defaults, log migration actions, handle failures gracefully (continue without blocking app)
-- [ ] T052 [US3] Update ValidateAndMigrateAsync() or equivalent method to call template directory validation during configuration check
+- [x] T049 [US3] Update `ConfigurationChecker` in `src/Infrastructure/Configuration/ConfigurationChecker.cs` to add ValidateTemplatesDirectory() method
+- [x] T050 [US3] Implement template directory validation to: check if templates directory exists, check if default templates exist, determine if migration needed
+- [x] T051 [US3] Add migration logic to: create templates directory if missing, call InstallDefaultTemplatesCommand to install defaults, log migration actions, handle failures gracefully (continue without blocking app)
+- [x] T052 [US3] Update ValidateAndMigrateAsync() or equivalent method to call template directory validation during configuration check
 
 **Checkpoint**: Migration fully automatic, existing users seamlessly upgraded, self-healing behavior tested
 
@@ -397,12 +399,42 @@ With multiple developers after Foundational phase completes:
 
 After implementation, verify these success criteria from spec.md:
 
-- **SC-001**: New users completing guided setup receive working default templates within 2 seconds
-- **SC-002**: 100% of existing users automatically migrated without manual intervention
-- **SC-003**: Template selection completes in under 10 seconds
-- **SC-004**: Custom templates recognized within 1 second of next command
-- **SC-005**: Template filtering 100% accurate (no daily templates for weekly commands)
-- **SC-006**: Edited templates reflected immediately without restart
-- **SC-007**: Users can edit templates in any text editor without issues
-- **SC-008**: System handles invalid templates without crashing
-- **SC-009**: Templates >1MB rejected with clear warnings
+- **SC-001**: ✅ New users completing guided setup receive working default templates within 2 seconds
+- **SC-002**: ✅ 100% of existing users automatically migrated without manual intervention
+- **SC-003**: ⏸️ Template selection completes in under 10 seconds (Phase 4 - pending)
+- **SC-004**: ✅ Custom templates recognized within 1 second of next command (foundation complete)
+- **SC-005**: ⏸️ Template filtering 100% accurate (Phase 4 - pending)
+- **SC-006**: ⏸️ Edited templates reflected immediately without restart (Phase 7 - pending)
+- **SC-007**: ⏸️ Users can edit templates in any text editor without issues (Phase 7 - pending)
+- **SC-008**: ⏸️ System handles invalid templates without crashing (Phase 8 - pending)
+- **SC-009**: ⏸️ Templates >1MB rejected with clear warnings (Phase 8 - pending)
+
+---
+
+## Additional Tasks Completed (Not in Original Spec)
+
+### Environment Variable Override Fix
+
+**Issue**: During testing, discovered that `config show` command was not respecting environment variable overrides for Storage, SSH, and Optional configuration sections.
+
+**Tasks Completed**:
+- Fixed `.env` file to use correct configuration key: `Storage__MemoryDirectory` instead of `TenSecondTom__MemoryDirectory`
+- Enhanced `ConfigCommandHandler.HandleShowAsync()` to apply environment variable overrides for ALL configuration sections:
+  - SSH: `Ssh__KeyPath`, `Ssh__KeySource`, `Ssh__AgentSocketPath`
+  - LLM: `Llm__Provider`, `Llm__ApiKey`, `Llm__Model` (already worked)
+  - Storage: `Storage__MemoryDirectory`, `Storage__CreateIfMissing` (fixed)
+  - Optional: `Optional__LogLevel`, `Optional__RetentionDays`, `Optional__EnableTelemetry` (added)
+
+**Files Modified**:
+- `src/Features/Setup/Handlers/ConfigCommandHandler.cs` (lines 76-145)
+- `.env` (corrected configuration key)
+
+**Impact**: Developers can now override ANY configuration setting via environment variables, and `config show` accurately displays the effective configuration. Critical for local development and testing.
+
+**Testing Verified**:
+```bash
+Storage__MemoryDirectory="./.memory" ./src/bin/Release/net9.0/TenSecondTom config show
+# Correctly shows: Memory Directory │ ./.memory
+```
+
+See `IMPLEMENTATION-NOTES.md` for complete details on all deviations and fixes.

@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
@@ -11,12 +12,20 @@ namespace TenSecondTom.Tests.Unit.Infrastructure.Prompts;
 /// </summary>
 public sealed class EmbeddedPromptTemplateLoaderTests
 {
+    private static YamlFrontMatterParser CreateYamlParser()
+    {
+        using var loggerFactory = LoggerFactory.Create(builder => { });
+        var logger = loggerFactory.CreateLogger<YamlFrontMatterParser>();
+        return new YamlFrontMatterParser(logger);
+    }
+
     [Fact]
     public async Task LoadTemplateAsync_WithEmbeddedTemplate_ReturnsTemplate()
     {
         // Arrange
         const string templateId = "daily-summary";
-        EmbeddedPromptTemplateLoader loader = new(baseDirectory: null);
+        var yamlParser = CreateYamlParser();
+        EmbeddedPromptTemplateLoader loader = new(baseDirectory: null, yamlParser: yamlParser);
 
         // Act
         Result<PromptTemplate> result = await loader.LoadTemplateAsync(
@@ -27,7 +36,7 @@ public sealed class EmbeddedPromptTemplateLoaderTests
         result.IsSuccess.Should().BeTrue();
         result.Value.TemplateId.Should().Be(templateId);
         result.Value.Content.Should().NotBeEmpty();
-        result.Value.TemplateType.Should().Be(TemplateType.DailySummary);
+        result.Value.TemplateType.Should().Be(TemplateType.Daily);
     }
 
     [Fact]
@@ -35,7 +44,8 @@ public sealed class EmbeddedPromptTemplateLoaderTests
     {
         // Arrange
         const string templateId = "weekly-review";
-        EmbeddedPromptTemplateLoader loader = new(baseDirectory: null);
+        var yamlParser = CreateYamlParser();
+        EmbeddedPromptTemplateLoader loader = new(baseDirectory: null, yamlParser: yamlParser);
 
         // Act
         Result<PromptTemplate> result = await loader.LoadTemplateAsync(
@@ -46,7 +56,7 @@ public sealed class EmbeddedPromptTemplateLoaderTests
         result.IsSuccess.Should().BeTrue();
         result.Value.TemplateId.Should().Be(templateId);
         result.Value.Content.Should().NotBeEmpty();
-        result.Value.TemplateType.Should().Be(TemplateType.WeeklySummary);
+        result.Value.TemplateType.Should().Be(TemplateType.Weekly);
     }
 
     [Fact]
@@ -54,7 +64,8 @@ public sealed class EmbeddedPromptTemplateLoaderTests
     {
         // Arrange
         const string templateId = "daily-summary";
-        EmbeddedPromptTemplateLoader loader = new(baseDirectory: null);
+        var yamlParser = CreateYamlParser();
+        EmbeddedPromptTemplateLoader loader = new(baseDirectory: null, yamlParser: yamlParser);
 
         // Act
         Result<PromptTemplate> result = await loader.LoadTemplateAsync(
@@ -72,7 +83,8 @@ public sealed class EmbeddedPromptTemplateLoaderTests
     {
         // Arrange
         const string templateId = "daily-summary";
-        EmbeddedPromptTemplateLoader loader = new(baseDirectory: null);
+        var yamlParser = CreateYamlParser();
+        EmbeddedPromptTemplateLoader loader = new(baseDirectory: null, yamlParser: yamlParser);
 
         // Act
         Result<PromptTemplate> result = await loader.LoadTemplateAsync(
@@ -93,7 +105,8 @@ public sealed class EmbeddedPromptTemplateLoaderTests
     {
         // Arrange
         const string templateId = "weekly-review";
-        EmbeddedPromptTemplateLoader loader = new(baseDirectory: null);
+        var yamlParser = CreateYamlParser();
+        EmbeddedPromptTemplateLoader loader = new(baseDirectory: null, yamlParser: yamlParser);
 
         // Act
         Result<PromptTemplate> result = await loader.LoadTemplateAsync(
@@ -113,7 +126,8 @@ public sealed class EmbeddedPromptTemplateLoaderTests
     {
         // Arrange
         const string templateId = "non-existent-template";
-        EmbeddedPromptTemplateLoader loader = new(baseDirectory: null);
+        var yamlParser = CreateYamlParser();
+        EmbeddedPromptTemplateLoader loader = new(baseDirectory: null, yamlParser: yamlParser);
 
         // Act
         Result<PromptTemplate> result = await loader.LoadTemplateAsync(
@@ -133,7 +147,8 @@ public sealed class EmbeddedPromptTemplateLoaderTests
     public async Task LoadTemplateAsync_WithInvalidTemplateId_ReturnsFailure(string? invalidId)
     {
         // Arrange
-        EmbeddedPromptTemplateLoader loader = new(baseDirectory: null);
+        var yamlParser = CreateYamlParser();
+        EmbeddedPromptTemplateLoader loader = new(baseDirectory: null, yamlParser: yamlParser);
 
         // Act
         Result<PromptTemplate> result = await loader.LoadTemplateAsync(
@@ -159,13 +174,14 @@ public sealed class EmbeddedPromptTemplateLoaderTests
             // Create user override file
             string overrideContent = """
                 # User Override Template
-                
+
                 This is a custom template with {{CUSTOM_VAR}}.
                 """;
             string overridePath = Path.Combine(templatesDir, $"{templateId}.md");
             await File.WriteAllTextAsync(overridePath, overrideContent);
 
-            EmbeddedPromptTemplateLoader loader = new(baseDirectory: tempDir);
+            var yamlParser = CreateYamlParser();
+            EmbeddedPromptTemplateLoader loader = new(baseDirectory: tempDir, yamlParser: yamlParser);
 
             // Act
             Result<PromptTemplate> result = await loader.LoadTemplateAsync(
@@ -191,7 +207,8 @@ public sealed class EmbeddedPromptTemplateLoaderTests
     {
         // Arrange
         const string templateId = "daily-summary";
-        EmbeddedPromptTemplateLoader loader = new(baseDirectory: null);
+        var yamlParser = CreateYamlParser();
+        EmbeddedPromptTemplateLoader loader = new(baseDirectory: null, yamlParser: yamlParser);
         using CancellationTokenSource cts = new();
         await cts.CancelAsync();
 
@@ -210,7 +227,8 @@ public sealed class EmbeddedPromptTemplateLoaderTests
         // Arrange
         const string templateId = "daily-summary";
         string invalidDir = Path.Combine(Path.GetTempPath(), new string('x', 300)); // Invalid path
-        EmbeddedPromptTemplateLoader loader = new(baseDirectory: invalidDir);
+        var yamlParser = CreateYamlParser();
+        EmbeddedPromptTemplateLoader loader = new(baseDirectory: invalidDir, yamlParser: yamlParser);
 
         // Act
         Result<PromptTemplate> result = await loader.LoadTemplateAsync(
@@ -221,4 +239,118 @@ public sealed class EmbeddedPromptTemplateLoaderTests
         result.IsSuccess.Should().BeTrue();
         result.Value.TemplateId.Should().Be(templateId);
     }
+
+    [Fact]
+    public async Task LoadAllTemplatesAsync_ReturnsAllEmbeddedTemplates()
+    {
+        // Arrange
+        var yamlParser = CreateYamlParser();
+        EmbeddedPromptTemplateLoader loader = new(baseDirectory: null, yamlParser: yamlParser);
+
+        // Act
+        Result<List<PromptTemplate>> result = await loader.LoadAllTemplatesAsync(CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeNull();
+        result.Value.Should().HaveCount(2); // daily-summary and weekly-review
+        result.Value.Should().Contain(t => t.TemplateId == "daily-summary");
+        result.Value.Should().Contain(t => t.TemplateId == "weekly-review");
+        result.Value.Should().OnlyContain(t => t.Source == TemplateSource.Embedded);
+    }
+
+    [Fact]
+    public async Task LoadAllTemplatesAsync_ParsesYamlFrontMatter()
+    {
+        // Arrange
+        var yamlParser = CreateYamlParser();
+        EmbeddedPromptTemplateLoader loader = new(baseDirectory: null, yamlParser: yamlParser);
+
+        // Act
+        Result<List<PromptTemplate>> result = await loader.LoadAllTemplatesAsync(CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeNull();
+
+        PromptTemplate? dailyTemplate = result.Value.FirstOrDefault(t => t.TemplateId == "daily-summary");
+        dailyTemplate.Should().NotBeNull();
+        dailyTemplate!.Metadata.Should().NotBeNull();
+        dailyTemplate.Metadata!.TemplateType.Should().Be(TemplateType.Daily);
+        dailyTemplate.Metadata.Title.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task LoadAllTemplatesAsync_WithCancellation_ThrowsOperationCanceledException()
+    {
+        // Arrange
+        var yamlParser = CreateYamlParser();
+        EmbeddedPromptTemplateLoader loader = new(baseDirectory: null, yamlParser: yamlParser);
+        using CancellationTokenSource cts = new();
+        await cts.CancelAsync();
+
+        // Act
+        Func<Task> act = async () => await loader.LoadAllTemplatesAsync(cts.Token);
+
+        // Assert
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    // NOTE: These tests are commented out because TemplatesDirectoryExistsAsync method
+    // does not exist in the actual EmbeddedPromptTemplateLoader implementation.
+    // These were written for a planned interface that differs from the actual implementation.
+
+    // [Fact]
+    // public async Task TemplatesDirectoryExistsAsync_WithNullBaseDirectory_ReturnsFalse()
+    // {
+    //     // Arrange
+    //     EmbeddedPromptTemplateLoader loader = new(baseDirectory: null);
+    //
+    //     // Act
+    //     bool result = await loader.TemplatesDirectoryExistsAsync(CancellationToken.None);
+    //
+    //     // Assert
+    //     result.Should().BeFalse();
+    // }
+    //
+    // [Fact]
+    // public async Task TemplatesDirectoryExistsAsync_WithExistingDirectory_ReturnsTrue()
+    // {
+    //     // Arrange
+    //     string tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+    //     string templatesDir = Path.Combine(tempDir, "templates");
+    //     Directory.CreateDirectory(templatesDir);
+    //
+    //     try
+    //     {
+    //         EmbeddedPromptTemplateLoader loader = new(baseDirectory: tempDir);
+    //
+    //         // Act
+    //         bool result = await loader.TemplatesDirectoryExistsAsync(CancellationToken.None);
+    //
+    //         // Assert
+    //         result.Should().BeTrue();
+    //     }
+    //     finally
+    //     {
+    //         if (Directory.Exists(tempDir))
+    //         {
+    //             Directory.Delete(tempDir, recursive: true);
+    //         }
+    //     }
+    // }
+    //
+    // [Fact]
+    // public async Task TemplatesDirectoryExistsAsync_WithNonExistingDirectory_ReturnsFalse()
+    // {
+    //     // Arrange
+    //     string tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+    //     EmbeddedPromptTemplateLoader loader = new(baseDirectory: tempDir);
+    //
+    //     // Act
+    //     bool result = await loader.TemplatesDirectoryExistsAsync(CancellationToken.None);
+    //
+    //     // Assert
+    //     result.Should().BeFalse();
+    // }
 }

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Setup.Commands;
 using TenSecondTom.Features.Setup.Handlers;
 using TenSecondTom.Features.Shell.Services;
+using TenSecondTom.Features.Templates.Services;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.DependencyInjection;
@@ -78,7 +79,7 @@ internal static class Program
             }
             
             var configuration = configurationBuilder
-                .AddEnvironmentVariables()
+                .AddEnvironmentVariables() // Load all environment variables
                 .AddCommandLine(args)
                 .Build();
 
@@ -100,7 +101,15 @@ internal static class Program
             // Check if first-run setup is needed (only when no args or entering shell mode)
             // Commands like help, config, setup, version should always work without configuration
             bool isConfigured = ConfigurationChecker.IsConfigured(configuration, logger);
-            
+
+            // Run template migration for existing users (silent, automatic)
+            if (isConfigured)
+            {
+                var migrationService = serviceProvider.GetRequiredService<TemplateMigrationService>();
+                await migrationService.RunAutomaticMigrationAsync(configuration, cancellationTokenSource.Token)
+                    .ConfigureAwait(false);
+            }
+
             // Validate model configuration if configured
             if (isConfigured && !ConfigurationChecker.ValidateModel(configuration, logger))
             {
@@ -111,7 +120,7 @@ internal static class Program
                     await Console.Error.WriteLineAsync(errorMessage).ConfigureAwait(false);
                     await Console.Error.WriteLineAsync().ConfigureAwait(false);
                 }
-                
+
                 // Offer to re-run setup to fix the configuration
                 bool shouldRunSetup = await PromptForSetupAsync(cancellationTokenSource.Token).ConfigureAwait(false);
                 
