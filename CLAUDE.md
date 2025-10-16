@@ -37,16 +37,21 @@ Follow this order (TDD):
 
 **Vertical Slice Architecture**: Each feature is self-contained.
 
+**NOTE**: The canonical project structure is defined in `.specify/memory/constitution.md` (Project Structure Standards). Always consult the constitution for authoritative structural guidance.
+
 ```text
 src/Features/[FeatureName]/
 ├── Commands/          # Command classes (mutations)
-├── Queries/           # Query classes (reads)
+├── Queries/           # Query classes (reads) [if needed]
 ├── Handlers/          # Business logic handlers
-├── Validation/        # FluentValidation validators
-└── Models/            # Feature-specific models
+├── Validation/        # FluentValidation validators [if needed]
+└── DependencyInjection.cs  # Feature-specific DI registration
 
-tests/Unit/Features/[FeatureName]/
-tests/Integration/Features/[FeatureName]/
+src/Infrastructure/    # Cross-cutting concerns (DI, config, logging)
+src/Shared/           # Shared models, abstractions, extensions
+
+tests/TenSecondTom.Tests/Features/[FeatureName]/
+tests/TenSecondTom.IntegrationTests/Features/[FeatureName]/
 ```
 
 **CQRS Pattern**: Separate commands from queries.

@@ -1,23 +1,20 @@
 <!--
 Sync Impact Report:
-- Version change: (initial) → 1.0.0
-- Added principles:
-  * I. Modern .NET & Idiomatic C#
-  * II. CLI-First Interface
-  * III. Test-First (NON-NEGOTIABLE)
-  * IV. DRY & Design Patterns
-  * V. Semantic Versioning & Automated Releases
-  * VI. Cross-Platform Distribution
-  * VII. Local Development Excellence
-  * VIII. Secrets Management
+- Version change: 1.1.0 → 1.2.0
+- Modified sections:
+  * Architecture & Design Standards (added Project Structure Standards subsection)
+  * Principle IV: DRY & Design Patterns (enhanced with structure reference)
 - Added sections:
-  * Architecture & Design Standards
-  * Quality & Testing Standards
-  * Development & Operations Standards
+  * Project Structure Standards (canonical directory layout for VSA)
 - Templates requiring updates:
-  * ✅ plan-template.md (constitution check section will be auto-generated based on these principles)
-  * ✅ spec-template.md (already aligned with testability requirements)
-  * ✅ tasks-template.md (already aligned with TDD and test-first approach)
+  * ✅ plan-template.md (updated to reference constitution for structure decisions)
+  * ✅ tasks-template.md (updated path conventions to align with constitutional structure)
+  * ✅ spec-template.md (no changes needed - user story focused)
+- Agent instruction files updated:
+  * ✅ AGENTS.md (updated structure and added constitution reference)
+  * ✅ CLAUDE.md (updated structure and added constitution reference)
+  * ✅ .github/copilot-instructions.md (updated structure and version reference)
+- Rationale: Adding explicit project structure prevents VSA implementation drift and provides clear canonical reference for feature organization
 - Follow-up TODOs: None
 -->
 
@@ -71,11 +68,11 @@ Sync Impact Report:
 - No duplication of logic or data structures
 - Use CQRS (Command Query Responsibility Segregation) when appropriate
 - Apply Factory pattern for object creation where beneficial
-- Implement Vertical Slice Architecture (VSA) for feature organization
+- Implement Vertical Slice Architecture (VSA) for feature organization (see Project Structure Standards below)
 - Patterns must serve clarity and maintainability, not complexity
 - Extract reusable components into well-defined abstractions
 
-**Rationale**: DRY reduces maintenance burden and defect surface area. Well-chosen patterns improve code organization, testability, and long-term maintainability for open-source contributors.
+**Rationale**: DRY reduces maintenance burden and defect surface area. Well-chosen patterns improve code organization, testability, and long-term maintainability for open-source contributors. The canonical project structure prevents architectural drift.
 
 ### V. Semantic Versioning & Automated Releases
 
@@ -138,6 +135,62 @@ Sync Impact Report:
 - **Factory Pattern**: Use for complex object construction and dependency resolution
 - **Dependency Injection**: Leverage built-in .NET DI container
 - **Single Responsibility**: Each class/method has one clear purpose
+
+### Project Structure Standards
+
+**The following directory structure is MANDATORY for all features:**
+
+```
+src/
+├── Features/              # Vertical slices (self-contained feature modules)
+│   └── [FeatureName]/
+│       ├── Commands/      # Command classes (mutations, writes)
+│       ├── Queries/       # Query classes (reads) [if needed]
+│       ├── Handlers/      # Command/Query handlers (business logic)
+│       ├── Validation/    # FluentValidation validators [if needed]
+│       └── DependencyInjection.cs  # Feature-specific DI registration
+├── Infrastructure/        # Cross-cutting concerns (DI, config, logging)
+│   ├── Configuration/     # App configuration setup
+│   ├── Logging/           # Serilog configuration
+│   └── DependencyInjection.cs  # Infrastructure-level DI
+├── Shared/                # Shared domain models, abstractions, utilities
+│   ├── Models/            # Common domain models
+│   ├── Abstractions/      # Interfaces, base classes
+│   └── Extensions/        # Extension methods
+└── Program.cs             # Entry point, host builder, DI composition
+
+tests/
+├── TenSecondTom.Tests/         # Unit tests (fast, isolated)
+│   └── Features/
+│       └── [FeatureName]/
+│           ├── Commands/       # Command tests
+│           ├── Queries/        # Query tests
+│           └── Handlers/       # Handler tests
+└── TenSecondTom.IntegrationTests/  # Integration tests
+    ├── Features/
+    │   └── [FeatureName]/      # Feature integration tests
+    └── Cli/                    # CLI command tests
+```
+
+**Feature Organization Rules:**
+
+1. **Self-Contained Slices**: Each feature in `src/Features/[FeatureName]` MUST contain all code specific to that feature
+2. **Commands vs Queries**: Separate commands (write/mutate) from queries (read-only) in dedicated folders
+3. **Handler Collocation**: Handlers MUST be in the same feature folder as their commands/queries
+4. **DI Registration**: Each feature MUST have its own `DependencyInjection.cs` with an extension method for service registration
+5. **No Cross-Feature Dependencies**: Features MUST NOT directly reference other features; use `Shared/` for common code
+6. **Infrastructure Separation**: Cross-cutting concerns (logging, config, auth) belong in `Infrastructure/`, not `Features/`
+7. **Test Mirroring**: Test structure MUST mirror source structure for discoverability
+
+**Naming Conventions for Vertical Slices:**
+
+- Feature folders: PascalCase singular (e.g., `Auth`, `Setup`, `Search`)
+- Command classes: `[Verb][Noun]Command` (e.g., `CreateUserCommand`, `UpdateSettingsCommand`)
+- Query classes: `Get[Noun]Query` or `List[Noun]Query` (e.g., `GetUserQuery`, `ListItemsQuery`)
+- Handler classes: `[Command/Query]Handler` (e.g., `CreateUserCommandHandler`, `GetUserQueryHandler`)
+- DI method: `AddFeature[FeatureName]Services` (e.g., `AddFeatureAuthServices`)
+
+**This structure is the canonical reference for VSA implementation and MUST be followed for all new features.**
 
 ### Naming Conventions
 
@@ -247,19 +300,29 @@ Sync Impact Report:
 - Consult constitution before major architectural decisions
 - Educate new contributors on constitutional requirements
 
-**Version**: 1.1.0 | **Ratified**: 2025-10-01 | **Last Amended**: 2025-10-02
+**Version**: 1.2.0 | **Ratified**: 2025-10-01 | **Last Amended**: 2025-10-16
 
 ---
 
 ## Changelog
 
+### Version 1.2.0 (2025-10-16)
+
+- **MINOR**: Added Project Structure Standards section to Architecture & Design Standards
+- Documented canonical directory layout for Vertical Slice Architecture
+- Added explicit rules for feature organization, naming conventions, and structural requirements
+- Enhanced Principle IV with reference to Project Structure Standards
+- Purpose: Prevent VSA implementation drift and provide clear structural guidance
+
 ### Version 1.1.0 (2025-10-02)
+
 - **MINOR**: Added Serilog logging framework mandate (organizational standard)
 - Added Logging Standards section to Development & Operations Standards
 - Specified log levels and structured logging requirements
 - Added security requirement: never log secrets or sensitive data
 
 ### Version 1.0.0 (2025-10-01)
+
 - **MAJOR**: Initial constitution ratified
 - Established 8 core principles
 - Defined architecture, quality, and operations standards

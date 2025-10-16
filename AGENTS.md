@@ -58,23 +58,45 @@ When suggesting code, apply these patterns:
 
 ## Project Structure
 
+**NOTE**: The canonical project structure is defined in `.specify/memory/constitution.md` (Project Structure Standards section). The structure below is a summary for quick reference.
+
 ```text
 src/
-├── Commands/           # CLI command definitions
-├── Features/          # Vertical slices (each contains command/query/handler/validation)
-│   └── [Feature]/
-│       ├── Commands/
-│       ├── Queries/
-│       ├── Handlers/
-│       └── Validation/
+├── Features/          # Vertical slices (self-contained feature modules)
+│   └── [FeatureName]/
+│       ├── Commands/      # Command classes (mutations, writes)
+│       ├── Queries/       # Query classes (reads) [if needed]
+│       ├── Handlers/      # Command/Query handlers (business logic)
+│       ├── Validation/    # FluentValidation validators [if needed]
+│       └── DependencyInjection.cs  # Feature-specific DI registration
 ├── Infrastructure/    # Cross-cutting concerns (DI, config, logging)
+│   ├── Configuration/
+│   ├── Logging/
+│   └── DependencyInjection.cs
+├── Shared/            # Shared domain models, abstractions, utilities
+│   ├── Models/
+│   ├── Abstractions/
+│   └── Extensions/
 └── Program.cs         # Entry point
 
 tests/
-├── Unit/             # Fast, isolated unit tests
-├── Integration/      # Component integration tests
-└── TestHelpers/      # Shared test utilities
+├── TenSecondTom.Tests/         # Unit tests (fast, isolated)
+│   └── Features/
+│       └── [FeatureName]/
+│           ├── Commands/
+│           ├── Queries/
+│           └── Handlers/
+└── TenSecondTom.IntegrationTests/  # Integration tests
+    ├── Features/
+    │   └── [FeatureName]/
+    └── Cli/
 ```
+
+**See `.specify/memory/constitution.md` for detailed rules on:**
+- Feature organization requirements
+- Naming conventions for vertical slices
+- Cross-feature dependency restrictions
+- Test structure mirroring
 
 ## CLI Design Guidelines
 
