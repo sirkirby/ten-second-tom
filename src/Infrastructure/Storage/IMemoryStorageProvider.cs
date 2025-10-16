@@ -7,7 +7,6 @@ namespace TenSecondTom.Infrastructure.Storage;
 /// Defines the contract for memory storage operations.
 /// Abstracts the storage mechanism to support different backends (file system, database, blob storage).
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public interface IMemoryStorageProvider
 {
     /// <summary>

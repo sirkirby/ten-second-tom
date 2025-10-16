@@ -66,6 +66,7 @@
     <PackageReference Include="Spectre.Console" Version="0.51.1" />
     <PackageReference Include="SSH.NET" Version="2025.0.0" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-rc.1.25451.107" />
+    <PackageReference Include="System.IO.Abstractions" Version="21.1.7" />
     <PackageReference Include="Terminal.Gui" Version="1.*" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
   </ItemGroup>

@@ -56,7 +56,7 @@ public sealed record ConfigurationSettings
             return false;
 
         // LLM provider must be set
-        if (!Enum.IsDefined(typeof(LlmProvider), Llm.Provider))
+        if (!Enum.IsDefined(Llm.Provider))
             return false;
 
         // API key must be set

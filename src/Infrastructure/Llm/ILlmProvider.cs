@@ -6,7 +6,6 @@ namespace TenSecondTom.Infrastructure.Llm;
 /// Defines the contract for LLM (Large Language Model) providers.
 /// Abstracts different LLM services (OpenAI, Anthropic, etc.) behind a common interface.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public interface ILlmProvider
 {
     /// <summary>

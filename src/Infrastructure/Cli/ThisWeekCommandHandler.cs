@@ -13,7 +13,6 @@ namespace TenSecondTom.Infrastructure.Cli;
 /// Handles the execution of the 'thisweek' command.
 /// Generates a weekly review from daily entries.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API for CLI commands")]
 public static class ThisWeekCommandHandler
 {
     /// <summary>
@@ -26,7 +25,6 @@ public static class ThisWeekCommandHandler
     /// <param name="providerOverride">Optional LLM provider override.</param>
     /// <param name="jsonOutput">Whether to output results in JSON format.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2007:Consider calling ConfigureAwait on the awaited task", Justification = "Console application, no synchronization context")]
     public static async Task ExecuteAsync(
         CreateWeeklyReviewHandler handler,
         IAuthenticationService authService,

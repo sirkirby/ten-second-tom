@@ -10,10 +10,6 @@ namespace TenSecondTom.Shared.TextEditing.Services;
 /// Provides full cursor navigation, multi-line editing, and clipboard support.
 /// </summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable", Justification = "Terminal.Gui views are disposed via Application.Shutdown")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA1848:Use the LoggerMessage delegates", Justification = "Simple logging for text editor, delegate overhead not justified")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Top-level exception handler for editor")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2007:Consider calling ConfigureAwait on the awaited task", Justification = "Console application, no synchronization context")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1305:Specify IFormatProvider", Justification = "CLI tool, invariant culture not needed")]
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "Terminal.Gui manages disposal")]
 public sealed class TerminalGuiTextEditor : IInteractiveTextEditor
 {

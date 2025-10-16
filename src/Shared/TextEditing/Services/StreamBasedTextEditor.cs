@@ -7,11 +7,6 @@ namespace TenSecondTom.Shared.TextEditing.Services;
 /// Simple fallback text editor using Console.ReadLine for non-interactive terminals.
 /// Supports multi-line input via line-by-line entry with explicit completion.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA1848:Use the LoggerMessage delegates", Justification = "Simple logging for text editor, delegate overhead not justified")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Top-level exception handler for editor")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2007:Consider calling ConfigureAwait on the awaited task", Justification = "Console application, no synchronization context")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1303:Do not pass literals as localized parameters", Justification = "CLI tool, localization not required")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1308:Normalize strings to uppercase", Justification = "User input normalization, lowercase is appropriate")]
 public sealed class StreamBasedTextEditor : IInteractiveTextEditor
 {
     private readonly InputSanitizer _sanitizer;

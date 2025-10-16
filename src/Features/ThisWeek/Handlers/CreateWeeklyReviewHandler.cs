@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.ThisWeek.Commands;
+using TenSecondTom.Features.Templates.Queries;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
@@ -16,7 +18,6 @@ namespace TenSecondTom.Features.ThisWeek.Handlers;
 /// Handles the creation of weekly review entries by aggregating daily entries.
 /// Orchestrates validation, authentication, data retrieval, LLM interaction, and storage.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyReviewCommand, Result<WeeklyEntry>>
 {
     private readonly IMemoryStorageProvider _storage;
@@ -25,6 +26,8 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
     private readonly IAuthenticationService _authService;
     private readonly IConfiguration _configuration;
     private readonly ILogger<CreateWeeklyReviewHandler> _logger;
+    private readonly TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler _listTemplatesHandler;
+    private readonly ITemplateSelectionUI _templateSelectionUI;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CreateWeeklyReviewHandler"/> class.
@@ -35,13 +38,17 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
     /// <param name="authService">The authentication service.</param>
     /// <param name="configuration">The application configuration (includes user secrets + environment variable overrides).</param>
     /// <param name="logger">The logger instance.</param>
+    /// <param name="listTemplatesHandler">Handler for listing available templates.</param>
+    /// <param name="templateSelectionUI">UI for interactive template selection.</param>
     public CreateWeeklyReviewHandler(
         IMemoryStorageProvider storage,
         ILlmProviderFactory llmFactory,
         IPromptTemplateLoader promptLoader,
         IAuthenticationService authService,
         IConfiguration configuration,
-        ILogger<CreateWeeklyReviewHandler> logger)
+        ILogger<CreateWeeklyReviewHandler> logger,
+        TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler listTemplatesHandler,
+        ITemplateSelectionUI templateSelectionUI)
     {
         _storage = storage;
         _llmFactory = llmFactory;
@@ -49,7 +56,8 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
         _authService = authService;
         _configuration = configuration;
         _logger = logger;
-        _logger = logger;
+        _listTemplatesHandler = listTemplatesHandler;
+        _templateSelectionUI = templateSelectionUI;
     }
 
     /// <summary>
@@ -104,9 +112,53 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
         // 6. Aggregate daily summaries
         string aggregatedContent = AggregateDailyEntries(entriesResult.Value);
 
-        // 7. Load weekly review template
+        // 7. Select prompt template
+        string selectedTemplateId;
+        Result<ListTemplatesQueryResult> templatesResult = await _listTemplatesHandler.Handle(
+            new ListTemplatesQuery(FilterByType: TemplateType.Weekly),
+            cancellationToken).ConfigureAwait(false);
+
+        if (!templatesResult.IsSuccess || templatesResult.Value.Templates.Count == 0)
+        {
+            // Fall back to embedded default template
+            _logger.LogWarning("No weekly templates found, falling back to embedded default template");
+            // Note: User notification is handled by CompositeTemplateLoader logging
+            // Console output would break separation of concerns - CLI handlers should display warnings
+            selectedTemplateId = "weekly-review";
+        }
+        else if (templatesResult.Value.Templates.Count == 1)
+        {
+            // Auto-select single template
+            selectedTemplateId = templatesResult.Value.Templates[0].TemplateId;
+            _logger.LogDebug("Auto-selected single weekly template: {TemplateId}", selectedTemplateId);
+        }
+        else
+        {
+            // Multiple templates - prompt user to select
+            try
+            {
+                string? userSelectedId = await _templateSelectionUI.SelectTemplateAsync(
+                    templatesResult.Value.Templates,
+                    "thisweek",
+                    cancellationToken).ConfigureAwait(false);
+
+                if (string.IsNullOrWhiteSpace(userSelectedId))
+                {
+                    return Result<WeeklyEntry>.Failure("Template selection cancelled");
+                }
+
+                selectedTemplateId = userSelectedId;
+                _logger.LogInformation("User selected weekly template: {TemplateId}", selectedTemplateId);
+            }
+            catch (OperationCanceledException)
+            {
+                return Result<WeeklyEntry>.Failure("Template selection cancelled by user");
+            }
+        }
+
+        // 8. Load selected weekly review template
         Result<PromptTemplate> templateResult = await _promptLoader.LoadTemplateAsync(
-            "weekly-review",
+            selectedTemplateId,
             cancellationToken).ConfigureAwait(false);
 
         if (!templateResult.IsSuccess)
@@ -116,7 +168,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
 
         string prompt = RenderPrompt(templateResult.Value, aggregatedContent, dateRange, entriesResult.Value.Count);
 
-        // 8. Determine LLM provider (use override, or load from config, or default to OpenAI)
+        // 9. Determine LLM provider (use override, or load from config, or default to OpenAI)
         string provider;
         if (!string.IsNullOrWhiteSpace(request.LlmProviderOverride))
         {
@@ -176,7 +228,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
             return Result<WeeklyEntry>.Failure($"Failed to generate weekly review: {completionResult.Error}");
         }
 
-        // 9. Parse response and validate 3+3 structure
+        // 10. Parse response and validate 3+3 structure
         Result<WeeklySummary> summaryResult = ParseWeeklySummary(completionResult.Value);
         if (!summaryResult.IsSuccess)
         {
@@ -196,7 +248,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
                 $"Weekly review must contain exactly 3 top challenges, but found {summaryResult.Value.TopChallenges.Count}");
         }
 
-        // 10. Create WeeklyEntry
+        // 11. Create WeeklyEntry
         int entryNumber = await GetNextEntryNumber(dateRange, cancellationToken).ConfigureAwait(false);
 
         WeeklyEntry weeklyEntry = new()
@@ -216,7 +268,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
             Summary = summaryResult.Value
         };
 
-        // 11. Save to storage
+        // 12. Save to storage
         Result<MemoryEntry> saveResult = await _storage.SaveAsync(weeklyEntry, cancellationToken).ConfigureAwait(false);
         if (!saveResult.IsSuccess)
         {
@@ -230,7 +282,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
             dateRange.EndDate,
             entriesResult.Value.Count);
 
-        // 12. Return Result<WeeklyEntry>
+        // 13. Return Result<WeeklyEntry>
         return Result<WeeklyEntry>.Success(weeklyEntry);
     }
 

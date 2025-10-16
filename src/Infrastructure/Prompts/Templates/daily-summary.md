@@ -1,3 +1,11 @@
+---
+templateType: daily
+title: Daily Summary
+description: Default template for daily journal entries
+version: 1.0
+author: Ten Second Tom
+---
+
 # Daily Summary Template
 
 You are an AI assistant helping to create a structured daily summary from a user's notes.

@@ -6,7 +6,6 @@ namespace TenSecondTom.Features.Retry.Commands;
 /// Command to retry failed LLM summarization for memory entries.
 /// Can retry all failed entries or a specific entry by ID.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public sealed record RetryFailedSummarizationCommand
 {
     /// <summary>
@@ -19,7 +18,6 @@ public sealed record RetryFailedSummarizationCommand
 /// <summary>
 /// Result of retry operation containing statistics about the retry attempts.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public sealed record RetryResult
 {
     /// <summary>

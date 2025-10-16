@@ -1,6 +1,13 @@
 using System.CommandLine;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using TenSecondTom.Features.Auth;
+using TenSecondTom.Features.Search;
+using TenSecondTom.Features.Setup;
+using TenSecondTom.Features.Shell;
+using TenSecondTom.Features.Templates;
+using TenSecondTom.Features.ThisWeek;
+using TenSecondTom.Features.Today;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.DependencyInjection;
 using Xunit;
@@ -18,7 +25,19 @@ public sealed class CommandRegistryTests : IDisposable
     public CommandRegistryTests()
     {
         var services = new ServiceCollection();
-        services.AddTenSecondTomServices();
+        
+        // Infrastructure (cross-cutting concerns)
+        services.AddInfrastructureServices();
+        
+        // Feature slices (vertical slice architecture)
+        services.AddTodayFeature();
+        services.AddThisWeekFeature();
+        services.AddSearchFeature();
+        services.AddAuthFeature();
+        services.AddTemplatesFeature();
+        services.AddSetupFeature();
+        services.AddShellFeature();
+        
         _serviceProvider = services.BuildServiceProvider();
     }
 

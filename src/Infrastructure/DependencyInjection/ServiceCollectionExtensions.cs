@@ -1,19 +1,13 @@
+using System.IO.Abstractions;
 using Anthropic.SDK;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OpenAI;
 using OpenAI.Chat;
-using TenSecondTom.Features.Auth.Handlers;
-using TenSecondTom.Features.Search.Handlers;
-using TenSecondTom.Features.Setup.Handlers;
-using TenSecondTom.Features.Setup.Queries;
-using TenSecondTom.Features.Setup.Validation;
-using TenSecondTom.Features.Shell.Services;
-using TenSecondTom.Features.ThisWeek.Handlers;
-using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Auth.SshProviders;
+using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
@@ -25,33 +19,71 @@ namespace TenSecondTom.Infrastructure.DependencyInjection;
 /// <summary>
 /// Extension methods for configuring services in the DI container.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API for dependency injection")]
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Adds all Ten Second Tom services to the service collection.
+    /// Adds infrastructure services (cross-cutting concerns) to the service collection.
+    /// Feature-specific services should be registered using their respective feature extension methods.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddTenSecondTomServices(this IServiceCollection services)
+    public static IServiceCollection AddInfrastructureServices(this IServiceCollection services)
     {
         // Add HttpClient support for API validators
         services.AddHttpClient();
-        
+
         // Infrastructure services
+        services.AddSingleton<IFileSystem, FileSystem>();
+
         services.AddSingleton<IMemoryStorageProvider>(serviceProvider =>
         {
             var configuration = serviceProvider.GetRequiredService<IConfiguration>();
             var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger<FileSystemStorageProvider>();
-            
+
             string baseDirectory = configuration["TenSecondTom:MemoryDirectory"] ?? "./.memory";
-            
+
             return new FileSystemStorageProvider(baseDirectory, logger);
         });
-        
+
         services.AddSingleton<ILlmProviderFactory, LlmProviderFactory>();
-        services.AddSingleton<IPromptTemplateLoader, EmbeddedPromptTemplateLoader>();
+
+        // Register YAML parser for template metadata
+        services.AddSingleton<YamlFrontMatterParser>();
+
+        // Register template loaders with fallback chain: FileSystem → Embedded
+        // This provides resilient template loading with graceful degradation
+        services.AddSingleton<IPromptTemplateLoader>(serviceProvider =>
+        {
+            var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+            var yamlParser = serviceProvider.GetRequiredService<YamlFrontMatterParser>();
+            var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+
+            // Determine templates directory from configuration
+            string memoryDirectory = configuration["Storage:MemoryDirectory"] ??
+                                   configuration["TenSecondTom:MemoryDirectory"] ??
+                                   "./.memory";
+            string templatesDirectory = Path.Combine(memoryDirectory, "templates");
+
+            // Create FileSystem loader (primary)
+            var fileSystemLogger = loggerFactory.CreateLogger<FileSystemTemplateLoader>();
+            var fileSystemLoader = new FileSystemTemplateLoader(
+                templatesDirectory,
+                yamlParser,
+                fileSystemLogger);
+
+            // Create Embedded loader (fallback)
+            var embeddedLoader = new EmbeddedPromptTemplateLoader(
+                baseDirectory: memoryDirectory,
+                yamlParser: yamlParser);
+
+            // Create Composite loader with fallback chain
+            var compositeLogger = loggerFactory.CreateLogger<CompositeTemplateLoader>();
+            return new CompositeTemplateLoader(
+                fileSystemLoader,
+                embeddedLoader,
+                compositeLogger);
+        });
         
         // Register SSH agent client
         services.AddSingleton<ISshAgentClient>(serviceProvider =>
@@ -162,43 +194,11 @@ public static class ServiceCollectionExtensions
             return new AnthropicLlmProvider(client, logger, model);
         });
 
-        // Feature handlers
-        services.AddTransient<CreateDailyEntryHandler>();
-        services.AddTransient<CreateWeeklyReviewHandler>();
-        services.AddTransient<SearchMemoriesQueryHandler>();
-        services.AddTransient<LoginCommandHandler>();
-        services.AddTransient<LogoutCommandHandler>();
-
-        // Setup feature services
-        services.AddTransient<SetupCommandHandler>();
-        services.AddTransient<ConfigCommandHandler>();
-        
-        // SSH Key Detectors - registered as both concrete types and interface for factory injection
-        services.AddTransient<ISshKeyDetector, SystemSshAgentDetector>();
-        services.AddTransient<ISshKeyDetector, OnePasswordSshAgentDetector>();
-        services.AddTransient<ISshKeyDetector, SecretiveSshAgentDetector>();
-        services.AddTransient<ISshKeyDetector, FileSystemSshKeyDetector>();
-        services.AddSingleton<ISshKeyDetectorFactory, SshKeyDetectorFactory>();
-        
-        // API Key Validators
-        services.AddTransient<IApiKeyValidator, OpenAIApiKeyValidator>();
-        services.AddTransient<IApiKeyValidator, AnthropicApiKeyValidator>();
-        
-        // Configuration Storage
-        services.AddSingleton<IConfigurationStorageService, UserSecretsStorageService>();
-        
         // Spectre.Console AnsiConsole for rich terminal UI
         services.AddSingleton<Spectre.Console.IAnsiConsole>(Spectre.Console.AnsiConsole.Console);
-        
-        // Setup Wizard UI
-        services.AddTransient<ISetupWizardUI, SpectreConsoleSetupWizard>();
 
-        // Shell services (Singletons for session persistence during app lifetime)
-        services.AddSingleton<IReplLoop, ReplLoop>();
-        services.AddSingleton<ICommandRouter, CommandRouter>();
-        services.AddSingleton<ISessionManager, SessionManager>();
-        services.AddSingleton<IAutocompleteEngine, AutocompleteEngine>();
-        services.AddSingleton<IOutputPaginator, OutputPaginator>();
+        // Template selection UI (T045/T046)
+        services.AddTransient<ITemplateSelectionUI, TemplateSelectionUI>();
 
         // Text editing services (T028)
         services.AddSingleton<InputSanitizer>();

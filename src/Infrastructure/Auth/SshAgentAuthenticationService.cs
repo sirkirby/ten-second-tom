@@ -10,8 +10,6 @@ namespace TenSecondTom.Infrastructure.Auth;
 /// Provides authentication using SSH agent for signing challenges.
 /// This is more secure than file-based SSH keys as the private key never leaves the agent.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types")]
 public sealed class SshAgentAuthenticationService : IAuthenticationService
 {
     private readonly ISshAgentClient _agentClient;

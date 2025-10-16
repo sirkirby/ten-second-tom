@@ -26,7 +26,8 @@
 - 📊 **Weekly Reviews**: AI-generated summaries of your week with themes and patterns
 - 🔍 **Searchable Archive**: Full-text search across all your memories
 - 🤖 **Multiple AI Providers**: Support for OpenAI and Anthropic
-- 📁 **Markdown Storage**: Human-readable files in `.memory/` directory
+- 📝 **Custom Templates**: Create and edit prompt templates to personalize your summaries
+- 📁 **Markdown Storage**: Human-readable files in configured `.memory/` directory
 - 🔐 **SSH Authentication**: Secure session management with SSH keys
 - 🎨 **Beautiful Terminal UI**: Rich formatting with Spectre.Console
 - 📤 **JSON Output**: Programmatic access for automation and integrations
@@ -519,6 +520,10 @@ Your memories are stored as plain markdown files:
 
 ```
 .memory/
+├── templates/              # Prompt templates (customizable!)
+│   ├── daily-summary.md   # Default daily template
+│   ├── weekly-review.md   # Default weekly template
+│   └── my-custom.md       # Your custom templates
 ├── today/
 │   ├── 10-01-2025_1.md
 │   ├── 10-01-2025_2.md    # Multiple entries per day supported
@@ -549,6 +554,208 @@ Had a productive meeting with the team...
 
 ## Key Events
 - Productive team meeting...
+```
+
+---
+
+## 📝 Custom Templates
+
+Ten Second Tom allows you to customize the prompt templates used for generating daily and weekly summaries. Templates are stored in `.memory/templates/` and can be edited with any text editor.
+
+### Creating a Custom Template
+
+Templates use **YAML front matter** for metadata and **Markdown** for the prompt content. Here's how to create one:
+
+**1. Create a new file in `.memory/templates/`**
+
+Example: `.memory/templates/my-daily-standup.md`
+
+**2. Add YAML front matter at the top**
+
+```yaml
+---
+templateType: daily       # Required: "daily" or "weekly"
+title: My Daily Standup   # Required: Display name in selection
+description: A focused template for daily standup format  # Optional
+version: 1.0              # Optional: For tracking updates
+author: Your Name         # Optional: Template creator
+---
+```
+
+**3. Add your custom prompt below the front matter**
+
+```markdown
+# Daily Standup - {{DATE}}
+
+Please create a standup-style summary from today's entries.
+
+## What I Did Today
+{{TODAY_ENTRIES}}
+
+## Focus Areas
+- Identify key accomplishments
+- List any blockers or challenges
+- Suggest priorities for tomorrow
+
+## Format
+- Use bullet points
+- Keep it concise (3-5 items per section)
+- Highlight any urgent items with ⚠️
+```
+
+### Template Metadata Fields
+
+| Field | Required | Description | Example |
+|-------|----------|-------------|---------|
+| `templateType` | ✅ Yes | Template type: `daily` or `weekly` | `daily` |
+| `title` | ✅ Yes | Display name (max 200 chars) | `My Daily Standup` |
+| `description` | ❌ No | Description shown in selection (max 500 chars) | `A focused template for...` |
+| `version` | ❌ No | Semantic version for tracking | `1.0` |
+| `author` | ❌ No | Template creator (max 100 chars) | `Your Name` |
+| `tags` | ❌ No | Categorization tags (future use) | `["work", "agile"]` |
+
+### Template Variables
+
+Use these variables in your template content:
+
+- `{{DATE}}` - Current date
+- `{{TODAY_ENTRIES}}` - User's daily entries
+- `{{WEEK_ENTRIES}}` - User's weekly entries
+- `{{ENTRIES}}` - Generic entries placeholder
+
+### Template Selection
+
+When you run `tom today` or `tom thisweek`, Ten Second Tom will:
+
+1. **Auto-select** if only one template is available (no prompt shown)
+2. **Show selection prompt** if multiple templates exist:
+   ```
+   Select a template for daily summary:
+   ▸ Daily Summary - Default template for daily journal entries [Default]
+     My Daily Standup - A focused template for daily standup format
+   ```
+3. **Fall back to embedded template** if no valid templates are found
+
+### Template Examples
+
+**Daily Gratitude Journal:**
+
+```yaml
+---
+templateType: daily
+title: Gratitude Journal
+description: Focus on positive moments and gratitude
+version: 1.0
+---
+
+# Daily Gratitude - {{DATE}}
+
+From today's entries ({{TODAY_ENTRIES}}), create a gratitude-focused summary:
+
+## Three Good Things
+Identify three positive moments or achievements from today.
+
+## Gratitude
+What am I grateful for today?
+
+## Lessons Learned
+What did I learn today that I can apply tomorrow?
+
+Keep the tone warm and encouraging.
+```
+
+**Weekly Sprint Review:**
+
+```yaml
+---
+templateType: weekly
+title: Sprint Review
+description: Agile sprint-focused weekly summary
+version: 1.0
+---
+
+# Sprint Review - Week of {{DATE}}
+
+Based on this week's entries ({{WEEK_ENTRIES}}), create a sprint review:
+
+## Sprint Goals Completed
+- What goals were achieved?
+- What features were delivered?
+
+## Sprint Retrospective
+- What went well?
+- What could be improved?
+
+## Next Sprint Planning
+- What should be prioritized?
+- Any blockers to address?
+
+Format as a structured agile sprint review.
+```
+
+### Template Best Practices
+
+✅ **DO:**
+- Keep templates under 1MB (soft limit)
+- Use clear, descriptive titles
+- Add helpful descriptions for selection
+- Test templates after creating them
+- Use semantic versioning for tracking
+- Include specific instructions for the LLM
+- Use variables for dynamic content
+
+❌ **DON'T:**
+- Use parent directory references (`..`) in filenames
+- Include path separators (`/`, `\`) in template IDs
+- Store sensitive information in templates
+- Create templates larger than 1MB
+
+### Template Validation
+
+Ten Second Tom validates templates automatically:
+
+- ✅ **Valid YAML** front matter
+- ✅ **Required fields** present (`templateType`, `title`)
+- ✅ **File size** under 1MB
+- ✅ **Filename** follows kebab-case convention
+- ✅ **UTF-8 encoding**
+
+Invalid templates are skipped with warnings in the logs.
+
+### Editing Templates
+
+Templates are reloaded on every command run - **no restart required!**
+
+1. Edit the template file with any text editor
+2. Save your changes
+3. Run `tom today` or `tom thisweek`
+4. Changes take effect immediately ✨
+
+### Restoring Default Templates
+
+If you delete or modify default templates and want them back:
+
+1. Delete the `.memory/templates/` directory
+2. Run any command - templates will be automatically restored
+
+Default templates are never overwritten, so feel free to customize them!
+
+### Troubleshooting Templates
+
+**Template not appearing in selection?**
+- Check YAML front matter is valid (use a YAML validator)
+- Ensure `templateType` matches command type (`daily` for `tom today`)
+- Check file extension is `.md`
+- Review logs for validation errors
+
+**Template selection not showing?**
+- If only one template exists, it's auto-selected (no prompt)
+- Check `.memory/templates/` directory exists
+- Verify at least one valid template for the command type
+
+**Want to see all templates?**
+```bash
+ls -la .memory/templates/
 ```
 
 ---

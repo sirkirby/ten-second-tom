@@ -10,7 +10,6 @@ namespace TenSecondTom.Infrastructure.Auth;
 /// Provides reusable authentication orchestration logic for CLI commands.
 /// Handles authentication checks, user prompts, and error formatting.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API for use across features")]
 public static class AuthenticationHelper
 {
     /// <summary>

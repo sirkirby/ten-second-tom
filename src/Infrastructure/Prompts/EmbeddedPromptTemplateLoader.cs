@@ -12,6 +12,7 @@ public sealed class EmbeddedPromptTemplateLoader : IPromptTemplateLoader
 {
     private const string EmbeddedResourcePrefix = "TenSecondTom.Infrastructure.Prompts.Templates";
     private readonly string? _baseDirectory;
+    private readonly YamlFrontMatterParser _yamlParser;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="EmbeddedPromptTemplateLoader"/> class.
@@ -20,9 +21,13 @@ public sealed class EmbeddedPromptTemplateLoader : IPromptTemplateLoader
     /// The base directory to search for user template overrides.
     /// If null, uses the default .memory directory from environment.
     /// </param>
-    public EmbeddedPromptTemplateLoader(string? baseDirectory = null)
+    /// <param name="yamlParser">
+    /// The YAML parser to use for extracting metadata from templates.
+    /// </param>
+    public EmbeddedPromptTemplateLoader(string? baseDirectory = null, YamlFrontMatterParser? yamlParser = null)
     {
         _baseDirectory = baseDirectory;
+        _yamlParser = yamlParser ?? throw new ArgumentNullException(nameof(yamlParser));
     }
 
     /// <inheritdoc />
@@ -67,6 +72,16 @@ public sealed class EmbeddedPromptTemplateLoader : IPromptTemplateLoader
         }
     }
 
+    /// <summary>
+    /// Attempts to load a user override template from the filesystem.
+    /// User overrides take precedence over embedded resources.
+    /// </summary>
+    /// <param name="templateId">The template ID to load.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>
+    /// A successful result containing the user override template if found,
+    /// or null if no override exists or loading fails (to trigger fallback to embedded).
+    /// </returns>
     private async Task<Result<PromptTemplate>?> TryLoadUserOverrideAsync(
         string templateId,
         CancellationToken cancellationToken)
@@ -109,7 +124,17 @@ public sealed class EmbeddedPromptTemplateLoader : IPromptTemplateLoader
         }
     }
 
-    private static async Task<Result<PromptTemplate>> LoadEmbeddedTemplateAsync(
+    /// <summary>
+    /// Loads a template from embedded assembly resources.
+    /// Parses YAML front matter if present to extract metadata.
+    /// </summary>
+    /// <param name="templateId">The template ID to load.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>
+    /// A result containing the embedded template,
+    /// or a failure result if the template is not found in embedded resources.
+    /// </returns>
+    private async Task<Result<PromptTemplate>> LoadEmbeddedTemplateAsync(
         string templateId,
         CancellationToken cancellationToken)
     {
@@ -127,29 +152,138 @@ public sealed class EmbeddedPromptTemplateLoader : IPromptTemplateLoader
         }
 
         using StreamReader reader = new(resourceStream);
-        string content = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+        string rawContent = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
 
-        TemplateType templateType = DetermineTemplateType(templateId);
+        // Parse YAML front matter if present
+        var parseResult = _yamlParser.Parse(rawContent);
+        string content;
+        TemplateMetadata? metadata = null;
+
+        if (parseResult.IsSuccess)
+        {
+            var parsed = parseResult.Value;
+            content = parsed.Content;
+            metadata = parsed.Metadata;
+        }
+        else
+        {
+            // No YAML front matter or parse failed - use raw content
+            content = rawContent;
+        }
+
+        TemplateType templateType = metadata?.TemplateType ?? DetermineTemplateType(templateId);
 
         PromptTemplate template = new()
         {
             TemplateId = templateId,
             Content = content,
             TemplateType = templateType,
-            Description = $"Embedded template: {templateId}"
+            Description = metadata?.Description ?? $"Embedded template: {templateId}",
+            Source = TemplateSource.Embedded,
+            Metadata = metadata
         };
 
         return Result<PromptTemplate>.Success(template);
     }
 
+    /// <inheritdoc />
+    public async Task<Result<List<PromptTemplate>>> LoadAllTemplatesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            List<PromptTemplate> templates = new();
+            Assembly assembly = typeof(EmbeddedPromptTemplateLoader).Assembly;
+
+            // Get all embedded template resources
+            string[] resourceNames = assembly.GetManifestResourceNames()
+                .Where(name => name.StartsWith(EmbeddedResourcePrefix, StringComparison.Ordinal) &&
+                              name.EndsWith(".md", StringComparison.Ordinal))
+                .ToArray();
+
+            foreach (string resourceName in resourceNames)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // Extract template ID from resource name
+                // Format: TenSecondTom.Infrastructure.Prompts.Templates.{templateId}.md
+                string templateId = resourceName
+                    .Replace($"{EmbeddedResourcePrefix}.", string.Empty, StringComparison.Ordinal)
+                    .Replace(".md", string.Empty, StringComparison.Ordinal);
+
+                using Stream? resourceStream = assembly.GetManifestResourceStream(resourceName);
+                if (resourceStream is null)
+                {
+                    continue; // Skip if resource can't be loaded
+                }
+
+                using StreamReader reader = new(resourceStream);
+                string rawContent = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+
+                // Parse YAML front matter if present
+                var parseResult = _yamlParser.Parse(rawContent);
+                string content;
+                TemplateMetadata? metadata = null;
+
+                if (parseResult.IsSuccess)
+                {
+                    var parsed = parseResult.Value;
+                    content = parsed.Content;
+                    metadata = parsed.Metadata;
+                }
+                else
+                {
+                    // No YAML front matter or parse failed - use raw content
+                    content = rawContent;
+                }
+
+                TemplateType templateType = metadata?.TemplateType ?? DetermineTemplateType(templateId);
+
+                templates.Add(new PromptTemplate
+                {
+                    TemplateId = templateId,
+                    Content = content,
+                    TemplateType = templateType,
+                    Description = metadata?.Description ?? $"Embedded template: {templateId}",
+                    Source = TemplateSource.Embedded,
+                    Metadata = metadata
+                });
+            }
+
+            return Result<List<PromptTemplate>>.Success(templates);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+#pragma warning disable CA1031 // Do not catch general exception types - we want to handle all exceptions gracefully
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            return Result<List<PromptTemplate>>.Failure(
+                $"Failed to load embedded templates: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Determines the template type from a template ID.
+    /// Maps known template IDs to their corresponding types.
+    /// </summary>
+    /// <param name="templateId">The template ID to analyze.</param>
+    /// <returns>
+    /// The template type: Daily for "daily-summary", Weekly for "weekly-review",
+    /// or SystemPrompt for all other templates.
+    /// </returns>
     private static TemplateType DetermineTemplateType(string templateId)
     {
 #pragma warning disable CA1308 // Normalize strings to uppercase - template IDs are conventionally lowercase
         return templateId.ToLowerInvariant() switch
 #pragma warning restore CA1308
         {
-            "daily-summary" => TemplateType.DailySummary,
-            "weekly-review" => TemplateType.WeeklySummary,
+            "daily-summary" => TemplateType.Daily,
+            "weekly-review" => TemplateType.Weekly,
             _ => TemplateType.SystemPrompt
         };
     }

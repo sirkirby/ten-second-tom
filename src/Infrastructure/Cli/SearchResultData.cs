@@ -3,7 +3,6 @@ namespace TenSecondTom.Infrastructure.Cli;
 /// <summary>
 /// DTO for search command JSON output data.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "DTO for JSON serialization")]
 public sealed class SearchResultData
 {
     /// <summary>
@@ -37,7 +36,6 @@ public sealed class SearchResultData
 /// <summary>
 /// DTO for individual search result entry in JSON output.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "DTO for JSON serialization")]
 public sealed class SearchResultEntry
 {
     /// <summary>

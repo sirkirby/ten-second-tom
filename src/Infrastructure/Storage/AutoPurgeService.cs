@@ -8,7 +8,6 @@ namespace TenSecondTom.Infrastructure.Storage;
 /// Service responsible for automatically purging old memory entries based on retention policy.
 /// Runs on application startup if auto-purge is enabled.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public sealed class AutoPurgeService
 {
     private readonly IMemoryStorageProvider _storageProvider;
@@ -37,7 +36,6 @@ public sealed class AutoPurgeService
     /// </summary>
     /// <param name="cancellationToken">Cancellation token for the async operation.</param>
     /// <returns>Result containing purge summary on success, or error message on failure.</returns>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates", Justification = "Simple logging for now")]
     public async Task<Result<AutoPurgeResult>> PurgeAsync(CancellationToken cancellationToken)
     {
         // Skip if auto-purge is disabled
@@ -120,7 +118,6 @@ public sealed class AutoPurgeService
 /// <summary>
 /// Result of an auto-purge operation.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public sealed record AutoPurgeResult
 {
     /// <summary>

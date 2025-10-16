@@ -2,8 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using TenSecondTom.Features.Setup.Commands;
-using TenSecondTom.Features.Setup.Handlers;
+using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Features.Shell.Services;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Configuration;
@@ -24,10 +23,6 @@ internal static class Program
     /// </summary>
     /// <param name="args">Command-line arguments.</param>
     /// <returns>Exit code (0 for success, non-zero for errors).</returns>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1303:Do not pass literals as localized parameters", Justification = "CLI application, localization not required")]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates for improved performance", Justification = "Startup logging, performance not critical")]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Top-level exception handler")]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2007:Consider calling ConfigureAwait on the awaited task", Justification = "Console application, no synchronization context")]
     public static async Task<int> Main(string[] args)
     {
         ILoggerFactory? loggerFactory = null;
@@ -78,7 +73,7 @@ internal static class Program
             }
             
             var configuration = configurationBuilder
-                .AddEnvironmentVariables()
+                .AddEnvironmentVariables() // Load all environment variables
                 .AddCommandLine(args)
                 .Build();
 
@@ -93,100 +88,23 @@ internal static class Program
             services.AddSingleton<IConfiguration>(configuration);
             services.AddSingleton(loggerFactory);
             services.AddLogging(); // Add logging services to enable ILogger<T> resolution
-            services.AddTenSecondTomServices();
+            
+            // Infrastructure (cross-cutting concerns)
+            services.AddInfrastructureServices();
+            
+            // Feature slices (vertical slice architecture)
+            services.AddAllFeatures();
             
             using var serviceProvider = services.BuildServiceProvider();
             
-            // Check if first-run setup is needed (only when no args or entering shell mode)
-            // Commands like help, config, setup, version should always work without configuration
-            bool isConfigured = ConfigurationChecker.IsConfigured(configuration, logger);
+            // Bootstrap application (handles setup, configuration validation, migrations)
+            var bootstrapper = serviceProvider.GetRequiredService<ApplicationBootstrapper>();
+            var bootstrapResult = await bootstrapper.BootstrapAsync(args, cancellationTokenSource.Token).ConfigureAwait(false);
             
-            // Validate model configuration if configured
-            if (isConfigured && !ConfigurationChecker.ValidateModel(configuration, logger))
+            // If bootstrap determined we should exit early (setup ran, invalid config, etc.), honor that
+            if (!bootstrapResult.ShouldContinue)
             {
-                string? errorMessage = ConfigurationChecker.GetModelValidationError(configuration);
-                if (errorMessage != null)
-                {
-                    await Console.Error.WriteLineAsync().ConfigureAwait(false);
-                    await Console.Error.WriteLineAsync(errorMessage).ConfigureAwait(false);
-                    await Console.Error.WriteLineAsync().ConfigureAwait(false);
-                }
-                
-                // Offer to re-run setup to fix the configuration
-                bool shouldRunSetup = await PromptForSetupAsync(cancellationTokenSource.Token).ConfigureAwait(false);
-                
-                if (!shouldRunSetup)
-                {
-                    logger.LogInformation("User declined to run setup. Exiting.");
-                    return 1;
-                }
-                
-                // Run setup to fix the configuration
-                logger.LogInformation("Running setup to fix invalid configuration");
-                var setupHandler = serviceProvider.GetRequiredService<SetupCommandHandler>();
-                var setupCommand = new SetupCommand
-                {
-                    Force = true, // Force re-configuration
-                    NonInteractive = false,
-                    ExistingConfiguration = null // Will load from storage within setup handler
-                };
-                
-                var setupResult = await setupHandler.Handle(setupCommand, cancellationTokenSource.Token).ConfigureAwait(false);
-                
-                if (!setupResult.IsSuccess)
-                {
-                    logger.LogError("Setup failed: {Error}", setupResult.Error);
-                    await Console.Error.WriteLineAsync($"Setup failed: {setupResult.Error}").ConfigureAwait(false);
-                    return 1;
-                }
-                
-                logger.LogInformation("Configuration updated successfully");
-                Console.WriteLine();
-                Console.WriteLine("Configuration updated! You can now use Ten Second Tom.");
-                Console.WriteLine();
-                
-                // If they were trying to run a command, suggest running it again
-                if (args.Length > 0)
-                {
-                    Console.WriteLine($"Please run your command again: tom {string.Join(" ", args)}");
-                }
-                
-                return 0;
-            }
-            
-            if (!isConfigured && args.Length == 0)
-            {
-                // No arguments and not configured = first-run setup wizard
-                logger.LogInformation("First-run detected. Launching setup wizard...");
-                Console.WriteLine();
-                Console.WriteLine("Welcome to Ten Second Tom! 🎩");
-                Console.WriteLine("Let's get you set up...");
-                Console.WriteLine();
-                
-                // Run setup wizard
-                var setupHandler = serviceProvider.GetRequiredService<SetupCommandHandler>();
-                var setupCommand = new SetupCommand
-                {
-                    Force = false,
-                    NonInteractive = false,
-                    ExistingConfiguration = null
-                };
-                
-                var setupResult = await setupHandler.Handle(setupCommand, cancellationTokenSource.Token).ConfigureAwait(false);
-                
-                if (!setupResult.IsSuccess)
-                {
-                    logger.LogError("Setup failed: {Error}", setupResult.Error);
-                    await Console.Error.WriteLineAsync($"Setup failed: {setupResult.Error}").ConfigureAwait(false);
-                    return 1;
-                }
-                
-                logger.LogInformation("Setup completed successfully");
-                Console.WriteLine();
-                Console.WriteLine("Setup complete! You can now use Ten Second Tom.");
-                Console.WriteLine();
-                Console.WriteLine("Try 'tom today' to record what you're working on.");
-                return 0;
+                return bootstrapResult.ExitCode;
             }
             
             // Determine execution mode: shell or single command
@@ -234,61 +152,5 @@ internal static class Program
             // Ensure all log messages are flushed
             LoggingConfiguration.CloseAndFlush();
         }
-    }
-
-    /// <summary>
-    /// Prompts the user to run setup to fix invalid or outdated configuration
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>True if user wants to run setup, false otherwise</returns>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1303:Do not pass literals as localized parameters", Justification = "CLI tool - localization not required")]
-    private static async Task<bool> PromptForSetupAsync(CancellationToken cancellationToken)
-    {
-        Console.WriteLine();
-        Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.Write("Your configuration appears to be invalid or outdated. Would you like to run setup again? (y/n): ");
-        Console.ResetColor();
-
-        // Check if console input is redirected (e.g., piped from echo or file)
-        if (Console.IsInputRedirected)
-        {
-            // Read from stdin (supports piped input)
-            string? input = await Console.In.ReadLineAsync(cancellationToken).ConfigureAwait(false);
-            
-            if (string.IsNullOrWhiteSpace(input))
-            {
-                Console.WriteLine();
-                return false;
-            }
-            
-            char firstChar = char.ToLowerInvariant(input.Trim()[0]);
-            Console.WriteLine(firstChar); // Echo the response
-            return firstChar == 'y';
-        }
-
-        // Interactive mode - use ReadKey for better UX
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            var key = Console.ReadKey(intercept: true);
-            
-            if (key.Key == ConsoleKey.Y)
-            {
-                Console.WriteLine("y");
-                return await Task.FromResult(true).ConfigureAwait(false);
-            }
-            
-            if (key.Key == ConsoleKey.N)
-            {
-                Console.WriteLine("n");
-                return await Task.FromResult(false).ConfigureAwait(false);
-            }
-            
-            // Invalid input - beep and continue
-            Console.Beep();
-        }
-        
-        // Cancelled
-        Console.WriteLine();
-        return false;
     }
 }

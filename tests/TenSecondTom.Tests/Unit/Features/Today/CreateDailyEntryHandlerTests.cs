@@ -5,6 +5,7 @@ using Moq;
 using TenSecondTom.Features.Today.Commands;
 using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
@@ -28,6 +29,8 @@ public sealed class CreateDailyEntryHandlerTests
     private readonly Mock<IAuthenticationService> _mockAuthService;
     private readonly Mock<IConfiguration> _mockConfiguration;
     private readonly Mock<ILogger<CreateDailyEntryHandler>> _mockLogger;
+    private readonly TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler _listTemplatesHandler;
+    private readonly Mock<ITemplateSelectionUI> _mockTemplateSelectionUI;
     private readonly CreateDailyEntryHandler _handler;
 
     public CreateDailyEntryHandlerTests()
@@ -39,6 +42,11 @@ public sealed class CreateDailyEntryHandlerTests
         _mockAuthService = new Mock<IAuthenticationService>();
         _mockConfiguration = new Mock<IConfiguration>();
         _mockLogger = new Mock<ILogger<CreateDailyEntryHandler>>();
+        var mockListTemplatesLogger = new Mock<ILogger<TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler>>();
+        _listTemplatesHandler = new TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler(
+            _mockPromptLoader.Object,
+            mockListTemplatesLogger.Object);
+        _mockTemplateSelectionUI = new Mock<ITemplateSelectionUI>();
 
         // Setup default configuration values
         _mockConfiguration.Setup(c => c["Llm:Provider"]).Returns("OpenAI");
@@ -56,7 +64,8 @@ public sealed class CreateDailyEntryHandlerTests
             {
                 TemplateId = "daily-summary",
                 Content = "Summarize: {{USER_INPUT}}",
-                TemplateType = TemplateType.DailySummary
+                TemplateType = TemplateType.Daily,
+                Source = TemplateSource.Embedded
             }));
 
         _mockLlmProvider.Setup(p => p.GenerateCompletionAsync(
@@ -81,7 +90,9 @@ public sealed class CreateDailyEntryHandlerTests
             _mockPromptLoader.Object,
             _mockAuthService.Object,
             _mockConfiguration.Object,
-            _mockLogger.Object);
+            _mockLogger.Object,
+            _listTemplatesHandler,
+            _mockTemplateSelectionUI.Object);
     }
 
     [Fact]

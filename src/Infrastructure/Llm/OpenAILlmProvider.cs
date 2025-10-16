@@ -7,9 +7,6 @@ namespace TenSecondTom.Infrastructure.Llm;
 /// <summary>
 /// OpenAI LLM provider implementation using the official OpenAI .NET SDK.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates", Justification = "Simple logging calls, delegate overhead not justified")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Top-level handler converts all exceptions to Result")]
 public sealed class OpenAILlmProvider : ILlmProvider
 {
     private readonly ChatClient _chatClient;

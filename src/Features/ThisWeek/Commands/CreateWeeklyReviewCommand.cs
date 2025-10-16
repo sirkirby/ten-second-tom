@@ -6,7 +6,6 @@ namespace TenSecondTom.Features.ThisWeek.Commands;
 /// <summary>
 /// Command to create a weekly review entry by aggregating daily entries.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public sealed record CreateWeeklyReviewCommand : IRequest<Result<WeeklyEntry>>
 {
     /// <summary>

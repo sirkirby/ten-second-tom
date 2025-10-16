@@ -213,6 +213,125 @@ public sealed class SetupCommandHandlerTests
         savedConfig.Optional.RetentionDays.Should().Be(30);
     }
 
+    // COMMENTED OUT: Test refers to removed template handling functionality
+    /*
+    [Fact]
+    public async Task Handle_InstallsTemplates_AfterMemoryDirectoryConfiguration()
+    {
+        // Arrange
+        var handler = CreateHandler();
+        var command = new SetupCommand { Force = false, NonInteractive = false };
+
+        SetupHappyPathMocks();
+
+        // Act
+        await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        _mockTemplateHandler.Verify(
+            x => x.Handle(
+                It.Is<InstallDefaultTemplatesCommand>(cmd =>
+                    cmd.TargetDirectory.Contains("templates") &&
+                    !cmd.OverwriteExisting),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+    */
+
+    // COMMENTED OUT: Test refers to removed template handling functionality
+    /*
+    [Fact]
+    public async Task Handle_TemplateInstallation_UsesCorrectTargetDirectory()
+    {
+        // Arrange
+        var handler = CreateHandler();
+        var command = new SetupCommand { Force = false, NonInteractive = false };
+        InstallDefaultTemplatesCommand? capturedCommand = null;
+
+        SetupHappyPathMocksExceptTemplateHandler();
+
+        _mockTemplateHandler
+            .Setup(x => x.Handle(It.IsAny<InstallDefaultTemplatesCommand>(), It.IsAny<CancellationToken>()))
+            .Callback<InstallDefaultTemplatesCommand, CancellationToken>((cmd, ct) => capturedCommand = cmd)
+            .ReturnsAsync(Result<InstallDefaultTemplatesResult>.Success(new InstallDefaultTemplatesResult
+            {
+                TemplatesInstalled = 5,
+                TemplatesSkipped = 0,
+                TemplatesFailed = 0,
+                InstalledTemplateIds = new List<string> { "backend-architect" }
+            }));
+
+        _mockStorageService
+            .Setup(x => x.SaveAsync(It.IsAny<ConfigurationSettings>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<string>.Success("/path"));
+
+        // Act
+        await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        capturedCommand.Should().NotBeNull();
+        capturedCommand!.TargetDirectory.Should().EndWith("templates");
+        capturedCommand.TargetDirectory.Should().Contain(".memory");
+        capturedCommand.OverwriteExisting.Should().BeFalse();
+    }
+    */
+
+    // COMMENTED OUT: Test refers to removed template handling functionality
+    /*
+    [Fact]
+    public async Task Handle_WhenTemplateInstallationFails_ContinuesSetup()
+    {
+        // Arrange
+        var handler = CreateHandler();
+        var command = new SetupCommand { Force = false, NonInteractive = false };
+
+        SetupHappyPathMocksExceptTemplateHandler();
+
+        _mockTemplateHandler
+            .Setup(x => x.Handle(It.IsAny<InstallDefaultTemplatesCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<InstallDefaultTemplatesResult>.Failure("Failed to install templates"));
+
+        _mockStorageService
+            .Setup(x => x.SaveAsync(It.IsAny<ConfigurationSettings>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<string>.Success("/path"));
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        _mockWizardUI.Verify(
+            x => x.ShowWarning(It.Is<string>(s => s.Contains("template"))),
+            Times.AtLeastOnce);
+    }
+    */
+
+    // COMMENTED OUT: Test refers to removed template handling functionality
+    /*
+    [Fact]
+    public async Task Handle_WhenTemplateInstallationSucceeds_LogsResult()
+    {
+        // Arrange
+        var handler = CreateHandler();
+        var command = new SetupCommand { Force = false, NonInteractive = false };
+
+        SetupHappyPathMocks();
+
+        // Act
+        await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        _mockLogger.Verify(
+            x => x.Log(
+                LogLevel.Information,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains('5') && v.ToString()!.Contains("template")),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.AtLeastOnce);
+    }
+    */
+
     #endregion
 
     #region Cancellation Tests
@@ -630,6 +749,53 @@ public sealed class SetupCommandHandlerTests
         savedConfig!.Optional.EnableTelemetry.Should().BeFalse();
     }
 
+    // NOTE: This test is commented out because SetupCommandHandler no longer uses IConfiguration directly.
+    // Environment variable configuration is now handled at the Program.cs level and tested in integration tests.
+    // See SetupWithTemplatesIntegrationTests for end-to-end environment variable testing.
+
+    // [Fact]
+    // public async Task Handle_WithEnvironmentMemoryDirectory_UsesEnvVarAsDefault()
+    // {
+    //     // Arrange
+    //     var handler = CreateHandler();
+    //     var command = new SetupCommand { Force = false, NonInteractive = false };
+    //     var envMemoryDir = "/custom/env/memory";
+    //     // Note: Environment configuration setup removed - handler doesn't use IConfiguration directly
+    //
+    //     SetupHappyPathMocksExceptMemoryDirectory();
+    //
+    //     // Mock will receive env var as default
+    //     string? capturedDefault = null;
+    //     _mockWizardUI
+    //         .Setup(x => x.PromptForMemoryDirectoryAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+    //         .Callback<string?, CancellationToken>((defaultDir, ct) => capturedDefault = defaultDir)
+    //         .ReturnsAsync(envMemoryDir);
+    //
+    //     ConfigurationSettings? savedConfig = null;
+    //     _mockStorageService
+    //         .Setup(x => x.SaveAsync(It.IsAny<ConfigurationSettings>(), It.IsAny<CancellationToken>()))
+    //         .Callback<ConfigurationSettings, CancellationToken>((config, ct) => savedConfig = config)
+    //         .ReturnsAsync(Result<string>.Success("/path"));
+    //
+    //     // Act
+    //     await handler.Handle(command, CancellationToken.None);
+    //
+    //     // Assert
+    //     capturedDefault.Should().Be(envMemoryDir, "environment variable should be passed as default");
+    //     savedConfig.Should().NotBeNull();
+    //     savedConfig!.Storage.MemoryDirectory.Should().Be(envMemoryDir);
+    //
+    //     // Verify debug logging
+    //     _mockLogger.Verify(
+    //         x => x.Log(
+    //             LogLevel.Debug,
+    //             It.IsAny<EventId>(),
+    //             It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("environment") && v.ToString()!.Contains(envMemoryDir)),
+    //             It.IsAny<Exception>(),
+    //             It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+    //         Times.Once);
+    // }
+
     #endregion
 
     #region Logging Tests
@@ -786,6 +952,18 @@ public sealed class SetupCommandHandlerTests
         SetupStorageMock();
     }
 
+    private void SetupHappyPathMocksExceptTemplateHandler()
+    {
+        SetupSshDetectionMock();
+        SetupSshKeySelectionMock();
+        SetupProviderSelectionMock();
+        SetupApiKeyMock();
+        SetupMemoryDirectoryMock();
+        SetupLogLevelMock();
+        SetupRetentionDaysMock();
+        SetupConfirmationMock();
+    }
+
     private void SetupSshDetectionMock()
     {
         var sshKeys = new List<SshKeyInfo>
@@ -876,6 +1054,7 @@ public sealed class SetupCommandHandlerTests
             .Setup(x => x.SaveAsync(It.IsAny<ConfigurationSettings>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<string>.Success("/Users/test/.microsoft/usersecrets/secrets.json"));
     }
+
 
     private static ConfigurationSettings CreateValidConfiguration()
     {

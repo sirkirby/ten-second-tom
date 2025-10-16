@@ -12,9 +12,6 @@ namespace TenSecondTom.Features.Retry.Handlers;
 /// Handles retry operations for entries where LLM summarization failed.
 /// Resubmits user input to LLM provider and updates entry metadata.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Retry operations need to catch all exceptions")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates", Justification = "Simple logging for now")]
 public sealed class RetryFailedSummarizationHandler
 {
     private readonly IMemoryStorageProvider _storageProvider;

@@ -7,7 +7,6 @@ namespace TenSecondTom.Features.Auth.Commands;
 /// Command to authenticate the user using SSH key-based authentication.
 /// Creates an active session if authentication succeeds.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Public API by design")]
 public sealed record LoginCommand : IRequest<Result<UserSession>>
 {
     /// <summary>

@@ -75,24 +75,69 @@ public sealed class ConfigCommandHandler
 
         // Apply environment variable overrides from IConfiguration
         // This shows the effective configuration that will be used at runtime
+        string? envSshKeyPath = _configuration["Ssh:KeyPath"];
+        string? envSshKeySource = _configuration["Ssh:KeySource"];
+        string? envSshAgentSocketPath = _configuration["Ssh:AgentSocketPath"];
         string? envProvider = _configuration["Llm:Provider"];
         string? envApiKey = _configuration["Llm:ApiKey"];
         string? envModel = _configuration["Llm:Model"];
+        string? envMemoryDir = _configuration["Storage:MemoryDirectory"];
+        string? envCreateIfMissing = _configuration["Storage:CreateIfMissing"];
+        string? envLogLevel = _configuration["Optional:LogLevel"];
+        string? envRetentionDays = _configuration["Optional:RetentionDays"];
+        string? envEnableTelemetry = _configuration["Optional:EnableTelemetry"];
 
         // If environment variables are set, they override user secrets
-        if (!string.IsNullOrWhiteSpace(envProvider) || 
-            !string.IsNullOrWhiteSpace(envApiKey) || 
-            !string.IsNullOrWhiteSpace(envModel))
+        bool hasSshOverrides = !string.IsNullOrWhiteSpace(envSshKeyPath) ||
+                              !string.IsNullOrWhiteSpace(envSshKeySource) ||
+                              !string.IsNullOrWhiteSpace(envSshAgentSocketPath);
+        bool hasLlmOverrides = !string.IsNullOrWhiteSpace(envProvider) ||
+                              !string.IsNullOrWhiteSpace(envApiKey) ||
+                              !string.IsNullOrWhiteSpace(envModel);
+        bool hasStorageOverrides = !string.IsNullOrWhiteSpace(envMemoryDir) ||
+                                   !string.IsNullOrWhiteSpace(envCreateIfMissing);
+        bool hasOptionalOverrides = !string.IsNullOrWhiteSpace(envLogLevel) ||
+                                    !string.IsNullOrWhiteSpace(envRetentionDays) ||
+                                    !string.IsNullOrWhiteSpace(envEnableTelemetry);
+
+        if (hasSshOverrides || hasLlmOverrides || hasStorageOverrides || hasOptionalOverrides)
         {
             config = config with
             {
+                Ssh = config.Ssh with
+                {
+                    KeyPath = envSshKeyPath ?? config.Ssh.KeyPath,
+                    KeySource = Enum.TryParse<SshKeySource>(envSshKeySource, true, out var keySource)
+                        ? keySource
+                        : config.Ssh.KeySource,
+                    AgentSocketPath = envSshAgentSocketPath ?? config.Ssh.AgentSocketPath
+                },
                 Llm = config.Llm with
                 {
-                    Provider = Enum.TryParse<LlmProvider>(envProvider, true, out var provider) 
-                        ? provider 
+                    Provider = Enum.TryParse<LlmProvider>(envProvider, true, out var provider)
+                        ? provider
                         : config.Llm.Provider,
                     ApiKey = envApiKey ?? config.Llm.ApiKey,
                     Model = envModel ?? config.Llm.Model
+                },
+                Storage = config.Storage with
+                {
+                    MemoryDirectory = envMemoryDir ?? config.Storage.MemoryDirectory,
+                    CreateIfMissing = bool.TryParse(envCreateIfMissing, out var createIfMissing)
+                        ? createIfMissing
+                        : config.Storage.CreateIfMissing
+                },
+                Optional = config.Optional with
+                {
+                    LogLevel = Enum.TryParse<Microsoft.Extensions.Logging.LogLevel>(envLogLevel, true, out var logLevel)
+                        ? logLevel
+                        : config.Optional.LogLevel,
+                    RetentionDays = int.TryParse(envRetentionDays, out var retentionDays)
+                        ? retentionDays
+                        : config.Optional.RetentionDays,
+                    EnableTelemetry = bool.TryParse(envEnableTelemetry, out var enableTelemetry)
+                        ? enableTelemetry
+                        : config.Optional.EnableTelemetry
                 }
             };
 
