@@ -175,13 +175,70 @@ Success Criteria:
 
 ---
 
-### Job 4: Validate
+### Job 4: Verify Release Build
+
+**Purpose**: Verify that release builds with version injection will succeed when tagged
+
+**Runner**: Dynamic (self-hosted if available, otherwise ubuntu-latest)
+
+**Dependencies**: Jobs 0, 1 (Select Runner, Build)
+
+**Steps**:
+1. Checkout code
+2. Setup .NET 9 SDK
+3. Restore dependencies
+4. Build release executable for Linux x64 with version injection
+5. Verify executable was created and check size
+6. Run smoke test (--version command)
+
+**Inputs**:
+- Source code from PR branch
+- .NET 9 SDK
+- PR number for version string
+
+**Outputs**:
+- Release build status (success/failure)
+- Executable size verification
+- Smoke test result
+
+**Performance Target**: ≤3 minutes
+
+**Contract**:
+```yaml
+Preconditions:
+  - Build job succeeded
+  - .NET 9 SDK available
+  - Valid .csproj file
+
+Postconditions:
+  - Release build completes successfully
+  - Single-file executable created
+  - Executable size ≤50MB (warning if exceeded)
+  - Smoke test passes (--version runs)
+
+Failure Modes:
+  - Build fails → fail with error messages
+  - Executable not created → fail with diagnostic
+  - Executable too large → warning, continue
+  - Smoke test fails → fail with error
+```
+
+**Why This Job Exists:**
+Ensures that the release workflow will succeed when a version tag is pushed. This job verifies that:
+- Release configuration compiles
+- Version injection works correctly
+- Single-file publish succeeds
+- The resulting binary runs
+
+---
+
+### Job 5: Validate
 
 **Purpose**: Aggregate status from all jobs and report to PR
 
 **Runner**: `ubuntu-latest`
 
-**Dependencies**: Jobs 1, 2, 3 (Build, Test, Coverage)
+**Dependencies**: Jobs 1, 2, 3, 4 (Build, Test, Coverage, Verify Release Build)
 
 **Steps**:
 1. Check status of all dependent jobs
@@ -212,6 +269,7 @@ Success Criteria:
   - Build: success
   - Test: success (zero failures)
   - Coverage: success (>=80%)
+  - Verify Release Build: success
 
 Failure Modes:
   - Any dependent job failed → this job fails
@@ -225,19 +283,23 @@ Failure Modes:
 ### Performance Contract (FR-029, NFR-001)
 
 ```yaml
-Total Execution Time: ≤10 minutes
+Total Execution Time: ≤13 minutes
 
 Breakdown:
   - Checkout & Setup: ≤1 minute
   - Build: ≤2 minutes
-  - Test: ≤5 minutes
-  - Coverage: ≤3 minutes (parallel with Test conceptually, but runs after)
+  - Test: ≤5 minutes (parallel with Coverage and Verify Release Build)
+  - Coverage: ≤3 minutes (parallel with Test and Verify Release Build)
+  - Verify Release Build: ≤3 minutes (parallel with Test and Coverage)
   - Validate: <1 minute
+
+Note: Test, Coverage, and Verify Release Build jobs run in parallel after Build completes.
 
 Mitigation if exceeded:
   - Implement test parallelization
   - Increase caching effectiveness
   - Split unit/integration tests into parallel jobs
+  - Optimize release build (use cached dependencies)
 ```
 
 ### Quality Contract (FR-026, FR-027, FR-028)

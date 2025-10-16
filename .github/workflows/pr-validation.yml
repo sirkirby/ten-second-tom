@@ -322,13 +322,73 @@ jobs:
           path: ./coverage/baseline.txt
           key: coverage-baseline-main
 
-  # Job 4: Validate
+  # Job 4: Verify Release Build
+  # Verifies that release builds will work when tagged
+  # Performance Target: ≤3 minutes
+  # Builds one platform to ensure release.yml will succeed
+  verify-release-build:
+    name: Verify Release Build
+    runs-on: ${{ needs.select-runner.outputs.linux }}
+    needs: [select-runner, build]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      
+      - name: Restore dependencies
+        run: dotnet restore
+      
+      - name: Build release executable (Linux x64)
+        run: |
+          dotnet publish src/TenSecondTom.csproj \
+            --configuration Release \
+            --runtime linux-x64 \
+            --self-contained true \
+            --output ./publish \
+            -p:PublishSingleFile=true \
+            -p:Version=0.0.0-pr.${{ github.event.pull_request.number }}
+      
+      - name: Verify build output
+        run: |
+          if [ ! -f "./publish/TenSecondTom" ]; then
+            echo "❌ Error: Release build did not produce executable"
+            exit 1
+          fi
+          
+          SIZE=$(stat -c%s ./publish/TenSecondTom)
+          SIZE_MB=$((SIZE / 1024 / 1024))
+          echo "📦 Executable size: ${SIZE_MB}MB"
+          
+          if [ $SIZE_MB -gt 50 ]; then
+            echo "⚠️  Warning: Executable size exceeds 50MB"
+          fi
+          
+          echo "✅ Release build verification passed"
+      
+      - name: Smoke test
+        run: |
+          chmod +x ./publish/TenSecondTom
+          ./publish/TenSecondTom --version
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ Release executable runs successfully"
+          else
+            echo "❌ Release executable failed to run"
+            exit 1
+          fi
+
+  # Job 5: Validate
   # Aggregates status from all previous jobs
   # This job ensures all quality gates passed before allowing merge
   validate:
     name: Validation Complete
     runs-on: ${{ needs.select-runner.outputs.linux }}
-    needs: [select-runner, build, test, coverage]
+    needs: [select-runner, build, test, coverage, verify-release-build]
     
     steps:
       - name: All checks passed
@@ -337,5 +397,6 @@ jobs:
           echo "   - Build: Completed with zero warnings"
           echo "   - Tests: All tests passed"
           echo "   - Coverage: No significant regression detected"
+          echo "   - Release Build: Verified and smoke tested"
           echo ""
           echo "Pull request is ready to merge."

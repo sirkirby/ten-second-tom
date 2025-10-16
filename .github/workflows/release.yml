@@ -63,85 +63,17 @@ permissions:
   issues: write        # Required for creating Winget/Chocolatey publication issues
 
 jobs:
-  select-runner:
-    name: Select Linux Runner
-    runs-on: ubuntu-latest
-    outputs:
-      linux: ${{ steps.detect.outputs.linux }}
-
-    steps:
-      - name: Detect available self-hosted runners
-        id: detect
-        env:
-          GH_TOKEN: ${{ secrets.RUNNER_QUERY_TOKEN }}
-        run: |
-          echo "🔍 Checking for online self-hosted Linux runners"
-          
-          # Fallback to ubuntu-latest if token not available or API fails
-          if [ -z "$GH_TOKEN" ]; then
-            echo "⚠️  RUNNER_QUERY_TOKEN secret not configured; using ubuntu-latest"
-            echo "linux=ubuntu-latest" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          
-          if ! RUNNERS=$(gh api repos/${{ github.repository }}/actions/runners --paginate 2>&1); then
-            echo "⚠️  Unable to query runner API; using ubuntu-latest"
-            echo "Error: $RUNNERS"
-            echo "linux=ubuntu-latest" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          
-          # Debug: show what we got
-          echo "📊 Runner API response:"
-          echo "$RUNNERS" | jq -r '.runners[]? | "  - \(.name): status=\(.status), os=\(.os), labels=\(.labels | map(.name) | join(","))"'
-          
-          # Match runners with status=online, os=Linux (case-insensitive), and self-hosted label
-          LINUX_COUNT=$(echo "$RUNNERS" | jq '[.runners[]? | select(.status == "online" and (.os | ascii_downcase) == "linux" and (.labels[]?.name == "self-hosted"))] | length')
-
-          if [ "$LINUX_COUNT" -gt 0 ]; then
-            echo "🤖 Found $LINUX_COUNT online self-hosted Linux runner(s); selecting self-hosted"
-            echo "linux=self-hosted" >> "$GITHUB_OUTPUT"
-          else
-            echo "☁️ No online self-hosted Linux runners found; using ubuntu-latest"
-            echo "linux=ubuntu-latest" >> "$GITHUB_OUTPUT"
-          fi
-
-  # Job 1: Validate Version and Find Artifacts
-  # Extract/validate version, ensure tag is on main, find build artifacts
-  # Performance Target: <2 minutes
+  # Job 1: Validate Version
+  # Extract/validate version, ensure tag is on main
+  # Performance Target: <1 minute
   validate-version:
-    name: Validate Version & Find Artifacts
-    needs: select-runner
-    runs-on: ${{ needs.select-runner.outputs.linux }}
+    name: Validate Version
+    runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.extract.outputs.version }}
       commit-sha: ${{ steps.validate.outputs.commit-sha }}
-      build-run-id: ${{ steps.find-artifacts.outputs.run-id }}
     
     steps:
-      - name: Install GitHub CLI (self-hosted runner)
-        run: |
-          if ! command -v gh &> /dev/null; then
-            echo "📦 Installing GitHub CLI..."
-            
-            # Detect if running as root (self-hosted runners may run as root)
-            if [ "$(id -u)" -eq 0 ]; then
-              SUDO=""
-            else
-              SUDO="sudo"
-            fi
-            
-            type -p curl >/dev/null || ($SUDO apt update && $SUDO apt install curl -y)
-            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | $SUDO dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-            $SUDO chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | $SUDO tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-            $SUDO apt update
-            $SUDO apt install gh -y
-            echo "✅ GitHub CLI installed"
-          else
-            echo "✅ GitHub CLI already installed"
-          fi
-      
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -222,106 +154,124 @@ jobs:
           else
             echo "✅ Version v$VERSION is unique"
           fi
+
+  # Job 2: Build Release Artifacts
+  # Rebuild binaries with release version embedded (not reusing dev builds)
+  # Performance Target: ≤10 minutes (parallel execution)
+  build-release-artifacts:
+    name: Build ${{ matrix.platform }} Release
+    runs-on: ${{ matrix.os }}
+    needs: [validate-version]
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            platform: osx-x64
+            runtime: osx-x64
+            executable: tom
+          - os: macos-latest
+            platform: osx-arm64
+            runtime: osx-arm64
+            executable: tom
+          - os: windows-latest
+            platform: win-x64
+            runtime: win-x64
+            executable: tom.exe
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate-version.outputs.commit-sha }}
       
-      - name: Find build workflow artifacts
-        id: find-artifacts
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      
+      - name: Restore dependencies
+        run: dotnet restore
+      
+      - name: Publish ${{ matrix.platform }} executable with release version
+        shell: bash
         run: |
-          COMMIT_SHA="${{ steps.validate.outputs.commit-sha }}"
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          echo "📦 Building ${{ matrix.platform }} with version: ${VERSION}"
           
-          echo "🔍 Looking for build workflow run for commit $COMMIT_SHA..."
+          dotnet publish src/TenSecondTom.csproj \
+            --configuration Release \
+            --runtime ${{ matrix.runtime }} \
+            --self-contained true \
+            --output ./publish \
+            -p:PublishSingleFile=true \
+            -p:Version=${VERSION}
+      
+      - name: Rename executable to 'tom' or 'tom.exe'
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform }}" = "win-x64" ]; then
+            mv ./publish/TenSecondTom.exe ./publish/tom.exe
+          else
+            mv ./publish/TenSecondTom ./publish/tom
+          fi
+      
+      - name: Verify artifact size
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            SIZE=$(stat -c%s ./publish/${{ matrix.executable }})
+          else
+            SIZE=$(stat -f%z ./publish/${{ matrix.executable }})
+          fi
           
-          # Find the build workflow run for this commit
-          RUN_ID=$(gh run list \
-            --workflow=build.yml \
-            --commit=$COMMIT_SHA \
-            --status=success \
-            --json databaseId \
-            --jq '.[0].databaseId')
+          SIZE_MB=$((SIZE / 1024 / 1024))
+          echo "📦 Executable size: ${SIZE_MB}MB"
           
-          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
-            echo "❌ Error: No successful build workflow run found for commit $COMMIT_SHA"
-            echo ""
-            echo "The release workflow reuses artifacts from the build workflow to avoid redundancy."
-            echo "Please ensure:"
-            echo "  1. Code has been merged to main branch"
-            echo "  2. Build workflow has completed successfully"
-            echo "  3. Tag is created on the same commit that was built"
-            echo ""
-            echo "Typical workflow:"
-            echo "  1. Merge PR to main → triggers build.yml"
-            echo "  2. Wait for build to complete"
-            echo "  3. Tag the merge commit: git tag v1.0.0 && git push origin v1.0.0"
+          if [ $SIZE -gt 52428800 ]; then
+            echo "❌ Error: Executable exceeds 50MB limit (${SIZE_MB}MB)"
             exit 1
           fi
           
-          echo "run-id=$RUN_ID" >> $GITHUB_OUTPUT
-          echo "✅ Found build workflow run: $RUN_ID"
-          echo "🔗 https://github.com/${{ github.repository }}/actions/runs/$RUN_ID"
-
-  # Job 2: Download Build Artifacts
-  # Reuse artifacts from the build workflow to avoid redundant builds
-  # Performance Target: <1 minute
-  download-artifacts:
-    name: Download Build Artifacts
-    runs-on: ${{ needs.select-runner.outputs.linux }}
-    needs: [select-runner, validate-version]
-    
-    steps:
-      - name: Install GitHub CLI (self-hosted runner)
+          echo "✅ Size check passed: ${SIZE_MB}MB"
+      
+      - name: Calculate checksum
+        shell: bash
         run: |
-          if ! command -v gh &> /dev/null; then
-            echo "📦 Installing GitHub CLI..."
-            
-            # Detect if running as root (self-hosted runners may run as root)
-            if [ "$(id -u)" -eq 0 ]; then
-              SUDO=""
-            else
-              SUDO="sudo"
-            fi
-            
-            type -p curl >/dev/null || ($SUDO apt update && $SUDO apt install curl -y)
-            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | $SUDO dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-            $SUDO chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | $SUDO tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-            $SUDO apt update
-            $SUDO apt install gh -y
-            echo "✅ GitHub CLI installed"
+          cd ./publish
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            sha256sum ${{ matrix.executable }} > ${{ matrix.executable }}.sha256
           else
-            echo "✅ GitHub CLI already installed"
+            shasum -a 256 ${{ matrix.executable }} > ${{ matrix.executable }}.sha256
+          fi
+          echo "📝 SHA256:"
+          cat ${{ matrix.executable }}.sha256
+      
+      - name: Smoke test - version command
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" != "Windows" ]; then
+            chmod +x ./publish/${{ matrix.executable }}
+          fi
+          
+          echo "🧪 Running smoke test: --version"
+          ./publish/${{ matrix.executable }} --version
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ Smoke test passed"
+          else
+            echo "❌ Smoke test failed"
+            exit 1
           fi
       
-      - name: Download artifacts from build workflow
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          RUN_ID="${{ needs.validate-version.outputs.build-run-id }}"
-          
-          echo "📥 Downloading artifacts from build run $RUN_ID..."
-          
-          # Download all three platform artifacts
-          gh run download $RUN_ID \
-            --repo ${{ github.repository }} \
-            --dir ./artifacts
-          
-          echo "✅ Downloaded artifacts:"
-          ls -lah ./artifacts/
-          
-          # Verify all expected artifacts exist
-          for artifact in ten-second-tom-osx-x64 ten-second-tom-osx-arm64 ten-second-tom-win-x64; do
-            if [ ! -d "./artifacts/$artifact" ]; then
-              echo "❌ Error: Expected artifact '$artifact' not found"
-              exit 1
-            fi
-            echo "  ✅ $artifact"
-          done
-      
-      - name: Upload artifacts for release jobs
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: release-artifacts
-          path: ./artifacts/
+          name: ten-second-tom-${{ matrix.platform }}-release
+          path: |
+            ./publish/${{ matrix.executable }}
+            ./publish/appsettings*.json
+            ./publish/*.dylib
+            ./publish/*.dll
           retention-days: 90
 
   # Job 3: Create GitHub Release
@@ -329,36 +279,13 @@ jobs:
   # Performance Target: ≤2 minutes
   create-github-release:
     name: Create GitHub Release
-    runs-on: ${{ needs.select-runner.outputs.linux }}
-    needs: [select-runner, validate-version, download-artifacts]
+    runs-on: ubuntu-latest
+    needs: [validate-version, build-release-artifacts]
     outputs:
       release-id: ${{ steps.create-release.outputs.id }}
       upload-url: ${{ steps.create-release.outputs.upload_url }}
     
     steps:
-      - name: Install GitHub CLI (self-hosted runner)
-        run: |
-          if ! command -v gh &> /dev/null; then
-            echo "📦 Installing GitHub CLI..."
-            
-            # Detect if running as root (self-hosted runners may run as root)
-            if [ "$(id -u)" -eq 0 ]; then
-              SUDO=""
-            else
-              SUDO="sudo"
-            fi
-            
-            type -p curl >/dev/null || ($SUDO apt update && $SUDO apt install curl -y)
-            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | $SUDO dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-            $SUDO chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | $SUDO tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-            $SUDO apt update
-            $SUDO apt install gh -y
-            echo "✅ GitHub CLI installed"
-          else
-            echo "✅ GitHub CLI already installed"
-          fi
-      
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -367,8 +294,36 @@ jobs:
       - name: Download release artifacts
         uses: actions/download-artifact@v4
         with:
-          name: release-artifacts
+          pattern: ten-second-tom-*-release
           path: ./artifacts
+      
+      - name: Package artifacts for distribution
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          
+          echo "📦 Creating distribution packages for version ${VERSION}"
+          mkdir -p ./release-packages
+          
+          # Package macOS x64
+          echo "Packaging macOS x64..."
+          cd ./artifacts/ten-second-tom-osx-x64-release
+          tar czf ../../release-packages/ten-second-tom-${VERSION}-osx-x64.tar.gz *
+          cd ../..
+          
+          # Package macOS ARM64
+          echo "Packaging macOS ARM64..."
+          cd ./artifacts/ten-second-tom-osx-arm64-release
+          tar czf ../../release-packages/ten-second-tom-${VERSION}-osx-arm64.tar.gz *
+          cd ../..
+          
+          # Package Windows x64
+          echo "Packaging Windows x64..."
+          cd ./artifacts/ten-second-tom-win-x64-release
+          zip -r ../../release-packages/ten-second-tom-${VERSION}-win-x64.zip *
+          cd ../..
+          
+          echo "✅ Distribution packages created:"
+          ls -lh ./release-packages/
       
       - name: Generate release notes
         id: release-notes
@@ -386,15 +341,23 @@ jobs:
 
           ### 📦 Downloads
 
-          Choose the appropriate binary for your platform:
+          Choose the appropriate package for your platform:
 
-          - **macOS (Intel)**: \`tom\` (from ten-second-tom-osx-x64)
-          - **macOS (Apple Silicon)**: \`tom\` (from ten-second-tom-osx-arm64)
-          - **Windows**: \`tom.exe\` (from ten-second-tom-win-x64)
+          - **macOS (Intel)**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-x64.tar.gz\`
+          - **macOS (Apple Silicon)**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-arm64.tar.gz\`
+          - **Windows**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-win-x64.zip\`
 
-          ### ✅ Verification
+          ### 🚀 Installation
 
-          Use \`shasum -a 256\` or \`Get-FileHash\` to verify the downloaded binaries."
+          **macOS:**
+          \`\`\`bash
+          tar xzf ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-x64.tar.gz
+          chmod +x tom
+          ./tom --version
+          \`\`\`
+
+          **Windows:**
+          Extract the zip file and run \`tom.exe\` from the extracted folder."
           else
             echo "📝 Generating changelog from $PREV_TAG to $VERSION"
             
@@ -407,15 +370,23 @@ jobs:
 
           ### 📦 Downloads
 
-          Choose the appropriate binary for your platform:
+          Choose the appropriate package for your platform:
 
-          - **macOS (Intel)**: \`tom\` (from ten-second-tom-osx-x64)
-          - **macOS (Apple Silicon)**: \`tom\` (from ten-second-tom-osx-arm64)
-          - **Windows**: \`tom.exe\` (from ten-second-tom-win-x64)
+          - **macOS (Intel)**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-x64.tar.gz\`
+          - **macOS (Apple Silicon)**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-arm64.tar.gz\`
+          - **Windows**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-win-x64.zip\`
 
-          ### ✅ Verification
+          ### 🚀 Installation
 
-          Use \`shasum -a 256\` or \`Get-FileHash\` to verify the downloaded binaries."
+          **macOS:**
+          \`\`\`bash
+          tar xzf ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-x64.tar.gz
+          chmod +x tom
+          ./tom --version
+          \`\`\`
+
+          **Windows:**
+          Extract the zip file and run \`tom.exe\` from the extracted folder."
           fi
           
           # Save notes to file (handle multiline)
@@ -453,25 +424,14 @@ jobs:
             exit 0
           fi
           
-          # Upload all artifacts
-          echo "📤 Uploading artifacts..."
+          # Upload all distribution packages
+          echo "📤 Uploading distribution packages..."
           
-          # Upload macOS x64
           gh release upload "$VERSION" \
-            ./artifacts/ten-second-tom-osx-x64/tom \
+            ./release-packages/* \
             --clobber
           
-          # Upload macOS ARM64
-          gh release upload "$VERSION" \
-            ./artifacts/ten-second-tom-osx-arm64/tom \
-            --clobber
-          
-          # Upload Windows x64
-          gh release upload "$VERSION" \
-            ./artifacts/ten-second-tom-win-x64/tom.exe \
-            --clobber
-          
-          echo "✅ All artifacts uploaded"
+          echo "✅ All distribution packages uploaded"
 
   # Job 4: Publish to Homebrew with Bottles
   # Create Homebrew bottles and upload to GitHub Packages, then update tap formula
@@ -497,7 +457,7 @@ jobs:
       - name: Download release artifacts
         uses: actions/download-artifact@v4
         with:
-          name: release-artifacts
+          pattern: ten-second-tom-*-release
           path: ./artifacts
       
       - name: Create Homebrew bottles
@@ -526,9 +486,9 @@ jobs:
           BOTTLE_DIR_ARM64="ten-second-tom/${VERSION}/bin"
           
           mkdir -p "$BOTTLE_DIR_ARM64"
-          cp "./artifacts/ten-second-tom-osx-arm64/tom" "$BOTTLE_DIR_ARM64/tom"
-          cp ./artifacts/ten-second-tom-osx-arm64/appsettings*.json "$BOTTLE_DIR_ARM64/" 2>/dev/null || true
-          cp ./artifacts/ten-second-tom-osx-arm64/*.dylib "$BOTTLE_DIR_ARM64/" 2>/dev/null || true
+          cp "./artifacts/ten-second-tom-osx-arm64-release/tom" "$BOTTLE_DIR_ARM64/tom"
+          cp ./artifacts/ten-second-tom-osx-arm64-release/appsettings*.json "$BOTTLE_DIR_ARM64/" 2>/dev/null || true
+          cp ./artifacts/ten-second-tom-osx-arm64-release/*.dylib "$BOTTLE_DIR_ARM64/" 2>/dev/null || true
           chmod +x "$BOTTLE_DIR_ARM64/tom"
           tar czf "$BOTTLE_NAME_ARM64" ten-second-tom
           
@@ -545,9 +505,9 @@ jobs:
           BOTTLE_DIR_X64="ten-second-tom/${VERSION}/bin"
           
           mkdir -p "$BOTTLE_DIR_X64"
-          cp "./artifacts/ten-second-tom-osx-x64/tom" "$BOTTLE_DIR_X64/tom"
-          cp ./artifacts/ten-second-tom-osx-x64/appsettings*.json "$BOTTLE_DIR_X64/" 2>/dev/null || true
-          cp ./artifacts/ten-second-tom-osx-x64/*.dylib "$BOTTLE_DIR_X64/" 2>/dev/null || true
+          cp "./artifacts/ten-second-tom-osx-x64-release/tom" "$BOTTLE_DIR_X64/tom"
+          cp ./artifacts/ten-second-tom-osx-x64-release/appsettings*.json "$BOTTLE_DIR_X64/" 2>/dev/null || true
+          cp ./artifacts/ten-second-tom-osx-x64-release/*.dylib "$BOTTLE_DIR_X64/" 2>/dev/null || true
           chmod +x "$BOTTLE_DIR_X64/tom"
           tar czf "$BOTTLE_NAME_X64" ten-second-tom
           
@@ -713,34 +673,11 @@ jobs:
   # Note: Phase 2 will automate the publication process
   document-winget:
     name: Document Winget Publication
-    runs-on: ${{ needs.select-runner.outputs.linux }}
-    needs: [select-runner, validate-version, create-github-release]
+    runs-on: ubuntu-latest
+    needs: [validate-version, create-github-release]
     if: success()  # Run even if other jobs fail
     
     steps:
-      - name: Install GitHub CLI (self-hosted runner)
-        run: |
-          if ! command -v gh &> /dev/null; then
-            echo "📦 Installing GitHub CLI..."
-            
-            # Detect if running as root (self-hosted runners may run as root)
-            if [ "$(id -u)" -eq 0 ]; then
-              SUDO=""
-            else
-              SUDO="sudo"
-            fi
-            
-            type -p curl >/dev/null || ($SUDO apt update && $SUDO apt install curl -y)
-            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | $SUDO dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-            $SUDO chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | $SUDO tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-            $SUDO apt update
-            $SUDO apt install gh -y
-            echo "✅ GitHub CLI installed"
-          else
-            echo "✅ GitHub CLI already installed"
-          fi
-      
       - name: Generate Winget manifest template
         run: |
           VERSION="${{ needs.validate-version.outputs.version }}"
@@ -803,34 +740,11 @@ jobs:
   # Note: Phase 2 will automate the publication process
   document-chocolatey:
     name: Document Chocolatey Publication
-    runs-on: ${{ needs.select-runner.outputs.linux }}
-    needs: [select-runner, validate-version, create-github-release]
+    runs-on: ubuntu-latest
+    needs: [validate-version, create-github-release]
     if: success()  # Run even if other jobs fail
     
     steps:
-      - name: Install GitHub CLI (self-hosted runner)
-        run: |
-          if ! command -v gh &> /dev/null; then
-            echo "📦 Installing GitHub CLI..."
-            
-            # Detect if running as root (self-hosted runners may run as root)
-            if [ "$(id -u)" -eq 0 ]; then
-              SUDO=""
-            else
-              SUDO="sudo"
-            fi
-            
-            type -p curl >/dev/null || ($SUDO apt update && $SUDO apt install curl -y)
-            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | $SUDO dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-            $SUDO chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | $SUDO tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-            $SUDO apt update
-            $SUDO apt install gh -y
-            echo "✅ GitHub CLI installed"
-          else
-            echo "✅ GitHub CLI already installed"
-          fi
-      
       - name: Generate Chocolatey nuspec template
         run: |
           VERSION="${{ needs.validate-version.outputs.version }}"

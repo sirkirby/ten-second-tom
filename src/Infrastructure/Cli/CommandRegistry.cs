@@ -73,9 +73,18 @@ public static class CommandRegistry
         {
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
             
-            // Simple version output (no logo in shell mode to avoid duplication)
-            var version = typeof(Logo).Assembly.GetName().Version;
-            var versionString = $"Ten Second Tom v{version?.Major}.{version?.Minor}.{version?.Build ?? 0}";
+            // Get full semantic version including pre-release labels (e.g., "1.1.0-beta.1")
+            var assembly = typeof(Logo).Assembly;
+            var informationalVersion = assembly
+                .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+                .FirstOrDefault() as System.Reflection.AssemblyInformationalVersionAttribute;
+            
+            // Use informational version if available (supports semver), otherwise fall back to assembly version
+            string version = informationalVersion?.InformationalVersion 
+                ?? assembly.GetName().Version?.ToString(3) 
+                ?? "0.0.0-dev";
+            
+            var versionString = $"Ten Second Tom v{version}";
             
             if (jsonOutput)
             {
