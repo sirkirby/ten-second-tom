@@ -111,7 +111,7 @@ public static class ThisWeekCommandHandler
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[red]Error:[/] {result.Error}");
+                    AnsiConsole.MarkupLine($"[red]Error:[/] {result.Error.EscapeMarkup()}");
                 }
             }).ConfigureAwait(false);
 

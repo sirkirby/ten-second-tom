@@ -278,7 +278,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
 
     public void ShowStatus(string message)
     {
-        _console.MarkupLine($"[grey]ℹ️  {message}[/]");
+        _console.MarkupLine($"[grey]ℹ️  {message.EscapeMarkup()}[/]");
     }
 
     public void ShowSuccess(string message)

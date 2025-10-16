@@ -104,7 +104,7 @@ public static class TodayCommandHandler
             {
                 if (!jsonOutput)
                 {
-                    AnsiConsole.MarkupLine($"[red]Editor error: {editorResult.ErrorMessage}[/]");
+                    AnsiConsole.MarkupLine($"[red]Editor error: {editorResult.ErrorMessage.EscapeMarkup()}[/]");
                 }
                 return;
             }
@@ -202,7 +202,7 @@ public static class TodayCommandHandler
                     }
                     else
                     {
-                        AnsiConsole.MarkupLine($"[red]Error:[/] {commandResult.Error}");
+                        AnsiConsole.MarkupLine($"[red]Error:[/] {commandResult.Error.EscapeMarkup()}");
                     }
                 }).ConfigureAwait(false);
         }

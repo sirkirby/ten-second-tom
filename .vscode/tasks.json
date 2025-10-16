@@ -38,6 +38,7 @@
         "--no-build",
         "--nologo"
       ],
+      "problemMatcher": [],
       "group": "test",
       "presentation": {
         "reveal": "always",

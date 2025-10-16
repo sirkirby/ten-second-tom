@@ -112,7 +112,7 @@ public static class SearchCommandHandler
                             ? $"from {fromDate.Value:yyyy-MM-dd}"
                             : $"up to {toDate!.Value:yyyy-MM-dd}";
                     
-                    AnsiConsole.MarkupLine($"[grey]Date range: {dateRangeText}[/]");
+                    AnsiConsole.MarkupLine($"[grey]Date range: {dateRangeText.EscapeMarkup()}[/]");
                 }
 
                 AnsiConsole.WriteLine();

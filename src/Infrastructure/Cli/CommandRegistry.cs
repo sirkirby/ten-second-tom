@@ -271,7 +271,7 @@ public static class CommandRegistry
                 else
                 {
                     AnsiConsole.MarkupLine("[red]Error:[/] Query is required.");
-                    AnsiConsole.MarkupLine("[dim]Usage: search <query> [--from-date YYYY-MM-DD] [--to-date YYYY-MM-DD] [--output-json][/]");
+                    AnsiConsole.MarkupLine("[dim]Usage: search <query> [[--from-date YYYY-MM-DD]] [[--to-date YYYY-MM-DD]] [[--output-json]][/]");
                 }
                 Environment.ExitCode = 1; // failure exit code
                 return;
@@ -289,8 +289,8 @@ public static class CommandRegistry
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[red]Invalid argument:[/] '{invalidToken}' cannot appear in query text. Specify options before the query.");
-                    AnsiConsole.MarkupLine("[dim]Usage: search [--from-date YYYY-MM-DD] [--to-date YYYY-MM-DD] <query words>[/]");
+                    AnsiConsole.MarkupLine($"[red]Invalid argument:[/] '{invalidToken.EscapeMarkup()}' cannot appear in query text. Specify options before the query.");
+                    AnsiConsole.MarkupLine("[dim]Usage: search [[--from-date YYYY-MM-DD]] [[--to-date YYYY-MM-DD]] <query words>[/]");
                 }
                 Environment.ExitCode = 1; // failure exit code
                 return;
@@ -552,7 +552,7 @@ public static class CommandRegistry
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[green]✓[/] Updated [yellow]{settingName}[/] successfully");
+                    AnsiConsole.MarkupLine($"[green]✓[/] Updated [yellow]{settingName.EscapeMarkup()}[/] successfully");
                 }
                 return 0;
             }
@@ -659,7 +659,7 @@ public static class CommandRegistry
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error}");
+                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error.EscapeMarkup()}");
                 }
                 return 1;
             }
