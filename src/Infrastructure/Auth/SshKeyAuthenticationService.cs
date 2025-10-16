@@ -59,7 +59,7 @@ public sealed class SshKeyAuthenticationService : IAuthenticationService
             }
 
             string keyPath = keyPathResult.Value;
-            AnsiConsole.MarkupLine($"[blue]Authenticating with SSH key:[/] [grey]{keyPath}[/]");
+            AnsiConsole.MarkupLine($"[blue]Authenticating with SSH key:[/] [grey]{keyPath.EscapeMarkup()}[/]");
 
             // Load SSH key with passphrase handling
             Result<string> keyHashResult = await LoadSshKeyAndGetHashAsync(keyPath, cancellationToken).ConfigureAwait(false);
