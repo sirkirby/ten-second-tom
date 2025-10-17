@@ -50,11 +50,11 @@ public sealed class TemplateMigrationIntegrationTests : IDisposable
     public async Task Migration_WhenTemplatesDirectoryDoesNotExist_CreatesAndInstallsTemplates()
     {
         // Arrange
-        string memoryDirectory = _testDirectory;
-        string templatesDirectory = Path.Combine(memoryDirectory, "templates");
+        string rootDirectory = _testDirectory;
+        string templatesDirectory = Path.Combine(rootDirectory, "templates");
 
         var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c["Storage:MemoryDirectory"]).Returns(memoryDirectory);
+        mockConfiguration.Setup(c => c["Storage:MemoryDirectory"]).Returns(rootDirectory);
 
         // Act
         await _migrationService.RunAutomaticMigrationAsync(
@@ -108,8 +108,8 @@ public sealed class TemplateMigrationIntegrationTests : IDisposable
     public async Task Migration_WhenUserHasCustomizedTemplates_PreservesCustomizations()
     {
         // Arrange
-        string memoryDirectory = _testDirectory;
-        string templatesDirectory = Path.Combine(memoryDirectory, "templates");
+        string rootDirectory = _testDirectory;
+        string templatesDirectory = Path.Combine(rootDirectory, "templates");
         Directory.CreateDirectory(templatesDirectory);
 
         // Create customized daily-summary
@@ -119,7 +119,7 @@ public sealed class TemplateMigrationIntegrationTests : IDisposable
             customContent);
 
         var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c["Storage:MemoryDirectory"]).Returns(memoryDirectory);
+        mockConfiguration.Setup(c => c["Storage:MemoryDirectory"]).Returns(rootDirectory);
 
         // Act
         await _migrationService.RunAutomaticMigrationAsync(

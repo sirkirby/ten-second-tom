@@ -346,7 +346,12 @@ title: Another Template
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
             .Callback<string, CancellationToken, int?, double?>((prompt, _, _, _) => capturedPrompt = prompt)
-            .ReturnsAsync(Result<string>.Success("## Generated Summary"));
+            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse 
+            { 
+                Content = "## Generated Summary",
+                InputTokens = 10,
+                OutputTokens = 20
+            }));
 
         var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
         var command = new CreateDailyEntryCommand
@@ -397,7 +402,12 @@ title: Another Template
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
-            .ReturnsAsync(Result<string>.Success("## Summary\nGenerated summary"));
+            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse 
+            { 
+                Content = "## Summary\nGenerated summary",
+                InputTokens = 10,
+                OutputTokens = 20
+            }));
 
         var mockLlmFactory = new Mock<ILlmProviderFactory>();
         mockLlmFactory.Setup(f => f.CreateProvider(It.IsAny<string>()))

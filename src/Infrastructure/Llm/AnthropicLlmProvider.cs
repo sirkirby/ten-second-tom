@@ -34,7 +34,10 @@ public sealed class AnthropicLlmProvider : ILlmProvider
     public string ProviderName => "Anthropic";
 
     /// <inheritdoc/>
-    public async Task<Result<string>> GenerateCompletionAsync(
+    public string ModelName => _model;
+
+    /// <inheritdoc/>
+    public async Task<Result<LlmResponse>> GenerateCompletionAsync(
         string prompt,
         CancellationToken cancellationToken,
         int? maxTokens = null,
@@ -42,7 +45,7 @@ public sealed class AnthropicLlmProvider : ILlmProvider
     {
         if (string.IsNullOrWhiteSpace(prompt))
         {
-            return Result<string>.Failure("Prompt cannot be empty");
+            return Result<LlmResponse>.Failure("Prompt cannot be empty");
         }
 
         try
@@ -75,46 +78,56 @@ public sealed class AnthropicLlmProvider : ILlmProvider
 
             string responseText = response.Content.OfType<TextContent>().FirstOrDefault()?.Text ?? string.Empty;
 
+            int inputTokens = response.Usage?.InputTokens ?? 0;
+            int outputTokens = response.Usage?.OutputTokens ?? 0;
+
             _logger.LogInformation(
                 "Anthropic API call successful. Input tokens: {InputTokens}, Output tokens: {OutputTokens}",
-                response.Usage?.InputTokens ?? 0,
-                response.Usage?.OutputTokens ?? 0);
+                inputTokens,
+                outputTokens);
 
             if (string.IsNullOrWhiteSpace(responseText))
             {
-                return Result<string>.Failure("Anthropic returned an empty response");
+                return Result<LlmResponse>.Failure("Anthropic returned an empty response");
             }
 
-            return Result<string>.Success(responseText);
+            var llmResponse = new LlmResponse
+            {
+                Content = responseText,
+                InputTokens = inputTokens,
+                OutputTokens = outputTokens
+            };
+
+            return Result<LlmResponse>.Success(llmResponse);
         }
         catch (OperationCanceledException)
         {
             _logger.LogWarning("Anthropic API call was cancelled");
-            return Result<string>.Failure("Operation was cancelled");
+            return Result<LlmResponse>.Failure("Operation was cancelled");
         }
         catch (Exception ex) when (ex.Message.Contains("rate limit", StringComparison.OrdinalIgnoreCase) ||
                                    ex.Message.Contains("429", StringComparison.Ordinal))
         {
             _logger.LogError(ex, "Anthropic rate limit exceeded");
-            return Result<string>.Failure("Rate limit exceeded. Please try again later.");
+            return Result<LlmResponse>.Failure("Rate limit exceeded. Please try again later.");
         }
         catch (Exception ex) when (ex.Message.Contains("authentication", StringComparison.OrdinalIgnoreCase) ||
                                    ex.Message.Contains("api key", StringComparison.OrdinalIgnoreCase) ||
                                    ex.Message.Contains("401", StringComparison.Ordinal))
         {
             _logger.LogError(ex, "Anthropic authentication failed");
-            return Result<string>.Failure("Authentication failed. Please check your API key.");
+            return Result<LlmResponse>.Failure("Authentication failed. Please check your API key.");
         }
         catch (Exception ex) when (ex.Message.Contains("network", StringComparison.OrdinalIgnoreCase) ||
                                    ex is HttpRequestException)
         {
             _logger.LogError(ex, "Network error calling Anthropic API");
-            return Result<string>.Failure("Network error occurred. Please check your connection.");
+            return Result<LlmResponse>.Failure("Network error occurred. Please check your connection.");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error calling Anthropic API");
-            return Result<string>.Failure($"Failed to generate completion: {ex.Message}");
+            return Result<LlmResponse>.Failure($"Failed to generate completion: {ex.Message}");
         }
     }
 }

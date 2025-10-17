@@ -26,14 +26,29 @@ public sealed class MockLlmProvider : ILlmProvider
     public string ProviderName => "MockProvider";
 
     /// <inheritdoc/>
-    public Task<Result<string>> GenerateCompletionAsync(
+    public string ModelName => "mock-model-1.0";
+
+    /// <inheritdoc/>
+    public Task<Result<LlmResponse>> GenerateCompletionAsync(
         string prompt,
         CancellationToken cancellationToken,
         int? maxTokens = null,
         double? temperature = null)
     {
         string response = _responses.Count > 0 ? _responses.Dequeue() : _defaultResponse;
-        return Task.FromResult(Result<string>.Success(response));
+        
+        // Simulate token usage - roughly estimate based on response length
+        int outputTokens = response.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+        int inputTokens = prompt.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+        
+        var llmResponse = new LlmResponse
+        {
+            Content = response,
+            InputTokens = inputTokens,
+            OutputTokens = outputTokens
+        };
+        
+        return Task.FromResult(Result<LlmResponse>.Success(llmResponse));
     }
 
     /// <summary>

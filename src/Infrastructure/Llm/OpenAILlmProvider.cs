@@ -33,7 +33,10 @@ public sealed class OpenAILlmProvider : ILlmProvider
     public string ProviderName => "OpenAI";
 
     /// <inheritdoc/>
-    public async Task<Result<string>> GenerateCompletionAsync(
+    public string ModelName => _model;
+
+    /// <inheritdoc/>
+    public async Task<Result<LlmResponse>> GenerateCompletionAsync(
         string prompt,
         CancellationToken cancellationToken,
         int? maxTokens = null,
@@ -41,7 +44,7 @@ public sealed class OpenAILlmProvider : ILlmProvider
     {
         if (string.IsNullOrWhiteSpace(prompt))
         {
-            return Result<string>.Failure("Prompt cannot be empty");
+            return Result<LlmResponse>.Failure("Prompt cannot be empty");
         }
 
         try
@@ -65,44 +68,42 @@ public sealed class OpenAILlmProvider : ILlmProvider
 
             string responseText = string.Join("", completion.Content.Select(c => c.Text));
 
+            int inputTokens = completion.Usage?.InputTokenCount ?? 0;
+            int outputTokens = completion.Usage?.OutputTokenCount ?? 0;
+
             _logger.LogInformation(
                 "OpenAI API call successful. Input tokens: {InputTokens}, Output tokens: {OutputTokens}",
-                completion.Usage?.InputTokenCount ?? 0,
-                completion.Usage?.OutputTokenCount ?? 0);
+                inputTokens,
+                outputTokens);
 
             if (string.IsNullOrWhiteSpace(responseText))
             {
-                return Result<string>.Failure("OpenAI returned an empty response");
+                return Result<LlmResponse>.Failure("OpenAI returned an empty response");
             }
 
-            return Result<string>.Success(responseText);
+            var response = new LlmResponse
+            {
+                Content = responseText,
+                InputTokens = inputTokens,
+                OutputTokens = outputTokens
+            };
+
+            return Result<LlmResponse>.Success(response);
         }
         catch (OperationCanceledException)
         {
             _logger.LogWarning("OpenAI API call was cancelled");
-            return Result<string>.Failure("Operation was cancelled");
+            return Result<LlmResponse>.Failure("Operation was cancelled");
         }
         catch (Exception ex) when (ex.Message.Contains("rate limit", StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogError(ex, "OpenAI rate limit exceeded");
-            return Result<string>.Failure("Rate limit exceeded. Please try again later.");
-        }
-        catch (Exception ex) when (ex.Message.Contains("authentication", StringComparison.OrdinalIgnoreCase) ||
-                                   ex.Message.Contains("api key", StringComparison.OrdinalIgnoreCase))
-        {
-            _logger.LogError(ex, "OpenAI authentication failed");
-            return Result<string>.Failure("Authentication failed. Please check your API key.");
-        }
-        catch (Exception ex) when (ex.Message.Contains("network", StringComparison.OrdinalIgnoreCase) ||
-                                   ex is HttpRequestException)
-        {
-            _logger.LogError(ex, "Network error calling OpenAI API");
-            return Result<string>.Failure("Network error occurred. Please check your connection.");
+            return Result<LlmResponse>.Failure("Rate limit exceeded. Please try again later.");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error calling OpenAI API");
-            return Result<string>.Failure($"Failed to generate completion: {ex.Message}");
+            _logger.LogError(ex, "OpenAI API call failed");
+            return Result<LlmResponse>.Failure($"OpenAI API error: {ex.Message}");
         }
     }
 }

@@ -1,106 +1,224 @@
 # Environment Configuration
 
-Ten Second Tom uses environment variables for configuration. You can set these in multiple ways:
+This document explains environment-based configuration for Ten Second Tom, including environment variables, development modes, and advanced configuration scenarios.
 
-## Option 1: .env File (Recommended for Development)
+> **Quick Start:** Most users should use `tom setup` for initial configuration. This document covers advanced environment-based configuration for special use cases.
 
-Create a `.env` file in the project root:
+> **Related Documentation:**
+> - [Configuration Guide](CONFIGURATION.md) - Primary configuration via setup wizard
+> - [Authentication Setup](AUTHENTICATION.md) - SSH key configuration
+> - [Security Policy](../SECURITY.md) - Security best practices
 
-```bash
-# Copy the example file
-cp .env.example .env
+---
 
-# Edit with your settings
-DOTNET_ENVIRONMENT=Development
-```
+## Primary Configuration Method
 
-The `.env` file is automatically loaded at startup and is already in `.gitignore` to keep your local settings private.
-
-### Available Environment Variables
-
-Ten Second Tom follows standard .NET configuration conventions. Use double underscores (`__`)
-to specify nested configuration keys (e.g., `Llm__ApiKey` maps to `Llm:ApiKey` in config).
+**For most users:** Use the interactive setup wizard:
 
 ```bash
-# Environment (Development, Staging, Production)
-DOTNET_ENVIRONMENT=Development
+# First-time setup (launches automatically)
+tom today
 
-# Memory storage directory
-TenSecondTom__MemoryDirectory=./.memory
+# Manual setup/reconfiguration
+tom setup
 
-# LLM Provider Configuration (Standard .NET convention)
-Llm__Provider=Anthropic
-Llm__ApiKey=your-api-key-here
-Llm__Model=claude-3-5-sonnet-20241022
-
-# SSH Agent Authentication
-Ssh__KeySource=ManualPath
-Ssh__KeyPath=~/.ssh/id_ed25519
-TenSecondTom__Auth__PublicKey=ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA...
-TenSecondTom__Auth__PublicKeyPath=~/.ssh/id_ed25519.pub
-
-# Logging
-Serilog__MinimumLevel__Default=Debug
+# View current configuration
+tom config show
 ```
 
-## Option 2: Shell Export (Session-wide)
+**Configuration is stored in:**
+- **Primary:** User Secrets (`~/.microsoft/usersecrets/ten-second-tom-secrets/secrets.json`)
+- **Fallback:** `appsettings.json` (with security warnings)
 
-```bash
-export DOTNET_ENVIRONMENT=Development
-export OPENAI_API_KEY=your-key
-dotnet run -- today
-```
+This document covers **environment variable overrides** and **advanced scenarios**.
 
-## Option 3: Inline (One-time)
-
-```bash
-DOTNET_ENVIRONMENT=Development dotnet run -- today
-```
-
-## Option 4: appsettings.json
-
-Edit `src/appsettings.json` or `src/appsettings.Development.json`:
-
-```json
-{
-  "TenSecondTom": {
-    "MemoryDirectory": "./.memory",
-    "LlmProvider": "OpenAI"
-  }
-}
-```
+---
 
 ## Configuration Hierarchy
 
 Settings are loaded in this order (later sources override earlier ones):
 
-1. `appsettings.json`
-2. `appsettings.{Environment}.json`
-3. User Secrets (dotnet user-secrets)
-4. **Environment Variables** (from .env or shell)
-5. Command-line arguments
+1. `appsettings.json` (defaults)
+2. `appsettings.{Environment}.json` (environment-specific)
+3. **User Secrets** (`~/.microsoft/usersecrets/ten-second-tom-secrets/secrets.json`)
+4. **Environment Variables** (runtime overrides)
+5. Command-line arguments (highest priority)
+
+---
+
+## Environment Variables
+
+### When to Use Environment Variables
+
+- **Production deployments** - Server/container environments
+- **CI/CD pipelines** - Automated testing and deployment
+- **One-time overrides** - Testing different settings temporarily
+- **Cross-platform scripts** - Portable configuration
+
+**For local development:** Use `tom setup` instead of manual environment variables.
+
+### Naming Convention
+
+Use double underscores (`__`) to specify nested configuration keys:
+
+```bash
+# Maps to: TenSecondTom:Llm:ApiKey
+TenSecondTom__Llm__ApiKey=your-key
+
+# Maps to: Llm:Provider
+Llm__Provider=Anthropic
+
+# Maps to: Serilog:MinimumLevel:Default
+Serilog__MinimumLevel__Default=Debug
+```
+
+### Common Environment Variables
+
+**LLM Configuration:**
+```bash
+# Provider selection
+Llm__Provider=OpenAI              # or Anthropic
+Llm__ApiKey=sk-your-key-here
+Llm__Model=gpt-4o-mini            # Optional, uses default if not set
+
+# Legacy format (still supported)
+TenSecondTom__Llm__Provider=OpenAI
+TenSecondTom__Llm__ApiKey=sk-your-key-here
+TenSecondTom__Llm__Model=gpt-4o-mini
+```
+
+**Storage Configuration:**
+```bash
+TenSecondTom__Storage__MemoryDirectory=~/Documents/tom-memories
+```
+
+**SSH Configuration:**
+```bash
+Ssh__KeyPath=~/.ssh/id_ed25519
+Ssh__KeySource=ManualPath
+```
+
+**Logging:**
+```bash
+Serilog__MinimumLevel__Default=Information
+Serilog__MinimumLevel__Default=Debug           # More verbose
+```
+
+**Application Environment:**
+```bash
+DOTNET_ENVIRONMENT=Development    # or Production, Staging
+```
+
+---
+
+## Setting Environment Variables
+
+### Option 1: Shell Export (Session-wide)
+
+**macOS/Linux (bash/zsh):**
+```bash
+export Llm__Provider=Anthropic
+export Llm__ApiKey=sk-ant-your-key-here
+export DOTNET_ENVIRONMENT=Development
+
+# Run application
+tom today
+```
+
+**Windows (PowerShell):**
+```powershell
+$env:Llm__Provider="Anthropic"
+$env:Llm__ApiKey="sk-ant-your-key-here"
+$env:DOTNET_ENVIRONMENT="Development"
+
+# Run application
+tom today
+```
+
+**Windows (Command Prompt):**
+```cmd
+set Llm__Provider=Anthropic
+set Llm__ApiKey=sk-ant-your-key-here
+set DOTNET_ENVIRONMENT=Development
+
+tom today
+```
+
+### Option 2: Inline (One-time Override)
+
+```bash
+# Test with different model temporarily
+Llm__Model=gpt-4o tom today
+
+# Use different memory directory
+TenSecondTom__Storage__MemoryDirectory=/tmp/test-memory tom today
+```
+
+### Option 3: Shell Profile (Persistent)
+
+**macOS/Linux (~/.zshrc or ~/.bashrc):**
+```bash
+# Add to end of file
+export DOTNET_ENVIRONMENT=Development
+export Llm__Provider=Anthropic
+export Llm__ApiKey=sk-ant-your-key-here
+
+# Reload shell
+source ~/.zshrc  # or source ~/.bashrc
+```
+
+**Windows (PowerShell Profile):**
+```powershell
+# Open profile
+notepad $PROFILE
+
+# Add lines:
+$env:DOTNET_ENVIRONMENT="Development"
+$env:Llm__Provider="Anthropic"
+$env:Llm__ApiKey="sk-ant-your-key-here"
+```
+
+### Option 4: .env File (Development Only)
+
+Create a `.env` file in your working directory:
+
+```bash
+# Copy the example
+cp .env.example .env
+
+# Edit with your settings
+DOTNET_ENVIRONMENT=Development
+Llm__Provider=Anthropic
+Llm__ApiKey=sk-ant-your-key-here
+```
+
+**Notes:**
+- `.env` files are automatically loaded at startup
+- Already in `.gitignore` to prevent committing secrets
+- Supplementary to User Secrets (doesn't replace them)
+- Environment variables in `.env` override User Secrets
+
+⚠️ **Security Warning:** The `.env` file approach stores secrets in plain text. For production, use proper secrets management.
+
+---
 
 ## Development Mode
 
-Set `DOTNET_ENVIRONMENT=Development` to enable:
-
-- **Mock Authentication**: Bypasses SSH key requirements
-- **Debug Logging**: More verbose logging output
-- **Development Warnings**: Visible warnings in CLI
-
-### Example Development Setup
+Enable development mode for local testing and debugging:
 
 ```bash
-# Create .env file
-cat > .env << EOF
-DOTNET_ENVIRONMENT=Development
-OPENAI_API_KEY=sk-your-key-here
-TenSecondTom__MemoryDirectory=./.memory
-EOF
-
-# Run the app (no need to set env vars manually)
-dotnet run -- today
+export DOTNET_ENVIRONMENT=Development
+tom today
 ```
+
+### Development Mode Features
+
+When `DOTNET_ENVIRONMENT=Development`:
+
+- **Mock Authentication** - Bypasses SSH key requirements (for testing)
+- **Debug Logging** - More verbose output
+- **Development Warnings** - Visible CLI warnings
+- **Relaxed Validation** - Some checks are loosened
 
 You'll see:
 ```
@@ -108,20 +226,223 @@ You'll see:
 [WRN] Using MockAuthenticationService - authentication bypassed for development
 ```
 
-## Security Notes
+### Example Development Setup
 
-- **Never commit `.env` files** - Already in `.gitignore`
-- **Use `.env.example`** - Template for sharing config structure
-- **API Keys**: Store in environment variables, not in code
-- **Production**: Use proper secrets management (Azure Key Vault, etc.)
+```bash
+# Create .env file (optional, supplementary to User Secrets)
+cat > .env << EOF
+DOTNET_ENVIRONMENT=Development
+EOF
+
+# Run setup wizard (stores config in User Secrets)
+tom setup
+
+# Run the app
+tom today
+```
+
+---
+
+## Production Configuration
+
+### Recommended Approach
+
+1. **Install via package manager** (Homebrew, Winget, etc.)
+2. **Use environment variables** for any runtime overrides
+3. **Use User Secrets** for local development configuration
+4. **Use configuration files** only for non-sensitive settings
+
+### CI/CD Example (GitHub Actions)
+
+```yaml
+env:
+  DOTNET_ENVIRONMENT: Production
+  Llm__Provider: OpenAI
+  Llm__ApiKey: ${{ secrets.OPENAI_API_KEY }}
+  Llm__Model: gpt-4o-mini
+```
+
+---
+
+## Advanced Scenarios
+
+### Override Single Setting Temporarily
+
+```bash
+# Test different model without changing saved config
+Llm__Model=gpt-4o tom today
+
+# Use different memory directory for testing
+TenSecondTom__Storage__MemoryDirectory=/tmp/test tom today
+```
+
+### Multiple Environment Configurations
+
+Create environment-specific config files:
+
+**appsettings.Development.json:**
+```json
+{
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Debug"
+    }
+  }
+}
+```
+
+**appsettings.Production.json:**
+```json
+{
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information"
+    }
+  }
+}
+```
+
+Switch environments:
+```bash
+DOTNET_ENVIRONMENT=Development tom today  # Uses appsettings.Development.json
+DOTNET_ENVIRONMENT=Production tom today   # Uses appsettings.Production.json
+```
+
+### Script-Friendly Configuration
+
+```bash
+#!/bin/bash
+# backup-memories.sh
+
+export DOTNET_ENVIRONMENT=Production
+export Llm__Provider=OpenAI
+export Llm__ApiKey="${OPENAI_API_KEY}"  # From parent environment
+export TenSecondTom__Storage__MemoryDirectory="${MEMORY_DIR:-~/.tom/memory}"
+
+tom today
+tom thisweek
+```
+
+---
 
 ## Troubleshooting
 
-**Q: Changes to .env not taking effect?**
-A: Restart the application - `.env` is loaded once at startup.
+### Changes Not Taking Effect
 
-**Q: Which environment am I in?**
-A: Check the log output - it shows which environment is loaded.
+**Problem:** Environment variable changes don't seem to apply.
 
-**Q: .env not loading?**
-A: Ensure the file is in the same directory where you run `dotnet run`.
+**Solutions:**
+
+1. **Restart your shell** - Environment variables are set at shell startup
+2. **Check spelling** - Variable names are case-sensitive
+3. **Verify double underscores** - Use `__` not `:` in env vars
+4. **Check hierarchy** - User Secrets may be overriding your environment variables
+
+```bash
+# View all environment variables
+env | grep -i tensecondtom
+env | grep -i llm
+
+# Check what the app sees
+tom config show
+```
+
+### .env File Not Loading
+
+**Problem:** Settings in `.env` file are ignored.
+
+**Solutions:**
+
+1. **Check file location** - `.env` must be in the working directory where you run `tom`
+2. **Verify format** - No spaces around `=`, one variable per line
+3. **Restart application** - `.env` is loaded once at startup
+4. **Check for quotes** - Usually don't need quotes unless value has spaces
+
+```bash
+# Correct format
+Llm__Provider=OpenAI
+Llm__ApiKey=sk-test123
+
+# Incorrect
+Llm__Provider = OpenAI   # ❌ spaces around =
+Llm__ApiKey="sk-test"    # ⚠️ quotes usually not needed
+```
+
+### Which Configuration Source Is Active?
+
+**Problem:** Not sure which configuration source is being used.
+
+**Solution:** Check the effective configuration:
+
+```bash
+tom config show
+
+# Look for the storage location at the bottom:
+# "Configuration loaded from: /Users/you/.microsoft/usersecrets/.../secrets.json"
+```
+
+### Environment vs User Secrets Priority
+
+**Remember:** Environment variables **override** User Secrets.
+
+```bash
+# User Secrets has: Llm__Provider=OpenAI
+# Environment sets:
+export Llm__Provider=Anthropic
+
+# Result: Anthropic is used (environment wins)
+tom config show
+```
+
+---
+
+## Security Best Practices
+
+### ✅ DO
+
+- Use `tom setup` for local development (stores in User Secrets)
+- Use environment variables for production deployments
+- Store secrets in CI/CD secret managers
+- Keep `.env` in `.gitignore`
+- Regularly rotate API keys
+- Use minimal permission scopes
+
+### ❌ DO NOT
+
+- Commit secrets to version control
+- Share `.env` files
+- Store secrets in `appsettings.json`
+- Use hardcoded secrets in scripts
+- Expose secrets in logs or error messages
+- Reuse secrets across environments
+
+---
+
+## Summary
+
+### For Local Development
+✅ **Recommended:** `tom setup` → User Secrets
+- Interactive wizard
+- Secure storage
+- Easy to update with `tom config`
+
+### For Production
+✅ **Recommended:** Environment variables
+- No files to manage
+- Works with containers
+- Integrates with secret managers
+
+### For Testing/Overrides
+✅ **Recommended:** Inline environment variables
+- Temporary changes
+- No config pollution
+- Easy to script
+
+---
+
+**Need More Help?**
+
+- Configuration Guide: [CONFIGURATION.md](CONFIGURATION.md)
+- Authentication Setup: [AUTHENTICATION.md](AUTHENTICATION.md)
+- Security Policy: [../SECURITY.md](../SECURITY.md)
+- Report Issues: [GitHub Issues](https://github.com/sirkirby/ten-second-tom/issues)

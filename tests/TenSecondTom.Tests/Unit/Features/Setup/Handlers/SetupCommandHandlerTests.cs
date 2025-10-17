@@ -6,6 +6,7 @@ using TenSecondTom.Features.Setup.Handlers;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Setup.Queries;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Results;
 using Xunit;
 
@@ -212,125 +213,6 @@ public sealed class SetupCommandHandlerTests
         savedConfig.Optional.LogLevel.Should().Be(Microsoft.Extensions.Logging.LogLevel.Information);
         savedConfig.Optional.RetentionDays.Should().Be(30);
     }
-
-    // COMMENTED OUT: Test refers to removed template handling functionality
-    /*
-    [Fact]
-    public async Task Handle_InstallsTemplates_AfterMemoryDirectoryConfiguration()
-    {
-        // Arrange
-        var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
-
-        SetupHappyPathMocks();
-
-        // Act
-        await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        _mockTemplateHandler.Verify(
-            x => x.Handle(
-                It.Is<InstallDefaultTemplatesCommand>(cmd =>
-                    cmd.TargetDirectory.Contains("templates") &&
-                    !cmd.OverwriteExisting),
-                It.IsAny<CancellationToken>()),
-            Times.Once);
-    }
-    */
-
-    // COMMENTED OUT: Test refers to removed template handling functionality
-    /*
-    [Fact]
-    public async Task Handle_TemplateInstallation_UsesCorrectTargetDirectory()
-    {
-        // Arrange
-        var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
-        InstallDefaultTemplatesCommand? capturedCommand = null;
-
-        SetupHappyPathMocksExceptTemplateHandler();
-
-        _mockTemplateHandler
-            .Setup(x => x.Handle(It.IsAny<InstallDefaultTemplatesCommand>(), It.IsAny<CancellationToken>()))
-            .Callback<InstallDefaultTemplatesCommand, CancellationToken>((cmd, ct) => capturedCommand = cmd)
-            .ReturnsAsync(Result<InstallDefaultTemplatesResult>.Success(new InstallDefaultTemplatesResult
-            {
-                TemplatesInstalled = 5,
-                TemplatesSkipped = 0,
-                TemplatesFailed = 0,
-                InstalledTemplateIds = new List<string> { "backend-architect" }
-            }));
-
-        _mockStorageService
-            .Setup(x => x.SaveAsync(It.IsAny<ConfigurationSettings>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<string>.Success("/path"));
-
-        // Act
-        await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        capturedCommand.Should().NotBeNull();
-        capturedCommand!.TargetDirectory.Should().EndWith("templates");
-        capturedCommand.TargetDirectory.Should().Contain(".memory");
-        capturedCommand.OverwriteExisting.Should().BeFalse();
-    }
-    */
-
-    // COMMENTED OUT: Test refers to removed template handling functionality
-    /*
-    [Fact]
-    public async Task Handle_WhenTemplateInstallationFails_ContinuesSetup()
-    {
-        // Arrange
-        var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
-
-        SetupHappyPathMocksExceptTemplateHandler();
-
-        _mockTemplateHandler
-            .Setup(x => x.Handle(It.IsAny<InstallDefaultTemplatesCommand>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<InstallDefaultTemplatesResult>.Failure("Failed to install templates"));
-
-        _mockStorageService
-            .Setup(x => x.SaveAsync(It.IsAny<ConfigurationSettings>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<string>.Success("/path"));
-
-        // Act
-        var result = await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        result.IsSuccess.Should().BeTrue();
-        _mockWizardUI.Verify(
-            x => x.ShowWarning(It.Is<string>(s => s.Contains("template"))),
-            Times.AtLeastOnce);
-    }
-    */
-
-    // COMMENTED OUT: Test refers to removed template handling functionality
-    /*
-    [Fact]
-    public async Task Handle_WhenTemplateInstallationSucceeds_LogsResult()
-    {
-        // Arrange
-        var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
-
-        SetupHappyPathMocks();
-
-        // Act
-        await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        _mockLogger.Verify(
-            x => x.Log(
-                LogLevel.Information,
-                It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains('5') && v.ToString()!.Contains("template")),
-                It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.AtLeastOnce);
-    }
-    */
 
     #endregion
 
@@ -673,8 +555,8 @@ public sealed class SetupCommandHandlerTests
 
         // Assert
         savedConfig.Should().NotBeNull();
-        savedConfig!.Storage.MemoryDirectory.Should().Contain(".memory");
-        savedConfig.Storage.MemoryDirectory.Should().Contain("ten-second-tom");
+        savedConfig!.Storage.MemoryDirectory.Should().Contain(DirectoryNames.ApplicationRoot);
+        savedConfig.Storage.MemoryDirectory.Should().NotContain(".memory", "root directory should not have .memory subdirectory");
     }
 
     [Fact]

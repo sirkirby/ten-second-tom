@@ -530,8 +530,8 @@ Your memories are stored as plain markdown files:
 │   ├── 10-02-2025_1.md
 │   └── 10-03-2025_1.md
 └── thisweek/
-    ├── 2025-40_1.md        # Week 40 of 2025
-    └── 2025-41_1.md
+    ├── 2025-40-Mon-1.md    # Week 40 of 2025, Monday, entry 1
+    └── 2025-41-Fri-1.md    # Week 41 of 2025, Friday, entry 1
 ```
 
 **File Format:**

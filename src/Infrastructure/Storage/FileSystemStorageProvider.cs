@@ -26,6 +26,15 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
     private readonly IDeserializer _yamlDeserializer;
 
     /// <summary>
+    /// Directories to exclude from memory entry enumeration.
+    /// These directories contain non-memory files (e.g., templates, configuration).
+    /// </summary>
+    private static readonly HashSet<string> ExcludedDirectories = new(StringComparer.OrdinalIgnoreCase)
+    {
+        DirectoryNames.Templates
+    };
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="FileSystemStorageProvider"/> class.
     /// </summary>
     /// <param name="baseDirectory">The base directory for storing memory files.</param>
@@ -56,7 +65,9 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
 
         try
         {
-            string filePath = GetFilePathForEntry(entry);
+            // Use the FilePath property from the entry itself (feature-owned logic)
+            string relativePath = entry.FilePath;
+            string filePath = Path.Combine(_baseDirectory, relativePath);
             string directory = Path.GetDirectoryName(filePath)!;
 
             // Create directory if it doesn't exist
@@ -197,6 +208,12 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
                     break;
                 }
 
+                // Skip files in excluded directories
+                if (IsExcludedPath(file))
+                {
+                    continue;
+                }
+
                 string content = await File.ReadAllTextAsync(file, cancellationToken).ConfigureAwait(false);
                 
                 if (content.Contains(query, StringComparison.OrdinalIgnoreCase))
@@ -257,6 +274,11 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
                 if (cancellationToken.IsCancellationRequested)
                 {
                     break;
+                }
+
+                if (IsExcludedPath(file))
+                {
+                    continue;
                 }
 
                 MemoryEntry? entry = await ParseMarkdownFileAsync(file, cancellationToken).ConfigureAwait(false);
@@ -325,6 +347,11 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
                     break;
                 }
 
+                if (IsExcludedPath(file))
+                {
+                    continue;
+                }
+
                 MemoryEntry? entry = await ParseMarkdownFileAsync(file, cancellationToken).ConfigureAwait(false);
                 
                 if (entry != null && entry.EntryId == entryId)
@@ -342,29 +369,6 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
             _logger.LogError(ex, "Failed to get entry {EntryId}", entryId);
             return Result<MemoryEntry?>.Failure($"Failed to retrieve entry: {ex.Message}");
         }
-    }
-
-    /// <summary>
-    /// Gets the file path for a memory entry based on its command and date.
-    /// </summary>
-    private string GetFilePathForEntry(MemoryEntry entry)
-    {
-        string directory = Path.Combine(_baseDirectory, entry.Command);
-        string fileName;
-
-    if (entry.Command == CommandNames.Today)
-        {
-            // Daily entries: MM-DD-YYYY_N.md
-            fileName = $"{entry.Timestamp.ToString("MM-dd-yyyy", CultureInfo.InvariantCulture)}_{entry.EntryNumber}.md";
-        }
-        else // thisweek
-        {
-            // Weekly entries: YYYY-WW_N.md (WW = ISO week number)
-            int weekNumber = GetIso8601WeekNumber(entry.Timestamp.DateTime);
-            fileName = $"{entry.Timestamp.Year}-{weekNumber:D2}_{entry.EntryNumber}.md";
-        }
-
-        return Path.Combine(directory, fileName);
     }
 
     /// <summary>
@@ -544,19 +548,20 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
     }
 
     /// <summary>
-    /// Gets the ISO 8601 week number for a given date.
+    /// Determines whether a file path is within an excluded directory.
     /// </summary>
-    private static int GetIso8601WeekNumber(DateTime date)
+    /// <param name="filePath">The file path to check.</param>
+    /// <returns>True if the file is in an excluded directory; otherwise, false.</returns>
+    private bool IsExcludedPath(string filePath)
     {
-        DayOfWeek day = CultureInfo.InvariantCulture.Calendar.GetDayOfWeek(date);
-        if (day >= DayOfWeek.Monday && day <= DayOfWeek.Wednesday)
-        {
-            date = date.AddDays(3);
-        }
-
-        return CultureInfo.InvariantCulture.Calendar.GetWeekOfYear(
-            date,
-            CalendarWeekRule.FirstFourDayWeek,
-            DayOfWeek.Monday);
+        // Get the relative path from the base directory
+        string relativePath = Path.GetRelativePath(_baseDirectory, filePath);
+        
+        // Split the path into segments
+        string[] pathSegments = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        
+        // Check if any segment matches an excluded directory
+        return pathSegments.Any(segment => ExcludedDirectories.Contains(segment));
     }
 }
+

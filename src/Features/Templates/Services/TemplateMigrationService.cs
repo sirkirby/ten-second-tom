@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Templates.Commands;
 using TenSecondTom.Features.Templates.Handlers;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Templates.Services;
@@ -44,18 +45,20 @@ public sealed class TemplateMigrationService
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        string? memoryDir = configuration["Storage:MemoryDirectory"];
-        _logger.LogDebug("Memory directory from configuration: {MemoryDir}", memoryDir);
+        // Use Storage:MemoryDirectory (configured root directory)
+        // This is the root containing templates/, today/, thisweek/, etc.
+        string? rootDirectory = configuration[ConfigurationKeys.StorageMemoryDirectory];
+        _logger.LogDebug("Root directory from configuration: {RootDirectory}", rootDirectory);
 
-        if (string.IsNullOrWhiteSpace(memoryDir))
+        if (string.IsNullOrWhiteSpace(rootDirectory))
         {
-            _logger.LogDebug("No memory directory configured, skipping template migration");
+            _logger.LogDebug("No root directory configured, skipping template migration");
             return;
         }
 
         try
         {
-            var migrationResult = await ValidateAndMigrateTemplatesAsync(memoryDir, cancellationToken)
+            var migrationResult = await ValidateAndMigrateTemplatesAsync(rootDirectory, cancellationToken)
                 .ConfigureAwait(false);
 
             if (migrationResult.IsSuccess && migrationResult.Value)
@@ -74,22 +77,23 @@ public sealed class TemplateMigrationService
     /// Validates that required templates exist and installs them if missing.
     /// This is a silent migration that runs automatically for existing users.
     /// </summary>
-    /// <param name="memoryDirectory">The memory directory path where templates should exist</param>
+    /// <param name="rootDirectory">The configured root directory (e.g., ~/ten-second-tom or ./.memory)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result indicating whether migration was needed and successful (true if migrated, false if not needed)</returns>
     private async Task<Result<bool>> ValidateAndMigrateTemplatesAsync(
-        string memoryDirectory,
+        string rootDirectory,
         CancellationToken cancellationToken = default)
     {
         // Validate input
-        if (string.IsNullOrWhiteSpace(memoryDirectory))
+        if (string.IsNullOrWhiteSpace(rootDirectory))
         {
-            return Result<bool>.Failure("Memory directory cannot be null or empty");
+            return Result<bool>.Failure("Root directory cannot be null or empty");
         }
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        string templatesDirectory = _fileSystem.Path.Combine(memoryDirectory, "templates");
+        // Templates are under root directory: {root}/templates
+        string templatesDirectory = _fileSystem.Path.Combine(rootDirectory, DirectoryNames.Templates);
 
         // Check if templates directory exists
         bool directoryExists = _fileSystem.Directory.Exists(templatesDirectory);

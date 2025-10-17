@@ -344,7 +344,7 @@ public sealed class FileSystemStorageProviderTests : IDisposable
         {
             EntryId = "thisweek-2025-40-1",
             Command = "thisweek",
-            Timestamp = new DateTimeOffset(2025, 10, 2, 14, 0, 0, TimeSpan.Zero),
+            Timestamp = new DateTimeOffset(2025, 10, 2, 14, 0, 0, TimeSpan.Zero), // Thursday, Oct 2, 2025, Week 40
             EntryNumber = 1,
             UserInput = "Weekly summary input",
             LlmResponse = "Weekly summary response",
@@ -372,8 +372,89 @@ public sealed class FileSystemStorageProviderTests : IDisposable
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        string expectedPath = Path.Combine(_testDirectory, "thisweek", "2025-40_1.md");
+        string expectedPath = Path.Combine(_testDirectory, "thisweek", "2025-40-Thu-1.md");
         File.Exists(expectedPath).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SearchEntriesAsync_ExcludesTemplatesDirectory()
+    {
+        // Arrange
+        var provider = new FileSystemStorageProvider(_testDirectory, _mockLogger.Object);
+
+        
+        // Create a regular memory entry
+        var memoryEntry = CreateTestDailyEntry("today-10-02-2025-1", 1, new DateTimeOffset(2025, 10, 2, 14, 0, 0, TimeSpan.Zero));
+        var modifiedEntry = memoryEntry with { UserInput = "Template test content" };
+        await provider.SaveAsync(modifiedEntry, CancellationToken.None);
+
+        // Create a template file that should be excluded
+        string templatesDir = Path.Combine(_testDirectory, "templates");
+        Directory.CreateDirectory(templatesDir);
+        string templateFile = Path.Combine(templatesDir, "test-template.md");
+        await File.WriteAllTextAsync(templateFile, "Template test content");
+
+        // Act
+        Result<IReadOnlyList<MemoryEntry>> result = await provider.SearchEntriesAsync(
+            "Template test content",
+            null,
+            null,
+            CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().HaveCount(1, "only the memory entry should be found, not the template file");
+        result.Value[0].EntryId.Should().Be("today-10-02-2025-1");
+    }
+
+    [Fact]
+    public async Task DeleteEntriesAsync_ExcludesTemplatesDirectory()
+    {
+        // Arrange
+        var provider = new FileSystemStorageProvider(_testDirectory, _mockLogger.Object);
+        
+        // Create a memory entry
+        var entry = CreateTestDailyEntry("today-10-02-2025-1", 1, new DateTimeOffset(2025, 10, 2, 14, 0, 0, TimeSpan.Zero));
+        await provider.SaveAsync(entry, CancellationToken.None);
+
+        // Create a template file that should be excluded from deletion
+        string templatesDir = Path.Combine(_testDirectory, "templates");
+        Directory.CreateDirectory(templatesDir);
+        string templateFile = Path.Combine(templatesDir, "test-template.md");
+        await File.WriteAllTextAsync(templateFile, "---\nentry-id: template-1\n---\nTemplate content");
+
+        // Act
+        Result<int> result = await provider.DeleteEntriesAsync(
+            DateTime.MinValue,
+            DateTime.MaxValue,
+            CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().Be(1, "only the memory entry should be deleted");
+        File.Exists(templateFile).Should().BeTrue("template file should not be deleted");
+    }
+
+    [Fact]
+    public async Task GetEntryByIdAsync_ExcludesTemplatesDirectory()
+    {
+        // Arrange
+        var provider = new FileSystemStorageProvider(_testDirectory, _mockLogger.Object);
+
+        // Create a template file with an entry ID that should be excluded
+        string templatesDir = Path.Combine(_testDirectory, "templates");
+        Directory.CreateDirectory(templatesDir);
+        string templateFile = Path.Combine(templatesDir, "test-template.md");
+        await File.WriteAllTextAsync(templateFile, "---\nentry-id: template-test-1\n---\nTemplate content");
+
+        // Act
+        Result<MemoryEntry?> result = await provider.GetEntryByIdAsync(
+            "template-test-1",
+            CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().BeNull("template files should be excluded from entry lookup");
     }
 
     /// <summary>

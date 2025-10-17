@@ -67,7 +67,7 @@ public sealed class CreateWeeklyReviewHandlerTests
                 Source = TemplateSource.Embedded
             }));
 
-        string mockLlmResponse = @"## Top 3 Accomplishments
+        string mockLlmResponseContent = @"## Top 3 Accomplishments
 1. Completed major project milestone
 2. Resolved critical bugs
 3. Improved team collaboration
@@ -89,7 +89,12 @@ Noticed pattern of afternoon productivity dips.
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
-            .ReturnsAsync(mockLlmResponse);
+            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse 
+            { 
+                Content = mockLlmResponseContent,
+                InputTokens = 100,
+                OutputTokens = 200
+            }));
 
         _handler = new CreateWeeklyReviewHandler(
             _mockStorage.Object,

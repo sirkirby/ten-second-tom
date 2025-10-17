@@ -211,13 +211,13 @@ public interface IMemoryStorageProvider
 │   ├── 10-01-2025_2.md
 │   └── 10-02-2025_1.md
 └── thisweek/
-    ├── 2025-40_1.md    # Week 40 of 2025
-    └── 2025-41_1.md
+    ├── 2025-40-Mon-1.md    # Week 40 of 2025, Monday, entry 1
+    └── 2025-41-Fri-1.md    # Week 41 of 2025, Friday, entry 1
 ```
 
 **File Naming Convention**:
 - Daily entries: `MM-DD-YYYY_N.md` (zero-padded month/day, 4-digit year, 1-based counter)
-- Weekly entries: `YYYY-WW_N.md` (4-digit year, ISO week number, 1-based counter)
+- Weekly entries: `YYYY-WW-DayOfWeek-N.md` (4-digit year, ISO week number, 3-letter day abbreviation, 1-based counter)
 - Counter increments for multiple same-day/week entries
 
 **File Content Structure**:

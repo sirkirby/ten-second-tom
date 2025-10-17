@@ -131,7 +131,7 @@ public sealed class MemoryEntryTests
         string filePath = entry.FilePath;
 
         // Assert
-        filePath.Should().Be(".memory/today/10-01-2025_1.md");
+        filePath.Should().Be("today/10-01-2025_1.md");
     }
 
     [Fact]
@@ -154,8 +154,8 @@ public sealed class MemoryEntryTests
         string filePath = entry.FilePath;
 
         // Assert
-        filePath.Should().StartWith(".memory/thisweek/2025-");
-        filePath.Should().EndWith("_1.md");
+        filePath.Should().StartWith("thisweek/2025-");
+        filePath.Should().EndWith("-1.md");
     }
 
     [Fact]

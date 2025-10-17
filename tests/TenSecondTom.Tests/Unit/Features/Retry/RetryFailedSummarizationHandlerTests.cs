@@ -52,7 +52,12 @@ public sealed class RetryFailedSummarizationHandlerTests
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
-            .ReturnsAsync(Result<string>.Success("New summary content"));
+            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse 
+            { 
+                Content = "New summary content",
+                InputTokens = 10,
+                OutputTokens = 20
+            }));
 
         _mockStorage
             .Setup(s => s.SaveAsync(It.IsAny<MemoryEntry>(), It.IsAny<CancellationToken>()))
@@ -91,7 +96,12 @@ public sealed class RetryFailedSummarizationHandlerTests
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
-            .ReturnsAsync(Result<string>.Success("New summary content"));
+            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse 
+            { 
+                Content = "New summary content",
+                InputTokens = 10,
+                OutputTokens = 20
+            }));
 
         _mockStorage
             .Setup(s => s.SaveAsync(It.IsAny<MemoryEntry>(), It.IsAny<CancellationToken>()))
@@ -186,7 +196,7 @@ public sealed class RetryFailedSummarizationHandlerTests
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
-            .ReturnsAsync(Result<string>.Failure("LLM API error"));
+            .ReturnsAsync(Result<LlmResponse>.Failure("LLM API error"));
 
         var command = new RetryFailedSummarizationCommand
         {
@@ -225,7 +235,12 @@ public sealed class RetryFailedSummarizationHandlerTests
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
-            .ReturnsAsync(Result<string>.Success("New summary content"));
+            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse 
+            { 
+                Content = "New summary content",
+                InputTokens = 10,
+                OutputTokens = 20
+            }));
 
         MemoryEntry? savedEntry = null;
         _mockStorage

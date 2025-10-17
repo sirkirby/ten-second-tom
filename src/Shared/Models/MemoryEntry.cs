@@ -46,9 +46,9 @@ public record MemoryEntry
     public required MemoryEntryMetadata Metadata { get; init; }
 
     /// <summary>
-    /// Gets the file path where this entry should be stored.
-    /// Daily entries: .memory/today/MM-DD-YYYY_N.md
-    /// Weekly entries: .memory/thisweek/YYYY-WW_N.md
+    /// Gets the file path where this entry should be stored (relative to storage root).
+    /// Daily entries: today/MM-DD-YYYY_N.md
+    /// Weekly entries: thisweek/YYYY-WW-DayOfWeek-N.md
     /// </summary>
     public string FilePath
     {
@@ -56,7 +56,7 @@ public record MemoryEntry
         {
             return Command switch
             {
-                CommandNames.Today => $".memory/{CommandNames.Today}/{Timestamp:MM-dd-yyyy}_{EntryNumber}.md",
+                CommandNames.Today => $"{CommandNames.Today}/{Timestamp:MM-dd-yyyy}_{EntryNumber}.md",
                 CommandNames.ThisWeek => GetWeeklyPath(),
                 _ => throw new InvalidOperationException($"Unknown command: {Command}")
             };
@@ -70,7 +70,8 @@ public record MemoryEntry
             Timestamp.DateTime,
             CalendarWeekRule.FirstFourDayWeek,
             DayOfWeek.Monday);
-        return $".memory/{CommandNames.ThisWeek}/{Timestamp.Year:0000}-{weekNumber:00}_{EntryNumber}.md";
+        var dayOfWeek = Timestamp.DateTime.ToString("ddd", CultureInfo.InvariantCulture);
+        return $"{CommandNames.ThisWeek}/{Timestamp.Year:0000}-{weekNumber:00}-{dayOfWeek}-{EntryNumber}.md";
     }
 }
 

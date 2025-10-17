@@ -175,7 +175,7 @@ public sealed class WeeklyEntryTests
     public void WeeklyEntry_FilePath_ShouldUseThisWeekDirectory()
     {
         // Arrange
-        var timestamp = new DateTimeOffset(2025, 10, 2, 14, 30, 0, TimeSpan.Zero);
+        var timestamp = new DateTimeOffset(2025, 10, 2, 14, 30, 0, TimeSpan.Zero); // Thursday, Oct 2, 2025, Week 40
         var entry = new WeeklyEntry
         {
             EntryId = "thisweek-2025-40-1",
@@ -192,7 +192,7 @@ public sealed class WeeklyEntryTests
         string filePath = entry.FilePath;
 
         // Assert
-        filePath.Should().Be(".memory/thisweek/2025-40_1.md");
+        filePath.Should().Be("thisweek/2025-40-Thu-1.md");
     }
 
     [Fact]

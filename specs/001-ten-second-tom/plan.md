@@ -247,7 +247,7 @@ tests/
 │   ├── 10-01-2025_1.md
 │   └── 10-01-2025_2.md
 └── thisweek/
-    └── 2025-40_1.md
+    └── 2025-40-Mon-1.md         # Week 40, Monday, entry 1
 ```
 
 **Structure Decision**: Single CLI project using Vertical Slice Architecture. Each feature (Today, ThisWeek, Search, Auth) is self-contained with its own commands/queries, handlers, and validation. Infrastructure layer provides cross-cutting concerns (LLM providers, storage, prompts, markdown rendering). Test structure mirrors source organization with unit, integration, and CLI-specific tests.

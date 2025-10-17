@@ -244,11 +244,11 @@ $env:TenSecondTom__Llm__Model="claude-3-haiku-20240307"
 
 **Anthropic (Balanced):**
 - `claude-sonnet-4-20250514` - Balanced capability and cost, Claude 4.0 Sonnet
-- `claude-sonnet-4-5-20250611` - Enhanced version, Claude 4.5 Sonnet
+- `claude-sonnet-4-5-20250929` - Enhanced version, Claude 4.5 Sonnet
 
 **Anthropic (Premium):**
 - `claude-opus-4-20250514` - Highest capability, premium cost, Claude 4.0 Opus
-- `claude-opus-4-1-20250619` - Top-tier model, Claude 4.1 Opus
+- `claude-opus-4-1-20250805` - Top-tier model, Claude 4.1 Opus
 
 **Notes:**
 

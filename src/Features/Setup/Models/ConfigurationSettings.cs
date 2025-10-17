@@ -1,3 +1,5 @@
+using TenSecondTom.Shared.Constants;
+
 namespace TenSecondTom.Features.Setup.Models;
 
 /// <summary>
@@ -23,7 +25,7 @@ public sealed record ConfigurationSettings
     { 
         MemoryDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".memory", "ten-second-tom")
+            DirectoryNames.ApplicationRoot)
     };
 
     /// <summary>
