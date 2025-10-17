@@ -31,7 +31,7 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
     /// </summary>
     private static readonly HashSet<string> ExcludedDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
-        "templates"
+        DirectoryNames.Templates
     };
 
     /// <summary>

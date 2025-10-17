@@ -3,6 +3,7 @@ using TenSecondTom.Features.Setup.Commands;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Setup.Queries;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Setup.Handlers;
@@ -130,7 +131,7 @@ public sealed class SetupCommandHandler
             {
                 memoryDirectory = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    ".memory", "ten-second-tom");
+                    DirectoryNames.ApplicationRoot);
             }
 
             // Step 5: Logging Level

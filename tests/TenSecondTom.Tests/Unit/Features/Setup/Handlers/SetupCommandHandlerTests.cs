@@ -6,6 +6,7 @@ using TenSecondTom.Features.Setup.Handlers;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Setup.Queries;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Results;
 using Xunit;
 
@@ -673,8 +674,8 @@ public sealed class SetupCommandHandlerTests
 
         // Assert
         savedConfig.Should().NotBeNull();
-        savedConfig!.Storage.MemoryDirectory.Should().Contain(".memory");
-        savedConfig.Storage.MemoryDirectory.Should().Contain("ten-second-tom");
+        savedConfig!.Storage.MemoryDirectory.Should().Contain(DirectoryNames.ApplicationRoot);
+        savedConfig.Storage.MemoryDirectory.Should().NotContain(".memory", "root directory should not have .memory subdirectory");
     }
 
     [Fact]

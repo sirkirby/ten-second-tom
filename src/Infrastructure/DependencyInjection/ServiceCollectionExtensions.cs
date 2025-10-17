@@ -12,6 +12,7 @@ using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.TextEditing.Services;
 
 namespace TenSecondTom.Infrastructure.DependencyInjection;
@@ -41,7 +42,11 @@ public static class ServiceCollectionExtensions
             var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger<FileSystemStorageProvider>();
 
-            string baseDirectory = configuration["TenSecondTom:MemoryDirectory"] ?? "./.memory";
+            // Use Storage:MemoryDirectory (configured root) or fallback to default
+            // This is the root directory containing templates/, today/, thisweek/, etc.
+            string baseDirectory = configuration[ConfigurationKeys.StorageMemoryDirectory] ??
+                configuration[ConfigurationKeys.TenSecondTomMemoryDirectory] ??
+                Path.Combine(".", DirectoryNames.ApplicationRoot);
 
             return new FileSystemStorageProvider(baseDirectory, logger);
         });
@@ -59,11 +64,13 @@ public static class ServiceCollectionExtensions
             var yamlParser = serviceProvider.GetRequiredService<YamlFrontMatterParser>();
             var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
 
-            // Determine templates directory from configuration
-            string memoryDirectory = configuration["Storage:MemoryDirectory"] ??
-                                   configuration["TenSecondTom:MemoryDirectory"] ??
-                                   "./.memory";
-            string templatesDirectory = Path.Combine(memoryDirectory, "templates");
+            // Templates are in the configured root directory under templates/ subdirectory
+            // Storage:MemoryDirectory is the root (e.g., ~/ten-second-tom or ./.memory)
+            // Structure: {root}/templates/, {root}/today/, {root}/thisweek/
+            string rootDirectory = configuration[ConfigurationKeys.StorageMemoryDirectory] ??
+                configuration[ConfigurationKeys.TenSecondTomMemoryDirectory] ??
+                Path.Combine(".", DirectoryNames.ApplicationRoot);
+            string templatesDirectory = Path.Combine(rootDirectory, DirectoryNames.Templates);
 
             // Create FileSystem loader (primary)
             var fileSystemLogger = loggerFactory.CreateLogger<FileSystemTemplateLoader>();
@@ -74,7 +81,7 @@ public static class ServiceCollectionExtensions
 
             // Create Embedded loader (fallback)
             var embeddedLoader = new EmbeddedPromptTemplateLoader(
-                baseDirectory: memoryDirectory,
+                baseDirectory: rootDirectory,
                 yamlParser: yamlParser);
 
             // Create Composite loader with fallback chain

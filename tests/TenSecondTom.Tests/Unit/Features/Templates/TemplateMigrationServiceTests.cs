@@ -53,16 +53,16 @@ public sealed class TemplateMigrationServiceTests
     public async Task RunAutomaticMigration_WithMemoryDirectory_PerformsMigration()
     {
         // Arrange
-        string memoryDirectory = "/test/memory";
-        string templatesDirectory = Path.Combine(memoryDirectory, "templates");
+        string rootDirectory = "/test/memory";
+        string templatesDirectory = Path.Combine(rootDirectory, "templates");
 
         var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c["Storage:MemoryDirectory"]).Returns(memoryDirectory);
+        mockConfiguration.Setup(c => c["Storage:MemoryDirectory"]).Returns(rootDirectory);
 
         _mockFileSystem.Setup(fs => fs.Directory.Exists(templatesDirectory))
             .Returns(false);
 
-        _mockFileSystem.Setup(fs => fs.Path.Combine(memoryDirectory, "templates"))
+        _mockFileSystem.Setup(fs => fs.Path.Combine(rootDirectory, "templates"))
             .Returns(templatesDirectory);
 
         _mockTemplateHandler.Setup(h => h.Handle(
@@ -99,16 +99,16 @@ public sealed class TemplateMigrationServiceTests
     public async Task RunAutomaticMigration_WhenMigrationFails_LogsWarningButDoesNotThrow()
     {
         // Arrange
-        string memoryDirectory = "/test/memory";
-        string templatesDirectory = Path.Combine(memoryDirectory, "templates");
+        string rootDirectory = "/test/memory";
+        string templatesDirectory = Path.Combine(rootDirectory, "templates");
 
         var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c["Storage:MemoryDirectory"]).Returns(memoryDirectory);
+        mockConfiguration.Setup(c => c["Storage:MemoryDirectory"]).Returns(rootDirectory);
 
         _mockFileSystem.Setup(fs => fs.Directory.Exists(templatesDirectory))
             .Returns(false);
 
-        _mockFileSystem.Setup(fs => fs.Path.Combine(memoryDirectory, "templates"))
+        _mockFileSystem.Setup(fs => fs.Path.Combine(rootDirectory, "templates"))
             .Returns(templatesDirectory);
 
         _mockTemplateHandler.Setup(h => h.Handle(

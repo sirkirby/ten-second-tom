@@ -36,7 +36,22 @@ public static class ConfigurationKeys
     public const string Root = "TenSecondTom";
 
     /// <summary>
-    /// Configuration key for the memory storage directory.
+    /// Configuration key for the base memory directory (from appsettings.json).
+    /// Environment variable: TenSecondTom__MemoryDirectory
+    /// This is the fallback when Storage:MemoryDirectory is not set.
+    /// </summary>
+    public const string TenSecondTomMemoryDirectory = "TenSecondTom:MemoryDirectory";
+
+    /// <summary>
+    /// Configuration key for the configured storage root directory (from user secrets or environment).
+    /// Environment variable: Storage__MemoryDirectory
+    /// This is the primary configuration for the application root directory.
+    /// All subdirectories (templates/, today/, thisweek/) are created under this root.
+    /// </summary>
+    public const string StorageMemoryDirectory = "Storage:MemoryDirectory";
+
+    /// <summary>
+    /// Configuration key for the user secrets ID.
     /// </summary>
     public const string UserSecretsId = "ten-second-tom-secrets";
 }
