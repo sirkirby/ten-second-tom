@@ -176,7 +176,7 @@ public sealed class DailyEntryTests
         string filePath = entry.FilePath;
 
         // Assert
-        filePath.Should().Be(".memory/today/10-02-2025_2.md");
+        filePath.Should().Be("today/10-02-2025_2.md");
     }
 
     [Fact]

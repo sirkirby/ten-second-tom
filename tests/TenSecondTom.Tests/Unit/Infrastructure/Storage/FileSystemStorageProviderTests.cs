@@ -344,7 +344,7 @@ public sealed class FileSystemStorageProviderTests : IDisposable
         {
             EntryId = "thisweek-2025-40-1",
             Command = "thisweek",
-            Timestamp = new DateTimeOffset(2025, 10, 2, 14, 0, 0, TimeSpan.Zero),
+            Timestamp = new DateTimeOffset(2025, 10, 2, 14, 0, 0, TimeSpan.Zero), // Thursday, Oct 2, 2025, Week 40
             EntryNumber = 1,
             UserInput = "Weekly summary input",
             LlmResponse = "Weekly summary response",
@@ -372,7 +372,7 @@ public sealed class FileSystemStorageProviderTests : IDisposable
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        string expectedPath = Path.Combine(_testDirectory, "thisweek", "2025-40_1.md");
+        string expectedPath = Path.Combine(_testDirectory, "thisweek", "2025-40-Thu-1.md");
         File.Exists(expectedPath).Should().BeTrue();
     }
 

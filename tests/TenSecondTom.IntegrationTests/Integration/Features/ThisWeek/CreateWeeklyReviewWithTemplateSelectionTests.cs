@@ -256,7 +256,9 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
             .Callback<string, CancellationToken, int?, double?>((_, _, _, _) => callSequence.Add("LLMCall"))
-            .ReturnsAsync(Result<string>.Success(@"## Top 3 Accomplishments
+            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse 
+            { 
+                Content = @"## Top 3 Accomplishments
 1. First accomplishment
 2. Second accomplishment
 3. Third accomplishment
@@ -271,7 +273,10 @@ Some insights here
 
 ## Goals for Next Week
 - Goal 1
-- Goal 2"));
+- Goal 2",
+                InputTokens = 100,
+                OutputTokens = 200
+            }));
 
         var command = new CreateWeeklyReviewCommand();
 
@@ -505,7 +510,9 @@ Some insights here
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
-            .ReturnsAsync(Result<string>.Success(@"## Top 3 Accomplishments
+            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse 
+            { 
+                Content = @"## Top 3 Accomplishments
 1. First accomplishment
 2. Second accomplishment
 3. Third accomplishment
@@ -520,7 +527,10 @@ Some insights here
 
 ## Goals for Next Week
 - Goal 1
-- Goal 2"));
+- Goal 2",
+                InputTokens = 100,
+                OutputTokens = 200
+            }));
 
         var mockLlmFactory = new Mock<ILlmProviderFactory>();
         mockLlmFactory.Setup(f => f.CreateProvider(It.IsAny<string>()))

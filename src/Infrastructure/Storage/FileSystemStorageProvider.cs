@@ -65,7 +65,9 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
 
         try
         {
-            string filePath = GetFilePathForEntry(entry);
+            // Use the FilePath property from the entry itself (feature-owned logic)
+            string relativePath = entry.FilePath;
+            string filePath = Path.Combine(_baseDirectory, relativePath);
             string directory = Path.GetDirectoryName(filePath)!;
 
             // Create directory if it doesn't exist
@@ -370,29 +372,6 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
     }
 
     /// <summary>
-    /// Gets the file path for a memory entry based on its command and date.
-    /// </summary>
-    private string GetFilePathForEntry(MemoryEntry entry)
-    {
-        string directory = Path.Combine(_baseDirectory, entry.Command);
-        string fileName;
-
-    if (entry.Command == CommandNames.Today)
-        {
-            // Daily entries: MM-DD-YYYY_N.md
-            fileName = $"{entry.Timestamp.ToString("MM-dd-yyyy", CultureInfo.InvariantCulture)}_{entry.EntryNumber}.md";
-        }
-        else // thisweek
-        {
-            // Weekly entries: YYYY-WW_N.md (WW = ISO week number)
-            int weekNumber = GetIso8601WeekNumber(entry.Timestamp.DateTime);
-            fileName = $"{entry.Timestamp.Year}-{weekNumber:D2}_{entry.EntryNumber}.md";
-        }
-
-        return Path.Combine(directory, fileName);
-    }
-
-    /// <summary>
     /// Generates markdown content with YAML frontmatter for a memory entry.
     /// </summary>
     private string GenerateMarkdownContent(MemoryEntry entry)
@@ -566,23 +545,6 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
             RetentionPolicy.TwoYears => now.AddYears(-2),
             _ => DateTime.MinValue
         };
-    }
-
-    /// <summary>
-    /// Gets the ISO 8601 week number for a given date.
-    /// </summary>
-    private static int GetIso8601WeekNumber(DateTime date)
-    {
-        DayOfWeek day = CultureInfo.InvariantCulture.Calendar.GetDayOfWeek(date);
-        if (day >= DayOfWeek.Monday && day <= DayOfWeek.Wednesday)
-        {
-            date = date.AddDays(3);
-        }
-
-        return CultureInfo.InvariantCulture.Calendar.GetWeekOfYear(
-            date,
-            CalendarWeekRule.FirstFourDayWeek,
-            DayOfWeek.Monday);
     }
 
     /// <summary>

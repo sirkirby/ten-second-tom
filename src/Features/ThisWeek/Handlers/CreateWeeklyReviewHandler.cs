@@ -207,7 +207,10 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
 
         _logger.LogDebug("Calling LLM provider {Provider} for weekly review", provider);
 
-        Result<string> completionResult;
+        // Track processing time
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        
+        Result<LlmResponse> completionResult;
         try
         {
             completionResult = await llmProvider.GenerateCompletionAsync(
@@ -221,6 +224,9 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
             _logger.LogError(ex, "LLM provider threw unexpected exception");
             return Result<WeeklyEntry>.Failure($"LLM service error: {ex.Message}");
         }
+        
+        stopwatch.Stop();
+        TimeSpan processingDuration = stopwatch.Elapsed;
 
         if (!completionResult.IsSuccess)
         {
@@ -229,7 +235,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
         }
 
         // 10. Parse response and validate 3+3 structure
-        Result<WeeklySummary> summaryResult = ParseWeeklySummary(completionResult.Value);
+        Result<WeeklySummary> summaryResult = ParseWeeklySummary(completionResult.Value.Content);
         if (!summaryResult.IsSuccess)
         {
             return Result<WeeklyEntry>.Failure($"Failed to parse LLM response: {summaryResult.Error}");
@@ -258,12 +264,13 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
             Timestamp = DateTimeOffset.UtcNow,
             EntryNumber = entryNumber,
             UserInput = $"Weekly review for {dateRange.StartDate:yyyy-MM-dd} to {dateRange.EndDate:yyyy-MM-dd} ({entriesResult.Value.Count} daily entries)",
-            LlmResponse = completionResult.Value,
+            LlmResponse = completionResult.Value.Content,
             Metadata = new MemoryEntryMetadata
             {
                 LlmProvider = llmProvider.ProviderName,
-                LlmModel = provider == LlmProviders.OpenAI ? "gpt-4" : "claude-3-sonnet-20240229",
-                TokensUsed = completionResult.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length
+                LlmModel = llmProvider.ModelName,
+                TokensUsed = completionResult.Value.TotalTokens,
+                ProcessingDuration = processingDuration
             },
             Summary = summaryResult.Value
         };
@@ -379,12 +386,49 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
 
     private async Task<int> GetNextEntryNumber(DateRange dateRange, CancellationToken cancellationToken)
     {
-        Result<int> countResult = await _storage.CountEntriesAsync(
+        // For weekly entries, we need to count entries for the same year-week-day combination
+        // File naming: YYYY-WW-DayOfWeek-N.md (e.g., 2025-42-Fri-1.md)
+        // Each day in the week starts at 1, so Friday entry 1, Saturday entry 1, etc.
+        
+        var calendar = System.Globalization.CultureInfo.InvariantCulture.Calendar;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        
+        int currentWeekNumber = calendar.GetWeekOfYear(
+            now.DateTime,
+            System.Globalization.CalendarWeekRule.FirstFourDayWeek,
+            DayOfWeek.Monday);
+        int currentYear = now.Year;
+        DayOfWeek currentDay = now.DayOfWeek;
+
+        // Get all thisweek entries in the week range
+        Result<IReadOnlyList<MemoryEntry>> entriesResult = await _storage.GetEntriesAsync(
             CommandNames.ThisWeek,
             dateRange.StartDate.DateTime,
+            dateRange.EndDate.DateTime,
             cancellationToken).ConfigureAwait(false);
 
-        return countResult.IsSuccess ? countResult.Value + 1 : 1;
+        if (!entriesResult.IsSuccess)
+        {
+            _logger.LogWarning("Failed to get existing weekly entries: {Error}", entriesResult.Error);
+            return 1;
+        }
+
+        // Count entries that belong to the same year, week, AND day of week
+        int count = entriesResult.Value.Count(entry =>
+        {
+            int entryWeekNumber = calendar.GetWeekOfYear(
+                entry.Timestamp.DateTime,
+                System.Globalization.CalendarWeekRule.FirstFourDayWeek,
+                DayOfWeek.Monday);
+            int entryYear = entry.Timestamp.Year;
+            DayOfWeek entryDay = entry.Timestamp.DayOfWeek;
+            
+            return entryYear == currentYear 
+                && entryWeekNumber == currentWeekNumber 
+                && entryDay == currentDay;
+        });
+
+        return count + 1;
     }
 
     private static Result<WeeklySummary> ParseWeeklySummary(string llmResponse)

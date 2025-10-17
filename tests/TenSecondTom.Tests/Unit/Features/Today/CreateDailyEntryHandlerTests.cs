@@ -73,7 +73,12 @@ public sealed class CreateDailyEntryHandlerTests
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
-            .ReturnsAsync(Result<string>.Success("## Summary\nKey events: meeting"));
+            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse 
+            { 
+                Content = "## Summary\nKey events: meeting",
+                InputTokens = 10,
+                OutputTokens = 20
+            }));
 
         _mockStorage.Setup(s => s.CountEntriesAsync(
                 It.IsAny<string>(), 
@@ -220,7 +225,7 @@ public sealed class CreateDailyEntryHandlerTests
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
-            .ReturnsAsync(Result<string>.Failure("API rate limit exceeded"));
+            .ReturnsAsync(Result<LlmResponse>.Failure("API rate limit exceeded"));
 
         // Act
         Result<DailyEntry> result = await _handler.Handle(command, CancellationToken.None);

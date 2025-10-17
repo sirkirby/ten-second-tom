@@ -41,13 +41,15 @@ public sealed class OpenAILlmProviderTests
         const string expectedResponse = "Test response from OpenAI";
 
         // Act
-        Result<string> result = await provider.GenerateCompletionAsync(
+        Result<LlmResponse> result = await provider.GenerateCompletionAsync(
             prompt,
             CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().Be(expectedResponse);
+        result.Value.Content.Should().Be(expectedResponse);
+        result.Value.InputTokens.Should().BeGreaterThan(0);
+        result.Value.OutputTokens.Should().BeGreaterThan(0);
     }
 
     [Fact(Skip = "Requires mocked OpenAI client - will implement with actual provider")]
@@ -58,7 +60,7 @@ public sealed class OpenAILlmProviderTests
         const int maxTokens = 1000;
 
         // Act
-        Result<string> result = await provider.GenerateCompletionAsync(
+        Result<LlmResponse> result = await provider.GenerateCompletionAsync(
             "Test prompt",
             CancellationToken.None,
             maxTokens);
@@ -76,7 +78,7 @@ public sealed class OpenAILlmProviderTests
         const double temperature = 0.7;
 
         // Act
-        Result<string> result = await provider.GenerateCompletionAsync(
+        Result<LlmResponse> result = await provider.GenerateCompletionAsync(
             "Test prompt",
             CancellationToken.None,
             null,
@@ -94,7 +96,7 @@ public sealed class OpenAILlmProviderTests
         var provider = CreateProvider();
 
         // Act
-        Result<string> result = await provider.GenerateCompletionAsync(
+        Result<LlmResponse> result = await provider.GenerateCompletionAsync(
             "Test prompt",
             CancellationToken.None);
 
@@ -110,7 +112,7 @@ public sealed class OpenAILlmProviderTests
         var provider = CreateProvider();
 
         // Act
-        Result<string> result = await provider.GenerateCompletionAsync(
+        Result<LlmResponse> result = await provider.GenerateCompletionAsync(
             "Test prompt",
             CancellationToken.None);
 
@@ -126,7 +128,7 @@ public sealed class OpenAILlmProviderTests
         var provider = CreateProvider();
 
         // Act
-        Result<string> result = await provider.GenerateCompletionAsync(
+        Result<LlmResponse> result = await provider.GenerateCompletionAsync(
             "Test prompt",
             CancellationToken.None);
 

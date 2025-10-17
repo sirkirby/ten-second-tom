@@ -305,7 +305,12 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
             .ReturnsAsync(() =>
             {
                 callSequence.Add("LLMCall");
-                return Result<string>.Success("Summary generated");
+                return Result<LlmResponse>.Success(new LlmResponse 
+                { 
+                    Content = "Summary generated",
+                    InputTokens = 10,
+                    OutputTokens = 20
+                });
             });
 
         var command = new CreateDailyEntryCommand
@@ -488,7 +493,12 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
-            .ReturnsAsync(Result<string>.Success("## Summary\nGenerated summary"));
+            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse 
+            { 
+                Content = "## Summary\nGenerated summary",
+                InputTokens = 10,
+                OutputTokens = 20
+            }));
 
         var mockLlmFactory = new Mock<ILlmProviderFactory>();
         mockLlmFactory.Setup(f => f.CreateProvider(It.IsAny<string>()))

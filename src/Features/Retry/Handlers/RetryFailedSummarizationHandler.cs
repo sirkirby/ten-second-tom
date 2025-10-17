@@ -203,10 +203,15 @@ public sealed class RetryFailedSummarizationHandler
         {
             _logger.LogDebug("Retrying entry {EntryId}", entry.EntryId);
 
+            // Track processing time
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
             // Call LLM provider with user input
-            Result<string> llmResult = await _llmProvider
+            Result<LlmResponse> llmResult = await _llmProvider
                 .GenerateCompletionAsync(entry.UserInput, cancellationToken)
                 .ConfigureAwait(false);
+
+            stopwatch.Stop();
 
             if (!llmResult.IsSuccess)
             {
@@ -225,12 +230,14 @@ public sealed class RetryFailedSummarizationHandler
 
             var updatedMetadata = entry.Metadata with
             {
+                TokensUsed = llmResult.Value.TotalTokens,
+                ProcessingDuration = stopwatch.Elapsed,
                 CustomTags = updatedTags
             };
 
             MemoryEntry updatedEntry = entry with
             {
-                LlmResponse = llmResult.Value,
+                LlmResponse = llmResult.Value.Content,
                 Metadata = updatedMetadata
             };
 

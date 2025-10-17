@@ -190,7 +190,14 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
             return Result<DailyEntry>.Failure($"Failed to create LLM provider '{provider}': {ex.Message}");
         }
 
-        Result<string> llmResult = await llmProvider.GenerateCompletionAsync(prompt, cancellationToken).ConfigureAwait(false);
+        // Track processing time
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        
+        Result<LlmResponse> llmResult = await llmProvider.GenerateCompletionAsync(prompt, cancellationToken).ConfigureAwait(false);
+        
+        stopwatch.Stop();
+        TimeSpan processingDuration = stopwatch.Elapsed;
+        
         if (!llmResult.IsSuccess)
         {
             // Save partial entry (user input only) for retry
@@ -199,7 +206,7 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
         }
 
         // 8. Parse LLM response into DailySummary
-        DailySummary summary = ParseDailySummary(llmResult.Value);
+        DailySummary summary = ParseDailySummary(llmResult.Value.Content);
 
         // 9. Create DailyEntry
         var entry = new DailyEntry
@@ -209,8 +216,12 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
             Timestamp = DateTimeOffset.UtcNow,
             EntryNumber = entryNumber,
             UserInput = userInput,
-            LlmResponse = llmResult.Value,
-            Metadata = CreateMetadata(provider, "gpt-4"), // TODO: Get model from config
+            LlmResponse = llmResult.Value.Content,
+            Metadata = CreateMetadata(
+                llmProvider.ProviderName, 
+                llmProvider.ModelName, 
+                llmResult.Value.TotalTokens,
+                processingDuration),
             Summary = summary
         };
 
@@ -435,14 +446,14 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
         };
     }
 
-    private static MemoryEntryMetadata CreateMetadata(string provider, string model)
+    private static MemoryEntryMetadata CreateMetadata(string provider, string model, int tokensUsed, TimeSpan processingDuration)
     {
         return new MemoryEntryMetadata
         {
             LlmProvider = provider,
             LlmModel = model,
-            TokensUsed = 0, // TODO: Track actual token usage
-            ProcessingDuration = TimeSpan.Zero, // TODO: Track actual duration
+            TokensUsed = tokensUsed,
+            ProcessingDuration = processingDuration,
             CustomTags = new Dictionary<string, string>
             {
                 ["ProcessedAt"] = DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture)

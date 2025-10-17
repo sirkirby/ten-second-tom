@@ -17,21 +17,29 @@ public sealed class ILlmProviderTests
         // Arrange
         const string expectedCompletion = "Test completion response";
         var mockProvider = new Mock<ILlmProvider>();
+        var expectedResponse = new LlmResponse 
+        { 
+            Content = expectedCompletion,
+            InputTokens = 10,
+            OutputTokens = 20
+        };
+        
         mockProvider.Setup(p => p.GenerateCompletionAsync(
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
-            .ReturnsAsync(Result<string>.Success(expectedCompletion));
+            .ReturnsAsync(Result<LlmResponse>.Success(expectedResponse));
 
         // Act
-        Result<string> result = await mockProvider.Object.GenerateCompletionAsync(
+        Result<LlmResponse> result = await mockProvider.Object.GenerateCompletionAsync(
             "Test prompt",
             CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().Be(expectedCompletion);
+        result.Value.Content.Should().Be(expectedCompletion);
+        result.Value.TotalTokens.Should().Be(30);
     }
 
     [Fact]
@@ -45,10 +53,10 @@ public sealed class ILlmProviderTests
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
-            .ReturnsAsync(Result<string>.Failure(expectedError));
+            .ReturnsAsync(Result<LlmResponse>.Failure(expectedError));
 
         // Act
-        Result<string> result = await mockProvider.Object.GenerateCompletionAsync(
+        Result<LlmResponse> result = await mockProvider.Object.GenerateCompletionAsync(
             "Test prompt",
             CancellationToken.None);
 
@@ -63,12 +71,19 @@ public sealed class ILlmProviderTests
         // Arrange
         const int expectedMaxTokens = 1000;
         var mockProvider = new Mock<ILlmProvider>();
+        var response = new LlmResponse 
+        { 
+            Content = "response",
+            InputTokens = 10,
+            OutputTokens = 20
+        };
+        
         mockProvider.Setup(p => p.GenerateCompletionAsync(
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>(),
                 expectedMaxTokens,
                 It.IsAny<double?>()))
-            .ReturnsAsync(Result<string>.Success("response"))
+            .ReturnsAsync(Result<LlmResponse>.Success(response))
             .Verifiable();
 
         // Act
@@ -87,12 +102,19 @@ public sealed class ILlmProviderTests
         // Arrange
         const double expectedTemperature = 0.7;
         var mockProvider = new Mock<ILlmProvider>();
+        var response = new LlmResponse 
+        { 
+            Content = "response",
+            InputTokens = 10,
+            OutputTokens = 20
+        };
+        
         mockProvider.Setup(p => p.GenerateCompletionAsync(
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
                 expectedTemperature))
-            .ReturnsAsync(Result<string>.Success("response"))
+            .ReturnsAsync(Result<LlmResponse>.Success(response))
             .Verifiable();
 
         // Act
@@ -117,12 +139,12 @@ public sealed class ILlmProviderTests
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
-            .ReturnsAsync(Result<string>.Failure("Operation cancelled"));
+            .ReturnsAsync(Result<LlmResponse>.Failure("Operation cancelled"));
 
         await cts.CancelAsync();
 
         // Act
-        Result<string> result = await mockProvider.Object.GenerateCompletionAsync(
+        Result<LlmResponse> result = await mockProvider.Object.GenerateCompletionAsync(
             "Test prompt",
             cts.Token);
 

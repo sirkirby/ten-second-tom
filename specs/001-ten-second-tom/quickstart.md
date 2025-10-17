@@ -186,7 +186,7 @@ $ tom thisweek
 - Set up CI/CD pipeline
 - Create initial project structure
 
-✅ Weekly review saved: .memory/thisweek/2025-40_1.md
+✅ Weekly review saved: .memory/thisweek/2025-40-Mon-1.md
 ```
 
 ### Search Memories (`/search`)
@@ -295,8 +295,8 @@ Your memory archive is organized as markdown files:
 │   ├── 10-01-2025_2.md    # Multiple entries same day
 │   └── 10-02-2025_1.md
 └── thisweek/
-    ├── 2025-40_1.md        # Week 40 of 2025
-    └── 2025-41_1.md
+    ├── 2025-40-Mon-1.md    # Week 40 of 2025, Monday, entry 1
+    └── 2025-41-Fri-1.md    # Week 41 of 2025, Friday, entry 1
 ```
 
 Each file is human-readable markdown with metadata:
