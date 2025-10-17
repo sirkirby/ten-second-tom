@@ -2,6 +2,8 @@
 
 This document explains how to configure authentication for Ten Second Tom. The application uses SSH key-based authentication to verify your identity when creating memory entries.
 
+> **Quick Start:** Run `tom setup` and the interactive wizard will automatically detect and configure your SSH keys. This document covers the details and advanced scenarios.
+
 ## Overview
 
 Ten Second Tom supports two authentication methods:
@@ -10,6 +12,29 @@ Ten Second Tom supports two authentication methods:
 2. **File-Based Keys** - Traditional SSH key files
 
 The application automatically selects the best available authentication method.
+
+### Setup Wizard (Recommended)
+
+The easiest way to configure authentication is through the setup wizard:
+
+```bash
+# First-time setup (launches automatically)
+tom today
+
+# Manual setup
+tom setup
+```
+
+The wizard will:
+- ✅ Automatically detect SSH keys from agents (1Password, Secretive, ssh-agent)
+- ✅ Scan your `~/.ssh/` directory for ED25519 keys
+- ✅ Present available keys for selection
+- ✅ Configure and validate your choice
+- ✅ Store configuration securely in User Secrets
+
+**No manual configuration needed!** The wizard handles everything.
+
+---
 
 ## Why SSH Key Authentication?
 
@@ -21,11 +46,35 @@ SSH key authentication provides:
 - **No passwords** - Secure authentication without password management
 - **Git integration** - Use the same keys you already use for GitHub, GitLab, etc.
 
+---
+
 ## SSH Agent Authentication (Recommended)
 
 SSH agents hold your private keys in memory and perform signing operations without exposing the key material. This is more secure than file-based keys.
 
-### Automatic Agent Detection
+### Quick Setup with Wizard
+
+**Recommended:** Use the setup wizard which automatically detects your SSH agent and available keys:
+
+```bash
+tom setup
+```
+
+The wizard will:
+1. Detect if you're using 1Password, Secretive, or system ssh-agent
+2. List all available SSH keys from your agent
+3. Let you select which key to use
+4. Automatically configure everything
+
+**That's it!** Skip to [Testing Your Setup](#step-4-test-your-setup) after running the wizard.
+
+---
+
+### Manual SSH Agent Setup (Advanced)
+
+If you prefer manual configuration or need to troubleshoot, follow these steps:
+
+#### Automatic Agent Detection
 
 **Ten Second Tom automatically detects and connects to popular SSH agents** - no manual configuration required!
 
@@ -122,9 +171,19 @@ ssh-add ~/.ssh/id_ed25519
 
 #### Step 3: Configure Your Public Key
 
+**Option A: Use Setup Wizard (Easiest)**
+
+```bash
+tom setup
+```
+
+The wizard automatically handles public key configuration. Skip to [Step 4](#step-4-test-your-setup).
+
+**Option B: Manual Configuration**
+
 Ten Second Tom needs your public key to verify signatures. You can provide it in three ways:
 
-**Option 1: .env File (Recommended for Development)**
+**Method 1: .env File (Recommended for Development)**
 
 The recommended approach is to use a `.env` file for local development:
 
@@ -271,7 +330,26 @@ Failed verifications are logged as security events for audit purposes.
 
 If SSH agent is not available, Ten Second Tom automatically falls back to file-based authentication.
 
-### Setup Instructions
+### Quick Setup with Wizard
+
+**Recommended:** The setup wizard handles file-based keys too:
+
+```bash
+tom setup
+```
+
+The wizard will:
+- Scan `~/.ssh/` for ED25519 keys
+- List available keys for selection
+- Automatically configure file paths
+
+**That's it!** Skip to [Step 3](#step-3-test-your-setup) after running the wizard.
+
+---
+
+### Manual File-Based Setup (Advanced)
+
+If you prefer manual configuration:
 
 #### Step 1: Generate SSH Key Pair (if needed)
 
@@ -752,41 +830,45 @@ If you encounter authentication issues:
 
 ## Summary
 
-**Recommended Setup (Development):**
-1. Use SSH agent for better security (automatically detected!)
-2. Configure public key in `.env` file (copy from `.env.example`)
-3. Keep private keys protected with passphrases
-4. Consider hardware keys for maximum security (via Secretive)
-5. Test your setup with `tom today`
+**Recommended Setup:**
 
-**Quick Start with Auto-Detection:**
 ```bash
-# 1. Copy environment template
-cp .env.example .env
+# Easiest: Use the setup wizard (handles everything automatically)
+tom setup
+```
 
-# 2. Start your SSH agent
-# Option A: 1Password (easiest - just enable in Settings → Developer)
-# Option B: Traditional ssh-agent
+The wizard automatically:
+- ✅ Detects SSH agents (1Password, Secretive, ssh-agent)
+- ✅ Scans for SSH keys in `~/.ssh/`
+- ✅ Presents available keys for selection
+- ✅ Validates and configures your choice
+- ✅ Stores configuration securely
+
+**Alternative: Manual Setup (Advanced Users)**
+
+If you prefer manual configuration or need specific customization:
+
+1. Start your SSH agent (or use file-based keys)
+2. Add your SSH key to the agent with `ssh-add`
+3. Configure via environment variables or config files
+4. Test with `tom today`
+
+**Quick Start Example:**
+
+```bash
+# Option 1: Interactive wizard (recommended)
+tom setup
+
+# Option 2: Manual with agent
 eval $(ssh-agent)
 ssh-add ~/.ssh/id_ed25519
-
-# 3. Configure your public key in .env
-# Option A: Add public key content
-echo "TenSecondTom__Auth__PublicKey=$(cat ~/.ssh/id_ed25519.pub)" >> .env
-
-# Option B: Or just add the path
-echo "TenSecondTom__Auth__PublicKeyPath=~/.ssh/id_ed25519.pub" >> .env
-
-# 4. Test - auto-detection finds your agent automatically!
+export TENSECONDTOM_AUTH_PUBLICKEYPATH=~/.ssh/id_ed25519.pub
 tom today
 ```
 
-**What Happens:**
-- Ten Second Tom automatically detects your SSH agent (1Password, Secretive, or system)
-- No need to configure `SSH_AUTH_SOCK` manually
-- Just works! 🎉
+---
 
 **For Production:**
-Use `appsettings.json` or production environment variables instead of `.env` file.
+Use `appsettings.json` or environment variables instead of `.env` file.
 
 That's it! You're ready to use Ten Second Tom with secure SSH authentication.
