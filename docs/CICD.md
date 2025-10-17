@@ -5,7 +5,10 @@
 
 ## Overview
 
-This document describes the GitHub Actions CI/CD pipeline for Ten Second Tom. The pipeline consists of three workflows that automate testing, building, and distributing the application across multiple platforms.
+This document describes the GitHub Actions CI/CD pipeline for Ten Second Tom. The pipeline consists of two workflows that automate testing, building, and distributing the application across multiple platforms:
+
+1. **PR Validation** (`pr-validation.yml`): Validates pull requests with build, test, and coverage checks
+2. **Release** (`release.yml`): Creates releases, builds binaries, and publishes to package managers
 
 ---
 
@@ -98,10 +101,11 @@ publish-homebrew:
 **Purpose**: Validate code quality before merging
 
 **Jobs**:
+
+- **Select Runner**: Detect available self-hosted Linux runners or fall back to GitHub-hosted runners
 - **Build**: Compile code with zero warnings
 - **Test**: Run all unit and integration tests
 - **Coverage**: Prevent coverage regression, track line coverage
-- **Validate**: Aggregate status from all jobs
 
 **Coverage Strategy**:
 - **Primary Metric**: Line coverage (% of executable lines hit by tests)
@@ -129,235 +133,131 @@ publish-homebrew:
 
 ---
 
-### 2. Build Workflow
+### 2. Release Workflow
 
-**File**: `.github/workflows/build.yml`  
-**Trigger**: Pushes to `main` branch, manual dispatch  
-**Purpose**: Build cross-platform self-contained executables
+**File**: `.github/workflows/release.yml`  
+**Trigger**: 
+- Push of semantic version tags (e.g., `v1.2.3`)
+- Manual dispatch via Actions UI (for testing)
+
+**Purpose**: Build release binaries, create GitHub releases, and publish to package managers
+
+**Manual Testing**: Supports workflow_dispatch with inputs:
+- `tag`: Version to release (e.g., `v0.0.1-test`)
+- `skip_homebrew`: Skip Homebrew publication (for PR testing)
+- `dry_run`: Skip release creation, logs only
 
 **Jobs**:
-1. **Test**: Re-run all tests on main branch to verify integrity
-2. **Build macOS x64**: Build self-contained executable for Intel Macs
-3. **Build macOS ARM64**: Build self-contained executable for Apple Silicon Macs
-4. **Build Windows x64**: Build self-contained executable for Windows
-5. **Verify macOS x64**: Smoke test Intel Mac executable with `--version`
-6. **Verify macOS ARM64**: Smoke test Apple Silicon executable with `--version`
-7. **Verify Windows x64**: Smoke test Windows executable with `--version`
 
-**Performance Targets**:
-- Test job: ≤5 minutes
-- Each build job: ≤5 minutes (run in parallel)
-- Each verify job: <1 minute
-- Total: ≤15 minutes
+1. **Validate Version**: Extract version from tag, validate format, check for duplicates, ensure tag is on main branch
+2. **Build Release Artifacts**: Build self-contained executables for all platforms with release version embedded
+3. **Create GitHub Release**: Package binaries, generate release notes, upload to GitHub releases
+4. **Publish to Homebrew**: Create Homebrew bottles (pre-built binaries), upload to release, update tap formula
+5. **Document Winget**: Generate Winget manifest template, create issue for manual publication (Phase 2: automate)
+6. **Document Chocolatey**: Generate Chocolatey nuspec template, create issue for manual publication (Phase 2: automate)
 
 **Build Configuration**:
+
 - **Runtime**: Self-contained (includes .NET runtime)
 - **Single File**: Executable + embedded dependencies
-- **Trimming**: Assembly-level IL trimming (`TrimMode=link`)
+- **Trimming**: Assembly-level IL trimming
 - **Size Target**: <50MB per executable (enforced by workflow)
-- **Configuration Files**: `appsettings.json` excluded from single-file bundle
-- **Native Libraries**: Included alongside executable (e.g., `libsodium.dylib`)
+- **Version Embedding**: Release version embedded in binary metadata
 
 **Artifacts** (90 days retention):
-- `ten-second-tom-osx-x64`: macOS Intel executable + config + native libs
-- `ten-second-tom-osx-arm64`: macOS Apple Silicon executable + config + native libs
-- `ten-second-tom-win-x64`: Windows executable + config + native libs
-- Each artifact includes:
-  - Executable file (`tom` or `tom.exe`)
-  - Configuration files (`appsettings.json`, `appsettings.Development.json`)
-  - Native libraries (`libsodium.dylib` on macOS, DLLs on Windows)
-  - SHA256 checksum (in workflow output)
+
+- `ten-second-tom-osx-x64-release`: macOS Intel executable + config + native libs
+- `ten-second-tom-osx-arm64-release`: macOS Apple Silicon executable + config + native libs
+- `ten-second-tom-win-x64-release`: Windows executable + config + native libs
 
 **Platforms**:
+
 - **macOS x64** (`osx-x64`): Intel-based Macs (macOS 10.15+)
 - **macOS ARM64** (`osx-arm64`): Apple Silicon Macs (M1/M2/M3+)
 - **Windows x64** (`win-x64`): 64-bit Windows (Windows 10+)
 
-**Concurrency**: Uses `github.sha` to cancel duplicate builds for the same commit
+**Performance Targets**:
 
-**Manual Triggering**: Available via Actions UI for debugging build issues
-
-**Build Process**:
-1. Restore NuGet packages (with caching)
-2. Publish self-contained executable with single-file bundling
-3. Verify executable size (fail if >50MB)
-4. Calculate SHA256 checksum
-5. Upload artifact with all runtime dependencies
-6. Download artifact and run smoke test (`--version`)
-
-**Troubleshooting Build Issues**:
-- **Trimming Warnings**: Add `TrimmerRootAssembly` directives for reflection-loaded assemblies
-- **Size Violations**: Review dependencies, enable more aggressive trimming
-- **Missing Config**: Ensure `ExcludeFromSingleFile=true` for config files
-- **Native Library Errors**: Include `*.dylib` (macOS) or `*.dll` (Windows) in artifact upload
-- **Smoke Test Failures**: Verify all runtime dependencies are in artifact
+- Validate version: <2 minutes
+- Build artifacts (parallel): ≤10 minutes
+- Create release: ≤2 minutes
+- Homebrew publication: ≤5 minutes (excluding approval wait)
+- Documentation jobs: <1 minute each
+- **Total**: ≤15 minutes (excluding approval)
 
 ---
 
-### 3. Release Workflow
+## Self-Hosted Runner Support
 
-**File**: `.github/workflows/release.yml`  
-**Trigger**: Semantic version tags (e.g., `v1.0.0`)  
-**Purpose**: Automated distribution to package managers
+The PR validation workflow includes automatic detection of self-hosted Linux runners with fallback to GitHub-hosted runners.
 
-#### Overview
+**Select Runner Job**:
 
-The release workflow automates the entire distribution process from version tag to package manager publication. It **reuses build artifacts from the build workflow** to avoid redundant builds and enforce proper release hygiene (merge to main → build → tag → release). The workflow validates versions, creates GitHub releases, and publishes to package managers.
+- Queries GitHub API for available self-hosted runners
+- Checks for online Linux runners with `self-hosted` label
+- Falls back to `ubuntu-latest` if none found or API unavailable
+- Requires `RUNNER_QUERY_TOKEN` secret (optional, falls back on failure)
 
-#### Jobs
+**Benefits**:
 
-##### 1. Validate Version
-- **Purpose**: Ensure tag follows semantic versioning and doesn't duplicate existing releases
-- **Steps**:
-  1. Extract version from tag (e.g., `v1.2.3` → `1.2.3`)
-  2. Validate format matches `MAJOR.MINOR.PATCH` (no pre-release or build metadata)
-  3. Query GitHub API to check if version already exists in releases
-  4. Output validated version for subsequent jobs
-- **Failure Conditions**:
-  - Tag doesn't start with 'v'
-  - Version format is invalid (e.g., `1.2`, `1.2.3-beta`)
-  - Version already exists as a GitHub release
-- **Performance Target**: <1 minute
+- Faster builds on dedicated hardware
+- Cost savings for high-frequency workflows
+- Graceful degradation to cloud runners
 
-##### 2. Download Build Artifacts
-- **Purpose**: Reuse artifacts from the build workflow to avoid redundant builds
-- **Dependencies**: Requires validate-version job success
-- **Strategy**: Download pre-built artifacts from the build workflow run for this commit
-- **Steps**:
-  1. Use GitHub CLI to download artifacts from build workflow run
-  2. Verify all three platform artifacts exist (osx-x64, osx-arm64, win-x64)
-  3. Re-upload artifacts for use by subsequent release jobs
-- **Artifacts Reused**:
-  - Pre-built executables from build.yml (already tested)
-  - SHA256 checksums (calculated during build)
-  - Configuration files and native libraries
-- **Why Reuse?**:
-  - Eliminates 15 minutes of redundant build time
-  - Ensures released binaries are identical to tested builds
-  - Enforces proper workflow: merge → build → tag → release
-  - Reduces CI compute usage and costs
-- **Performance Target**: <1 minute (just download, no rebuild)
+**Setup** (optional):
 
-##### 3. Create GitHub Release
-- **Purpose**: Publish official GitHub release with downloadable binaries
-- **Dependencies**: Requires build-release-artifacts job success
-- **Steps**:
-  1. Download all platform artifacts
-  2. Generate release notes from git commits since last tag
-  3. Create GitHub release with version tag
-  4. Upload binaries and checksums as release assets
-  5. Mark as latest release
-- **Release Assets**:
-  - `tom` (macOS Intel binary)
-  - `checksums-osx-x64.txt` (SHA256 checksum)
-  - `tom` (macOS ARM64 binary)
-  - `checksums-osx-arm64.txt` (SHA256 checksum)
-  - `tom.exe` (Windows binary)
-  - `checksum.txt` (SHA256 checksum)
-- **Release Notes**: Auto-generated from commits with link to full changelog
-- **Performance Target**: ≤2 minutes
+1. Configure self-hosted runner with Linux OS
+2. Add `self-hosted` label to runner
+3. Create fine-grained token with `actions: read` permission
+4. Add as `RUNNER_QUERY_TOKEN` repository secret
 
-##### 4. Publish to Homebrew
-- **Purpose**: Update Homebrew tap with new formula version
-- **Dependencies**: Requires create-github-release job success
-- **Environment**: `production` (requires manual approval)
-- **Approval Gate**: Must be approved by maintainers in CODEOWNERS before execution
-- **Steps**:
-  1. Wait for manual approval (no time limit)
-  2. Clone Homebrew tap repository
-  3. Generate formula with version, URLs, and checksums
-  4. Commit and push formula to tap repository
-  5. Verify formula syntax with `brew audit`
-- **Formula Generation**:
-  - Version extracted from tag
-  - URLs point to GitHub release assets
-  - SHA256 checksums from build artifacts
-  - Architecture detection (`Hardware::CPU.intel?`)
-  - Install block copies binary to `bin/`
-  - Test block verifies `--version` command
-- **Secrets Required**: `HOMEBREW_TAP_TOKEN` with repo write access
-- **Performance Target**: ≤5 minutes (excluding approval wait)
+---
 
-##### 5. Document Winget Release
-- **Purpose**: Generate Winget manifest template for manual publication
-- **Dependencies**: Requires create-github-release job success
-- **Steps**:
-  1. Generate `.winget/manifests/` directory structure
-  2. Create version manifest with download URLs and checksums
-  3. Create installer manifest with silent install flags
-  4. Create locale manifest with descriptions
-  5. Create GitHub issue with manifest files and publication instructions
-- **Status**: Manual process (automation planned for Phase 2)
-- **Documentation**: Issue includes step-by-step PR creation guide
-- **Performance Target**: <1 minute
+## Release Workflow Details
 
-##### 6. Document Chocolatey Release
-- **Purpose**: Generate Chocolatey package template for manual publication
-- **Dependencies**: Requires create-github-release job success
-- **Steps**:
-  1. Generate `.chocolatey/` directory structure
-  2. Create nuspec file with package metadata
-  3. Create installation script with download and verification
-  4. Create GitHub issue with package files and publication instructions
-- **Status**: Manual process (automation planned for Phase 2)
-- **Documentation**: Issue includes step-by-step publication guide
-- **Performance Target**: <1 minute
+### Approval Process
 
-#### Concurrency Control
+The release workflow requires manual approval before publishing to Homebrew:
 
-```yaml
-concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: false
+1. **Tag Version**: Push semantic version tag (e.g., `git tag v1.0.0 && git push origin v1.0.0`)
+2. **Validation**: Workflow validates version format, checks for duplicates, ensures tag is on main branch
+3. **Build Artifacts**: Builds self-contained executables for all platforms with release version embedded
+4. **GitHub Release**: Creates release with binaries, checksums, and auto-generated release notes
+5. **Approval Request**: GitHub sends notification to reviewers configured in production environment
+6. **Manual Review**: Reviewer checks release notes and approves/rejects deployment
+7. **Homebrew Publication**: Upon approval, creates bottles and updates tap formula automatically
+8. **Documentation**: Creates GitHub issues for manual Winget/Chocolatey publication
+
+### Testing with workflow_dispatch
+
+For PR testing without creating actual releases:
+
+```bash
+# Go to Actions → Release → Run workflow
+# - Branch: your-pr-branch
+# - Tag: v0.0.1-test
+# - Skip Homebrew: true
+# - Dry run: true
 ```
 
-- **Purpose**: Prevent multiple releases from running simultaneously
-- **Group Key**: Uses tag reference (e.g., `refs/tags/v1.0.0`)
-- **Cancel Behavior**: Does not cancel in-progress releases
-- **Rationale**: Canceling mid-release could corrupt external service publications
+This allows testing the workflow logic without publishing to external services.
 
-#### Performance Summary
+### Package Managers Status
 
-**Total Time** (excluding approval):
-- Sequential: Validate (2min) → Download (1min) → Release (2min) → Homebrew (5min) → Docs (1min)
-- **Target**: ≤10 minutes from tag push to Homebrew availability
-- **Actual**: Typically 8-10 minutes (15 minutes faster than building from scratch)
-- **Savings**: Reusing build artifacts eliminates ~15 minutes of redundant work
-
-**With Approval**:
-- Add human approval time (unlimited, typically minutes to hours)
-- Total: ≤30 minutes if approved immediately
-
-#### Approval Process
-
-1. **Merge to Main**: Merge PR to main branch (triggers build.yml automatically)
-2. **Wait for Build**: Ensure build workflow completes successfully
-3. **Tag Commit**: Tag the merge commit with version (e.g., `git tag v1.0.0 && git push origin v1.0.0`)
-4. **Validation**: Workflow validates version, tag location, and finds build artifacts
-5. **Download**: Reuses pre-built artifacts from build workflow (no rebuild)
-6. **GitHub Release**: Release created with binaries and checksums
-7. **Approval Request**: GitHub sends notification to reviewers in CODEOWNERS
-8. **Manual Review**: Reviewer checks release notes and approves/rejects
-9. **Publication**: Upon approval, Homebrew formula updated automatically
-10. **Documentation**: Issues created for manual Winget/Chocolatey publication
-
-#### Package Managers Status
-
-- ✅ **Homebrew**: Fully automated with approval gate
-- 📋 **Winget**: Manual publication with generated manifests
-- 📋 **Chocolatey**: Manual publication with generated packages
-
-**Phase 2 Plans**: Automate Winget and Chocolatey publication (estimated 2-3 weeks)
+- ✅ **Homebrew**: Fully automated with bottle support and approval gate
+- 📋 **Winget**: Manual publication with generated manifests (Phase 2: automate)
+- 📋 **Chocolatey**: Manual publication with generated packages (Phase 2: automate)
 
 ---
 
 ## Homebrew Tap Setup with Bottle Support
 
-To enable automated Homebrew publication with fast binary installations (bottles), you must create and configure a Homebrew tap repository. The release workflow will automatically create bottles, upload them to GitHub releases, and update the formula.
+To enable automated Homebrew publication with fast binary installations (bottles), you must create and configure a Homebrew tap repository. The release workflow automatically creates bottles, uploads them to GitHub releases, and updates the formula.
 
 ### What are Homebrew Bottles?
 
 Bottles are pre-compiled binaries that Homebrew can install without building from source. This provides:
+
 - **Fast Installation**: Users download ready-to-use binaries instead of compiling
 - **Consistent Builds**: All users get identical binaries
 - **Better UX**: No need for build tools or compilation wait time
@@ -726,7 +626,6 @@ Add these badges to `README.md` to show workflow status:
 
 ```markdown
 [![PR Validation](https://github.com/sirkirby/ten-second-tom/actions/workflows/pr-validation.yml/badge.svg)](https://github.com/sirkirby/ten-second-tom/actions/workflows/pr-validation.yml)
-[![Build](https://github.com/sirkirby/ten-second-tom/actions/workflows/build.yml/badge.svg)](https://github.com/sirkirby/ten-second-tom/actions/workflows/build.yml)
 [![Release](https://github.com/sirkirby/ten-second-tom/actions/workflows/release.yml/badge.svg)](https://github.com/sirkirby/ten-second-tom/actions/workflows/release.yml)
 ```
 
@@ -793,30 +692,6 @@ Add these badges to `README.md` to show workflow status:
 
 ---
 
-### Build Workflow Issues
-
-**Problem**: Executable size exceeds 50MB
-
-**Solution**:
-1. Check assembly trimming settings in `.csproj`
-2. Enable more aggressive trimming:
-   ```xml
-   <TrimMode>link</TrimMode>
-   <InvariantGlobalization>true</InvariantGlobalization>
-   ```
-3. Review included dependencies for unnecessary packages
-4. Consider IL linking for further size reduction
-
-**Problem**: Smoke test failures
-
-**Solution**:
-1. Download artifact to test locally
-2. Check executable permissions (macOS/Linux)
-3. Verify runtime dependencies are included
-4. Test `--version` command manually
-
----
-
 ### Release Workflow Issues
 
 #### Version Validation Failures
@@ -838,7 +713,8 @@ git push origin v1.0.0
 **Problem**: Tag not on main branch
 
 **Solution**:
-The release workflow requires that tags be created on commits that exist on the main branch. This ensures all releases go through the standard quality gates (PR review, tests, builds).
+
+The release workflow validates that tags are on commits that exist on the main branch (for production releases). This ensures all releases go through standard quality gates.
 
 ```bash
 # Check if your current commit is on main
@@ -855,37 +731,32 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
+For testing on PR branches, use workflow_dispatch with `dry_run: true` to skip the main branch check.
+
 **Problem**: No build artifacts found for commit
 
 **Solution**:
-The release workflow reuses artifacts from the build workflow to avoid redundant builds. If no artifacts are found, it means:
-1. The commit hasn't been merged to main yet, OR
-2. The build workflow hasn't run yet, OR
-3. The build workflow failed
 
-**Fix**:
+The release workflow builds artifacts as part of the release process (not reusing from a separate build workflow). If build fails:
+
 ```bash
-# 1. Ensure code is merged to main
-git checkout main
-git pull origin main
+# Check the release workflow logs for build errors
+gh run list --workflow=release.yml
 
-# 2. Check if build workflow ran successfully
-gh run list --workflow=build.yml --branch=main
+# View specific run details
+gh run view <run-id>
 
-# 3. If build failed, fix the issues and merge again
-
-# 4. Wait for build to complete (check Actions tab)
-
-# 5. Then tag the merge commit:
-git tag v1.0.0
-git push origin v1.0.0
+# Common build issues:
+# - Missing dependencies
+# - .NET SDK version mismatch
+# - Platform-specific build errors
 ```
 
 **Typical workflow**:
-1. Create PR → triggers pr-validation.yml
-2. Merge to main → triggers build.yml (creates artifacts)
-3. Wait for build success (5-15 minutes)
-4. Tag merge commit → triggers release.yml (reuses artifacts)
+
+1. Create PR → triggers pr-validation.yml (build, test, coverage)
+2. Merge to main
+3. Tag merge commit → triggers release.yml (builds + publishes)
 
 **Problem**: Invalid semantic version format
 
@@ -1256,37 +1127,14 @@ The release workflow should complete in ~10 minutes by reusing build artifacts. 
 3. Reduce dependencies or enable more aggressive trimming
 4. Check GitHub Actions runner performance (may be throttled)
 
----
+**Problem**: Winget/Chocolatey documentation jobs fail
 
-## Performance Optimization Tips
+**Solution**:
 
-### Reduce Build Time
-
-1. **Use caching**:
-   - NuGet packages cached by default
-   - Consider caching build outputs for incremental builds
-
-2. **Parallelize jobs**:
-   - Build jobs run in parallel (already implemented)
-   - Consider splitting test suite if needed
-
-3. **Optimize dependencies**:
-   - Remove unused packages
-   - Use faster alternative packages where possible
-
-### Reduce Test Time
-
-1. **Profile slow tests**:
-   - Use test logging to identify slow tests
-   - Optimize or refactor slow tests
-
-2. **Use test filtering**:
-   - Consider separating fast unit tests from slow integration tests
-   - Run integration tests only on main branch if needed
-
-3. **Parallelize test execution**:
-   - xUnit parallelizes by default
-   - Ensure tests are thread-safe
+1. Verify workflow has `issues: write` permission
+2. Check GitHub API rate limits: `https://api.github.com/rate_limit`
+3. Create issue manually with generated manifest content if needed
+4. Verify issue template renders correctly (check Markdown syntax)
 
 ---
 
@@ -1340,5 +1188,5 @@ For issues with CI/CD workflows:
 
 ---
 
-**Document Version**: 1.0.0  
-**Last Updated**: 2025-10-03
+**Document Version**: 2.0.0  
+**Last Updated**: 2025-10-17

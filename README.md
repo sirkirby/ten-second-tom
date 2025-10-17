@@ -13,7 +13,6 @@
 **Ten Second Tom** is a CLI application for personal memory management that guides you through daily reflection prompts, leverages AI to generate structured summaries, and builds a searchable archive of your experiences. Named after the character from the movie *50 First Dates*, Ten Second Tom helps you remember what matters.
 
 [![PR Validation](https://github.com/sirkirby/ten-second-tom/actions/workflows/pr-validation.yml/badge.svg)](https://github.com/sirkirby/ten-second-tom/actions/workflows/pr-validation.yml)
-[![Build](https://github.com/sirkirby/ten-second-tom/actions/workflows/build.yml/badge.svg)](https://github.com/sirkirby/ten-second-tom/actions/workflows/build.yml)
 [![Release](https://github.com/sirkirby/ten-second-tom/actions/workflows/release.yml/badge.svg)](https://github.com/sirkirby/ten-second-tom/actions/workflows/release.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![.NET Version](https://img.shields.io/badge/.NET-9.0-purple.svg)](https://dotnet.microsoft.com/)
@@ -27,7 +26,7 @@
 - 🔍 **Searchable Archive**: Full-text search across all your memories
 - 🤖 **Multiple AI Providers**: Support for OpenAI and Anthropic
 - 📝 **Custom Templates**: Create and edit prompt templates to personalize your summaries
-- 📁 **Markdown Storage**: Human-readable files in configured `.memory/` directory
+- 📁 **Markdown Storage**: Human-readable files in configured memory directory
 - 🔐 **SSH Authentication**: Secure session management with SSH keys
 - 🎨 **Beautiful Terminal UI**: Rich formatting with Spectre.Console
 - 📤 **JSON Output**: Programmatic access for automation and integrations
@@ -127,9 +126,9 @@ Environment variable values take precedence over user secrets and `appsettings.j
 | Anthropic  | `claude-3-haiku-20240307`       | Claude 3 Haiku           | Budget    | ✅       | Fast and cost-effective, version 3.0 |
 | Anthropic  | `claude-3-5-haiku-20241022`     | Claude 3.5 Haiku         | Budget    |         | Improved performance, version 3.5 |
 | Anthropic  | `claude-sonnet-4-20250514`      | Claude Sonnet 4          | Balanced  |         | Balanced capability, Claude 4.0 |
-| Anthropic  | `claude-sonnet-4-5-20250611`    | Claude Sonnet 4.5        | Balanced  |         | Enhanced version, Claude 4.5 |
+| Anthropic  | `claude-sonnet-4-5-20250929`    | Claude Sonnet 4.5        | Balanced  |         | Enhanced version, Claude 4.5 |
 | Anthropic  | `claude-opus-4-20250514`        | Claude Opus 4            | Premium   |         | Highest capability, Claude 4.0 |
-| Anthropic  | `claude-opus-4-1-20250619`      | Claude Opus 4.1          | Premium   |         | Top-tier model, Claude 4.1 |
+| Anthropic  | `claude-opus-4-1-20250805`      | Claude Opus 4.1          | Premium   |         | Top-tier model, Claude 4.1 |
 
 **Notes:**
 
@@ -243,7 +242,7 @@ You can also use an `appsettings.json` file for non-sensitive configuration. **A
 
 ### Memory Directory
 
-By default, memories are stored in `./.memory/` in your current directory. To customize:
+By default, memories are stored in `~/ten-second-tom/` in your home directory. To customize:
 
 ```json
 {
@@ -361,7 +360,7 @@ $ tom today
 - [ ] Finalize architecture design
 - [ ] Start implementation tomorrow
 
-✅ Daily entry saved: .memory/today/10-03-2025_1.md
+✅ Daily entry saved: ~/ten-second-tom/today/10-03-2025_1.md
 ```
 
 ### Weekly Review
@@ -519,7 +518,7 @@ Use single command mode for:
 Your memories are stored as plain markdown files:
 
 ```
-.memory/
+~/ten-second-tom/
 ├── templates/              # Prompt templates (customizable!)
 │   ├── daily-summary.md   # Default daily template
 │   ├── weekly-review.md   # Default weekly template
@@ -560,15 +559,15 @@ Had a productive meeting with the team...
 
 ## 📝 Custom Templates
 
-Ten Second Tom allows you to customize the prompt templates used for generating daily and weekly summaries. Templates are stored in `.memory/templates/` and can be edited with any text editor.
+Ten Second Tom allows you to customize the prompt templates used for generating daily and weekly summaries. Templates are stored in `~/ten-second-tom/templates/` and can be edited with any text editor.
 
 ### Creating a Custom Template
 
 Templates use **YAML front matter** for metadata and **Markdown** for the prompt content. Here's how to create one:
 
-**1. Create a new file in `.memory/templates/`**
+**1. Create a new file in `~/ten-second-tom/templates/`**
 
-Example: `.memory/templates/my-daily-standup.md`
+Example: `~/ten-second-tom/templates/my-daily-standup.md`
 
 **2. Add YAML front matter at the top**
 
@@ -735,7 +734,7 @@ Templates are reloaded on every command run - **no restart required!**
 
 If you delete or modify default templates and want them back:
 
-1. Delete the `.memory/templates/` directory
+1. Delete the `~/ten-second-tom/templates/` directory
 2. Run any command - templates will be automatically restored
 
 Default templates are never overwritten, so feel free to customize them!
@@ -750,12 +749,12 @@ Default templates are never overwritten, so feel free to customize them!
 
 **Template selection not showing?**
 - If only one template exists, it's auto-selected (no prompt)
-- Check `.memory/templates/` directory exists
+- Check `~/ten-second-tom/templates/` directory exists
 - Verify at least one valid template for the command type
 
 **Want to see all templates?**
 ```bash
-ls -la .memory/templates/
+ls -la ~/ten-second-tom/templates/
 ```
 
 ---
