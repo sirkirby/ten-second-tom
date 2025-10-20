@@ -17,24 +17,30 @@ namespace TenSecondTom.Infrastructure.Cli;
 /// </summary>
 public static class TodayCommandHandler
 {
-    private static readonly string[] DefaultPrompts =
-    [
-        "What happened today?",
-        "Anything interesting planned for tomorrow?",
-        "Unfinished tasks?"
-    ];
-
     /// <summary>
     /// Executes the today command by prompting the user and creating a daily entry.
     /// </summary>
     /// <param name="handler">The command handler.</param>
     /// <param name="authService">The authentication service.</param>
     /// <param name="textEditor">The interactive text editor for multi-line input.</param>
+    /// <param name="notes">Optional notes content from command line.</param>
+    /// <param name="noEdit">Whether to skip the interactive editor.</param>
+    /// <param name="useDefaultTemplate">Whether to use the default template automatically.</param>
+    /// <param name="templateName">Optional template name to use.</param>
     /// <param name="providerOverride">Optional LLM provider override.</param>
     /// <param name="jsonOutput">Whether to output results in JSON format.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA1849:Call async methods when in an async method", Justification = "Spectre.Console Ask/Confirm are synchronous by design")]
-    public static async Task ExecuteAsync(IRequestHandler<CreateDailyEntryCommand, Result<DailyEntry>> handler, IAuthenticationService authService, IInteractiveTextEditor textEditor, string? providerOverride, bool jsonOutput = false)
+    public static async Task ExecuteAsync(
+        IRequestHandler<CreateDailyEntryCommand, Result<DailyEntry>> handler,
+        IAuthenticationService authService,
+        IInteractiveTextEditor textEditor,
+        string? notes,
+        bool noEdit,
+        bool useDefaultTemplate,
+        string? templateName,
+        string? providerOverride,
+        bool jsonOutput = false)
     {
         ArgumentNullException.ThrowIfNull(handler);
         ArgumentNullException.ThrowIfNull(authService);
@@ -59,33 +65,45 @@ public static class TodayCommandHandler
             return;
         }
 
-        // Only show UI elements if not in JSON mode
-        if (!jsonOutput)
+        // Validate: --no-edit requires notes argument
+        if (noEdit && string.IsNullOrWhiteSpace(notes))
         {
-            AnsiConsole.MarkupLine("[bold cyan]📝 Today's Reflection[/]");
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[dim]Answer 3-5 questions about your day. Press Ctrl+C to cancel.[/]");
-            AnsiConsole.WriteLine();
+            if (jsonOutput)
+            {
+                string json = JsonOutputFormatter.FormatFailure(
+                    CommandNames.Today,
+                    "--no-edit flag requires notes argument. Usage: tom today \"your notes here\" --no-edit",
+                    DateTimeOffset.UtcNow);
+                Console.WriteLine(json);
+            }
+            else
+            {
+                AnsiConsole.MarkupLine("[red]Error:[/] --no-edit flag requires notes argument");
+                AnsiConsole.MarkupLine("Usage: tom today \"your notes here\" --no-edit");
+            }
+            return;
         }
 
-        var responses = new Dictionary<string, string>();
+        // Gather content
+        string content;
 
-        // Collect responses using the interactive text editor
-        for (int i = 0; i < DefaultPrompts.Length; i++)
+        if (noEdit && !string.IsNullOrWhiteSpace(notes))
         {
-            string question = DefaultPrompts[i];
-            
+            // Use CLI argument directly
+            content = notes;
+        }
+        else
+        {
+            // Interactive editor mode
             if (!jsonOutput)
             {
-                AnsiConsole.MarkupLine($"[yellow]{question}[/]");
-                AnsiConsole.MarkupLine("[dim](Press Ctrl+D when done, Ctrl+C to cancel)[/]");
-                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine("\n[bold cyan]📝 Notes for Today[/]");
+                AnsiConsole.MarkupLine("[dim](Press Ctrl+D when done, Ctrl+C to cancel)[/]\n");
             }
 
-            // Use the text editor for multi-line input
-            var editorConfig = EditorConfiguration.Default with { Title = question };
+            var editorConfig = EditorConfiguration.Default with { Title = "Notes for Today" };
             EditorResult editorResult = await textEditor.EditAsync(
-                initialContent: null,
+                initialContent: notes, // Use notes as initial content if provided
                 configuration: editorConfig,
                 cancellationToken: CancellationToken.None).ConfigureAwait(false);
 
@@ -100,7 +118,15 @@ public static class TodayCommandHandler
 
             if (editorResult.IsError)
             {
-                if (!jsonOutput)
+                if (jsonOutput)
+                {
+                    string json = JsonOutputFormatter.FormatFailure(
+                        CommandNames.Today,
+                        $"Editor error: {editorResult.ErrorMessage}",
+                        DateTimeOffset.UtcNow);
+                    Console.WriteLine(json);
+                }
+                else
                 {
                     AnsiConsole.MarkupLine($"[red]Editor error: {editorResult.ErrorMessage.EscapeMarkup()}[/]");
                 }
@@ -109,66 +135,35 @@ public static class TodayCommandHandler
 
             if (string.IsNullOrWhiteSpace(editorResult.Content))
             {
-                if (!jsonOutput)
+                if (jsonOutput)
                 {
-                    AnsiConsole.MarkupLine("[red]Answer cannot be empty. Please try again.[/]");
-                    i--; // Retry this question
+                    string json = JsonOutputFormatter.FormatFailure(
+                        CommandNames.Today,
+                        "No content entered",
+                        DateTimeOffset.UtcNow);
+                    Console.WriteLine(json);
                 }
-                continue;
+                else
+                {
+                    AnsiConsole.MarkupLine("[yellow]No content entered. Exiting.[/]");
+                }
+                return;
             }
 
-            responses[question] = editorResult.Content.Trim();
+            content = editorResult.Content.Trim();
 
             if (!jsonOutput)
             {
-                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine("\n[green]✓[/] Content saved\n");
             }
-        }
-
-        // Ask if user wants to add more responses (up to 5 total)
-        while (responses.Count < 5 && !jsonOutput)
-        {
-            if (!AnsiConsole.Confirm($"[dim]Add another response? ({responses.Count}/5)[/]", defaultValue: false))
-            {
-                break;
-            }
-
-            string customQuestion = AnsiConsole.Ask<string>("[yellow]Your question:[/]");
-            if (string.IsNullOrWhiteSpace(customQuestion))
-            {
-                AnsiConsole.MarkupLine("[red]Question cannot be empty.[/]");
-                continue;
-            }
-
-            AnsiConsole.MarkupLine("[dim](Press Ctrl+D when done, Ctrl+C to cancel)[/]");
-            AnsiConsole.WriteLine();
-
-            var editorConfig = EditorConfiguration.Default with { Title = "Add another response?" };
-            EditorResult editorResult = await textEditor.EditAsync(
-                initialContent: null,
-                configuration: editorConfig,
-                cancellationToken: CancellationToken.None).ConfigureAwait(false);
-
-            if (editorResult.IsCancelled || editorResult.IsError)
-            {
-                AnsiConsole.MarkupLine("[yellow]Skipping custom question.[/]");
-                continue;
-            }
-
-            if (string.IsNullOrWhiteSpace(editorResult.Content))
-            {
-                AnsiConsole.MarkupLine("[red]Answer cannot be empty.[/]");
-                continue;
-            }
-
-            responses[customQuestion.Trim()] = editorResult.Content.Trim();
-            AnsiConsole.WriteLine();
         }
 
         // Create command
         var command = new CreateDailyEntryCommand
         {
-            Responses = responses,
+            Content = content,
+            TemplateName = templateName,
+            UseDefaultTemplate = useDefaultTemplate,
             LlmProviderOverride = providerOverride
         };
 

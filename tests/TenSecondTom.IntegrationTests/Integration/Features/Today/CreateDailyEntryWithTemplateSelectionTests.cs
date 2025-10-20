@@ -59,12 +59,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
 
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["What happened today?"] = "Had a productive meeting",
-                ["Plans for tomorrow?"] = "Finish the design doc",
-                ["How are you feeling?"] = "Energized"
-            }
+            Content = "Had a productive meeting\nFinish the design doc\nEnergized"
         };
 
         // Act
@@ -94,12 +89,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
 
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["What happened today?"] = "Had a productive meeting",
-                ["Plans for tomorrow?"] = "Finish the design doc",
-                ["How are you feeling?"] = "Energized"
-            }
+            Content = "Had a productive meeting\nFinish the design doc\nEnergized"
         };
 
         // Act
@@ -134,12 +124,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
 
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["What happened today?"] = "Meeting",
-                ["Plans for tomorrow?"] = "Code review",
-                ["How are you feeling?"] = "Good"
-            }
+            Content = "Meeting\nCode review\nGood"
         };
 
         // Act
@@ -188,12 +173,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
 
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["What happened today?"] = "Meeting",
-                ["Plans for tomorrow?"] = "Code review",
-                ["How are you feeling?"] = "Good"
-            }
+            Content = "Meeting\nCode review\nGood"
         };
 
         // Act
@@ -225,12 +205,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
 
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["What happened today?"] = "Meeting",
-                ["Plans for tomorrow?"] = "Code review",
-                ["How are you feeling?"] = "Good"
-            }
+            Content = "Meeting\nCode review\nGood"
         };
 
         // Act
@@ -251,12 +226,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
 
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["What happened today?"] = "Meeting",
-                ["Plans for tomorrow?"] = "Code review",
-                ["How are you feeling?"] = "Good"
-            }
+            Content = "Meeting\nCode review\nGood"
         };
 
         // Act
@@ -305,8 +275,8 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
             .ReturnsAsync(() =>
             {
                 callSequence.Add("LLMCall");
-                return Result<LlmResponse>.Success(new LlmResponse 
-                { 
+                return Result<LlmResponse>.Success(new LlmResponse
+                {
                     Content = "Summary generated",
                     InputTokens = 10,
                     OutputTokens = 20
@@ -315,12 +285,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
 
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["What happened today?"] = "Meeting",
-                ["Plans for tomorrow?"] = "Code review",
-                ["How are you feeling?"] = "Good"
-            }
+            Content = "Meeting\nCode review\nGood"
         };
 
         // Act

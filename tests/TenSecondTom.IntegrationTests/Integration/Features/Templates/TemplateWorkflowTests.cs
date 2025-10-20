@@ -96,12 +96,7 @@ version: 1.0
 
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["What happened today?"] = "Implemented custom templates feature",
-                ["Plans for tomorrow?"] = "Add comprehensive tests",
-                ["How are you feeling?"] = "Accomplished"
-            }
+            Content = "Implemented custom templates feature\nAdd comprehensive tests\nAccomplished"
         };
 
         // Act - Run command which should discover and use custom template
@@ -204,12 +199,7 @@ A brief daily check-in.
         var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["What happened?"] = "Created templates",
-                ["Plans?"] = "Test them",
-                ["Feeling?"] = "Good"
-            }
+            Content = "Created templates\nTest them\nGood"
         };
 
         // Act
@@ -272,12 +262,7 @@ invalid: {unclosed
         var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["What happened today?"] = "Worked on templates",
-                ["Plans for tomorrow?"] = "Test validation",
-                ["How are you feeling?"] = "Good"
-            }
+            Content = "Worked on templates\nTest validation\nGood"
         };
 
         // Act
@@ -356,12 +341,7 @@ title: Another Template
         var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["What happened?"] = "Test input",
-                ["Plans?"] = "Test plans",
-                ["Feeling?"] = "Good"
-            }
+            Content = "Test input\nTest plans\nGood"
         };
 
         // Act

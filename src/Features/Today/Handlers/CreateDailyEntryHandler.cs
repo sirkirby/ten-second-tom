@@ -98,57 +98,87 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
         int entryNumber = countResult.Value + 1;
 
         // 4. Format user input for LLM
-        string userInput = FormatUserInput(request.Responses);
+        string userInput = FormatUserInput(request.Content);
 
         // 5. Select prompt template
         string selectedTemplateId;
-        Result<ListTemplatesQueryResult> templatesResult = await _listTemplatesHandler.Handle(
-            new ListTemplatesQuery(FilterByType: TemplateType.Daily),
-            cancellationToken).ConfigureAwait(false);
 
-        if (!templatesResult.IsSuccess || templatesResult.Value.Templates.Count == 0)
+        if (!string.IsNullOrWhiteSpace(request.TemplateName))
         {
-            // Fall back to embedded default template
-            _logger.LogWarning("No daily templates found, falling back to embedded default template");
-            // Note: User notification is handled by CompositeTemplateLoader logging
-            // Console output would break separation of concerns - CLI handlers should display warnings
-            selectedTemplateId = "daily-summary";
+            // User specified a template name via --template flag
+            selectedTemplateId = request.TemplateName;
+            _logger.LogDebug("Using user-specified template: {TemplateId}", selectedTemplateId);
         }
-        else if (templatesResult.Value.Templates.Count == 1)
+        else if (request.UseDefaultTemplate)
         {
-            // Auto-select single template
-            selectedTemplateId = templatesResult.Value.Templates[0].TemplateId;
-            _logger.LogDebug("Auto-selected single daily template: {TemplateId}", selectedTemplateId);
+            // User requested default template via --use-default-template flag
+            selectedTemplateId = TemplateConstants.DailySummaryTemplateId;
+            _logger.LogDebug("Using default template as requested: {TemplateId}", selectedTemplateId);
         }
         else
         {
-            // Multiple templates - prompt user to select
-            try
+            // Existing flow: list templates and auto-select or prompt user
+            Result<ListTemplatesQueryResult> templatesResult = await _listTemplatesHandler.Handle(
+                new ListTemplatesQuery(FilterByType: TemplateType.Daily),
+                cancellationToken).ConfigureAwait(false);
+
+            if (!templatesResult.IsSuccess || templatesResult.Value.Templates.Count == 0)
             {
-                string? userSelectedId = await _templateSelectionUI.SelectTemplateAsync(
-                    templatesResult.Value.Templates,
-                    "today",
-                    cancellationToken).ConfigureAwait(false);
-
-                if (string.IsNullOrWhiteSpace(userSelectedId))
-                {
-                    return Result<DailyEntry>.Failure("Template selection cancelled");
-                }
-
-                selectedTemplateId = userSelectedId;
-                _logger.LogInformation("User selected daily template: {TemplateId}", selectedTemplateId);
+                // Fall back to embedded default template
+                _logger.LogWarning("No daily templates found, falling back to embedded default template");
+                selectedTemplateId = TemplateConstants.DailySummaryTemplateId;
             }
-            catch (OperationCanceledException)
+            else if (templatesResult.Value.Templates.Count == 1)
             {
-                return Result<DailyEntry>.Failure("Template selection cancelled by user");
+                // Auto-select single template
+                selectedTemplateId = templatesResult.Value.Templates[0].TemplateId;
+                _logger.LogDebug("Auto-selected single daily template: {TemplateId}", selectedTemplateId);
+            }
+            else
+            {
+                // Multiple templates - prompt user to select
+                try
+                {
+                    string? userSelectedId = await _templateSelectionUI.SelectTemplateAsync(
+                        templatesResult.Value.Templates,
+                        "today",
+                        cancellationToken).ConfigureAwait(false);
+
+                    if (string.IsNullOrWhiteSpace(userSelectedId))
+                    {
+                        return Result<DailyEntry>.Failure("Template selection cancelled");
+                    }
+
+                    selectedTemplateId = userSelectedId;
+                    _logger.LogInformation("User selected daily template: {TemplateId}", selectedTemplateId);
+                }
+                catch (OperationCanceledException)
+                {
+                    return Result<DailyEntry>.Failure("Template selection cancelled by user");
+                }
             }
         }
 
-        // 6. Load selected prompt template
+        // 6. Load selected prompt template (with fallback for user-specified invalid templates)
         Result<PromptTemplate> templateResult = await _promptLoader.LoadTemplateAsync(selectedTemplateId, cancellationToken).ConfigureAwait(false);
         if (!templateResult.IsSuccess)
         {
-            return Result<DailyEntry>.Failure($"Failed to load prompt template: {templateResult.Error}");
+            // If user specified a template name that doesn't exist, fall back to default
+            if (!string.IsNullOrWhiteSpace(request.TemplateName))
+            {
+                _logger.LogWarning("Template '{TemplateId}' not found, falling back to default template", selectedTemplateId);
+                selectedTemplateId = TemplateConstants.DailySummaryTemplateId;
+                templateResult = await _promptLoader.LoadTemplateAsync(selectedTemplateId, cancellationToken).ConfigureAwait(false);
+
+                if (!templateResult.IsSuccess)
+                {
+                    return Result<DailyEntry>.Failure($"Failed to load default template: {templateResult.Error}");
+                }
+            }
+            else
+            {
+                return Result<DailyEntry>.Failure($"Failed to load prompt template: {templateResult.Error}");
+            }
         }
 
         string prompt = RenderPrompt(templateResult.Value, userInput);
@@ -244,27 +274,9 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
 
     private static Result<DailyEntry> ValidateCommand(CreateDailyEntryCommand request)
     {
-        if (request.Responses == null || request.Responses.Count == 0)
+        if (string.IsNullOrWhiteSpace(request.Content))
         {
-            return Result<DailyEntry>.Failure("Daily responses cannot be empty");
-        }
-
-        if (request.Responses.Count < 3 || request.Responses.Count > 5)
-        {
-            return Result<DailyEntry>.Failure("Daily reflection requires 3-5 responses");
-        }
-
-        foreach (KeyValuePair<string, string> kvp in request.Responses)
-        {
-            if (string.IsNullOrWhiteSpace(kvp.Key))
-            {
-                return Result<DailyEntry>.Failure("Question text cannot be empty");
-            }
-
-            if (string.IsNullOrWhiteSpace(kvp.Value))
-            {
-                return Result<DailyEntry>.Failure("Answer cannot be empty or whitespace");
-            }
+            return Result<DailyEntry>.Failure("Daily content cannot be null, empty, or whitespace");
         }
 
         if (!string.IsNullOrWhiteSpace(request.LlmProviderOverride))
@@ -281,16 +293,10 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
         return Result<DailyEntry>.Success(null!); // Validation passed, but no entry created yet
     }
 
-    private static string FormatUserInput(Dictionary<string, string> responses)
+    private static string FormatUserInput(string content)
     {
-        var lines = new List<string>();
-        foreach (KeyValuePair<string, string> kvp in responses)
-        {
-            lines.Add($"Q: {kvp.Key}");
-            lines.Add($"A: {kvp.Value}");
-            lines.Add(string.Empty); // Blank line between Q&A pairs
-        }
-        return string.Join(Environment.NewLine, lines);
+        // Content is now provided directly by the user - return as-is to preserve formatting
+        return content;
     }
 
     private static string RenderPrompt(PromptTemplate template, string userInput)

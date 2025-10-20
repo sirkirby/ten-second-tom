@@ -167,12 +167,39 @@ public static class CommandRegistry
     {
         var todayCommand = new Command("today", "Capture today's reflection with 3-5 prompts");
 
-        // Add options for LLM provider override
+        // Add argument for notes
+        var notesArgument = new Argument<string?>("notes")
+        {
+            Description = "Notes for today. If omitted, opens interactive editor.",
+            Arity = ArgumentArity.ZeroOrOne
+        };
+
+        // Add options
+        var noEditOption = new Option<bool>("--no-edit")
+        {
+            Description = "Skip interactive editor and use notes from command line argument."
+        };
+
+        var useDefaultTemplateOption = new Option<bool>("--use-default-template")
+        {
+            Description = "Automatically use default template (no prompt)."
+        };
+
+        var templateOption = new Option<string?>("--template")
+        {
+            Description = "Use specific template by name (without .md extension)."
+        };
+
         var providerOption = new Option<string?>("--provider")
         {
             Description = "LLM provider to use (OpenAI or Anthropic). Defaults to configured provider."
         };
-        
+
+        // Add argument and options to command
+        todayCommand.Arguments.Add(notesArgument);
+        todayCommand.Options.Add(noEditOption);
+        todayCommand.Options.Add(useDefaultTemplateOption);
+        todayCommand.Options.Add(templateOption);
         todayCommand.Options.Add(providerOption);
         todayCommand.Options.Add(jsonOutputOption);
 
@@ -181,10 +208,25 @@ public static class CommandRegistry
         {
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
             string? provider = parseResult.GetValue(providerOption);
+            string? notes = parseResult.GetValue(notesArgument);
+            bool noEdit = parseResult.GetValue(noEditOption);
+            bool useDefaultTemplate = parseResult.GetValue(useDefaultTemplateOption);
+            string? templateName = parseResult.GetValue(templateOption);
+
             var handler = serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
             var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
             var textEditor = serviceProvider.GetRequiredService<TenSecondTom.Shared.TextEditing.Services.IInteractiveTextEditor>();
-            await TodayCommandHandler.ExecuteAsync(handler, authService, textEditor, provider, jsonOutput).ConfigureAwait(false);
+
+            await TodayCommandHandler.ExecuteAsync(
+                handler,
+                authService,
+                textEditor,
+                notes,
+                noEdit,
+                useDefaultTemplate,
+                templateName,
+                provider,
+                jsonOutput).ConfigureAwait(false);
         });
 
         return todayCommand;

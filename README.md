@@ -21,7 +21,7 @@
 
 ## ✨ Features
 
-- 🧠 **Guided Daily Reflections**: Answer 3-5 prompts to capture your day
+- 🧠 **Simplified Daily Reflections**: Single free-form text entry to capture your thoughts
 - 📊 **Weekly Reviews**: AI-generated summaries of your week with themes and patterns
 - 🔍 **Searchable Archive**: Full-text search across all your memories
 - 🤖 **Multiple AI Providers**: Support for OpenAI and Anthropic
@@ -35,11 +35,54 @@
 
 ---
 
+## 🔄 Breaking Changes
+
+### Version 2.0.0 (Upcoming)
+
+#### Simplified `/today` Command
+The `/today` command has been streamlined for a better user experience:
+
+- **Before**: Three separate prompts ("What happened today?", "Plans for tomorrow?", "Unfinished tasks?")
+- **After**: Single free-form text entry allowing you to write naturally
+
+**Migration Notes:**
+- No data migration required - all existing entries remain unchanged
+- Custom templates continue to work - they now receive the complete user input via `{{USER_INPUT}}`
+- New CLI options available for automation: `--no-edit`, `--use-default-template`, `--template <name>`
+
+---
+
 ## 📋 Prerequisites
 
 - **.NET 9 SDK** or later ([Download](https://dotnet.microsoft.com/download))
 - **OpenAI API Key** or **Anthropic API Key**
 - **SSH Key** (Ed25519 or RSA) in `~/.ssh/`
+
+---
+
+## 📋 Command Reference
+
+### today Command
+
+```
+tom today [notes] [options]
+
+Arguments:
+  notes                        Notes for today (optional). If omitted, opens interactive editor.
+
+Options:
+  --no-edit                    Skip interactive editor, use notes from command line
+  --use-default-template       Automatically use default template (no prompt)
+  --template <name>            Use specific template by name (without .md)
+  --provider <provider>        Override LLM provider (OpenAI or Anthropic)
+  --output-json                Output results in JSON format
+
+Examples:
+  tom today                                              # Interactive mode (opens editor)
+  tom today "Quick note" --no-edit                      # Quick entry mode
+  tom today "Note" --no-edit --use-default-template     # Fastest mode (< 3 seconds)
+  tom today "Note" --no-edit --template "standup"       # Use specific template
+```
 
 ---
 
@@ -322,7 +365,7 @@ tom config set api-key "..."  # Update specific setting
 
 ### Daily Reflection
 
-Capture your day with guided prompts:
+Capture your day with a simplified single-prompt flow:
 
 ```bash
 $ tom today
@@ -333,15 +376,14 @@ $ tom today
 ```
 📅 Daily Reflection - October 3, 2025
 
-❓ What happened today?
+📝 What would you like to remember from today?
+
 > Had a productive meeting with the team about the new feature.
   Made significant progress on the design document.
 
-❓ Anything interesting planned for tomorrow?
-> Will finalize the architecture and start implementation.
+  Tomorrow I'll finalize the architecture and start implementation.
 
-❓ Is there something you didn't finish that needs attention?
-> Need to review John's pull request before end of day.
+  Still need to review John's pull request before end of day.
 
 ⏳ Generating summary...
 
@@ -361,6 +403,35 @@ $ tom today
 - [ ] Start implementation tomorrow
 
 ✅ Daily entry saved: ~/ten-second-tom/today/10-03-2025_1.md
+```
+
+### Quick Entry Mode
+
+Skip the interactive editor and provide your notes directly from the command line:
+
+```bash
+# Quick entry without editor
+$ tom today "Completed OAuth integration. Fixed rate limiting issues." --no-edit
+
+# Quick entry with default template (fastest mode)
+$ tom today "Shipped feature X today" --no-edit --use-default-template
+
+# Quick entry with specific template
+$ tom today "Daily standup notes" --no-edit --template "engineering-standup"
+```
+
+### Multi-line Notes from CLI
+
+You can include formatted multi-line notes directly:
+
+```bash
+# Using quotes with line breaks (bash/zsh)
+$ tom today "Line 1: Completed task A
+Line 2: Working on task B
+Line 3: Blocked on task C" --no-edit
+
+# Using echo with pipe
+$ echo -e "Today's highlights:\n- Fixed critical bug\n- Deployed to production" | tom today --no-edit
 ```
 
 ### Weekly Review
@@ -449,7 +520,7 @@ All commands in shell mode use a slash prefix:
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `/today` | Capture today's reflection | `/today` |
+| `/today` | Capture today's reflection (single prompt) | `/today` |
 | `/thisweek` | Generate weekly review | `/thisweek` |
 | `/search` | Search memory entries | `/search meeting` |
 | `/login` | Authenticate with SSH key | `/login` |
