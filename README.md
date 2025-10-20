@@ -35,23 +35,6 @@
 
 ---
 
-## 🔄 Breaking Changes
-
-### Version 2.0.0 (Upcoming)
-
-#### Simplified `/today` Command
-The `/today` command has been streamlined for a better user experience:
-
-- **Before**: Three separate prompts ("What happened today?", "Plans for tomorrow?", "Unfinished tasks?")
-- **After**: Single free-form text entry allowing you to write naturally
-
-**Migration Notes:**
-- No data migration required - all existing entries remain unchanged
-- Custom templates continue to work - they now receive the complete user input via `{{USER_INPUT}}`
-- New CLI options available for automation: `--no-edit`, `--use-default-template`, `--template <name>`
-
----
-
 ## 📋 Prerequisites
 
 - **.NET 9 SDK** or later ([Download](https://dotnet.microsoft.com/download))
