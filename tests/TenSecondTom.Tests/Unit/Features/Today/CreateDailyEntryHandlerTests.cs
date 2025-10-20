@@ -10,6 +10,7 @@ using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 
@@ -106,12 +107,7 @@ public sealed class CreateDailyEntryHandlerTests
         // Arrange
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["What happened today?"] = "Had a productive meeting",
-                ["Plans for tomorrow?"] = "Finish the design doc",
-                ["How are you feeling?"] = "Energized and focused"
-            }
+            Content = "Had a productive meeting today.\nPlanning to finish the design doc tomorrow.\nFeeling energized and focused."
         };
 
         // Act
@@ -132,12 +128,12 @@ public sealed class CreateDailyEntryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WithEmptyResponses_ReturnsValidationError()
+    public async Task Handle_WithEmptyContent_ReturnsValidationError()
     {
         // Arrange
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>()
+            Content = string.Empty
         };
 
         // Act
@@ -145,7 +141,7 @@ public sealed class CreateDailyEntryHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Daily responses cannot be empty");
+        result.Error.Should().Contain("content");
 
         _mockStorage.Verify(s => s.SaveAsync(
             It.IsAny<DailyEntry>(),
@@ -153,16 +149,12 @@ public sealed class CreateDailyEntryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WithFewerThan3Responses_ReturnsValidationError()
+    public async Task Handle_WithWhitespaceOnlyContent_ReturnsValidationError()
     {
         // Arrange
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["Question 1?"] = "Answer 1",
-                ["Question 2?"] = "Answer 2"
-            }
+            Content = "   \t\n   "
         };
 
         // Act
@@ -170,7 +162,7 @@ public sealed class CreateDailyEntryHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Daily reflection requires 3-5 responses");
+        result.Error.Should().Contain("content");
 
         _mockStorage.Verify(s => s.SaveAsync(
             It.IsAny<DailyEntry>(),
@@ -178,32 +170,26 @@ public sealed class CreateDailyEntryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WithMoreThan5Responses_ReturnsValidationError()
+    public async Task Handle_WithMultiLineContent_PreservesFormatting()
     {
         // Arrange
+        var multiLineContent = "First line of my day\nSecond line with details\n\nThird line after blank";
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["Question 1?"] = "Answer 1",
-                ["Question 2?"] = "Answer 2",
-                ["Question 3?"] = "Answer 3",
-                ["Question 4?"] = "Answer 4",
-                ["Question 5?"] = "Answer 5",
-                ["Question 6?"] = "Answer 6"
-            }
+            Content = multiLineContent
         };
 
         // Act
         Result<DailyEntry> result = await _handler.Handle(command, CancellationToken.None);
 
         // Assert
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Daily reflection requires 3-5 responses");
+        result.IsSuccess.Should().BeTrue();
+        result.Value.UserInput.Should().Be(multiLineContent);
+        result.Value.UserInput.Should().Contain("\n");
 
         _mockStorage.Verify(s => s.SaveAsync(
-            It.IsAny<DailyEntry>(),
-            It.IsAny<CancellationToken>()), Times.Never);
+            It.Is<DailyEntry>(e => e.UserInput == multiLineContent),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -212,16 +198,11 @@ public sealed class CreateDailyEntryHandlerTests
         // Arrange
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["What happened today?"] = "Had a productive meeting",
-                ["Plans for tomorrow?"] = "Finish the design doc",
-                ["How are you feeling?"] = "Energized and focused"
-            }
+            Content = "Had a productive meeting today.\nPlanning to finish the design doc tomorrow.\nFeeling energized and focused."
         };
 
         _mockLlmProvider.Setup(p => p.GenerateCompletionAsync(
-                It.IsAny<string>(), 
+                It.IsAny<string>(),
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
@@ -237,8 +218,8 @@ public sealed class CreateDailyEntryHandlerTests
 
         // Verify partial entry was saved (user input only, no LLM response)
         _mockStorage.Verify(s => s.SaveAsync(
-            It.Is<DailyEntry>(e => 
-                e.UserInput.Contains("Had a productive meeting") && 
+            It.Is<DailyEntry>(e =>
+                e.UserInput.Contains("Had a productive meeting") &&
                 string.IsNullOrEmpty(e.LlmResponse)),
             It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -249,12 +230,7 @@ public sealed class CreateDailyEntryHandlerTests
         // Arrange
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["What happened today?"] = "Had a productive meeting",
-                ["Plans for tomorrow?"] = "Finish the design doc",
-                ["How are you feeling?"] = "Energized and focused"
-            }
+            Content = "Had a productive meeting today.\nPlanning to finish the design doc tomorrow.\nFeeling energized and focused."
         };
 
         _mockStorage.Setup(s => s.SaveAsync(It.IsAny<DailyEntry>(), It.IsAny<CancellationToken>()))
@@ -275,12 +251,7 @@ public sealed class CreateDailyEntryHandlerTests
         // Arrange
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["What happened today?"] = "Had a productive meeting",
-                ["Plans for tomorrow?"] = "Finish the design doc",
-                ["How are you feeling?"] = "Energized and focused"
-            },
+            Content = "Had a productive meeting today.\nPlanning to finish the design doc tomorrow.\nFeeling energized and focused.",
             LlmProviderOverride = "OpenAI"
         };
 
@@ -304,12 +275,7 @@ public sealed class CreateDailyEntryHandlerTests
         // Arrange
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["What happened today?"] = "Had a productive meeting",
-                ["Plans for tomorrow?"] = "Finish the design doc",
-                ["How are you feeling?"] = "Energized and focused"
-            },
+            Content = "Had a productive meeting today.\nPlanning to finish the design doc tomorrow.\nFeeling energized and focused.",
             LlmProviderOverride = "Anthropic"
         };
 
@@ -333,12 +299,7 @@ public sealed class CreateDailyEntryHandlerTests
         // Arrange
         var command = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["What happened today?"] = "Had a productive meeting",
-                ["Plans for tomorrow?"] = "Finish the design doc",
-                ["How are you feeling?"] = "Energized and focused"
-            },
+            Content = "Had a productive meeting today.\nPlanning to finish the design doc tomorrow.\nFeeling energized and focused.",
             LlmProviderOverride = "InvalidProvider"
         };
 
@@ -361,22 +322,12 @@ public sealed class CreateDailyEntryHandlerTests
         // Arrange
         var command1 = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["What happened today?"] = "Morning meeting",
-                ["Plans for tomorrow?"] = "Design review",
-                ["How are you feeling?"] = "Good"
-            }
+            Content = "Morning meeting notes and reflections."
         };
 
         var command2 = new CreateDailyEntryCommand
         {
-            Responses = new Dictionary<string, string>
-            {
-                ["What happened today?"] = "Afternoon coding session",
-                ["Plans for tomorrow?"] = "Code review",
-                ["How are you feeling?"] = "Productive"
-            }
+            Content = "Afternoon coding session recap."
         };
 
         // Setup storage to simulate existing entry
@@ -404,5 +355,114 @@ public sealed class CreateDailyEntryHandlerTests
             It.Is<string>(cmd => cmd == "today"),
             It.IsAny<DateTime>(),
             It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task Handle_WithTemplateName_UsesSpecifiedTemplate()
+    {
+        // Arrange
+        var customTemplateId = "custom-daily-template";
+        var command = new CreateDailyEntryCommand
+        {
+            Content = "Daily content for custom template",
+            TemplateName = customTemplateId
+        };
+
+        _mockPromptLoader.Setup(p => p.LoadTemplateAsync(customTemplateId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<PromptTemplate>.Success(new PromptTemplate
+            {
+                TemplateId = customTemplateId,
+                Content = "Custom template: {{USER_INPUT}}",
+                TemplateType = TemplateType.Daily,
+                Source = TemplateSource.FileSystem
+            }));
+
+        // Act
+        Result<DailyEntry> result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+
+        _mockPromptLoader.Verify(p => p.LoadTemplateAsync(customTemplateId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_WithInvalidTemplateName_FallsBackToDefaultAndLogsWarning()
+    {
+        // Arrange
+        var invalidTemplateId = "non-existent-template";
+        var command = new CreateDailyEntryCommand
+        {
+            Content = "Daily content with invalid template",
+            TemplateName = invalidTemplateId
+        };
+
+        // Setup: LoadTemplateAsync returns failure for invalid template
+        _mockPromptLoader.Setup(p => p.LoadTemplateAsync(invalidTemplateId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<PromptTemplate>.Failure($"Template '{invalidTemplateId}' not found"));
+
+        // Setup: LoadTemplateAsync succeeds for default template
+        _mockPromptLoader.Setup(p => p.LoadTemplateAsync(TemplateConstants.DailySummaryTemplateId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<PromptTemplate>.Success(new PromptTemplate
+            {
+                TemplateId = TemplateConstants.DailySummaryTemplateId,
+                Content = "Default: {{USER_INPUT}}",
+                TemplateType = TemplateType.Daily,
+                Source = TemplateSource.Embedded
+            }));
+
+        // Act
+        Result<DailyEntry> result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+
+        // Verify the invalid template was attempted
+        _mockPromptLoader.Verify(p => p.LoadTemplateAsync(invalidTemplateId, It.IsAny<CancellationToken>()), Times.Once);
+
+        // Verify fallback to default template
+        _mockPromptLoader.Verify(p => p.LoadTemplateAsync(TemplateConstants.DailySummaryTemplateId, It.IsAny<CancellationToken>()), Times.Once);
+
+        // Verify warning was logged
+        _mockLogger.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains(invalidTemplateId)),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_WithUseDefaultTemplate_SkipsTemplateSelection()
+    {
+        // Arrange
+        var command = new CreateDailyEntryCommand
+        {
+            Content = "Daily content for default template",
+            UseDefaultTemplate = true
+        };
+
+        // Setup multiple templates to ensure selection is bypassed
+        _mockPromptLoader.Setup(p => p.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<List<PromptTemplate>>.Success([
+                new PromptTemplate { TemplateId = "template1", Content = "Template 1", TemplateType = TemplateType.Daily, Source = TemplateSource.FileSystem },
+                new PromptTemplate { TemplateId = "template2", Content = "Template 2", TemplateType = TemplateType.Daily, Source = TemplateSource.FileSystem }
+            ]));
+
+        // Act
+        Result<DailyEntry> result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+
+        // Verify that the default template was loaded directly
+        _mockPromptLoader.Verify(p => p.LoadTemplateAsync(TemplateConstants.DailySummaryTemplateId, It.IsAny<CancellationToken>()), Times.Once);
+
+        // Verify template selection UI was never shown
+        _mockTemplateSelectionUI.Verify(
+            ui => ui.SelectTemplateAsync(It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }

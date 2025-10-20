@@ -61,7 +61,7 @@ public sealed class TodayCommandHandlerTests
                     Command = "today",
                     Timestamp = DateTimeOffset.UtcNow,
                     EntryNumber = 1,
-                    UserInput = string.Join("\n", cmd.Responses.Values),
+                    UserInput = cmd.Content,
                     LlmResponse = "Test summary",
                     Metadata = new MemoryEntryMetadata
                     {
@@ -88,6 +88,10 @@ public sealed class TodayCommandHandlerTests
             mockHandler.Object,
             mockAuthService.Object,
             mockEditor.Object,
+            notes: null,
+            noEdit: false,
+            useDefaultTemplate: false,
+            templateName: null,
             providerOverride: null,
             jsonOutput: true // Use JSON mode to avoid console output
         );
@@ -98,13 +102,13 @@ public sealed class TodayCommandHandlerTests
                 It.IsAny<string?>(),
                 It.IsAny<EditorConfiguration?>(),
                 It.IsAny<CancellationToken>()),
-            Times.Exactly(3)); // Should call editor 3 times (for default prompts)
+            Times.Once); // Should call editor once for content input
 
         mockHandler.Verify(
             h => h.Handle(
                 It.Is<CreateDailyEntryCommand>(cmd =>
-                    cmd.Responses.Count == 3 &&
-                    cmd.Responses.Values.All(v => v.StartsWith("Answer", StringComparison.Ordinal))),
+                    !string.IsNullOrEmpty(cmd.Content) &&
+                    cmd.Content.StartsWith("Answer", StringComparison.Ordinal)),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -135,6 +139,10 @@ public sealed class TodayCommandHandlerTests
             mockHandler.Object,
             mockAuthService.Object,
             mockEditor.Object,
+            notes: null,
+            noEdit: false,
+            useDefaultTemplate: false,
+            templateName: null,
             providerOverride: null,
             jsonOutput: true
         );
@@ -180,6 +188,10 @@ public sealed class TodayCommandHandlerTests
             mockHandler.Object,
             mockAuthService.Object,
             mockEditor.Object,
+            notes: null,
+            noEdit: false,
+            useDefaultTemplate: false,
+            templateName: null,
             providerOverride: null,
             jsonOutput: true
         );
@@ -232,10 +244,10 @@ public sealed class TodayCommandHandlerTests
                     Command = "today",
                     Timestamp = DateTimeOffset.UtcNow,
                     EntryNumber = 1,
-                    UserInput = string.Join("\n", cmd.Responses.Values),
+                    UserInput = cmd.Content,
                     LlmResponse = "Summary",
-                    Metadata = new MemoryEntryMetadata 
-                    { 
+                    Metadata = new MemoryEntryMetadata
+                    {
                         LlmProvider = "test-provider",
                         LlmModel = "test-model"
                     },
@@ -249,6 +261,10 @@ public sealed class TodayCommandHandlerTests
             mockHandler.Object,
             mockAuthService.Object,
             mockEditor.Object,
+            notes: null,
+            noEdit: false,
+            useDefaultTemplate: false,
+            templateName: null,
             providerOverride: null,
             jsonOutput: true
         );
@@ -257,7 +273,7 @@ public sealed class TodayCommandHandlerTests
         mockHandler.Verify(
             h => h.Handle(
                 It.Is<CreateDailyEntryCommand>(cmd =>
-                    cmd.Responses.Values.All(v => v.Contains('\n', StringComparison.Ordinal))),
+                    cmd.Content.Contains('\n', StringComparison.Ordinal)),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
