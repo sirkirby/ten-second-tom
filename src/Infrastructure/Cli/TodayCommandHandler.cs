@@ -1,13 +1,21 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Spectre.Console;
+using TenSecondTom.Features.Audio.Commands;
+using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Features.Today.Commands;
-using TenSecondTom.Features.Today.Handlers;
+using TenSecondTom.Features.Today.Models;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.OutputFormatters;
 using TenSecondTom.Shared.Results;
 using TenSecondTom.Shared.TextEditing.Services;
 using TenSecondTom.Shared.TextEditing.Models;
+using AudioHandlers = TenSecondTom.Features.Audio.Handlers;
+using TodayHandlers = TenSecondTom.Features.Today.Handlers;
 
 namespace TenSecondTom.Infrastructure.Cli;
 
@@ -20,31 +28,36 @@ public static class TodayCommandHandler
     /// <summary>
     /// Executes the today command by prompting the user and creating a daily entry.
     /// </summary>
-    /// <param name="handler">The command handler.</param>
-    /// <param name="authService">The authentication service.</param>
-    /// <param name="textEditor">The interactive text editor for multi-line input.</param>
+    /// <param name="serviceProvider">Service provider for dependency injection.</param>
     /// <param name="notes">Optional notes content from command line.</param>
     /// <param name="noEdit">Whether to skip the interactive editor.</param>
     /// <param name="useDefaultTemplate">Whether to use the default template automatically.</param>
     /// <param name="templateName">Optional template name to use.</param>
     /// <param name="providerOverride">Optional LLM provider override.</param>
+    /// <param name="useVoice">Whether to use voice recording for input.</param>
+    /// <param name="sttSelection">STT engine selection (auto, local, or openai). Only used with voice input.</param>
     /// <param name="jsonOutput">Whether to output results in JSON format.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA1849:Call async methods when in an async method", Justification = "Spectre.Console Ask/Confirm are synchronous by design")]
     public static async Task ExecuteAsync(
-        IRequestHandler<CreateDailyEntryCommand, Result<DailyEntry>> handler,
-        IAuthenticationService authService,
-        IInteractiveTextEditor textEditor,
+        IServiceProvider serviceProvider,
         string? notes,
         bool noEdit,
         bool useDefaultTemplate,
         string? templateName,
         string? providerOverride,
+        bool useVoice,
+        string? sttSelection,
         bool jsonOutput = false)
     {
-        ArgumentNullException.ThrowIfNull(handler);
-        ArgumentNullException.ThrowIfNull(authService);
-        ArgumentNullException.ThrowIfNull(textEditor);
+        ArgumentNullException.ThrowIfNull(serviceProvider);
+
+        // Resolve required services
+        var handler = serviceProvider.GetRequiredService<TodayHandlers.CreateDailyEntryHandler>();
+        var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
+        var textEditor = serviceProvider.GetRequiredService<IInteractiveTextEditor>();
+        var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+        var logger = serviceProvider.GetRequiredService<ILogger<TodayHandlers.CreateVoiceNoteEntryHandler>>();
 
         // Show warning if using mock authentication (only in non-JSON mode)
         if (!jsonOutput && authService is MockAuthenticationService)
@@ -62,6 +75,19 @@ public static class TodayCommandHandler
 
         if (!authResult.IsSuccess)
         {
+            return;
+        }
+
+        // Handle voice input mode
+        if (useVoice)
+        {
+            await ExecuteVoiceInputAsync(
+                serviceProvider,
+                useDefaultTemplate,
+                templateName,
+                providerOverride,
+                sttSelection,
+                jsonOutput).ConfigureAwait(false);
             return;
         }
 
@@ -170,7 +196,7 @@ public static class TodayCommandHandler
         // Execute command with progress indicator (only show progress in non-JSON mode)
         DailyEntry? entry = null;
         Result<DailyEntry> commandResult;
-        
+
         if (jsonOutput)
         {
             commandResult = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
@@ -273,5 +299,261 @@ public static class TodayCommandHandler
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Executes the voice input workflow for the today command.
+    /// Records audio, transcribes it, and creates a voice note entry.
+    /// </summary>
+    private static async Task ExecuteVoiceInputAsync(
+        IServiceProvider serviceProvider,
+        bool useDefaultTemplate,
+        string? templateName,
+        string? providerOverride,
+        string? sttSelection,
+        bool jsonOutput)
+    {
+        // Resolve required services
+        var recordHandler = serviceProvider.GetRequiredService<AudioHandlers.IRequestHandler<RecordAudioCommand, Result<AudioRecording>>>();
+        var transcribeHandler = serviceProvider.GetRequiredService<AudioHandlers.IRequestHandler<TranscribeAudioCommand, Result<TranscriptionResult>>>();
+        var voiceNoteHandler = serviceProvider.GetRequiredService<TodayHandlers.IRequestHandler<CreateVoiceNoteEntryCommand, Result<VoiceNoteEntry>>>();
+        var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+        var logger = serviceProvider.GetRequiredService<ILogger<TodayHandlers.CreateVoiceNoteEntryHandler>>();
+
+        // Get audio configuration
+        var audioConfig = configuration.GetSection("TenSecondTom:Audio").Get<AudioConfiguration>()
+            ?? new AudioConfiguration();
+
+        // Get memory directory from configuration
+        var memoryDirectory = configuration.GetValue<string>("TenSecondTom:MemoryDirectory");
+        if (string.IsNullOrWhiteSpace(memoryDirectory))
+        {
+            var error = "Memory directory not configured. Run 'tom setup' to configure.";
+            if (jsonOutput)
+            {
+                Console.WriteLine(JsonOutputFormatter.FormatFailure(CommandNames.Today, error, DateTimeOffset.UtcNow));
+            }
+            else
+            {
+                AnsiConsole.MarkupLine($"[red]Error:[/] {error}");
+            }
+            return;
+        }
+
+        // Expand home directory
+        memoryDirectory = memoryDirectory.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+
+        // Create temp audio file path
+        var timestamp = DateTimeOffset.Now.ToString("yyyyMMdd-HHmmss");
+        var audioFilePath = Path.Combine(Path.GetTempPath(), $"tom-voice-{timestamp}.wav");
+
+        try
+        {
+            // Step 1: Record audio
+            if (!jsonOutput)
+            {
+                AnsiConsole.MarkupLine("[cyan]🎤 Recording... Press Enter to stop.[/]");
+            }
+            else
+            {
+                logger.LogInformation("Recording audio to {AudioFile}", audioFilePath);
+            }
+
+            var recordCommand = new RecordAudioCommand { OutputPath = audioFilePath };
+            var recordResult = await recordHandler.Handle(recordCommand, CancellationToken.None).ConfigureAwait(false);
+
+            if (!recordResult.IsSuccess)
+            {
+                var error = $"Recording failed: {recordResult.Error}";
+                if (jsonOutput)
+                {
+                    Console.WriteLine(JsonOutputFormatter.FormatFailure(CommandNames.Today, error, DateTimeOffset.UtcNow));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]Error:[/] {error}");
+                }
+                return;
+            }
+
+            var recording = recordResult.Value;
+
+            if (!jsonOutput)
+            {
+                AnsiConsole.MarkupLine($"[green]✓[/] Recording complete ({recording.Duration.TotalSeconds:F1}s)");
+            }
+
+            // Parse STT selection
+            SttSelection selection = ParseSttSelection(sttSelection ?? audioConfig.PreferredStt);
+
+            // Step 2: Transcribe audio
+            if (!jsonOutput)
+            {
+                AnsiConsole.MarkupLine($"[cyan]✍️  Transcribing with {selection}...[/]");
+            }
+            else
+            {
+                logger.LogInformation("Transcribing audio with {Selection}", selection);
+            }
+
+            var transcribeCommand = new TranscribeAudioCommand
+            {
+                AudioFilePath = audioFilePath,
+                Selection = selection
+            };
+
+            Result<TranscriptionResult> transcribeResult;
+            if (jsonOutput)
+            {
+                transcribeResult = await transcribeHandler.Handle(transcribeCommand, CancellationToken.None).ConfigureAwait(false);
+            }
+            else
+            {
+                transcribeResult = Result<TranscriptionResult>.Failure("Not executed");
+                await AnsiConsole.Status()
+                    .Spinner(Spinner.Known.Dots)
+                    .SpinnerStyle(Style.Parse("cyan"))
+                    .StartAsync("[cyan]Transcribing...[/]", async ctx =>
+                    {
+                        transcribeResult = await transcribeHandler.Handle(transcribeCommand, CancellationToken.None).ConfigureAwait(false);
+                    }).ConfigureAwait(false);
+            }
+
+            if (!transcribeResult.IsSuccess)
+            {
+                var error = $"Transcription failed: {transcribeResult.Error}";
+                if (jsonOutput)
+                {
+                    Console.WriteLine(JsonOutputFormatter.FormatFailure(CommandNames.Today, error, DateTimeOffset.UtcNow));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]Error:[/] {error}");
+                }
+                return;
+            }
+
+            var transcription = transcribeResult.Value;
+
+            if (!jsonOutput)
+            {
+                AnsiConsole.MarkupLine($"[green]✓[/] Transcription complete ({transcription.WordCount} words, {transcription.SttEngine})");
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine("[bold]Transcript:[/]");
+                AnsiConsole.MarkupLine($"[dim]{Markup.Escape(transcription.TranscriptText.Trim())}[/]");
+                AnsiConsole.WriteLine();
+            }
+
+            // Step 3: Create voice note entry
+            var voiceNoteCommand = new CreateVoiceNoteEntryCommand
+            {
+                TranscriptText = transcription.TranscriptText,
+                Recording = recording,
+                Transcription = transcription,
+                TemplateName = templateName,
+                UseDefaultTemplate = useDefaultTemplate,
+                LlmProviderOverride = providerOverride
+            };
+
+            var voiceNoteResult = await voiceNoteHandler.Handle(voiceNoteCommand, CancellationToken.None).ConfigureAwait(false);
+
+            if (!voiceNoteResult.IsSuccess)
+            {
+                var error = $"Failed to create voice note entry: {voiceNoteResult.Error}";
+                if (jsonOutput)
+                {
+                    Console.WriteLine(JsonOutputFormatter.FormatFailure(CommandNames.Today, error, DateTimeOffset.UtcNow));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]Error:[/] {error}");
+                }
+                return;
+            }
+
+            var entry = voiceNoteResult.Value;
+
+            // Step 4: Clean up audio file if configured
+            if (!audioConfig.KeepFiles)
+            {
+                try
+                {
+                    File.Delete(audioFilePath);
+                    logger.LogDebug("Deleted temporary audio file: {AudioFile}", audioFilePath);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to delete temporary audio file: {AudioFile}", audioFilePath);
+                }
+            }
+            else
+            {
+                // Move audio file to memory directory if keeping files
+                var audioDestPath = Path.Combine(memoryDirectory, recording.Filename);
+                try
+                {
+                    File.Move(audioFilePath, audioDestPath, overwrite: true);
+                    logger.LogInformation("Moved audio file to {Destination}", audioDestPath);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to move audio file to memory directory");
+                }
+            }
+
+            // Display results
+            if (jsonOutput)
+            {
+                var jsonData = new
+                {
+                    entryId = entry.EntryId,
+                    timestamp = entry.Timestamp,
+                    audioFilename = entry.AudioFilename,
+                    audioDuration = entry.AudioDuration.TotalSeconds,
+                    wordCount = transcription.WordCount,
+                    sttEngine = entry.SttEngine.ToString(),
+                    sttModel = entry.SttModel
+                };
+
+                Console.WriteLine(JsonOutputFormatter.FormatSuccess(CommandNames.Today, jsonData, DateTimeOffset.UtcNow));
+            }
+            else
+            {
+                AnsiConsole.MarkupLine("[bold green]✓ Voice note entry created successfully![/]");
+                AnsiConsole.MarkupLine($"[dim]Entry ID: {entry.EntryId}[/]");
+                if (audioConfig.KeepFiles)
+                {
+                    AnsiConsole.MarkupLine($"[dim]Audio saved: {entry.AudioFilename}[/]");
+                }
+            }
+        }
+        finally
+        {
+            // Ensure cleanup of temp file if it still exists
+            if (File.Exists(audioFilePath))
+            {
+                try
+                {
+                    File.Delete(audioFilePath);
+                }
+                catch
+                {
+                    // Ignore cleanup errors
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Parses STT selection string to enum.
+    /// </summary>
+    private static SttSelection ParseSttSelection(string? selection)
+    {
+        return selection?.ToLowerInvariant() switch
+        {
+            "local" => SttSelection.Local,
+            "openai" => SttSelection.OpenAI,
+            _ => SttSelection.Auto
+        };
     }
 }

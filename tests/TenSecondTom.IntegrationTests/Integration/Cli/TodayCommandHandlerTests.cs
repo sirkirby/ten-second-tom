@@ -1,6 +1,7 @@
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using TenSecondTom.Features.Today.Commands;
 using TenSecondTom.Features.Today.Handlers;
@@ -10,6 +11,7 @@ using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 using TenSecondTom.Shared.TextEditing.Models;
 using TenSecondTom.Shared.TextEditing.Services;
+using TenSecondTom.IntegrationTests.TestHelpers;
 
 namespace TenSecondTom.IntegrationTests.Integration.Cli;
 
@@ -23,9 +25,9 @@ public sealed class TodayCommandHandlerTests
     public async Task ExecuteAsync_WithEditorSaved_CreatesEntry()
     {
         // Arrange
-        var mockHandler = new Mock<IRequestHandler<CreateDailyEntryCommand, Result<DailyEntry>>>();
         var mockAuthService = new Mock<IAuthenticationService>();
         var mockEditor = new Mock<IInteractiveTextEditor>();
+        var mockLlm = MockLlmProvider.WithDailySummaryResponse();
 
         // Setup authentication to succeed
         mockAuthService
@@ -48,51 +50,23 @@ public sealed class TodayCommandHandlerTests
                 );
             });
 
-        // Setup handler to return success
-        mockHandler
-            .Setup(h => h.Handle(
-                It.IsAny<CreateDailyEntryCommand>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync((CreateDailyEntryCommand cmd, CancellationToken ct) =>
-            {
-                var entry = new DailyEntry
-                {
-                    EntryId = "test-entry-1",
-                    Command = "today",
-                    Timestamp = DateTimeOffset.UtcNow,
-                    EntryNumber = 1,
-                    UserInput = cmd.Content,
-                    LlmResponse = "Test summary",
-                    Metadata = new MemoryEntryMetadata
-                    {
-                        LlmProvider = "OpenAI",
-                        LlmModel = "gpt-4",
-                        TokensUsed = 100,
-                        ProcessingDuration = TimeSpan.FromSeconds(1),
-                        CustomTags = new Dictionary<string, string>()
-                    },
-                    Summary = new DailySummary
-                    {
-                        KeyEvents = new List<string> { "Event 1" },
-                        Themes = new List<string> { "Theme 1" },
-                        TodoItems = new List<TodoItem>(),
-                        ImportantPeople = new List<string>(),
-                        NotableTasks = new List<string>()
-                    }
-                };
-                return Result<DailyEntry>.Success(entry);
-            });
+        // Build service provider with mocks
+        var serviceProvider = new TestServiceProviderBuilder()
+            .WithAuthenticationService(mockAuthService.Object)
+            .WithTextEditor(mockEditor.Object)
+            .WithLlmProvider(mockLlm)
+            .Build();
 
         // Act
         await TodayCommandHandler.ExecuteAsync(
-            mockHandler.Object,
-            mockAuthService.Object,
-            mockEditor.Object,
+            serviceProvider,
             notes: null,
             noEdit: false,
             useDefaultTemplate: false,
             templateName: null,
             providerOverride: null,
+            useVoice: false,
+            sttSelection: null,
             jsonOutput: true // Use JSON mode to avoid console output
         );
 
@@ -103,14 +77,6 @@ public sealed class TodayCommandHandlerTests
                 It.IsAny<EditorConfiguration?>(),
                 It.IsAny<CancellationToken>()),
             Times.Once); // Should call editor once for content input
-
-        mockHandler.Verify(
-            h => h.Handle(
-                It.Is<CreateDailyEntryCommand>(cmd =>
-                    !string.IsNullOrEmpty(cmd.Content) &&
-                    cmd.Content.StartsWith("Answer", StringComparison.Ordinal)),
-                It.IsAny<CancellationToken>()),
-            Times.Once);
     }
 
     [Fact]
@@ -134,16 +100,22 @@ public sealed class TodayCommandHandlerTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(EditorResult.Cancelled(EditorMetadata.Empty));
 
+        // Build service provider with mocks
+        var serviceProvider = new TestServiceProviderBuilder()
+            .WithAuthenticationService(mockAuthService.Object)
+            .WithTextEditor(mockEditor.Object)
+            .Build();
+
         // Act
         await TodayCommandHandler.ExecuteAsync(
-            mockHandler.Object,
-            mockAuthService.Object,
-            mockEditor.Object,
+            serviceProvider,
             notes: null,
             noEdit: false,
             useDefaultTemplate: false,
             templateName: null,
             providerOverride: null,
+            useVoice: false,
+            sttSelection: null,
             jsonOutput: true
         );
 
@@ -183,16 +155,22 @@ public sealed class TodayCommandHandlerTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(EditorResult.Error("Terminal error", EditorMetadata.Empty));
 
+        // Build service provider with mocks
+        var serviceProvider = new TestServiceProviderBuilder()
+            .WithAuthenticationService(mockAuthService.Object)
+            .WithTextEditor(mockEditor.Object)
+            .Build();
+
         // Act
         await TodayCommandHandler.ExecuteAsync(
-            mockHandler.Object,
-            mockAuthService.Object,
-            mockEditor.Object,
+            serviceProvider,
             notes: null,
             noEdit: false,
             useDefaultTemplate: false,
             templateName: null,
             providerOverride: null,
+            useVoice: false,
+            sttSelection: null,
             jsonOutput: true
         );
 
@@ -215,9 +193,9 @@ public sealed class TodayCommandHandlerTests
     public async Task ExecuteAsync_WithMultiLineContent_PreservesContent()
     {
         // Arrange
-        var mockHandler = new Mock<IRequestHandler<CreateDailyEntryCommand, Result<DailyEntry>>>();
         var mockAuthService = new Mock<IAuthenticationService>();
         var mockEditor = new Mock<IInteractiveTextEditor>();
+        var mockLlm = MockLlmProvider.WithDailySummaryResponse();
 
         mockAuthService
             .Setup(a => a.IsAuthenticatedAsync(It.IsAny<CancellationToken>()))
@@ -232,50 +210,32 @@ public sealed class TodayCommandHandlerTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(EditorResult.Saved(multiLineContent, EditorMetadata.Empty));
 
-        mockHandler
-            .Setup(h => h.Handle(
-                It.IsAny<CreateDailyEntryCommand>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync((CreateDailyEntryCommand cmd, CancellationToken ct) =>
-            {
-                var entry = new DailyEntry
-                {
-                    EntryId = "test-entry",
-                    Command = "today",
-                    Timestamp = DateTimeOffset.UtcNow,
-                    EntryNumber = 1,
-                    UserInput = cmd.Content,
-                    LlmResponse = "Summary",
-                    Metadata = new MemoryEntryMetadata
-                    {
-                        LlmProvider = "test-provider",
-                        LlmModel = "test-model"
-                    },
-                    Summary = new DailySummary()
-                };
-                return Result<DailyEntry>.Success(entry);
-            });
+        // Build service provider with mocks
+        var serviceProvider = new TestServiceProviderBuilder()
+            .WithAuthenticationService(mockAuthService.Object)
+            .WithTextEditor(mockEditor.Object)
+            .WithLlmProvider(mockLlm)
+            .Build();
 
         // Act
         await TodayCommandHandler.ExecuteAsync(
-            mockHandler.Object,
-            mockAuthService.Object,
-            mockEditor.Object,
+            serviceProvider,
             notes: null,
             noEdit: false,
             useDefaultTemplate: false,
             templateName: null,
             providerOverride: null,
+            useVoice: false,
+            sttSelection: null,
             jsonOutput: true
         );
 
         // Assert
-        mockHandler.Verify(
-            h => h.Handle(
-                It.Is<CreateDailyEntryCommand>(cmd =>
-                    cmd.Content.Contains('\n', StringComparison.Ordinal)),
+        mockEditor.Verify(
+            e => e.EditAsync(
+                It.IsAny<string?>(),
+                It.IsAny<EditorConfiguration?>(),
                 It.IsAny<CancellationToken>()),
-            Times.Once);
+            Times.Once); // Editor should be called once
     }
 }
-

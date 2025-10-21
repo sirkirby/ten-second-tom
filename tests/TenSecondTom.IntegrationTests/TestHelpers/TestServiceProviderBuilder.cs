@@ -12,6 +12,7 @@ using TenSecondTom.Features.Today;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.DependencyInjection;
 using TenSecondTom.Infrastructure.Llm;
+using TenSecondTom.Shared.TextEditing.Services;
 
 namespace TenSecondTom.IntegrationTests.TestHelpers;
 
@@ -24,6 +25,7 @@ public sealed class TestServiceProviderBuilder
     private IConfiguration? _configuration;
     private ILlmProvider? _llmProvider;
     private IAuthenticationService? _authService;
+    private IInteractiveTextEditor? _textEditor;
     private string _memoryBasePath;
 
     /// <summary>
@@ -65,6 +67,17 @@ public sealed class TestServiceProviderBuilder
     public TestServiceProviderBuilder WithAuthenticationService(IAuthenticationService authService)
     {
         _authService = authService;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets a custom text editor service.
+    /// </summary>
+    /// <param name="textEditor">The text editor to use.</param>
+    /// <returns>The builder for chaining.</returns>
+    public TestServiceProviderBuilder WithTextEditor(IInteractiveTextEditor textEditor)
+    {
+        _textEditor = textEditor;
         return this;
     }
 
@@ -139,6 +152,17 @@ public sealed class TestServiceProviderBuilder
                 _services.Remove(authDescriptor);
             }
             _services.AddSingleton(_authService);
+        }
+
+        if (_textEditor != null)
+        {
+            // Remove registered text editor and add custom
+            var editorDescriptor = _services.FirstOrDefault(d => d.ServiceType == typeof(IInteractiveTextEditor));
+            if (editorDescriptor != null)
+            {
+                _services.Remove(editorDescriptor);
+            }
+            _services.AddSingleton(_textEditor);
         }
 
         return _services.BuildServiceProvider();

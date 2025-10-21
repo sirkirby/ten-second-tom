@@ -30,6 +30,11 @@ public static class ServiceCollectionExtensions
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddInfrastructureServices(this IServiceCollection services)
     {
+        // Bind configuration sections
+        services.AddOptions<Configuration.AudioConfiguration>()
+            .BindConfiguration("Audio")
+            .ValidateOnStart();
+
         // Add HttpClient support for API validators
         services.AddHttpClient();
 

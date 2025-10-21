@@ -127,9 +127,15 @@ public sealed record LlmConfiguration
     public string? ApiKey { get; init; }
 
     /// <summary>
-    /// Gets the model to use
+    /// Gets the model to use for chat/text generation
     /// </summary>
     public string? Model { get; init; }
+
+    /// <summary>
+    /// Gets the model to use for speech-to-text transcription.
+    /// Only used when Provider is OpenAI. Defaults to "whisper-1".
+    /// </summary>
+    public string? SpeechToTextModel { get; init; }
 }
 
 /// <summary>
