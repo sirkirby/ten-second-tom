@@ -50,7 +50,7 @@ public sealed class CreateDailyEntryHandlerTests
         _mockTemplateSelectionUI = new Mock<ITemplateSelectionUI>();
 
         // Setup default configuration values
-        _mockConfiguration.Setup(c => c["Llm:Provider"]).Returns("OpenAI");
+        _mockConfiguration.Setup(c => c[ConfigurationKeys.LlmProvider]).Returns("OpenAI");
         _mockConfiguration.Setup(c => c["Llm:Model"]).Returns("gpt-4o");
 
         // Setup default successful behaviors

@@ -111,6 +111,13 @@ var result = user switch
 // ✅ Nullable reference types (always enabled)
 public string? GetOptionalValue() => _value;
 public string GetRequiredValue() => _value ?? throw new InvalidOperationException();
+
+// ✅ Constants instead of magic strings (REQUIRED)
+var memoryDir = configuration[ConfigurationKeys.MemoryDirectory]; // Not "TenSecondTom:MemoryDirectory"
+if (command == CommandNames.Today) { } // Not "today"
+
+// ✅ ALLOWED - Logging and diagnostics can use literal strings
+_logger.LogInformation("Processing request for user {UserId}", userId);
 ```
 
 ### Naming Conventions
@@ -304,7 +311,9 @@ public class UserService
 // ❌ Hardcoded secrets or config
 var connectionString = "Server=localhost;...";  // NO! Use configuration
 
-// ❌ Magic strings
+// ❌ Magic strings for config, commands, or shared identifiers
+var memoryDir = config["TenSecondTom:MemoryDirectory"];  // NO! Use ConfigurationKeys.MemoryDirectory
+if (command == "today") { }  // NO! Use CommandNames.Today
 if (user.Role == "admin") { }  // NO! Use constants or enums
 ```
 
@@ -347,12 +356,20 @@ var config = builder.Configuration
     .Get<DatabaseConfig>() 
     ?? throw new InvalidOperationException("Database config missing");
 
-// ✅ Constants for magic values
+// ✅ Constants for shared identifiers (in Shared/Constants/)
 public static class UserRoles
 {
     public const string Admin = "Admin";
     public const string User = "User";
 }
+
+// ✅ Use constants from Shared/Constants/
+var memoryDir = configuration[ConfigurationKeys.MemoryDirectory];
+if (command == CommandNames.Today) { /* ... */ }
+var logsDir = Path.Combine(baseDir, DirectoryNames.Logs);
+
+// ✅ Logging and diagnostics can use literal strings
+_logger.LogInformation("User {Username} logged in successfully", username);
 ```
 
 ## Performance Guidelines
@@ -469,7 +486,7 @@ When making suggestions, prioritize in this order:
 
 ---
 
-**Constitution**: `.specify/memory/constitution.md` v1.0.0  
-**Last Updated**: 2025-10-01
+**Constitution**: `.specify/memory/constitution.md` v1.3.0  
+**Last Updated**: 2025-10-21
 
 When in doubt, consult the constitution or ask the user for clarification.

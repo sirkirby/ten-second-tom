@@ -1,3 +1,4 @@
+using TenSecondTom.Shared.Contracts;
 using System.IO.Abstractions;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
@@ -38,7 +39,7 @@ public sealed class TemplateMigrationServiceTests
     {
         // Arrange
         var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c["Storage:MemoryDirectory"]).Returns((string?)null);
+        mockConfiguration.Setup(c => c["TenSecondTom:MemoryDirectory"]).Returns((string?)null);
 
         // Act
         await _service.RunAutomaticMigrationAsync(mockConfiguration.Object, CancellationToken.None);
@@ -57,7 +58,7 @@ public sealed class TemplateMigrationServiceTests
         string templatesDirectory = Path.Combine(rootDirectory, "templates");
 
         var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c["Storage:MemoryDirectory"]).Returns(rootDirectory);
+        mockConfiguration.Setup(c => c["TenSecondTom:MemoryDirectory"]).Returns(rootDirectory);
 
         _mockFileSystem.Setup(fs => fs.Directory.Exists(templatesDirectory))
             .Returns(false);
@@ -103,7 +104,7 @@ public sealed class TemplateMigrationServiceTests
         string templatesDirectory = Path.Combine(rootDirectory, "templates");
 
         var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c["Storage:MemoryDirectory"]).Returns(rootDirectory);
+        mockConfiguration.Setup(c => c["TenSecondTom:MemoryDirectory"]).Returns(rootDirectory);
 
         _mockFileSystem.Setup(fs => fs.Directory.Exists(templatesDirectory))
             .Returns(false);

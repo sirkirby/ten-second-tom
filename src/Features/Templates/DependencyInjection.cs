@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using TenSecondTom.Features.Templates.Commands;
 using TenSecondTom.Features.Templates.Handlers;
+using TenSecondTom.Features.Templates.Queries;
 using TenSecondTom.Features.Templates.Services;
+using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Templates;
@@ -18,11 +20,18 @@ public static class TemplatesFeatureExtensions
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddTemplatesFeature(this IServiceCollection services)
     {
+        // Register handlers (dual registration: concrete + interface)
         services.AddTransient<InstallDefaultTemplatesHandler>();
         services.AddTransient<IRequestHandler<InstallDefaultTemplatesCommand, Result<InstallDefaultTemplatesResult>>>(
             sp => sp.GetRequiredService<InstallDefaultTemplatesHandler>());
+
         services.AddTransient<ListTemplatesQueryHandler>();
+        services.AddTransient<IRequestHandler<ListTemplatesQuery, Result<ListTemplatesQueryResult>>>(
+            sp => sp.GetRequiredService<ListTemplatesQueryHandler>());
+
+        // Register services
         services.AddTransient<TemplateMigrationService>();
+
         return services;
     }
 }

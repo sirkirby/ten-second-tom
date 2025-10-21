@@ -1,14 +1,7 @@
+using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Templates.Commands;
-
-/// <summary>
-/// Marker interface for request/response pattern.
-/// Indicates this command returns a specific response type.
-/// </summary>
-public interface IRequest<out TResponse>
-{
-}
 
 /// <summary>
 /// Command to install default prompt templates to the filesystem.

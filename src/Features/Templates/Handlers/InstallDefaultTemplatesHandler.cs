@@ -3,26 +3,10 @@ using System.Reflection;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Templates.Commands;
 using TenSecondTom.Infrastructure.Prompts;
+using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Templates.Handlers;
-
-/// <summary>
-/// Handler interface for processing requests and returning responses.
-/// Defines the contract for command and query handlers in the application.
-/// </summary>
-/// <typeparam name="TRequest">The type of request to handle.</typeparam>
-/// <typeparam name="TResponse">The type of response to return.</typeparam>
-public interface IRequestHandler<in TRequest, TResponse>
-{
-    /// <summary>
-    /// Handles the request and returns the appropriate response.
-    /// </summary>
-    /// <param name="request">The request to process.</param>
-    /// <param name="cancellationToken">Token to cancel the operation.</param>
-    /// <returns>The response from processing the request.</returns>
-    Task<TResponse> Handle(TRequest request, CancellationToken cancellationToken);
-}
 
 /// <summary>
 /// Handler for installing default prompt templates to the filesystem.

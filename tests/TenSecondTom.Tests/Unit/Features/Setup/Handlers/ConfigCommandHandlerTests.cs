@@ -7,6 +7,7 @@ using TenSecondTom.Features.Setup.Handlers;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Setup.Validation;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Tests.Unit.Features.Setup.Handlers;
@@ -39,9 +40,9 @@ public sealed class ConfigCommandHandlerTests
         _mockAnthropicValidator.Setup(v => v.Provider).Returns(LlmProvider.Anthropic);
 
         // Setup default configuration values
-        _mockConfiguration.Setup(c => c["Llm:Provider"]).Returns((string?)null);
-        _mockConfiguration.Setup(c => c["Llm:ApiKey"]).Returns((string?)null);
-        _mockConfiguration.Setup(c => c["Llm:Model"]).Returns((string?)null);
+        _mockConfiguration.Setup(c => c[ConfigurationKeys.LlmProvider]).Returns((string?)null);
+        _mockConfiguration.Setup(c => c[ConfigurationKeys.LlmApiKey]).Returns((string?)null);
+        _mockConfiguration.Setup(c => c[ConfigurationKeys.LlmModel]).Returns((string?)null);
 
         var validators = new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object };
 
@@ -135,7 +136,11 @@ public sealed class ConfigCommandHandlerTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeNull();
-        result.Value.Should().BeSameAs(config);
+        result.Value.Ssh.Should().BeEquivalentTo(config.Ssh);
+        result.Value.Llm.Should().BeEquivalentTo(config.Llm);
+        result.Value.Storage.Should().BeEquivalentTo(config.Storage);
+        result.Value.Optional.Should().BeEquivalentTo(config.Optional);
+        result.Value.Audio.Should().NotBeNull(); // Audio config is always populated from IConfiguration
         
         _mockStorageService.Verify(s => s.LoadAsync(It.IsAny<CancellationToken>()), Times.Once);
     }

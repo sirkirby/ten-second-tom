@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using TenSecondTom.Features.Audio;
 using TenSecondTom.Features.Auth;
 using TenSecondTom.Features.Search;
 using TenSecondTom.Features.Setup;
@@ -26,17 +27,20 @@ public static class FeatureRegistrationExtensions
         services.AddTodayFeature();
         services.AddThisWeekFeature();
         services.AddSearchFeature();
-        
+
+        // Audio & Voice features
+        services.AddFeatureAudioServices();
+
         // Authentication & Security
         services.AddAuthFeature();
-        
+
         // Configuration & Setup
         services.AddSetupFeature();
         services.AddTemplatesFeature();
-        
+
         // Interactive Shell
         services.AddShellFeature();
-        
+
         return services;
     }
 }

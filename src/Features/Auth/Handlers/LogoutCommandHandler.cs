@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Auth.Commands;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Auth.Handlers;

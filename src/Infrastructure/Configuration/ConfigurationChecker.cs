@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Templates.Commands;
 using TenSecondTom.Features.Templates.Handlers;
+using TenSecondTom.Shared.Constants;
 
 namespace TenSecondTom.Infrastructure.Configuration;
 
@@ -21,14 +22,13 @@ public static class ConfigurationChecker
     /// <returns>True if configured, false if setup is needed</returns>
     public static bool IsConfigured(IConfiguration configuration, ILogger logger)
     {
-        // Check for required configuration keys (matching UserSecretsStorageService format)
-        // Keys are stored as: Ssh:KeyPath, Llm:Provider, Llm:ApiKey, Storage:MemoryDirectory
+        // Check for required configuration keys using standard TenSecondTom:* namespace
         // Note: Either Ssh:KeyPath OR Ssh:KeySource must be present (agents don't need KeyPath)
-        string? sshKeyPath = configuration["Ssh:KeyPath"];
-        string? sshKeySource = configuration["Ssh:KeySource"];
-        string? llmProvider = configuration["Llm:Provider"];
-        string? llmApiKey = configuration["Llm:ApiKey"];
-        string? memoryDirectory = configuration["Storage:MemoryDirectory"];
+        string? sshKeyPath = configuration[ConfigurationKeys.SshKeyPath];
+        string? sshKeySource = configuration[ConfigurationKeys.SshKeySource];
+        string? llmProvider = configuration[ConfigurationKeys.LlmProvider];
+        string? llmApiKey = configuration[ConfigurationKeys.LlmApiKey];
+        string? memoryDirectory = configuration[ConfigurationKeys.MemoryDirectory];
 
         // SSH is configured if either KeyPath is set OR KeySource is set
         bool hasSshConfiguration = !string.IsNullOrWhiteSpace(sshKeyPath) || 
@@ -44,13 +44,13 @@ public static class ConfigurationChecker
             logger.LogInformation("Application is not configured. Setup wizard will be launched.");
             
             if (!hasSshConfiguration)
-                logger.LogDebug("Missing: SSH configuration (neither Ssh:KeyPath nor Ssh:KeySource is set)");
+                logger.LogDebug("Missing: SSH configuration (neither TenSecondTom:Ssh:KeyPath nor TenSecondTom:Ssh:KeySource is set)");
             if (string.IsNullOrWhiteSpace(llmProvider))
-                logger.LogDebug("Missing: LLM provider (Llm:Provider)");
+                logger.LogDebug("Missing: LLM provider (TenSecondTom:Llm:Provider)");
             if (string.IsNullOrWhiteSpace(memoryDirectory))
-                logger.LogDebug("Missing: Memory directory (Storage:MemoryDirectory)");
+                logger.LogDebug("Missing: Memory directory (TenSecondTom:MemoryDirectory)");
             if (string.IsNullOrWhiteSpace(llmApiKey))
-                logger.LogDebug("Missing: LLM API key (Llm:ApiKey)");
+                logger.LogDebug("Missing: LLM API key (TenSecondTom:Llm:ApiKey)");
         }
 
         return isConfigured;
@@ -64,8 +64,8 @@ public static class ConfigurationChecker
     /// <returns>True if model is valid or not configured, false if invalid</returns>
     public static bool ValidateModel(IConfiguration configuration, ILogger logger)
     {
-        string? provider = configuration["Llm:Provider"];
-        string? model = configuration["Llm:Model"];
+        string? provider = configuration[ConfigurationKeys.LlmProvider];
+        string? model = configuration[ConfigurationKeys.LlmModel];
         
         // If no model is configured, validation passes (model is optional in some scenarios)
         if (string.IsNullOrWhiteSpace(model))
@@ -114,8 +114,8 @@ public static class ConfigurationChecker
     /// <returns>Error message string, or null if validation would pass</returns>
     public static string? GetModelValidationError(IConfiguration configuration)
     {
-        string? provider = configuration["Llm:Provider"];
-        string? model = configuration["Llm:Model"];
+        string? provider = configuration[ConfigurationKeys.LlmProvider];
+        string? model = configuration[ConfigurationKeys.LlmModel];
         
         // If no model is configured, no error
         if (string.IsNullOrWhiteSpace(model))
@@ -173,10 +173,8 @@ public static class ConfigurationChecker
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Get templates directory from configuration
-        string memoryDirectory = configuration["Storage:MemoryDirectory"] ??
-                               configuration["TenSecondTom:MemoryDirectory"] ??
-                               "./.memory";
+        // Get memory directory using standard .NET configuration
+        string memoryDirectory = configuration[ConfigurationKeys.MemoryDirectory] ?? "./.memory";
 
         string templatesDirectory = fileSystem.Path.Combine(memoryDirectory, "templates");
 

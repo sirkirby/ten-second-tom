@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Spectre.Console;
 using TenSecondTom.Features.Search.Handlers;
 using TenSecondTom.Features.Setup.Commands;
@@ -22,6 +23,12 @@ namespace TenSecondTom.Infrastructure.Cli;
 public static class CommandRegistry
 {
     private static readonly string[] QuitAliases = ["exit"];
+
+    private static readonly System.Text.Json.JsonSerializerOptions SnakeCaseJsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower
+    };
 
     /// <summary>
     /// Builds and configures the root command with all subcommands.
@@ -53,6 +60,7 @@ public static class CommandRegistry
         rootCommand.Subcommands.Add(BuildTodayCommand(serviceProvider, jsonOutputOption));
         rootCommand.Subcommands.Add(BuildThisWeekCommand(serviceProvider, jsonOutputOption));
         rootCommand.Subcommands.Add(BuildSearchCommand(serviceProvider, jsonOutputOption));
+        rootCommand.Subcommands.Add(BuildRecordCommand(serviceProvider, jsonOutputOption));
         rootCommand.Subcommands.Add(BuildLoginCommand(serviceProvider, jsonOutputOption));
         rootCommand.Subcommands.Add(BuildLogoutCommand(serviceProvider, jsonOutputOption));
         rootCommand.Subcommands.Add(BuildSetupCommand(serviceProvider, jsonOutputOption));
@@ -118,6 +126,7 @@ public static class CommandRegistry
                     new { command = "today", description = "Capture today's reflection with 3-5 prompts", requiresAuth = true },
                     new { command = "thisweek", description = "Generate a weekly review from recent daily entries", requiresAuth = true },
                     new { command = "search", description = "Search memory entries by text query", requiresAuth = true },
+                    new { command = "record", description = "Record audio with transcription and save to library", requiresAuth = true },
                     new { command = "login", description = "Authenticate with SSH key and create a session", requiresAuth = false },
                     new { command = "logout", description = "Log out and invalidate the current session", requiresAuth = true },
                     new { command = "setup", description = "Run guided setup wizard to configure Ten Second Tom", requiresAuth = false },
@@ -144,6 +153,7 @@ public static class CommandRegistry
                 table.AddRow("[cyan]/today[/]", "Capture today's reflection with 3-5 prompts", "[green]Yes[/]");
                 table.AddRow("[cyan]/thisweek[/]", "Generate a weekly review from recent daily entries", "[green]Yes[/]");
                 table.AddRow("[cyan]/search[/] [dim]<query>[/]", "Search memory entries by text query", "[green]Yes[/]");
+                table.AddRow("[cyan]/record[/]", "Record audio with transcription and save to library", "[green]Yes[/]");
                 table.AddRow("[cyan]/login[/]", "Authenticate with SSH key and create a session", "[red]No[/]");
                 table.AddRow("[cyan]/logout[/]", "Log out and invalidate the current session", "[green]Yes[/]");
                 table.AddRow("[cyan]/setup[/]", "Run guided setup wizard to configure Ten Second Tom", "[red]No[/]");
@@ -195,12 +205,24 @@ public static class CommandRegistry
             Description = "LLM provider to use (OpenAI or Anthropic). Defaults to configured provider."
         };
 
+        var voiceOption = new Option<bool>("--voice")
+        {
+            Description = "Capture notes using voice recording instead of text input."
+        };
+
+        var sttOption = new Option<string?>("--stt")
+        {
+            Description = "STT engine selection: auto (default), local, or openai. Only used with --voice."
+        };
+
         // Add argument and options to command
         todayCommand.Arguments.Add(notesArgument);
         todayCommand.Options.Add(noEditOption);
         todayCommand.Options.Add(useDefaultTemplateOption);
         todayCommand.Options.Add(templateOption);
         todayCommand.Options.Add(providerOption);
+        todayCommand.Options.Add(voiceOption);
+        todayCommand.Options.Add(sttOption);
         todayCommand.Options.Add(jsonOutputOption);
 
         // Set action
@@ -212,20 +234,18 @@ public static class CommandRegistry
             bool noEdit = parseResult.GetValue(noEditOption);
             bool useDefaultTemplate = parseResult.GetValue(useDefaultTemplateOption);
             string? templateName = parseResult.GetValue(templateOption);
-
-            var handler = serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
-            var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
-            var textEditor = serviceProvider.GetRequiredService<TenSecondTom.Shared.TextEditing.Services.IInteractiveTextEditor>();
+            bool useVoice = parseResult.GetValue(voiceOption);
+            string? stt = parseResult.GetValue(sttOption);
 
             await TodayCommandHandler.ExecuteAsync(
-                handler,
-                authService,
-                textEditor,
+                serviceProvider,
                 notes,
                 noEdit,
                 useDefaultTemplate,
                 templateName,
                 provider,
+                useVoice,
+                stt,
                 jsonOutput).ConfigureAwait(false);
         });
 
@@ -389,6 +409,144 @@ public static class CommandRegistry
         });
 
         return searchCommand;
+    }
+
+    private static Command BuildRecordCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
+    {
+        var recordCommand = new Command("record", "Record audio with transcription and save to recording/ directory");
+
+        // Add options
+        var sttOption = new Option<string?>("--stt")
+        {
+            Description = "STT engine selection: auto (default), local, or openai."
+        };
+
+        recordCommand.Options.Add(sttOption);
+        recordCommand.Options.Add(jsonOutputOption);
+
+        // Set action
+        recordCommand.SetAction(async (parseResult) =>
+        {
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
+            string? stt = parseResult.GetValue(sttOption);
+
+            // Get AudioConfiguration to read default PreferredStt and timeout
+            var audioConfig = serviceProvider.GetService<IOptions<Configuration.AudioConfiguration>>()?.Value
+                ?? new Configuration.AudioConfiguration();
+            
+            // Parse STT selection - use configured default or fall back to Auto
+            var sttSelection = TenSecondTom.Features.Audio.Models.SttSelection.Auto;
+            
+            // If no --stt flag provided, use configuration default
+            if (string.IsNullOrWhiteSpace(stt))
+            {
+                if (audioConfig.PreferredStt is not null)
+                {
+                    if (!Enum.TryParse<TenSecondTom.Features.Audio.Models.SttSelection>(audioConfig.PreferredStt, ignoreCase: true, out sttSelection))
+                    {
+                        // Invalid config value, fall back to Auto
+                        sttSelection = TenSecondTom.Features.Audio.Models.SttSelection.Auto;
+                    }
+                }
+            }
+            else
+            {
+                // --stt flag provided, parse and validate it
+                if (!Enum.TryParse<TenSecondTom.Features.Audio.Models.SttSelection>(stt, ignoreCase: true, out sttSelection))
+                {
+                    if (jsonOutput)
+                    {
+                        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                        {
+                            success = false,
+                            error = $"Invalid STT selection: {stt}. Valid options: auto, local, openai"
+                        }));
+                    }
+                    else
+                    {
+                        AnsiConsole.MarkupLine($"[red]Invalid STT selection:[/] {stt.EscapeMarkup()}");
+                        AnsiConsole.MarkupLine("[dim]Valid options: auto, local, openai[/]");
+                    }
+                    return 1;
+                }
+            }
+
+            // Get handler
+            var handler = serviceProvider.GetService<TenSecondTom.Features.Audio.Handlers.RecordCommandHandler>();
+            if (handler is null)
+            {
+                if (jsonOutput)
+                {
+                    Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        success = false,
+                        error = "Record functionality is unavailable - handler not registered in DI container."
+                    }));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine("[red]Record unavailable:[/] handler not registered. Ensure AddFeatureAudioServices() was called.");
+                }
+                return 1;
+            }
+
+            // Execute command with configured timeout
+            var command = new TenSecondTom.Features.Audio.Commands.RecordCommand
+            {
+                SttSelection = sttSelection,
+                MaxDurationSeconds = audioConfig.Timeouts.RecordSeconds  // Use configured timeout
+            };
+
+            var result = await handler.Handle(command, CancellationToken.None);
+
+            if (result.IsSuccess && result.Value is not null)
+            {
+                var recording = result.Value;
+
+                if (jsonOutput)
+                {
+                    var output = new
+                    {
+                        success = true,
+                        audio_path = recording.AudioFilePath,
+                        transcription_path = recording.TranscriptionFilePath,
+                        text = File.ReadAllText(recording.TranscriptionFilePath),
+                        duration_seconds = recording.Duration.TotalSeconds,
+                        word_count = recording.TranscriptionWordCount,
+                        stt_engine = recording.SttEngine.ToString(),
+                        stt_model = recording.SttModel,
+                        recorded_at = recording.RecordedAt,
+                        file_size_bytes = recording.FileSizeBytes
+                    };
+                    Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(output, SnakeCaseJsonOptions));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[green]✓[/] Recording saved to: [cyan]{recording.AudioFilePath.EscapeMarkup()}[/]");
+                    AnsiConsole.MarkupLine($"[green]✓[/] Transcription saved to: [cyan]{recording.TranscriptionFilePath.EscapeMarkup()}[/]");
+                    AnsiConsole.MarkupLine($"[dim]Duration:[/] {recording.Duration.TotalSeconds:F1}s | [dim]Words:[/] {recording.TranscriptionWordCount} | [dim]Engine:[/] {recording.SttEngine} ({recording.SttModel ?? "default"})");
+                }
+                return 0;
+            }
+            else
+            {
+                if (jsonOutput)
+                {
+                    Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        success = false,
+                        error = result.Error ?? "Recording failed"
+                    }));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]✗[/] Recording failed: {(result.Error ?? "Unknown error").EscapeMarkup()}");
+                }
+                return 1;
+            }
+        });
+
+        return recordCommand;
     }
 
     private static Command BuildLoginCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
@@ -759,6 +917,23 @@ public static class CommandRegistry
         // Optional Configuration
         table.AddRow("Log Level", config.Optional.LogLevel.ToString());
         table.AddRow("Retention Days", config.Optional.RetentionDays.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        // Audio Configuration
+        table.AddRow("[yellow]Audio Settings[/]", "");
+        table.AddRow("  Preferred STT", config.Audio.PreferredStt);
+        table.AddRow("  Keep Files", config.Audio.KeepFiles ? "Yes" : "No");
+        
+        // Audio Recorder Configuration
+        table.AddRow("  [dim]Recorder:[/]", "");
+        table.AddRow("    Input Volume", config.Audio.Recorder.InputVolume.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture));
+        table.AddRow("    Noise Reduction", config.Audio.Recorder.EnableNoiseReduction ? "Enabled" : "Disabled");
+        table.AddRow("    Frequency Filters", config.Audio.Recorder.EnableFrequencyFilters ? "Enabled" : "Disabled");
+        
+        // Audio Preprocessing Configuration
+        table.AddRow("  [dim]Preprocessing:[/]", "");
+        table.AddRow("    Remove Silence", config.Audio.Preprocessing.RemoveSilence ? "Enabled" : "Disabled");
+        table.AddRow("    Silence Threshold", $"{config.Audio.Preprocessing.SilenceThresholdDb} dB");
+        table.AddRow("    Min Silence Duration", $"{config.Audio.Preprocessing.MinimumSilenceDurationMs} ms");
 
         // Metadata
         table.AddRow("[dim]Created[/]", $"[dim]{config.CreatedAt:yyyy-MM-dd HH:mm:ss}[/]");

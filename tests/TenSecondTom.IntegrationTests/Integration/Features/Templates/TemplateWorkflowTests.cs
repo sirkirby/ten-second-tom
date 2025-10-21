@@ -13,6 +13,7 @@ using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
 using TenSecondTom.IntegrationTests.TestHelpers;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 
@@ -365,7 +366,7 @@ title: Another Template
 
         // Mock configuration
         var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c["Llm:Provider"]).Returns("OpenAI");
+        mockConfiguration.Setup(c => c[ConfigurationKeys.LlmProvider]).Returns("OpenAI");
         mockConfiguration.Setup(c => c["Llm:Model"]).Returns("gpt-4o");
         services.AddSingleton(mockConfiguration.Object);
 

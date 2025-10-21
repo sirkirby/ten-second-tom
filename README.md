@@ -22,8 +22,9 @@
 ## ✨ Features
 
 - 🧠 **Simplified Daily Reflections**: Single free-form text entry to capture your thoughts
+- 🎤 **Voice Entry**: Record audio notes with local-first speech-to-text transcription
 - 📊 **Weekly Reviews**: AI-generated summaries of your week with themes and patterns
-- 🔍 **Searchable Archive**: Full-text search across all your memories
+- 🔍 **Searchable Archive**: Full-text search across all your memories (including voice transcripts)
 - 🤖 **Multiple AI Providers**: Support for OpenAI and Anthropic
 - 📝 **Custom Templates**: Create and edit prompt templates to personalize your summaries
 - 📁 **Markdown Storage**: Human-readable files in configured memory directory
@@ -37,9 +38,29 @@
 
 ## 📋 Prerequisites
 
-- **.NET 9 SDK** or later ([Download](https://dotnet.microsoft.com/download))
-- **OpenAI API Key** or **Anthropic API Key**
-- **SSH Key** (Ed25519 or RSA) in `~/.ssh/`
+### Core Requirements
+
+- **.NET 9 SDK** or later ([Download](https://dotnet.microsoft.com/download)) - for building from source
+- **OpenAI API Key** or **Anthropic API Key** - for AI-powered summaries
+- **SSH Key** (Ed25519 or RSA) in `~/.ssh/` - for secure authentication
+
+### Voice Entry Requirements (Optional)
+
+- **FFmpeg** ([Download](https://ffmpeg.org/)) - **REQUIRED** for audio recording
+  - macOS: `brew install ffmpeg` (automatically installed with Homebrew tom package)
+  - Linux: `sudo apt install ffmpeg` (Ubuntu/Debian) or `sudo yum install ffmpeg` (RHEL/CentOS)
+  - Windows: Download from [ffmpeg.org](https://ffmpeg.org/download.html)
+- **whisper.cpp** ([GitHub](https://github.com/ggerganov/whisper.cpp)) - for local, privacy-focused transcription (OR use OpenAI API)
+  - Install: `brew install whisper-cpp`
+  - Download model to default location (base.en, 142 MB):
+    ```bash
+    mkdir -p ~/.cache/whisper
+    curl -L -o ~/.cache/whisper/ggml-base.en.bin \
+      https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
+    ```
+  - That's it! Tom looks for the model at `~/.cache/whisper/ggml-base.en.bin` by default
+
+**Note**: Homebrew installation automatically installs FFmpeg as a required dependency. whisper.cpp is optional - you can use OpenAI API for transcription instead.
 
 ---
 
@@ -66,6 +87,95 @@ Examples:
   tom today "Note" --no-edit --use-default-template     # Fastest mode (< 3 seconds)
   tom today "Note" --no-edit --template "standup"       # Use specific template
 ```
+
+### Voice Entry (NEW)
+
+Capture daily reflections using voice instead of typing:
+
+```
+tom today --voice [options]
+
+Options:
+  --voice                      Record audio and transcribe to text
+  --stt <engine>              STT engine: auto (default), local, or openai
+  --output-json               Output results in JSON format
+
+Examples:
+  tom today --voice                          # Record voice note (auto STT)
+  tom today --voice --stt local             # Force local whisper.cpp
+  tom today --voice --stt openai            # Force OpenAI Whisper API
+```
+
+**Prerequisites:**
+- **FFmpeg** for audio recording ([Download](https://ffmpeg.org/))
+- **whisper.cpp** for local transcription ([Download](https://github.com/ggerganov/whisper.cpp)) OR **OpenAI API key** for cloud transcription
+
+**Storage Note:** Audio recordings are ~940KB/minute. A 5-minute recording uses ~4.7MB.
+
+**Audio Configuration:** Ten Second Tom includes automatic silence removal and noise reduction optimized for laptop microphones. For professional mics or custom settings, see the [Audio Configuration](#audio-configuration) section below.
+
+**Legal Guidance:** Ten Second Tom is designed for single-user personal use on your own device. Do not record conversations without consent.
+
+### Standalone Recording
+
+Record and save audio with transcription for later use:
+
+```
+tom record [options]
+
+Options:
+  --stt <engine>    STT engine: auto (default), local, or openai
+  --output-json     Output results in JSON format
+
+Files saved to:
+  <memory-dir>/recording/recording-YYYYMMdd-HHmmss.wav
+  <memory-dir>/recording/recording-YYYYMMdd-HHmmss.txt
+```
+
+### Audio Configuration
+
+Ten Second Tom provides extensive audio configuration for different microphone types and recording scenarios. All settings can be configured via **environment variables** (recommended for Homebrew users) or configuration files.
+
+#### Key Features
+
+- **Microphone Optimization**: Presets for laptop/built-in mics, professional dynamic mics, condenser/USB mics, and studio setups
+- **Silence Removal**: Automatically compress long silence gaps in recordings (enabled by default)
+- **Noise Reduction**: Adaptive noise reduction during recording (enabled by default for laptop mics)
+- **Frequency Filters**: High-pass/low-pass filters to remove rumble and hiss (enabled by default)
+
+#### Quick Configuration Examples
+
+**For Laptop/Built-in Microphones (Default):**
+```bash
+# No configuration needed - optimized by default!
+tom today --voice
+```
+
+**For Professional Dynamic Microphones:**
+```bash
+export TenSecondTom__Audio__Recorder__InputVolume=0.75
+export TenSecondTom__Audio__Recorder__EnableNoiseReduction=false
+tom today --voice
+```
+
+**Adjust Silence Removal Sensitivity:**
+```bash
+export TenSecondTom__Audio__Preprocessing__SilenceThresholdDb=-60  # More aggressive
+tom today --voice
+```
+
+#### Available Settings
+
+| Setting | Environment Variable | Default | Description |
+|---------|---------------------|---------|-------------|
+| Input Volume | `TenSecondTom__Audio__Recorder__InputVolume` | `1.0` | Volume multiplier (0.0-2.0) |
+| Noise Reduction | `TenSecondTom__Audio__Recorder__EnableNoiseReduction` | `true` | Adaptive noise filter |
+| Frequency Filters | `TenSecondTom__Audio__Recorder__EnableFrequencyFilters` | `true` | High/low-pass filters |
+| Remove Silence | `TenSecondTom__Audio__Preprocessing__RemoveSilence` | `true` | Compress silence gaps |
+| Silence Threshold | `TenSecondTom__Audio__Preprocessing__SilenceThresholdDb` | `-50` | Detection threshold (dB) |
+| Min Silence Duration | `TenSecondTom__Audio__Preprocessing__MinimumSilenceDurationMs` | `500` | Minimum silence (ms) |
+
+**For complete configuration guide, microphone presets, and troubleshooting:** See [docs/AUDIO.md](docs/AUDIO.md)
 
 ---
 
@@ -918,6 +1028,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Documentation**: 
   - [Configuration Guide](docs/CONFIGURATION.md)
+  - [Audio Configuration](docs/AUDIO.md)
   - [Authentication Setup](docs/AUTHENTICATION.md)
   - [Security Policy](SECURITY.md)
   - [CI/CD Documentation](docs/CICD.md)
