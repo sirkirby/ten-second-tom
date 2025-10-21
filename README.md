@@ -1,7 +1,7 @@
 # Ten Second Tom
 
 ```
- _____               ____                          _   _____
+ _____               ____                           _   _____
 |_   _|__ _ __      / ___|  ___  ___ ___  _ __   __| | |_   _|__  _ __ ___
   | |/ _ \ '_ \     \___ \ / _ \/ __/ _ \| '_ \ / _` |   | |/ _ \| '_ ` _ \
   | |  __/ | | |     ___) |  __/ (_| (_) | | | | (_| |   | | (_) | | | | | |
@@ -16,6 +16,10 @@
 [![Release](https://github.com/sirkirby/ten-second-tom/actions/workflows/release.yml/badge.svg)](https://github.com/sirkirby/ten-second-tom/actions/workflows/release.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![.NET Version](https://img.shields.io/badge/.NET-9.0-purple.svg)](https://dotnet.microsoft.com/)
+
+![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/sirkirby/ten-second-tom?sort=semver)
+[![brew install](https://img.shields.io/badge/brew_install-sirkirby/ten--second--tom/ten--second--tom-informational)](https://github.com/sirkirby/homebrew-ten-second-tom)
+
 
 ---
 
@@ -416,7 +420,7 @@ When you run Ten Second Tom for the first time, it will automatically launch the
 ```bash
 $ tom today
 
- _____               ____                          _   _____
+ _____               ____                           _   _____
 |_   _|__ _ __      / ___|  ___  ___ ___  _ __   __| | |_   _|__  _ __ ___
   | |/ _ \ '_ \     \___ \ / _ \/ __/ _ \| '_ \ / _` |   | |/ _ \| '_ ` _ \
   | |  __/ | | |     ___) |  __/ (_| (_) | | | | (_| |   | | (_) | | | | | |
@@ -594,7 +598,7 @@ $ tom
 This launches an interactive shell where you can execute multiple commands without re-authentication:
 
 ```text
- _____               ____                          _   _____
+ _____               ____                           _   _____
 |_   _|__ _ __      / ___|  ___  ___ ___  _ __   __| | |_   _|__  _ __ ___
   | |/ _ \ '_ \     \___ \ / _ \/ __/ _ \| '_ \ / _` |   | |/ _ \| '_ ` _ \
   | |  __/ | | |     ___) |  __/ (_| (_) | | | | (_| |   | | (_) | | | | | |
