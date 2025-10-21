@@ -1,20 +1,20 @@
 <!--
 Sync Impact Report:
-- Version change: 1.1.0 → 1.2.0
+- Version change: 1.2.0 → 1.3.0
 - Modified sections:
-  * Architecture & Design Standards (added Project Structure Standards subsection)
-  * Principle IV: DRY & Design Patterns (enhanced with structure reference)
+  * Architecture & Design Standards (added Magic Strings & Constants subsection)
+  * Code Quality (enhanced with constants reference)
 - Added sections:
-  * Project Structure Standards (canonical directory layout for VSA)
+  * Magic Strings & Constants (mandatory constants for config/keys/shared definitions)
 - Templates requiring updates:
-  * ✅ plan-template.md (updated to reference constitution for structure decisions)
-  * ✅ tasks-template.md (updated path conventions to align with constitutional structure)
+  * ✅ plan-template.md (no changes needed - already references constitution)
+  * ✅ tasks-template.md (no changes needed - structure already established)
   * ✅ spec-template.md (no changes needed - user story focused)
 - Agent instruction files updated:
-  * ✅ AGENTS.md (updated structure and added constitution reference)
-  * ✅ CLAUDE.md (updated structure and added constitution reference)
-  * ✅ .github/copilot-instructions.md (updated structure and version reference)
-- Rationale: Adding explicit project structure prevents VSA implementation drift and provides clear canonical reference for feature organization
+  * ✅ AGENTS.md (added magic strings prohibition and constants convention)
+  * ✅ CLAUDE.md (added magic strings prohibition and constants convention)
+  * ✅ .github/copilot-instructions.md (added magic strings prohibition and version bump)
+- Rationale: Magic strings create maintenance burden, risk typos, and reduce discoverability. Centralizing constants in Shared/Constants improves code quality and prevents configuration/key errors.
 - Follow-up TODOs: None
 -->
 
@@ -192,6 +192,37 @@ tests/
 
 **This structure is the canonical reference for VSA implementation and MUST be followed for all new features.**
 
+### Magic Strings & Constants
+
+**Magic strings MUST NOT be used for configuration keys, shared definitions, or identifiers. Constants MUST be centralized in `Shared/Constants/`.**
+
+- **Prohibited**: Hardcoded strings for configuration keys, command names, file paths, template keys, shared identifiers
+- **Allowed**: Logging messages, diagnostic output, user-facing text (unless shared across features)
+- **Organization**: Constants MUST be organized by domain in `src/Shared/Constants/` (e.g., `ConfigurationKeys.cs`, `CommandNames.cs`, `DirectoryNames.cs`)
+- **Naming**: Constant classes MUST use descriptive plural names ending in "Constants", "Keys", "Names", or "Providers" (e.g., `AudioConstants`, `LlmProviders`)
+- **Documentation**: All constants MUST have XML documentation explaining usage and (for config) environment variable format
+- **VSA Compliance**: Constants are shared across features, so they belong in `Shared/Constants/`, not within individual feature slices
+
+**Examples**:
+
+```csharp
+// ❌ BAD - Magic strings
+var memoryDir = configuration["TenSecondTom:MemoryDirectory"];
+if (command == "today") { }
+var logPath = Path.Combine(baseDir, "logs");
+
+// ✅ GOOD - Constants
+var memoryDir = configuration[ConfigurationKeys.MemoryDirectory];
+if (command == CommandNames.Today) { }
+var logPath = Path.Combine(baseDir, DirectoryNames.Logs);
+
+// ✅ ALLOWED - Logging and diagnostics (not shared definitions)
+_logger.LogInformation("Processing voice entry for user");
+Console.WriteLine("Setup complete! Run 'tom today' to get started.");
+```
+
+**Rationale**: Magic strings create maintenance burden (find/replace errors), introduce typos that compile but fail at runtime, reduce discoverability (hard to find all usages), and violate DRY when the same string appears in multiple locations. Centralized constants provide type safety, IDE autocomplete, and a single source of truth.
+
 ### Naming Conventions
 
 - Follow Microsoft naming guidelines
@@ -199,6 +230,7 @@ tests/
 - Commands end with "Command", Queries end with "Query"
 - Handlers end with "Handler"
 - Test classes end with "Tests"
+- Constant classes end with descriptive suffix ("Constants", "Keys", "Names", "Providers")
 
 ### Error Handling
 
@@ -232,6 +264,7 @@ tests/
 - Format code with .editorconfig rules
 - Review and resolve all code analysis warnings
 - Maintain XML documentation comments for public APIs
+- Use constants from `Shared/Constants/` for all shared strings (config keys, command names, paths, etc.)
 
 ## Development & Operations Standards
 
@@ -300,11 +333,23 @@ tests/
 - Consult constitution before major architectural decisions
 - Educate new contributors on constitutional requirements
 
-**Version**: 1.2.0 | **Ratified**: 2025-10-01 | **Last Amended**: 2025-10-16
+**Version**: 1.3.0 | **Ratified**: 2025-10-01 | **Last Amended**: 2025-10-21
 
 ---
 
 ## Changelog
+
+### Version 1.3.0 (2025-10-21)
+
+- **MINOR**: Added Magic Strings & Constants subsection to Architecture & Design Standards
+- Prohibited magic strings for configuration keys, shared definitions, and identifiers
+- Mandated use of constants from `Shared/Constants/` directory (VSA-compliant)
+- Defined allowed exceptions: logging messages, diagnostic output, user-facing text
+- Established naming conventions for constant classes (ending in "Constants", "Keys", "Names", or "Providers")
+- Required XML documentation for all constants
+- Enhanced Code Quality section with constants requirement
+- Enhanced Naming Conventions with constant class naming rules
+- Purpose: Eliminate maintenance burden and runtime errors from magic strings; centralize shared definitions
 
 ### Version 1.2.0 (2025-10-16)
 

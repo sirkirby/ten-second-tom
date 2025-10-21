@@ -32,7 +32,7 @@ public static class ServiceCollectionExtensions
     {
         // Bind configuration sections
         services.AddOptions<Configuration.AudioConfiguration>()
-            .BindConfiguration("Audio")
+            .BindConfiguration(ConfigurationKeys.AudioSection)
             .ValidateOnStart();
 
         // Add HttpClient support for API validators

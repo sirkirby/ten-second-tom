@@ -140,6 +140,7 @@ tests/
 - **Prefer `required` properties** over constructor parameters where appropriate
 - **Use `readonly` liberally** for immutability
 - **Avoid `null`**: Use nullable reference types and guard clauses
+- **No magic strings**: Use constants from `Shared/Constants/` for config keys, command names, paths, and shared identifiers (logging/diagnostic strings are exceptions)
 
 ## Security & Secrets
 
@@ -194,6 +195,7 @@ tests/
 ❌ Don't use outdated C# patterns (pre-C# 9)
 ❌ Don't create anemic domain models (models without behavior)
 ❌ Don't violate DRY, SOLID, or KISS principles
+❌ Don't use magic strings for config keys, command names, paths, or shared identifiers
 
 ## Documentation
 
@@ -203,6 +205,24 @@ tests/
 - Include inline comments only for non-obvious "why" explanations, not "what"
 
 ## Examples
+
+### Constants vs Magic Strings
+
+```csharp
+// ❌ BAD - Magic strings
+var memoryDir = configuration["TenSecondTom:MemoryDirectory"];
+if (commandName == "today") { /* ... */ }
+var logsPath = Path.Combine(baseDir, "logs");
+
+// ✅ GOOD - Use constants from Shared/Constants/
+var memoryDir = configuration[ConfigurationKeys.MemoryDirectory];
+if (commandName == CommandNames.Today) { /* ... */ }
+var logsPath = Path.Combine(baseDir, DirectoryNames.Logs);
+
+// ✅ ALLOWED - Logging and diagnostics
+_logger.LogInformation("Processing voice entry for user {UserId}", userId);
+Console.WriteLine("Setup complete! Run 'tom today' to get started.");
+```
 
 ### Good Command Structure
 
@@ -271,6 +291,6 @@ public sealed class CreateUserCommandHandlerTests
 
 ---
 
-**Constitution Version**: 1.0.0 | **Last Updated**: 2025-10-01
+**Constitution Version**: 1.3.0 | **Last Updated**: 2025-10-21
 
 For questions about architectural decisions or edge cases, consult `.specify/memory/constitution.md`.

@@ -58,6 +58,13 @@ public static class ConfigurationKeys
     /// </summary>
     public const string SshAgentSocketPath = "TenSecondTom:Ssh:AgentSocketPath";
 
+    /// <summary>
+    /// Configuration section for audio recording and transcription settings.
+    /// Used for binding AudioConfiguration.
+    /// Environment variable prefix: TenSecondTom__Audio__*
+    /// </summary>
+    public const string AudioSection = "TenSecondTom:Audio";
+
     // ═══════════════════════════════════════════════════════════════
     // OTHER KEYS
     // ═══════════════════════════════════════════════════════════════
