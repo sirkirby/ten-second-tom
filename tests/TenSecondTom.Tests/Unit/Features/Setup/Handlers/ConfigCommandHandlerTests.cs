@@ -136,7 +136,11 @@ public sealed class ConfigCommandHandlerTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeNull();
-        result.Value.Should().BeSameAs(config);
+        result.Value.Ssh.Should().BeEquivalentTo(config.Ssh);
+        result.Value.Llm.Should().BeEquivalentTo(config.Llm);
+        result.Value.Storage.Should().BeEquivalentTo(config.Storage);
+        result.Value.Optional.Should().BeEquivalentTo(config.Optional);
+        result.Value.Audio.Should().NotBeNull(); // Audio config is always populated from IConfiguration
         
         _mockStorageService.Verify(s => s.LoadAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
