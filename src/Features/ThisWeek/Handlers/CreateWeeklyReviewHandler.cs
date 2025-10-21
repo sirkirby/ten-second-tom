@@ -8,6 +8,7 @@ using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
+using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Results;
@@ -177,7 +178,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
         else
         {
             // Read from IConfiguration which includes environment variable overrides
-            string? configuredProvider = _configuration["Llm:Provider"];
+            string? configuredProvider = _configuration[ConfigurationKeys.LlmProvider];
             if (!string.IsNullOrWhiteSpace(configuredProvider))
             {
                 provider = configuredProvider;

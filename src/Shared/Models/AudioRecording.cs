@@ -1,9 +1,14 @@
-namespace TenSecondTom.Features.Audio.Models;
+namespace TenSecondTom.Shared.Models;
 
 /// <summary>
 /// Represents a captured voice recording with metadata.
 /// Contains all information about an audio file created by the recorder.
 /// </summary>
+/// <remarks>
+/// This model represents a fundamental input method (voice) alongside text input.
+/// Stored in Shared because audio recordings are used across multiple features
+/// (Today, ThisWeek, future voice commands) and represent a core application capability.
+/// </remarks>
 public sealed class AudioRecording
 {
     /// <summary>
@@ -81,3 +86,4 @@ public sealed class AudioRecording
                && !string.IsNullOrWhiteSpace(Encoding);
     }
 }
+

@@ -1,7 +1,15 @@
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using TenSecondTom.Features.Audio.Models;
+using TenSecondTom.Features.Templates.Handlers;
+using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Infrastructure.Cli;
+using TenSecondTom.Infrastructure.Llm;
+using TenSecondTom.Infrastructure.Prompts;
+using TenSecondTom.Infrastructure.Storage;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Features.Today.Commands;
 using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Features.Today.Models;
@@ -15,11 +23,25 @@ namespace TenSecondTom.Tests.Features.Today.Handlers;
 /// </summary>
 public sealed class CreateVoiceNoteEntryHandlerTests
 {
+    private readonly Mock<IMemoryStorageProvider> _mockStorage;
+    private readonly Mock<ILlmProviderFactory> _mockLlmFactory;
+    private readonly Mock<IPromptTemplateLoader> _mockPromptLoader;
+    private readonly Mock<IAuthenticationService> _mockAuthService;
+    private readonly Mock<IConfiguration> _mockConfiguration;
     private readonly Mock<ILogger<CreateVoiceNoteEntryHandler>> _mockLogger;
+    private readonly Mock<ITemplateSelectionUI> _mockTemplateSelectionUI;
+    private readonly Mock<ILlmProvider> _mockLlmProvider;
 
     public CreateVoiceNoteEntryHandlerTests()
     {
+        _mockStorage = new Mock<IMemoryStorageProvider>();
+        _mockLlmFactory = new Mock<ILlmProviderFactory>();
+        _mockPromptLoader = new Mock<IPromptTemplateLoader>();
+        _mockAuthService = new Mock<IAuthenticationService>();
+        _mockConfiguration = new Mock<IConfiguration>();
         _mockLogger = new Mock<ILogger<CreateVoiceNoteEntryHandler>>();
+        _mockTemplateSelectionUI = new Mock<ITemplateSelectionUI>();
+        _mockLlmProvider = new Mock<ILlmProvider>();
     }
 
     [Fact]
@@ -71,6 +93,14 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         result.Value.TranscriptText.Should().Be(transcription.TranscriptText);
         result.Value.SttEngine.Should().Be(SttEngine.Local);
         result.Value.SttModel.Should().Be("ggml-base.en");
+        result.Value.Summary.Should().NotBeNull();
+        
+        // Verify LLM was called
+        _mockLlmProvider.Verify(x => x.GenerateCompletionAsync(
+            It.IsAny<string>(),
+            It.IsAny<CancellationToken>(),
+            It.IsAny<int?>(),
+            It.IsAny<double?>()), Times.Once);
     }
 
     [Fact]
@@ -115,7 +145,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        // Verify frontmatter includes audio metadata
+        result.IsSuccess.Should().BeTrue();
         result.Value.AudioFilename.Should().Be("note-20251020-143000.wav");
         result.Value.AudioDuration.Should().Be(TimeSpan.FromSeconds(120));
     }
@@ -143,9 +173,9 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        // Implementation should generate markdown with <details> tag
-        // This is validated by checking that TranscriptText is preserved
+        result.IsSuccess.Should().BeTrue();
         result.Value.TranscriptText.Should().Be(transcription.TranscriptText);
+        result.Value.UserInput.Should().Be(transcription.TranscriptText);
     }
 
     [Fact]
@@ -171,9 +201,17 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        // Should invoke LLM to generate summary
-        // Summary should be populated in LlmSummary property
-        result.Value.UserInput.Should().Be(transcription.TranscriptText);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Summary.Should().NotBeNull();
+        result.Value.Summary!.KeyEvents.Should().NotBeEmpty();
+        result.Value.Metadata.LlmProvider.Should().Be("TestProvider");
+        
+        // Verify LLM was invoked (prompt template would be rendered with the transcript)
+        _mockLlmProvider.Verify(x => x.GenerateCompletionAsync(
+            It.IsAny<string>(), // The rendered prompt will contain the transcript
+            It.IsAny<CancellationToken>(),
+            It.IsAny<int?>(),
+            It.IsAny<double?>()), Times.Once);
     }
 
     [Fact]
@@ -197,10 +235,11 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        // Should reuse existing DailyEntry creation patterns
-        // Entry should have proper timestamps and metadata
+        result.IsSuccess.Should().BeTrue();
         result.Value.UserInput.Should().NotBeNullOrWhiteSpace();
         result.Value.Timestamp.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(5));
+        result.Value.EntryId.Should().StartWith("today-");
+        result.Value.EntryNumber.Should().Be(1); // First entry of the day
     }
 
     [Fact]
@@ -225,9 +264,12 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        // Should attempt to load "custom-voice-template"
-        // Fallback to default if not found
         result.IsSuccess.Should().BeTrue();
+        
+        // Verify template was loaded with custom name
+        _mockPromptLoader.Verify(x => x.LoadTemplateAsync(
+            "custom-voice-template",
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -252,8 +294,10 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        // Should use Anthropic LLM provider for summary generation
         result.IsSuccess.Should().BeTrue();
+        
+        // Verify Anthropic provider was requested
+        _mockLlmFactory.Verify(x => x.CreateProvider("Anthropic"), Times.Once);
     }
 
     [Fact]
@@ -279,8 +323,8 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
+        result.IsSuccess.Should().BeTrue();
         // Transcript should be preserved exactly as-is
-        // Markdown special characters should not break rendering
         result.Value.TranscriptText.Should().Contain("**bold**");
         result.Value.TranscriptText.Should().Contain("`code`");
     }
@@ -331,9 +375,15 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        _mockLogger.Invocations.Should().Contain(i =>
-            i.ToString()!.Contains("voice", StringComparison.OrdinalIgnoreCase),
-            "Should log voice entry creation");
+        // Verify that logger was called (handler logs creation)
+        _mockLogger.Verify(
+            x => x.Log(
+                LogLevel.Information,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("voice", StringComparison.OrdinalIgnoreCase)),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.AtLeastOnce);
     }
 
     [Fact]
@@ -341,9 +391,8 @@ public sealed class CreateVoiceNoteEntryHandlerTests
     {
         // Arrange
         var recording = CreateSampleRecording();
-        var transcription = CreateSampleTranscription(
-            recording.FilePath,
-            "This is private confidential information");
+        var sensitiveText = "This is private confidential information";
+        var transcription = CreateSampleTranscription(recording.FilePath, sensitiveText);
 
         var command = new CreateVoiceNoteEntryCommand
         {
@@ -359,8 +408,15 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        _mockLogger.Invocations.Should().NotContain(i =>
-            i.ToString()!.Contains("private confidential information"),
+        // Verify that sensitive transcript content is NEVER logged
+        _mockLogger.Verify(
+            x => x.Log(
+                It.IsAny<LogLevel>(),
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains(sensitiveText)),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Never,
             "Should NEVER log transcript content for privacy");
     }
 
@@ -385,13 +441,14 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
+        result.IsSuccess.Should().BeTrue();
         result.Value.IsValid().Should().BeTrue("Voice note entry should be valid");
         result.Value.TranscriptText.Should().Be(result.Value.UserInput,
             "Transcript should match user input");
     }
 
     [Fact]
-    public async Task Handle_RespectsCancellationToken()
+    public async Task Handle_WhenNotAuthenticated_ReturnsFailure()
     {
         // Arrange
         var recording = CreateSampleRecording();
@@ -405,23 +462,117 @@ public sealed class CreateVoiceNoteEntryHandlerTests
             UseDefaultTemplate = true
         };
 
-        var cts = new CancellationTokenSource();
-        cts.Cancel();
-
+        // Create handler first, then override auth to return false
         var handler = CreateHandler();
+        
+        // Override auth mock to return false for this test
+        _mockAuthService.Reset();
+        _mockAuthService
+            .Setup(x => x.IsAuthenticatedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
 
         // Act
-        var act = () => handler.Handle(command, cts.Token);
+        var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("Authentication required");
     }
 
     private CreateVoiceNoteEntryHandler CreateHandler()
     {
-        // In real implementation, this would inject dependencies
-        // For now, defining the test contract
-        return new CreateVoiceNoteEntryHandler(_mockLogger.Object);
+        // Setup auth service mock
+        _mockAuthService
+            .Setup(x => x.IsAuthenticatedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        // Setup configuration mocks
+        _mockConfiguration
+            .Setup(x => x["TenSecondTom:MemoryDirectory"])
+            .Returns("/test/memory");
+        _mockConfiguration
+            .Setup(x => x["TenSecondTom:MemoryDirectory"])
+            .Returns("/test/memory");
+
+        // Setup template loader mock
+        var mockTemplate = new PromptTemplate
+        {
+            TemplateId = "default",
+            Content = "Analyze this: {{UserInput}}",
+            TemplateType = TemplateType.Daily,
+            Description = "Test template"
+        };
+        _mockPromptLoader
+            .Setup(x => x.LoadTemplateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<PromptTemplate>.Success(mockTemplate));
+
+        // Setup LLM provider mock
+        var llmResponseText = @"## Key Events
+- Implemented voice notes
+- Wrote comprehensive tests
+
+## Themes and Patterns
+- Test-driven development
+- Audio processing
+
+## To-Do Items
+- [ ] Review implementation
+- [ ] Update documentation
+
+## Overall Reflection
+Successfully implemented voice note feature with TDD approach.";
+        
+        var llmResponse = new LlmResponse
+        {
+            Content = llmResponseText,
+            InputTokens = 100,
+            OutputTokens = 150
+        };
+        
+        _mockLlmProvider
+            .Setup(x => x.ProviderName)
+            .Returns("TestProvider");
+        
+        _mockLlmProvider
+            .Setup(x => x.ModelName)
+            .Returns("test-model");
+        
+        _mockLlmProvider
+            .Setup(x => x.GenerateCompletionAsync(
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<int?>(),
+                It.IsAny<double?>()))
+            .ReturnsAsync(Result<LlmResponse>.Success(llmResponse));
+        
+        _mockLlmFactory
+            .Setup(x => x.CreateProvider(It.IsAny<string>()))
+            .Returns(_mockLlmProvider.Object);
+
+        // Setup storage provider mock
+        _mockStorage
+            .Setup(x => x.CountEntriesAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<int>.Success(0)); // Return 0 so next entry is 1
+        
+        _mockStorage
+            .Setup(x => x.SaveAsync(It.IsAny<MemoryEntry>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((MemoryEntry entry, CancellationToken _) => Result<MemoryEntry>.Success(entry));
+
+        // Create real ListTemplatesQueryHandler instance with mocked dependencies
+        var listTemplatesLogger = Mock.Of<ILogger<TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler>>();
+        var listTemplatesHandler = new TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler(
+            _mockPromptLoader.Object,
+            listTemplatesLogger);
+
+        return new CreateVoiceNoteEntryHandler(
+            _mockStorage.Object,
+            _mockLlmFactory.Object,
+            _mockPromptLoader.Object,
+            _mockAuthService.Object,
+            _mockConfiguration.Object,
+            _mockLogger.Object,
+            listTemplatesHandler,
+            _mockTemplateSelectionUI.Object);
     }
 
     private static AudioRecording CreateSampleRecording()

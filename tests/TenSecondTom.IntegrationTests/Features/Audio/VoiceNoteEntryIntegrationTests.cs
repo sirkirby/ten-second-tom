@@ -1,6 +1,7 @@
 using FluentAssertions;
 using System.Diagnostics;
 using TenSecondTom.Features.Audio.Models;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Features.Audio.Services;
 using Xunit.Abstractions;
 

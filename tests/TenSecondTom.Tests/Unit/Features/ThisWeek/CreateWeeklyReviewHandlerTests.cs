@@ -10,6 +10,7 @@ using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 
@@ -48,7 +49,7 @@ public sealed class CreateWeeklyReviewHandlerTests
         _mockTemplateSelectionUI = new Mock<ITemplateSelectionUI>();
 
         // Setup default configuration values
-        _mockConfiguration.Setup(c => c["Llm:Provider"]).Returns("OpenAI");
+        _mockConfiguration.Setup(c => c[ConfigurationKeys.LlmProvider]).Returns("OpenAI");
         _mockConfiguration.Setup(c => c["Llm:Model"]).Returns("gpt-4o");
 
         // Setup default successful behaviors

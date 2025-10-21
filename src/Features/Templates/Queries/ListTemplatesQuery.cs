@@ -1,5 +1,6 @@
 using TenSecondTom.Features.Templates.Commands;
 using TenSecondTom.Features.Templates.Models;
+using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 

@@ -1,8 +1,13 @@
-namespace TenSecondTom.Features.Audio.Models;
+namespace TenSecondTom.Shared.Models;
 
 /// <summary>
 /// Represents available speech-to-text engines for audio transcription.
 /// </summary>
+/// <remarks>
+/// These engines represent fundamental methods for processing voice input,
+/// a core capability alongside text input. Stored in Shared because speech-to-text
+/// is a cross-cutting concern used by multiple features.
+/// </remarks>
 public enum SttEngine
 {
     /// <summary>
@@ -17,3 +22,4 @@ public enum SttEngine
     /// </summary>
     OpenAI
 }
+

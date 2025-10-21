@@ -1,4 +1,3 @@
-using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Shared.Models;
 
 namespace TenSecondTom.Features.Today.Models;
@@ -10,9 +9,10 @@ namespace TenSecondTom.Features.Today.Models;
 public sealed record VoiceNoteEntry : DailyEntry
 {
     /// <summary>
-    /// Gets the name of the audio file (e.g., "note-20251020-143000.wav").
+    /// Gets or sets the name of the audio file (e.g., "note-20251020-143000.wav").
+    /// This can be updated if the file is renamed after initial creation.
     /// </summary>
-    public required string AudioFilename { get; init; }
+    public required string AudioFilename { get; set; }
 
     /// <summary>
     /// Gets the duration of the audio recording.

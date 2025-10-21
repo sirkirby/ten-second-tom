@@ -4,6 +4,7 @@ using Moq;
 using TenSecondTom.Features.Audio.Commands;
 using TenSecondTom.Features.Audio.Handlers;
 using TenSecondTom.Features.Audio.Models;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Features.Audio.Services;
 using TenSecondTom.Shared.Results;
 

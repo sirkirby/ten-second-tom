@@ -326,7 +326,7 @@ public sealed class FirstTimeSetupTests : IDisposable
 
         // Template handler registration (required by SetupCommandHandler)
         services.AddTransient<
-            TenSecondTom.Features.Templates.Handlers.IRequestHandler<
+            TenSecondTom.Shared.Contracts.IRequestHandler<
                 TenSecondTom.Features.Templates.Commands.InstallDefaultTemplatesCommand,
                 TenSecondTom.Shared.Results.Result<TenSecondTom.Features.Templates.Commands.InstallDefaultTemplatesResult>>,
             TenSecondTom.Features.Templates.Handlers.InstallDefaultTemplatesHandler>();

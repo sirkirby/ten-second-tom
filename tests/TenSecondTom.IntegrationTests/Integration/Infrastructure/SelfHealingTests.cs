@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Constants;
 
 namespace TenSecondTom.IntegrationTests.Integration.Infrastructure;
 
@@ -26,7 +27,7 @@ public sealed class SelfHealingTests
         // Create configuration with memory directory
         var configData = new Dictionary<string, string?>
         {
-            ["Storage:MemoryDirectory"] = "/.memory",
+            [ConfigurationKeys.MemoryDirectory] = "/.memory",
             ["Llm:Provider"] = "OpenAI",
             ["Llm:ApiKey"] = "test-key"
         };
@@ -286,7 +287,7 @@ public sealed class SelfHealingTests
         var customConfig = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Storage:MemoryDirectory"] = memoryDirectory,
+                [ConfigurationKeys.MemoryDirectory] = memoryDirectory,
                 ["Llm:Provider"] = "OpenAI",
                 ["Llm:ApiKey"] = "test-key"
             })

@@ -116,7 +116,7 @@ public sealed class EnvironmentVariableConfigTests : IDisposable
                 ["TenSecondTom:Llm:ApiKey"] = "sk-test-key",
                 ["TenSecondTom:Llm:Model"] = "gpt-4o-mini",
                 ["TenSecondTom:Ssh:KeyPath"] = "/path/to/key",
-                ["TenSecondTom:Storage:MemoryDirectory"] = "/tmp/memory"
+                ["TenSecondTom:MemoryDirectory"] = "/tmp/memory"
             })
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -146,7 +146,7 @@ public sealed class EnvironmentVariableConfigTests : IDisposable
                 ["TenSecondTom:Llm:ApiKey"] = "sk-user-secrets-key",
                 ["TenSecondTom:Llm:Model"] = "gpt-4o-mini",
                 ["TenSecondTom:Ssh:KeyPath"] = "/user/secrets/key",
-                ["TenSecondTom:Storage:MemoryDirectory"] = "/tmp/memory"
+                ["TenSecondTom:MemoryDirectory"] = "/tmp/memory"
             })
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -177,7 +177,7 @@ public sealed class EnvironmentVariableConfigTests : IDisposable
                 ["TenSecondTom:Llm:ApiKey"] = "sk-test-key",
                 ["TenSecondTom:Llm:Model"] = "gpt-4o-mini", // User secrets
                 ["TenSecondTom:Ssh:KeyPath"] = "/path/to/key",
-                ["TenSecondTom:Storage:MemoryDirectory"] = "/tmp/memory"
+                ["TenSecondTom:MemoryDirectory"] = "/tmp/memory"
             })
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -206,7 +206,7 @@ public sealed class EnvironmentVariableConfigTests : IDisposable
                 ["TenSecondTom:Llm:Provider"] = "OpenAI",
                 ["TenSecondTom:Llm:ApiKey"] = "default-key",
                 ["TenSecondTom:Ssh:KeyPath"] = "/default/key",
-                ["TenSecondTom:Storage:MemoryDirectory"] = "/tmp/memory"
+                ["TenSecondTom:MemoryDirectory"] = "/tmp/memory"
             })
             // Layer 2: user secrets
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -242,7 +242,7 @@ public sealed class EnvironmentVariableConfigTests : IDisposable
                 ["TenSecondTom:Llm:ApiKey"] = "sk-openai-key",
                 ["TenSecondTom:Llm:Model"] = "gpt-4o-mini",
                 ["TenSecondTom:Ssh:KeyPath"] = "/path/to/key",
-                ["TenSecondTom:Storage:MemoryDirectory"] = "/tmp/memory"
+                ["TenSecondTom:MemoryDirectory"] = "/tmp/memory"
             })
             .AddInMemoryCollection(new Dictionary<string, string?>
             {

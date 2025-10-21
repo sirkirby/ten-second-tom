@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Templates.Commands;
 using TenSecondTom.Features.Templates.Handlers;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Templates.Services;
@@ -45,9 +46,9 @@ public sealed class TemplateMigrationService
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        // Use Storage:MemoryDirectory (configured root directory)
-        // This is the root containing templates/, today/, thisweek/, etc.
-        string? rootDirectory = configuration[ConfigurationKeys.StorageMemoryDirectory];
+        // Get memory directory using standard .NET configuration
+        // TenSecondTom:MemoryDirectory is the root containing templates/, today/, thisweek/, etc.
+            string? rootDirectory = configuration[ConfigurationKeys.MemoryDirectory];
         _logger.LogDebug("Root directory from configuration: {RootDirectory}", rootDirectory);
 
         if (string.IsNullOrWhiteSpace(rootDirectory))

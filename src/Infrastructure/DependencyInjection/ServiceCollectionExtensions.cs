@@ -47,10 +47,9 @@ public static class ServiceCollectionExtensions
             var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger<FileSystemStorageProvider>();
 
-            // Use Storage:MemoryDirectory (configured root) or fallback to default
-            // This is the root directory containing templates/, today/, thisweek/, etc.
-            string baseDirectory = configuration[ConfigurationKeys.StorageMemoryDirectory] ??
-                configuration[ConfigurationKeys.TenSecondTomMemoryDirectory] ??
+            // Get memory directory using standard .NET configuration precedence
+            // env vars → user secrets → appsettings.json → default
+            string baseDirectory = configuration[ConfigurationKeys.MemoryDirectory] ??
                 Path.Combine(".", DirectoryNames.ApplicationRoot);
 
             return new FileSystemStorageProvider(baseDirectory, logger);
@@ -70,10 +69,9 @@ public static class ServiceCollectionExtensions
             var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
 
             // Templates are in the configured root directory under templates/ subdirectory
-            // Storage:MemoryDirectory is the root (e.g., ~/ten-second-tom or ./.memory)
+            // TenSecondTom:MemoryDirectory is the root (e.g., ~/ten-second-tom or ./.memory)
             // Structure: {root}/templates/, {root}/today/, {root}/thisweek/
-            string rootDirectory = configuration[ConfigurationKeys.StorageMemoryDirectory] ??
-                configuration[ConfigurationKeys.TenSecondTomMemoryDirectory] ??
+            string rootDirectory = configuration[ConfigurationKeys.MemoryDirectory] ??
                 Path.Combine(".", DirectoryNames.ApplicationRoot);
             string templatesDirectory = Path.Combine(rootDirectory, DirectoryNames.Templates);
 
@@ -135,17 +133,17 @@ public static class ServiceCollectionExtensions
             var configuration = serviceProvider.GetRequiredService<IConfiguration>();
             
             // Use standard .NET configuration hierarchy: appsettings → user secrets → environment variables
-            // Configuration system handles priority automatically (Llm:ApiKey or Llm__ApiKey env var)
-            string? apiKey = configuration["Llm:ApiKey"];
+            // Configuration system handles priority automatically (TenSecondTom__Llm__ApiKey env var)
+            string? apiKey = configuration[ConfigurationKeys.LlmApiKey];
             
             if (string.IsNullOrWhiteSpace(apiKey))
             {
                 throw new InvalidOperationException(
                     "OpenAI API key not configured. Run 'tom setup' to configure your API key, " +
-                    "or set Llm__ApiKey environment variable.");
+                    "or set TenSecondTom__Llm__ApiKey environment variable.");
             }
 
-            string model = configuration["Llm:Model"] ?? 
+            string model = configuration[ConfigurationKeys.LlmModel] ?? 
                           configuration["TenSecondTom:OpenAI:Model"] ?? 
                           "gpt-4o";
             var openAIClient = new OpenAIClient(apiKey);
@@ -158,8 +156,8 @@ public static class ServiceCollectionExtensions
             var configuration = serviceProvider.GetRequiredService<IConfiguration>();
             
             // Use standard .NET configuration hierarchy: appsettings → user secrets → environment variables
-            // Configuration system handles priority automatically (Llm:ApiKey or Llm__ApiKey env var)
-            string? apiKey = configuration["Llm:ApiKey"];
+            // Configuration system handles priority automatically (TenSecondTom__Llm__ApiKey env var)
+            string? apiKey = configuration[ConfigurationKeys.LlmApiKey];
             
             if (string.IsNullOrWhiteSpace(apiKey))
             {
@@ -180,7 +178,7 @@ public static class ServiceCollectionExtensions
                 .CreateLogger<OpenAILlmProvider>();
             
             // Get configured model or use default from ModelRegistry
-            string? configuredModel = configuration["Llm:Model"];
+            string? configuredModel = configuration[ConfigurationKeys.LlmModel];
             string model = !string.IsNullOrWhiteSpace(configuredModel)
                 ? configuredModel
                 : TenSecondTom.Features.Setup.Models.ModelRegistry.GetDefault(
@@ -197,7 +195,7 @@ public static class ServiceCollectionExtensions
                 .CreateLogger<AnthropicLlmProvider>();
             
             // Get configured model or use default from ModelRegistry
-            string? configuredModel = configuration["Llm:Model"];
+            string? configuredModel = configuration[ConfigurationKeys.LlmModel];
             string model = !string.IsNullOrWhiteSpace(configuredModel)
                 ? configuredModel
                 : TenSecondTom.Features.Setup.Models.ModelRegistry.GetDefault(

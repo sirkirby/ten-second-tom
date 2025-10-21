@@ -8,6 +8,7 @@ using TenSecondTom.Features.Today.Commands;
 using TenSecondTom.Features.Today.Models;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.OutputFormatters;
@@ -314,9 +315,9 @@ public static class TodayCommandHandler
         bool jsonOutput)
     {
         // Resolve required services
-        var recordHandler = serviceProvider.GetRequiredService<AudioHandlers.IRequestHandler<RecordAudioCommand, Result<AudioRecording>>>();
-        var transcribeHandler = serviceProvider.GetRequiredService<AudioHandlers.IRequestHandler<TranscribeAudioCommand, Result<TranscriptionResult>>>();
-        var voiceNoteHandler = serviceProvider.GetRequiredService<TodayHandlers.IRequestHandler<CreateVoiceNoteEntryCommand, Result<VoiceNoteEntry>>>();
+        var recordHandler = serviceProvider.GetRequiredService<IRequestHandler<RecordAudioCommand, Result<AudioRecording>>>();
+        var transcribeHandler = serviceProvider.GetRequiredService<IRequestHandler<TranscribeAudioCommand, Result<TranscriptionResult>>>();
+        var voiceNoteHandler = serviceProvider.GetRequiredService<IRequestHandler<CreateVoiceNoteEntryCommand, Result<VoiceNoteEntry>>>();
         var configuration = serviceProvider.GetRequiredService<IConfiguration>();
         var logger = serviceProvider.GetRequiredService<ILogger<TodayHandlers.CreateVoiceNoteEntryHandler>>();
 
@@ -324,8 +325,10 @@ public static class TodayCommandHandler
         var audioConfig = configuration.GetSection("TenSecondTom:Audio").Get<AudioConfiguration>()
             ?? new AudioConfiguration();
 
-        // Get memory directory from configuration
-        var memoryDirectory = configuration.GetValue<string>("TenSecondTom:MemoryDirectory");
+        // Get memory directory from configuration with proper precedence
+        // PRIMARY: Storage:MemoryDirectory (from .env, user secrets, environment vars)
+        // FALLBACK: TenSecondTom:MemoryDirectory (from appsettings.json)
+        var memoryDirectory = configuration.GetMemoryDirectory(expandHomeDirectory: true);
         if (string.IsNullOrWhiteSpace(memoryDirectory))
         {
             var error = "Memory directory not configured. Run 'tom setup' to configure.";
@@ -339,9 +342,6 @@ public static class TodayCommandHandler
             }
             return;
         }
-
-        // Expand home directory
-        memoryDirectory = memoryDirectory.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
         // Create temp audio file path
         var timestamp = DateTimeOffset.Now.ToString("yyyyMMdd-HHmmss");
@@ -444,7 +444,7 @@ public static class TodayCommandHandler
                 AnsiConsole.WriteLine();
             }
 
-            // Step 3: Create voice note entry
+            // Step 3: Create voice note entry with AI processing
             var voiceNoteCommand = new CreateVoiceNoteEntryCommand
             {
                 TranscriptText = transcription.TranscriptText,
@@ -455,7 +455,38 @@ public static class TodayCommandHandler
                 LlmProviderOverride = providerOverride
             };
 
-            var voiceNoteResult = await voiceNoteHandler.Handle(voiceNoteCommand, CancellationToken.None).ConfigureAwait(false);
+            VoiceNoteEntry? entry = null;
+            Result<VoiceNoteEntry> voiceNoteResult;
+
+            if (jsonOutput)
+            {
+                voiceNoteResult = await voiceNoteHandler.Handle(voiceNoteCommand, CancellationToken.None).ConfigureAwait(false);
+                if (voiceNoteResult.IsSuccess)
+                {
+                    entry = voiceNoteResult.Value;
+                }
+            }
+            else
+            {
+                // Show AI processing spinner
+                voiceNoteResult = Result<VoiceNoteEntry>.Failure("Not executed");
+                await AnsiConsole.Status()
+                    .Spinner(Spinner.Known.Dots)
+                    .SpinnerStyle(Style.Parse("cyan"))
+                    .StartAsync("[cyan]Generating AI summary...[/]", async ctx =>
+                    {
+                        voiceNoteResult = await voiceNoteHandler.Handle(voiceNoteCommand, CancellationToken.None).ConfigureAwait(false);
+
+                        if (voiceNoteResult.IsSuccess)
+                        {
+                            entry = voiceNoteResult.Value;
+                        }
+                        else
+                        {
+                            AnsiConsole.MarkupLine($"[red]Error:[/] {voiceNoteResult.Error.EscapeMarkup()}");
+                        }
+                    }).ConfigureAwait(false);
+            }
 
             if (!voiceNoteResult.IsSuccess)
             {
@@ -471,7 +502,11 @@ public static class TodayCommandHandler
                 return;
             }
 
-            var entry = voiceNoteResult.Value;
+            if (entry == null)
+            {
+                AnsiConsole.MarkupLine("[red]Error:[/] Failed to create entry");
+                return;
+            }
 
             // Step 4: Clean up audio file if configured
             if (!audioConfig.KeepFiles)
@@ -488,16 +523,45 @@ public static class TodayCommandHandler
             }
             else
             {
-                // Move audio file to memory directory if keeping files
-                var audioDestPath = Path.Combine(memoryDirectory, recording.Filename);
-                try
+                // Move audio file to today directory with consistent naming pattern
+                var todayDir = Path.Combine(memoryDirectory, "today");
+                Directory.CreateDirectory(todayDir); // Ensure directory exists
+                
+                // Extract date and number from entry-id (e.g., "today-10-21-2025-1" -> "10-21-2025_1.wav")
+                var entryIdParts = entry.EntryId.Split('-');
+                if (entryIdParts.Length >= 5)
                 {
-                    File.Move(audioFilePath, audioDestPath, overwrite: true);
-                    logger.LogInformation("Moved audio file to {Destination}", audioDestPath);
+                    var month = entryIdParts[1];
+                    var day = entryIdParts[2];
+                    var year = entryIdParts[3];
+                    var number = entryIdParts[4];
+                    var newFilename = $"{month}-{day}-{year}_{number}.wav";
+                    var audioDestPath = Path.Combine(todayDir, newFilename);
+                    
+                    try
+                    {
+                        File.Move(audioFilePath, audioDestPath, overwrite: true);
+                        entry.AudioFilename = newFilename; // Update entry to reflect actual filename
+                        logger.LogInformation("Moved audio file to {Destination}", audioDestPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, "Failed to move audio file to today directory");
+                    }
                 }
-                catch (Exception ex)
+                else
                 {
-                    logger.LogWarning(ex, "Failed to move audio file to memory directory");
+                    logger.LogWarning("Invalid entry ID format: {EntryId}, falling back to original filename", entry.EntryId);
+                    var audioDestPath = Path.Combine(todayDir, recording.Filename);
+                    try
+                    {
+                        File.Move(audioFilePath, audioDestPath, overwrite: true);
+                        logger.LogInformation("Moved audio file to {Destination}", audioDestPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, "Failed to move audio file to today directory");
+                    }
                 }
             }
 
@@ -512,17 +576,69 @@ public static class TodayCommandHandler
                     audioDuration = entry.AudioDuration.TotalSeconds,
                     wordCount = transcription.WordCount,
                     sttEngine = entry.SttEngine.ToString(),
-                    sttModel = entry.SttModel
+                    sttModel = entry.SttModel,
+                    provider = entry.Metadata.LlmProvider,
+                    summary = new
+                    {
+                        keyEvents = entry.Summary.KeyEvents,
+                        themes = entry.Summary.Themes,
+                        todoItems = entry.Summary.TodoItems.Select(t => new { description = t.Description, isCompleted = t.IsCompleted }),
+                        importantPeople = entry.Summary.ImportantPeople,
+                        notableTasks = entry.Summary.NotableTasks
+                    }
                 };
 
                 Console.WriteLine(JsonOutputFormatter.FormatSuccess(CommandNames.Today, jsonData, DateTimeOffset.UtcNow));
             }
             else
             {
+                AnsiConsole.WriteLine();
                 AnsiConsole.MarkupLine("[bold green]✓ Voice note entry created successfully![/]");
-                AnsiConsole.MarkupLine($"[dim]Entry ID: {entry.EntryId}[/]");
+                AnsiConsole.WriteLine();
+
+                var panel = new Panel(new Markup($"""
+                    [bold]Entry ID:[/] {entry.EntryId}
+                    [bold]Timestamp:[/] {entry.Timestamp:yyyy-MM-dd HH:mm:ss}
+                    [bold]Provider:[/] {entry.Metadata.LlmProvider}
+                    [bold]Audio:[/] {entry.AudioDuration.TotalSeconds:F1}s ({entry.SttEngine})
+
+                    [bold cyan]Summary:[/]
+                    [dim]{entry.LlmResponse.Split('\n').Take(5).Aggregate((a, b) => a + "\n" + b)}...[/]
+                    """))
+                {
+                    Header = new PanelHeader("🎤 Voice Note Summary"),
+                    Border = BoxBorder.Rounded,
+                    BorderStyle = new Style(foreground: Color.Cyan1)
+                };
+
+                AnsiConsole.Write(panel);
+
+                // Show key events if any
+                if (entry.Summary.KeyEvents.Count > 0)
+                {
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.MarkupLine("[bold]Key Events:[/]");
+                    foreach (string keyEvent in entry.Summary.KeyEvents)
+                    {
+                        AnsiConsole.MarkupLine($"  • {Markup.Escape(keyEvent)}");
+                    }
+                }
+
+                // Show todo items if any
+                if (entry.Summary.TodoItems.Count > 0)
+                {
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.MarkupLine("[bold]Todo Items:[/]");
+                    foreach (TodoItem todo in entry.Summary.TodoItems)
+                    {
+                        string status = todo.IsCompleted ? "✓" : "○";
+                        AnsiConsole.MarkupLine($"  {status} {Markup.Escape(todo.Description)}");
+                    }
+                }
+
                 if (audioConfig.KeepFiles)
                 {
+                    AnsiConsole.WriteLine();
                     AnsiConsole.MarkupLine($"[dim]Audio saved: {entry.AudioFilename}[/]");
                 }
             }

@@ -455,6 +455,42 @@ tom config show
 tom config show --show-secrets
 ```
 
+## Configuration Standard for Developers
+
+> **Audience:** This section is for developers contributing to Ten Second Tom.  
+> **Status:** MANDATORY - Must be enforced in all features
+
+All configuration in Ten Second Tom uses the **TenSecondTom:** namespace for consistency. This section establishes the canonical pattern that **MUST** be followed in all current and future features.
+
+### Configuration Key Naming Convention
+
+Ten Second Tom uses standard .NET configuration patterns:
+
+**Files (appsettings.json, User Secrets)** - Use colons (`:`) for hierarchy:
+```json
+{
+  "TenSecondTom": {
+    "MemoryDirectory": "~/ten-second-tom",
+    "Audio": {
+      "KeepFiles": true
+    },
+    "Llm": {
+      "Provider": "OpenAI",
+      "ApiKey": "sk-..."
+    }
+  }
+}
+```
+
+**Environment Variables (.env file, shell exports)** - Use double underscores (`__`) for hierarchy:
+```bash
+# .env file
+TenSecondTom__MemoryDirectory=~/ten-second-tom
+TenSecondTom__Audio__KeepFiles=true
+TenSecondTom__Llm__Provider=OpenAI
+TenSecondTom__Llm__ApiKey=sk-...
+```
+
 ## Timeout Configuration
 
 SSH key detection and API validation operations have configurable timeouts to prevent the setup wizard from hanging.

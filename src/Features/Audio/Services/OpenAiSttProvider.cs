@@ -4,9 +4,10 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenAI;
 using OpenAI.Audio;
-using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Audio.Services;
@@ -50,7 +51,7 @@ public sealed class OpenAiSttProvider : ISttProvider
             return Task.FromResult(false);
         }
 
-        var apiKey = _configuration["Llm:ApiKey"];
+        var apiKey = _configuration[ConfigurationKeys.LlmApiKey];
         var isAvailable = !string.IsNullOrWhiteSpace(apiKey);
 
         if (!isAvailable)
@@ -80,7 +81,7 @@ public sealed class OpenAiSttProvider : ISttProvider
                 $"Cannot use OpenAI STT: Current provider is {_configSettings.Llm.Provider}. Change to OpenAI in 'tom config llm'.");
         }
 
-        var apiKey = _configuration["Llm:ApiKey"];
+        var apiKey = _configuration[ConfigurationKeys.LlmApiKey];
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             return Result<TranscriptionResult>.Failure("OpenAI API key not configured. Run 'tom setup' to configure your API key.");

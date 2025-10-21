@@ -1,7 +1,8 @@
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Audio.Commands;
-using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Features.Audio.Services;
+using TenSecondTom.Shared.Contracts;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Audio.Handlers;

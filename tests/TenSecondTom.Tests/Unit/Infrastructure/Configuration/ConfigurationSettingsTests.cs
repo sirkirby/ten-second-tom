@@ -21,7 +21,7 @@ public sealed class ConfigurationSettingsTests
                 ["TenSecondTom:Llm:ApiKey"] = "test-api-key",
                 ["TenSecondTom:Llm:Model"] = "gpt-4o",
                 ["TenSecondTom:Ssh:KeyPath"] = "/path/to/key",
-                ["TenSecondTom:Storage:MemoryDirectory"] = "/tmp/memory"
+                ["TenSecondTom:MemoryDirectory"] = "/tmp/memory"
             })
             .Build();
 
@@ -46,7 +46,7 @@ public sealed class ConfigurationSettingsTests
                 ["TenSecondTom:Llm:ApiKey"] = "test-api-key",
                 ["TenSecondTom:Llm:Model"] = "gpt-4o-mini", // User secrets
                 ["TenSecondTom:Ssh:KeyPath"] = "/path/to/key",
-                ["TenSecondTom:Storage:MemoryDirectory"] = "/tmp/memory"
+                ["TenSecondTom:MemoryDirectory"] = "/tmp/memory"
             })
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -72,7 +72,7 @@ public sealed class ConfigurationSettingsTests
                 ["TenSecondTom:Llm:Provider"] = "OpenAI",
                 ["TenSecondTom:Llm:ApiKey"] = "test-api-key",
                 ["TenSecondTom:Ssh:KeyPath"] = "/path/to/key",
-                ["TenSecondTom:Storage:MemoryDirectory"] = "/tmp/memory"
+                ["TenSecondTom:MemoryDirectory"] = "/tmp/memory"
             })
             .Build();
 
@@ -95,7 +95,7 @@ public sealed class ConfigurationSettingsTests
                 ["TenSecondTom:Llm:ApiKey"] = "test-api-key",
                 ["TenSecondTom:Llm:Model"] = "claude-3-5-sonnet-20241022",
                 ["TenSecondTom:Ssh:KeyPath"] = "/path/to/key",
-                ["TenSecondTom:Storage:MemoryDirectory"] = "/tmp/memory"
+                ["TenSecondTom:MemoryDirectory"] = "/tmp/memory"
             })
             .Build();
 
@@ -119,7 +119,7 @@ public sealed class ConfigurationSettingsTests
                 ["TenSecondTom:Llm:ApiKey"] = "test-api-key",
                 ["TenSecondTom:Llm:Model"] = "claude-3-5-sonnet-20241022",
                 ["TenSecondTom:Ssh:KeyPath"] = "/path/to/key",
-                ["TenSecondTom:Storage:MemoryDirectory"] = "/tmp/memory"
+                ["TenSecondTom:MemoryDirectory"] = "/tmp/memory"
             })
             .Build();
 
@@ -143,7 +143,7 @@ public sealed class ConfigurationSettingsTests
                 ["TenSecondTom:Llm:ApiKey"] = "test-api-key",
                 ["TenSecondTom:Llm:Model"] = "  gpt-4o  ",
                 ["TenSecondTom:Ssh:KeyPath"] = "/path/to/key",
-                ["TenSecondTom:Storage:MemoryDirectory"] = "/tmp/memory"
+                ["TenSecondTom:MemoryDirectory"] = "/tmp/memory"
             })
             .Build();
 
@@ -211,7 +211,7 @@ public sealed class ConfigurationSettingsTests
                 ["TenSecondTom:Llm:ApiKey"] = "test-api-key",
                 ["TenSecondTom:Llm:Model"] = "gpt-4o",
                 ["TenSecondTom:Ssh:KeyPath"] = "/path/to/key",
-                ["TenSecondTom:Storage:MemoryDirectory"] = "/tmp/memory"
+                ["TenSecondTom:MemoryDirectory"] = "/tmp/memory"
             })
             .Build();
 

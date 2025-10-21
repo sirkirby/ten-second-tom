@@ -1,15 +1,8 @@
-using TenSecondTom.Features.Audio.Models;
+using TenSecondTom.Shared.Contracts;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Audio.Commands;
-
-/// <summary>
-/// Marker interface for request/response pattern.
-/// Indicates this command returns a specific response type.
-/// </summary>
-public interface IRequest<out TResponse>
-{
-}
 
 /// <summary>
 /// Command to record audio to a specified file path.

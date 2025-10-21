@@ -1,7 +1,8 @@
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Audio.Commands;
-using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Features.Audio.Services;
+using TenSecondTom.Shared.Contracts;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Audio.Handlers;
@@ -63,21 +64,4 @@ public sealed class RecordAudioCommandHandler : IRequestHandler<RecordAudioComma
 
         return result;
     }
-}
-
-/// <summary>
-/// Marker interface for request handlers.
-/// </summary>
-/// <typeparam name="TRequest">The request type.</typeparam>
-/// <typeparam name="TResponse">The response type.</typeparam>
-public interface IRequestHandler<in TRequest, TResponse>
-    where TRequest : IRequest<TResponse>
-{
-    /// <summary>
-    /// Handles the request.
-    /// </summary>
-    /// <param name="request">The request to handle.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The response.</returns>
-    Task<TResponse> Handle(TRequest request, CancellationToken cancellationToken);
 }

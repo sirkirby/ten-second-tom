@@ -1,3 +1,4 @@
+using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 

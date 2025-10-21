@@ -1,3 +1,5 @@
+using TenSecondTom.Shared.Models;
+
 namespace TenSecondTom.Features.Audio.Models;
 
 /// <summary>

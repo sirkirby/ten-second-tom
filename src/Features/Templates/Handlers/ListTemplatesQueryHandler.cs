@@ -3,6 +3,7 @@ using TenSecondTom.Features.Templates.Models;
 using TenSecondTom.Features.Templates.Queries;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 

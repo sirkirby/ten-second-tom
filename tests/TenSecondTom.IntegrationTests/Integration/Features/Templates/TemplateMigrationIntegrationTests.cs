@@ -1,3 +1,4 @@
+using TenSecondTom.Shared.Contracts;
 using System.IO.Abstractions;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
@@ -54,7 +55,7 @@ public sealed class TemplateMigrationIntegrationTests : IDisposable
         string templatesDirectory = Path.Combine(rootDirectory, "templates");
 
         var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c["Storage:MemoryDirectory"]).Returns(rootDirectory);
+        mockConfiguration.Setup(c => c["TenSecondTom:MemoryDirectory"]).Returns(rootDirectory);
 
         // Act
         await _migrationService.RunAutomaticMigrationAsync(
@@ -80,7 +81,7 @@ public sealed class TemplateMigrationIntegrationTests : IDisposable
         // Arrange
         string memoryDirectory = _testDirectory;
         var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c["Storage:MemoryDirectory"]).Returns(memoryDirectory);
+        mockConfiguration.Setup(c => c["TenSecondTom:MemoryDirectory"]).Returns(memoryDirectory);
 
         // Act - First migration
         await _migrationService.RunAutomaticMigrationAsync(
@@ -119,7 +120,7 @@ public sealed class TemplateMigrationIntegrationTests : IDisposable
             customContent);
 
         var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c["Storage:MemoryDirectory"]).Returns(rootDirectory);
+        mockConfiguration.Setup(c => c["TenSecondTom:MemoryDirectory"]).Returns(rootDirectory);
 
         // Act
         await _migrationService.RunAutomaticMigrationAsync(

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Constants;
 
 namespace TenSecondTom.Tests.Unit.Infrastructure.Configuration;
 
@@ -27,10 +28,10 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
-            ["Llm:Provider"] = "OpenAI",
-            ["Llm:ApiKey"] = "sk-test1234567890",
-            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
+            [ConfigurationKeys.SshKeyPath] = "~/.ssh/id_ed25519",
+            [ConfigurationKeys.LlmProvider] = "OpenAI",
+            [ConfigurationKeys.LlmApiKey] = "sk-test1234567890",
+            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
         });
 
         // Act
@@ -46,10 +47,10 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
-            ["Llm:Provider"] = "Anthropic",
-            ["Llm:ApiKey"] = "sk-ant-test1234567890",
-            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
+            [ConfigurationKeys.SshKeyPath] = "~/.ssh/id_ed25519",
+            [ConfigurationKeys.LlmProvider] = "Anthropic",
+            [ConfigurationKeys.LlmApiKey] = "sk-ant-test1234567890",
+            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
         });
 
         // Act
@@ -65,10 +66,10 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
-            ["Llm:Provider"] = "OPENAI",
-            ["Llm:ApiKey"] = "sk-test1234567890",
-            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
+            [ConfigurationKeys.SshKeyPath] = "~/.ssh/id_ed25519",
+            [ConfigurationKeys.LlmProvider] = "OPENAI",
+            [ConfigurationKeys.LlmApiKey] = "sk-test1234567890",
+            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
         });
 
         // Act
@@ -85,10 +86,10 @@ public sealed class ConfigurationCheckerTests
         // This test is no longer relevant since we don't check environment variables
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
-            ["Llm:Provider"] = "OpenAI",
-            ["Llm:ApiKey"] = "sk-test1234567890",
-            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
+            [ConfigurationKeys.SshKeyPath] = "~/.ssh/id_ed25519",
+            [ConfigurationKeys.LlmProvider] = "OpenAI",
+            [ConfigurationKeys.LlmApiKey] = "sk-test1234567890",
+            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
         });
 
         // Act
@@ -109,9 +110,9 @@ public sealed class ConfigurationCheckerTests
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             // SSH configuration missing entirely
-            ["Llm:Provider"] = "OpenAI",
-            ["Llm:ApiKey"] = "sk-test1234567890",
-            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
+            [ConfigurationKeys.LlmProvider] = "OpenAI",
+            [ConfigurationKeys.LlmApiKey] = "sk-test1234567890",
+            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
         });
 
         // Act
@@ -128,11 +129,11 @@ public sealed class ConfigurationCheckerTests
         // Arrange - KeyPath is null but KeySource is set (agent scenario)
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Ssh:KeyPath"] = null,
-            ["Ssh:KeySource"] = "OnePasswordAgent",
-            ["Llm:Provider"] = "OpenAI",
-            ["Llm:ApiKey"] = "sk-test1234567890",
-            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
+            [ConfigurationKeys.SshKeyPath] = null,
+            [ConfigurationKeys.SshKeySource] = "OnePasswordAgent",
+            [ConfigurationKeys.LlmProvider] = "OpenAI",
+            [ConfigurationKeys.LlmApiKey] = "sk-test1234567890",
+            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
         });
 
         // Act
@@ -148,10 +149,10 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
+            [ConfigurationKeys.SshKeyPath] = "~/.ssh/id_ed25519",
             // LLM provider missing
-            ["Llm:ApiKey"] = "sk-test1234567890",
-            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
+            [ConfigurationKeys.LlmApiKey] = "sk-test1234567890",
+            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
         });
 
         // Act
@@ -168,9 +169,9 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
-            ["Llm:Provider"] = "OpenAI",
-            ["Llm:ApiKey"] = "sk-test1234567890"
+            [ConfigurationKeys.SshKeyPath] = "~/.ssh/id_ed25519",
+            [ConfigurationKeys.LlmProvider] = "OpenAI",
+            [ConfigurationKeys.LlmApiKey] = "sk-test1234567890"
             // Memory directory missing
         });
 
@@ -188,9 +189,9 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
-            ["Llm:Provider"] = "OpenAI",
-            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
+            [ConfigurationKeys.SshKeyPath] = "~/.ssh/id_ed25519",
+            [ConfigurationKeys.LlmProvider] = "OpenAI",
+            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
             // API key missing
         });
 
@@ -209,9 +210,9 @@ public sealed class ConfigurationCheckerTests
         // All providers use the same configuration key now
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
-            ["Llm:Provider"] = "OpenAI",
-            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
+            [ConfigurationKeys.SshKeyPath] = "~/.ssh/id_ed25519",
+            [ConfigurationKeys.LlmProvider] = "OpenAI",
+            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
             // Missing API key
         });
 
@@ -228,10 +229,10 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Ssh:KeyPath"] = "",
-            ["Llm:Provider"] = "",
-            ["Llm:ApiKey"] = "",
-            ["Storage:MemoryDirectory"] = ""
+            [ConfigurationKeys.SshKeyPath] = "",
+            [ConfigurationKeys.LlmProvider] = "",
+            [ConfigurationKeys.LlmApiKey] = "",
+            ["TenSecondTom:MemoryDirectory"] = ""
         });
 
         // Act
@@ -247,10 +248,10 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Ssh:KeyPath"] = "   ",
-            ["Llm:Provider"] = "  ",
-            ["Llm:ApiKey"] = "  ",
-            ["Storage:MemoryDirectory"] = "   "
+            [ConfigurationKeys.SshKeyPath] = "   ",
+            [ConfigurationKeys.LlmProvider] = "  ",
+            [ConfigurationKeys.LlmApiKey] = "  ",
+            ["TenSecondTom:MemoryDirectory"] = "   "
         });
 
         // Act
@@ -270,10 +271,10 @@ public sealed class ConfigurationCheckerTests
         // Arrange - Unknown provider is still configured as long as all fields are present
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
-            ["Llm:Provider"] = "UnknownProvider",
-            ["Llm:ApiKey"] = "sk-test1234567890",
-            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
+            [ConfigurationKeys.SshKeyPath] = "~/.ssh/id_ed25519",
+            [ConfigurationKeys.LlmProvider] = "UnknownProvider",
+            [ConfigurationKeys.LlmApiKey] = "sk-test1234567890",
+            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
         });
 
         // Act
@@ -324,10 +325,10 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
-            ["Llm:Provider"] = "OpenAI",
-            ["Llm:ApiKey"] = "sk-test1234567890",
-            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
+            [ConfigurationKeys.SshKeyPath] = "~/.ssh/id_ed25519",
+            [ConfigurationKeys.LlmProvider] = "OpenAI",
+            [ConfigurationKeys.LlmApiKey] = "sk-test1234567890",
+            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
         });
 
         // Act
@@ -350,8 +351,8 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
-            ["Llm:Provider"] = "OpenAI"
+            [ConfigurationKeys.SshKeyPath] = "~/.ssh/id_ed25519",
+            [ConfigurationKeys.LlmProvider] = "OpenAI"
             // Missing: Memory directory and API key
         });
 
@@ -422,10 +423,10 @@ public sealed class ConfigurationCheckerTests
         // Environment variables are not checked by ConfigurationChecker
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
-            ["Llm:Provider"] = "OpenAI",
-            ["Llm:ApiKey"] = "sk-config-key",
-            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
+            [ConfigurationKeys.SshKeyPath] = "~/.ssh/id_ed25519",
+            [ConfigurationKeys.LlmProvider] = "OpenAI",
+            [ConfigurationKeys.LlmApiKey] = "sk-config-key",
+            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
         });
 
         // Act
@@ -442,9 +443,9 @@ public sealed class ConfigurationCheckerTests
         // Environment variables must be loaded into IConfiguration before this check
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Ssh:KeyPath"] = "~/.ssh/id_ed25519",
-            ["Llm:Provider"] = "OpenAI",
-            ["Storage:MemoryDirectory"] = "~/.ten-second-tom/memory"
+            [ConfigurationKeys.SshKeyPath] = "~/.ssh/id_ed25519",
+            [ConfigurationKeys.LlmProvider] = "OpenAI",
+            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
             // No API key in configuration
         });
 
@@ -465,8 +466,8 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Llm:Provider"] = "OpenAI",
-            ["Llm:Model"] = "gpt-4o-mini-2024-07-18"
+            [ConfigurationKeys.LlmProvider] = "OpenAI",
+            [ConfigurationKeys.LlmModel] = "gpt-4o-mini-2024-07-18"
         });
 
         // Act
@@ -482,8 +483,8 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Llm:Provider"] = "Anthropic",
-            ["Llm:Model"] = "claude-3-5-haiku-20241022"
+            [ConfigurationKeys.LlmProvider] = "Anthropic",
+            [ConfigurationKeys.LlmModel] = "claude-3-5-haiku-20241022"
         });
 
         // Act
@@ -499,8 +500,8 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Llm:Provider"] = "OpenAI",
-            ["Llm:Model"] = "claude-3-5-haiku-20241022" // Anthropic model with OpenAI provider
+            [ConfigurationKeys.LlmProvider] = "OpenAI",
+            [ConfigurationKeys.LlmModel] = "claude-3-5-haiku-20241022" // Anthropic model with OpenAI provider
         });
 
         // Act
@@ -517,7 +518,7 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Llm:Provider"] = "OpenAI"
+            [ConfigurationKeys.LlmProvider] = "OpenAI"
             // No model configured
         });
 
@@ -534,7 +535,7 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Llm:Model"] = "gpt-4o-mini"
+            [ConfigurationKeys.LlmModel] = "gpt-4o-mini"
             // No provider configured
         });
 
@@ -551,8 +552,8 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Llm:Provider"] = "InvalidProvider",
-            ["Llm:Model"] = "some-model"
+            [ConfigurationKeys.LlmProvider] = "InvalidProvider",
+            [ConfigurationKeys.LlmModel] = "some-model"
         });
 
         // Act
@@ -569,8 +570,8 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Llm:Provider"] = "OpenAI",
-            ["Llm:Model"] = "gpt-999-nonexistent"
+            [ConfigurationKeys.LlmProvider] = "OpenAI",
+            [ConfigurationKeys.LlmModel] = "gpt-999-nonexistent"
         });
 
         // Act
@@ -586,8 +587,8 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Llm:Provider"] = "OpenAI",
-            ["Llm:Model"] = ""
+            [ConfigurationKeys.LlmProvider] = "OpenAI",
+            [ConfigurationKeys.LlmModel] = ""
         });
 
         // Act
@@ -603,8 +604,8 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Llm:Provider"] = "OpenAI",
-            ["Llm:Model"] = "   "
+            [ConfigurationKeys.LlmProvider] = "OpenAI",
+            [ConfigurationKeys.LlmModel] = "   "
         });
 
         // Act
@@ -624,8 +625,8 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Llm:Provider"] = "OpenAI",
-            ["Llm:Model"] = "gpt-4o-mini-2024-07-18"
+            [ConfigurationKeys.LlmProvider] = "OpenAI",
+            [ConfigurationKeys.LlmModel] = "gpt-4o-mini-2024-07-18"
         });
 
         // Act
@@ -641,8 +642,8 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Llm:Provider"] = "OpenAI",
-            ["Llm:Model"] = "claude-3-5-haiku-20241022" // Anthropic model
+            [ConfigurationKeys.LlmProvider] = "OpenAI",
+            [ConfigurationKeys.LlmModel] = "claude-3-5-haiku-20241022" // Anthropic model
         });
 
         // Act
@@ -661,7 +662,7 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Llm:Provider"] = "OpenAI"
+            [ConfigurationKeys.LlmProvider] = "OpenAI"
             // No model configured
         });
 
@@ -678,7 +679,7 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Llm:Model"] = "gpt-4o-mini"
+            [ConfigurationKeys.LlmModel] = "gpt-4o-mini"
             // No provider configured
         });
 
@@ -695,8 +696,8 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Llm:Provider"] = "InvalidProvider",
-            ["Llm:Model"] = "some-model"
+            [ConfigurationKeys.LlmProvider] = "InvalidProvider",
+            [ConfigurationKeys.LlmModel] = "some-model"
         });
 
         // Act
@@ -713,8 +714,8 @@ public sealed class ConfigurationCheckerTests
         // Arrange
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Llm:Provider"] = "OpenAI",
-            ["Llm:Model"] = "invalid-model"
+            [ConfigurationKeys.LlmProvider] = "OpenAI",
+            [ConfigurationKeys.LlmModel] = "invalid-model"
         });
 
         // Act

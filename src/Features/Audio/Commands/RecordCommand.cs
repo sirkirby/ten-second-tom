@@ -1,4 +1,5 @@
 using TenSecondTom.Features.Audio.Models;
+using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Audio.Commands;

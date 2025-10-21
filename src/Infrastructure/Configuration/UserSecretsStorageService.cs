@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Setup.Models;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Infrastructure.Configuration;
@@ -59,22 +60,23 @@ public sealed class UserSecretsStorageService : IConfigurationStorageService
                 }
 
                 // Convert to dictionary format for User Secrets
+                // All keys now use TenSecondTom:* namespace for consistency
                 var configData = new Dictionary<string, string?>
                 {
-                    ["Ssh:KeyPath"] = settings.Ssh.KeyPath,
-                    ["Ssh:KeySource"] = settings.Ssh.KeySource?.ToString(),
-                    ["Ssh:AgentSocketPath"] = settings.Ssh.AgentSocketPath,
-                    ["Llm:Provider"] = settings.Llm.Provider.ToString(),
-                    ["Llm:ApiKey"] = settings.Llm.ApiKey,
-                    ["Llm:Model"] = settings.Llm.Model,
-                    ["Storage:MemoryDirectory"] = settings.Storage.MemoryDirectory,
-                    ["Storage:CreateIfMissing"] = settings.Storage.CreateIfMissing.ToString(),
-                    ["Optional:LogLevel"] = settings.Optional.LogLevel.ToString(),
-                    ["Optional:RetentionDays"] = settings.Optional.RetentionDays.ToString(),
-                    ["Optional:EnableTelemetry"] = settings.Optional.EnableTelemetry.ToString(),
-                    ["Configuration:CreatedAt"] = settings.CreatedAt.ToString("O"),
-                    ["Configuration:LastModifiedAt"] = settings.LastModifiedAt?.ToString("O"),
-                    ["Configuration:Version"] = settings.ConfigurationVersion
+                    [ConfigurationKeys.SshKeyPath] = settings.Ssh.KeyPath,
+                    [ConfigurationKeys.SshKeySource] = settings.Ssh.KeySource?.ToString(),
+                    [ConfigurationKeys.SshAgentSocketPath] = settings.Ssh.AgentSocketPath,
+                    [ConfigurationKeys.LlmProvider] = settings.Llm.Provider.ToString(),
+                    [ConfigurationKeys.LlmApiKey] = settings.Llm.ApiKey,
+                    [ConfigurationKeys.LlmModel] = settings.Llm.Model,
+                    [ConfigurationKeys.MemoryDirectory] = settings.Storage.MemoryDirectory,
+                    ["TenSecondTom:CreateIfMissing"] = settings.Storage.CreateIfMissing.ToString(),
+                    ["TenSecondTom:Optional:LogLevel"] = settings.Optional.LogLevel.ToString(),
+                    ["TenSecondTom:Optional:RetentionDays"] = settings.Optional.RetentionDays.ToString(),
+                    ["TenSecondTom:Optional:EnableTelemetry"] = settings.Optional.EnableTelemetry.ToString(),
+                    ["TenSecondTom:Configuration:CreatedAt"] = settings.CreatedAt.ToString("O"),
+                    ["TenSecondTom:Configuration:LastModifiedAt"] = settings.LastModifiedAt?.ToString("O"),
+                    ["TenSecondTom:Configuration:Version"] = settings.ConfigurationVersion
                 };
 
                 // Write to User Secrets file
@@ -253,48 +255,48 @@ public sealed class UserSecretsStorageService : IConfigurationStorageService
         {
             Ssh = new SshConfiguration
             {
-                KeyPath = data.TryGetValue("Ssh:KeyPath", out var keyPath) ? keyPath : null,
-                KeySource = data.TryGetValue("Ssh:KeySource", out var keySource) && !string.IsNullOrEmpty(keySource)
-                    ? Enum.Parse<SshKeySource>(keySource) 
+                KeyPath = data.TryGetValue(ConfigurationKeys.SshKeyPath, out var keyPath) ? keyPath : null,
+                KeySource = data.TryGetValue(ConfigurationKeys.SshKeySource, out var keySource) && !string.IsNullOrEmpty(keySource)
+                    ? Enum.Parse<SshKeySource>(keySource)
                     : null,
-                AgentSocketPath = data.TryGetValue("Ssh:AgentSocketPath", out var socketPath) ? socketPath : null
+                AgentSocketPath = data.TryGetValue(ConfigurationKeys.SshAgentSocketPath, out var socketPath) ? socketPath : null
             },
             Llm = new LlmConfiguration
             {
-                Provider = data.TryGetValue("Llm:Provider", out var provider) && !string.IsNullOrEmpty(provider)
-                    ? Enum.Parse<LlmProvider>(provider) 
+                Provider = data.TryGetValue(ConfigurationKeys.LlmProvider, out var provider) && !string.IsNullOrEmpty(provider)
+                    ? Enum.Parse<LlmProvider>(provider)
                     : LlmProvider.OpenAI,
-                ApiKey = data.TryGetValue("Llm:ApiKey", out var apiKey) ? apiKey : null,
-                Model = data.TryGetValue("Llm:Model", out var model) ? model : null
+                ApiKey = data.TryGetValue(ConfigurationKeys.LlmApiKey, out var apiKey) ? apiKey : null,
+                Model = data.TryGetValue(ConfigurationKeys.LlmModel, out var model) ? model : null
             },
             Storage = new StorageConfiguration
             {
-                MemoryDirectory = data.TryGetValue("Storage:MemoryDirectory", out var memDir) && !string.IsNullOrEmpty(memDir)
-                    ? memDir 
+                MemoryDirectory = data.TryGetValue(ConfigurationKeys.MemoryDirectory, out var memDir) && !string.IsNullOrEmpty(memDir)
+                    ? memDir
                     : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".memory", "ten-second-tom"),
-                CreateIfMissing = data.TryGetValue("Storage:CreateIfMissing", out var createMissing) && !string.IsNullOrEmpty(createMissing)
-                    ? bool.Parse(createMissing) 
+                CreateIfMissing = data.TryGetValue("TenSecondTom:CreateIfMissing", out var createMissing) && !string.IsNullOrEmpty(createMissing)
+                    ? bool.Parse(createMissing)
                     : true
             },
             Optional = new OptionalConfiguration
             {
-                LogLevel = data.TryGetValue("Optional:LogLevel", out var logLevel) && !string.IsNullOrEmpty(logLevel)
+                LogLevel = data.TryGetValue("TenSecondTom:Optional:LogLevel", out var logLevel) && !string.IsNullOrEmpty(logLevel)
                     ? Enum.Parse<Microsoft.Extensions.Logging.LogLevel>(logLevel)
                     : Microsoft.Extensions.Logging.LogLevel.Information,
-                RetentionDays = data.TryGetValue("Optional:RetentionDays", out var retention) && !string.IsNullOrEmpty(retention)
+                RetentionDays = data.TryGetValue("TenSecondTom:Optional:RetentionDays", out var retention) && !string.IsNullOrEmpty(retention)
                     ? int.Parse(retention)
                     : 30,
-                EnableTelemetry = data.TryGetValue("Optional:EnableTelemetry", out var telemetry) && !string.IsNullOrEmpty(telemetry)
+                EnableTelemetry = data.TryGetValue("TenSecondTom:Optional:EnableTelemetry", out var telemetry) && !string.IsNullOrEmpty(telemetry)
                     ? bool.Parse(telemetry)
                     : false
             },
-            CreatedAt = data.TryGetValue("Configuration:CreatedAt", out var created) && !string.IsNullOrEmpty(created)
+            CreatedAt = data.TryGetValue("TenSecondTom:Configuration:CreatedAt", out var created) && !string.IsNullOrEmpty(created)
                 ? DateTime.Parse(created)
                 : DateTime.UtcNow,
-            LastModifiedAt = data.TryGetValue("Configuration:LastModifiedAt", out var modified) && !string.IsNullOrEmpty(modified)
+            LastModifiedAt = data.TryGetValue("TenSecondTom:Configuration:LastModifiedAt", out var modified) && !string.IsNullOrEmpty(modified)
                 ? DateTime.Parse(modified)
                 : null,
-            ConfigurationVersion = data.TryGetValue("Configuration:Version", out var version) && !string.IsNullOrEmpty(version)
+            ConfigurationVersion = data.TryGetValue("TenSecondTom:Configuration:Version", out var version) && !string.IsNullOrEmpty(version)
                 ? version
                 : "1.0"
         };

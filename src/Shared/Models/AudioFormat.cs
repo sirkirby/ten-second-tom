@@ -1,8 +1,13 @@
-namespace TenSecondTom.Features.Audio.Models;
+namespace TenSecondTom.Shared.Models;
 
 /// <summary>
 /// Represents supported audio file formats.
 /// </summary>
+/// <remarks>
+/// These formats represent fundamental input methods for voice-based user input,
+/// alongside text-based input. Stored in Shared because audio recording is a
+/// core application capability used across multiple features.
+/// </remarks>
 public enum AudioFormat
 {
     /// <summary>
@@ -26,3 +31,4 @@ public enum AudioFormat
     /// </summary>
     M4a
 }
+

@@ -1,9 +1,15 @@
-namespace TenSecondTom.Features.Audio.Models;
+namespace TenSecondTom.Shared.Models;
 
 /// <summary>
 /// Represents the output of speech-to-text processing.
 /// Contains the transcript and metadata about the transcription process.
 /// </summary>
+/// <remarks>
+/// This model represents the result of processing voice input, a fundamental
+/// input method alongside text. Stored in Shared because transcription results
+/// are used across multiple features (Today, ThisWeek, future voice commands)
+/// and represent a core application capability.
+/// </remarks>
 public sealed class TranscriptionResult
 {
     /// <summary>
@@ -85,3 +91,4 @@ public sealed class TranscriptionResult
                && (!ConfidenceScore.HasValue || (ConfidenceScore.Value >= 0.0f && ConfidenceScore.Value <= 1.0f));
     }
 }
+

@@ -8,6 +8,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using TenSecondTom.Features.Audio.Models;
+using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Features.Audio.Services;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Infrastructure.Configuration;
@@ -413,7 +415,7 @@ public sealed class OpenAiSttProviderTests
     private OpenAiSttProvider CreateProvider(ConfigurationSettings? settings = null)
     {
         var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c["Llm:ApiKey"]).Returns("test-api-key");
+        mockConfiguration.Setup(c => c[ConfigurationKeys.LlmApiKey]).Returns("test-api-key");
 
         var configOptions = Options.Create(settings ?? _configSettings);
 

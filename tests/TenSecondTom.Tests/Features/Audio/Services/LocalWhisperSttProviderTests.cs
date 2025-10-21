@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using TenSecondTom.Features.Audio.Models;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Features.Audio.Services;
 using TenSecondTom.Infrastructure.Configuration;
 

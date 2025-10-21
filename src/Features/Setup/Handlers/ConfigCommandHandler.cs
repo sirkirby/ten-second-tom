@@ -4,6 +4,7 @@ using TenSecondTom.Features.Setup.Commands;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Setup.Validation;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Setup.Handlers;
@@ -75,17 +76,17 @@ public sealed class ConfigCommandHandler
 
         // Apply environment variable overrides from IConfiguration
         // This shows the effective configuration that will be used at runtime
-        string? envSshKeyPath = _configuration["Ssh:KeyPath"];
-        string? envSshKeySource = _configuration["Ssh:KeySource"];
-        string? envSshAgentSocketPath = _configuration["Ssh:AgentSocketPath"];
-        string? envProvider = _configuration["Llm:Provider"];
-        string? envApiKey = _configuration["Llm:ApiKey"];
-        string? envModel = _configuration["Llm:Model"];
-        string? envMemoryDir = _configuration["Storage:MemoryDirectory"];
-        string? envCreateIfMissing = _configuration["Storage:CreateIfMissing"];
-        string? envLogLevel = _configuration["Optional:LogLevel"];
-        string? envRetentionDays = _configuration["Optional:RetentionDays"];
-        string? envEnableTelemetry = _configuration["Optional:EnableTelemetry"];
+        string? envSshKeyPath = _configuration[ConfigurationKeys.SshKeyPath];
+        string? envSshKeySource = _configuration[ConfigurationKeys.SshKeySource];
+        string? envSshAgentSocketPath = _configuration[ConfigurationKeys.SshAgentSocketPath];
+        string? envProvider = _configuration[ConfigurationKeys.LlmProvider];
+        string? envApiKey = _configuration[ConfigurationKeys.LlmApiKey];
+        string? envModel = _configuration[ConfigurationKeys.LlmModel];
+        string? envMemoryDir = _configuration[ConfigurationKeys.MemoryDirectory];
+        string? envCreateIfMissing = _configuration["TenSecondTom:CreateIfMissing"];
+        string? envLogLevel = _configuration["TenSecondTom:Optional:LogLevel"];
+        string? envRetentionDays = _configuration["TenSecondTom:Optional:RetentionDays"];
+        string? envEnableTelemetry = _configuration["TenSecondTom:Optional:EnableTelemetry"];
 
         // If environment variables are set, they override user secrets
         bool hasSshOverrides = !string.IsNullOrWhiteSpace(envSshKeyPath) ||

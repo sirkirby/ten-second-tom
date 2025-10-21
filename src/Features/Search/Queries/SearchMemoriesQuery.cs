@@ -1,15 +1,8 @@
+using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Search.Queries;
-
-/// <summary>
-/// Marker interface for request/response pattern.
-/// Indicates this query returns a specific response type.
-/// </summary>
-public interface IRequest<out TResponse>
-{
-}
 
 /// <summary>
 /// Query to search memory entries by text query with optional date range filters.

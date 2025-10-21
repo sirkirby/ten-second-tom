@@ -3,7 +3,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Audio.Commands;
 using TenSecondTom.Features.Audio.Models;
+using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Audio.Handlers;
@@ -32,10 +34,8 @@ public sealed class RecordCommandHandler(
         }
 
         // Create recording/ directory if it doesn't exist
-        // Use Storage:MemoryDirectory (configured root) or fallback to default
-        var memoryDir = _configuration[ConfigurationKeys.StorageMemoryDirectory] ??
-                        _configuration[ConfigurationKeys.TenSecondTomMemoryDirectory] ??
-                        Path.Combine(".", DirectoryNames.ApplicationRoot);
+        // Use proper configuration precedence: .env → user secrets → appsettings.json
+        var memoryDir = _configuration.GetMemoryDirectory(expandHomeDirectory: true);
 
         if (string.IsNullOrWhiteSpace(memoryDir))
         {
@@ -102,9 +102,15 @@ public sealed class RecordCommandHandler(
             transcription.SttEngine,
             transcription.SttModel);
 
-        // Step 3: Move files from temp to recording/ directory with naming pattern: recording-YYYYMMdd-HHmmss.*
-        var timestamp = DateTimeOffset.UtcNow;
-        var filePrefix = $"recording-{timestamp:yyyyMMdd-HHmmss}";
+        // Step 3: Determine entry number for today and create consistent naming pattern
+        var today = DateTimeOffset.UtcNow;
+        
+        // Count existing recordings for today to get the next number
+        var existingFiles = Directory.GetFiles(recordingDir, $"{today:MM-dd-yyyy}_*.wav");
+        int nextNumber = existingFiles.Length + 1;
+        
+        // Use consistent naming pattern: MM-dd-yyyy_N (e.g., "10-21-2025_1")
+        var filePrefix = $"{today:MM-dd-yyyy}_{nextNumber}";
         var audioFilePath = Path.Combine(recordingDir, $"{filePrefix}.wav");
         var transcriptionFilePath = Path.Combine(recordingDir, $"{filePrefix}.txt");
 
@@ -122,7 +128,7 @@ public sealed class RecordCommandHandler(
             var transcriptWithMetadata = new StringBuilder();
             transcriptWithMetadata.AppendLine("---");
             transcriptWithMetadata.AppendLine($"recording-id: {filePrefix}");
-            transcriptWithMetadata.AppendLine($"timestamp: {timestamp:O}");
+            transcriptWithMetadata.AppendLine($"timestamp: {today:O}");
             transcriptWithMetadata.AppendLine($"audio-duration-seconds: {recording.Duration.TotalSeconds:F2}");
             transcriptWithMetadata.AppendLine($"file-size-bytes: {fileSizeBytes}");
             transcriptWithMetadata.AppendLine($"stt-engine: {transcription.SttEngine}");
@@ -145,7 +151,7 @@ public sealed class RecordCommandHandler(
             {
                 AudioFilePath = audioFilePath,
                 TranscriptionFilePath = transcriptionFilePath,
-                RecordedAt = timestamp,
+                RecordedAt = today,
                 Duration = recording.Duration,
                 FileSizeBytes = fileSizeBytes,
                 TranscriptionWordCount = transcription.WordCount,

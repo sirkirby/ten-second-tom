@@ -1,3 +1,4 @@
+using TenSecondTom.Shared.Contracts;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
