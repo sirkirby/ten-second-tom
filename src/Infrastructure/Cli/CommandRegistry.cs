@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Spectre.Console;
 using TenSecondTom.Features.Search.Handlers;
 using TenSecondTom.Features.Setup.Commands;
@@ -429,10 +430,28 @@ public static class CommandRegistry
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
             string? stt = parseResult.GetValue(sttOption);
 
-            // Parse STT selection
+            // Get AudioConfiguration to read default PreferredStt and timeout
+            var audioConfig = serviceProvider.GetService<IOptions<Configuration.AudioConfiguration>>()?.Value
+                ?? new Configuration.AudioConfiguration();
+            
+            // Parse STT selection - use configured default or fall back to Auto
             var sttSelection = TenSecondTom.Features.Audio.Models.SttSelection.Auto;
-            if (!string.IsNullOrWhiteSpace(stt))
+            
+            // If no --stt flag provided, use configuration default
+            if (string.IsNullOrWhiteSpace(stt))
             {
+                if (audioConfig.PreferredStt is not null)
+                {
+                    if (!Enum.TryParse<TenSecondTom.Features.Audio.Models.SttSelection>(audioConfig.PreferredStt, ignoreCase: true, out sttSelection))
+                    {
+                        // Invalid config value, fall back to Auto
+                        sttSelection = TenSecondTom.Features.Audio.Models.SttSelection.Auto;
+                    }
+                }
+            }
+            else
+            {
+                // --stt flag provided, parse and validate it
                 if (!Enum.TryParse<TenSecondTom.Features.Audio.Models.SttSelection>(stt, ignoreCase: true, out sttSelection))
                 {
                     if (jsonOutput)
@@ -471,10 +490,11 @@ public static class CommandRegistry
                 return 1;
             }
 
-            // Execute command
+            // Execute command with configured timeout
             var command = new TenSecondTom.Features.Audio.Commands.RecordCommand
             {
-                SttSelection = sttSelection
+                SttSelection = sttSelection,
+                MaxDurationSeconds = audioConfig.Timeouts.RecordSeconds  // Use configured timeout
             };
 
             var result = await handler.Handle(command, CancellationToken.None);

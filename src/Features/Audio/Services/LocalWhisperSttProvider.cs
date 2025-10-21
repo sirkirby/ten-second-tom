@@ -181,8 +181,9 @@ public sealed class LocalWhisperSttProvider : ISttProvider
                 return Result<TranscriptionResult>.Failure("whisper.cpp returned empty transcript");
             }
 
-            // Trim whitespace
-            transcriptText = transcriptText.Trim();
+            // Normalize whitespace: replace line breaks and multiple spaces with single space
+            // This makes local whisper output match OpenAI's clean single-line format
+            transcriptText = System.Text.RegularExpressions.Regex.Replace(transcriptText, @"\s+", " ").Trim();
 
             // Calculate word count
             var wordCount = transcriptText.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;

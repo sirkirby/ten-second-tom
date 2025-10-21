@@ -65,6 +65,7 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
     /// <inheritdoc/>
     public async Task<Result<AudioRecording>> RecordAsync(
         string outputPath,
+        int? maxDurationSeconds = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
@@ -127,7 +128,7 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
 
         _logger.LogInformation("Recording started. Press Enter to stop recording...");
 
-        // Wait for user to press Enter to stop recording
+        // Wait for user to press Enter to stop recording, with optional timeout
         try
         {
             // Read stderr in background to prevent buffer overflow
@@ -137,8 +138,74 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
                 _logger.LogDebug("FFmpeg stderr: {StdErr}", stderr);
             }, cancellationToken);
 
-            // Wait for Enter key
-            await Task.Run(() => Console.ReadLine(), cancellationToken);
+            bool shouldContinue = true;
+            var recordingStart = DateTimeOffset.UtcNow;
+            var lastPromptTime = recordingStart;
+
+            // Use a polling loop to check for Enter key without blocking Console.ReadLine
+            while (shouldContinue && !cancellationToken.IsCancellationRequested)
+            {
+                // Calculate time until next timeout prompt
+                var timeElapsedSinceLastPrompt = DateTimeOffset.UtcNow - lastPromptTime;
+                var timeUntilPrompt = maxDurationSeconds.HasValue
+                    ? TimeSpan.FromSeconds(maxDurationSeconds.Value) - timeElapsedSinceLastPrompt
+                    : TimeSpan.MaxValue;
+
+                // Check for Enter key press (non-blocking)
+                if (Console.KeyAvailable)
+                {
+                    var key = Console.ReadKey(intercept: true);
+                    if (key.Key == ConsoleKey.Enter)
+                    {
+                        // User pressed Enter to stop
+                        shouldContinue = false;
+                        break;
+                    }
+                }
+
+                // Check if timeout reached
+                if (maxDurationSeconds.HasValue && timeUntilPrompt <= TimeSpan.Zero)
+                {
+                    // Timeout reached - prompt user to continue
+                    var totalElapsed = (DateTimeOffset.UtcNow - recordingStart).TotalSeconds;
+                    Console.WriteLine($"\nRecording limit reached ({totalElapsed:F0}s / {maxDurationSeconds}s interval).");
+                    Console.Write("Continue recording? (y/n): ");
+                    
+                    // Add a timeout to the continuation prompt (30 seconds)
+                    var responseTask = Task.Run(() => Console.ReadLine()?.Trim().ToLowerInvariant());
+                    var promptTimeout = Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
+                    var completedPromptTask = await Task.WhenAny(responseTask, promptTimeout);
+                    
+                    string? response = null;
+                    if (completedPromptTask == responseTask)
+                    {
+                        response = await responseTask;
+                    }
+                    else
+                    {
+                        // User didn't respond within 30 seconds - default to stopping
+                        Console.WriteLine("\nNo response received. Stopping recording.");
+                        shouldContinue = false;
+                        break;
+                    }
+                    
+                    if (response == "y" || response == "yes")
+                    {
+                        Console.WriteLine("Recording continues. Press Enter to stop.");
+                        lastPromptTime = DateTimeOffset.UtcNow; // Reset the interval timer
+                        continue;
+                    }
+                    else
+                    {
+                        // User chose to stop
+                        shouldContinue = false;
+                        break;
+                    }
+                }
+
+                // Small delay to avoid busy waiting
+                await Task.Delay(100, cancellationToken);
+            }
 
             // Send 'q' to FFmpeg stdin to gracefully stop
             await process.StandardInput.WriteAsync('q');
@@ -255,3 +322,4 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
         throw new PlatformNotSupportedException("Unsupported platform for audio recording");
     }
 }
+

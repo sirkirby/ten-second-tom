@@ -46,9 +46,11 @@ public sealed class RecordAudioCommandHandler : IRequestHandler<RecordAudioComma
             throw new ArgumentException("Output path cannot be null or empty.", nameof(request));
         }
 
-        _logger.LogInformation("Recording audio to {OutputPath}", request.OutputPath);
+        _logger.LogInformation("Recording audio to {OutputPath} with max duration: {MaxDuration}s", 
+            request.OutputPath, 
+            request.MaxDurationSeconds?.ToString() ?? "unlimited");
 
-        var result = await _recorder.RecordAsync(request.OutputPath, cancellationToken);
+        var result = await _recorder.RecordAsync(request.OutputPath, request.MaxDurationSeconds, cancellationToken);
 
         if (result.IsSuccess)
         {

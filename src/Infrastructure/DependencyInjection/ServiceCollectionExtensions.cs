@@ -143,9 +143,7 @@ public static class ServiceCollectionExtensions
                     "or set TenSecondTom__Llm__ApiKey environment variable.");
             }
 
-            string model = configuration[ConfigurationKeys.LlmModel] ?? 
-                          configuration["TenSecondTom:OpenAI:Model"] ?? 
-                          "gpt-4o";
+            string model = configuration[ConfigurationKeys.LlmModel] ?? LlmConstants.OpenAIModels.Gpt4o;
             var openAIClient = new OpenAIClient(apiKey);
             return openAIClient.GetChatClient(model);
         });

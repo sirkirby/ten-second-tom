@@ -19,9 +19,10 @@ public interface IAudioRecorder
 
     /// <summary>
     /// Starts recording audio to the specified output path.
-    /// Returns when the user stops recording (e.g., presses Enter).
+    /// Returns when the user stops recording (e.g., presses Enter) or timeout is reached.
     /// </summary>
     /// <param name="outputPath">The file path where the audio should be saved.</param>
+    /// <param name="maxDurationSeconds">Maximum recording duration in seconds. If null, records indefinitely. If specified, prompts user to continue when timeout is reached.</param>
     /// <param name="cancellationToken">Cancellation token for async operation.</param>
     /// <returns>
     /// A result containing the <see cref="AudioRecording"/> if successful,
@@ -30,8 +31,10 @@ public interface IAudioRecorder
     /// <remarks>
     /// This is a blocking operation that waits for user input to stop recording.
     /// The implementation should provide visual feedback to the user during recording.
+    /// When maxDurationSeconds is reached, the user is prompted to continue or stop.
     /// </remarks>
     Task<Result<AudioRecording>> RecordAsync(
         string outputPath,
+        int? maxDurationSeconds = null,
         CancellationToken cancellationToken = default);
 }

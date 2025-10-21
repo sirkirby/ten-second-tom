@@ -359,7 +359,11 @@ public static class TodayCommandHandler
                 logger.LogInformation("Recording audio to {AudioFile}", audioFilePath);
             }
 
-            var recordCommand = new RecordAudioCommand { OutputPath = audioFilePath };
+            var recordCommand = new RecordAudioCommand 
+            { 
+                OutputPath = audioFilePath,
+                MaxDurationSeconds = audioConfig.Timeouts.TodaySeconds  // Use TodaySeconds for voice notes
+            };
             var recordResult = await recordHandler.Handle(recordCommand, CancellationToken.None).ConfigureAwait(false);
 
             if (!recordResult.IsSuccess)

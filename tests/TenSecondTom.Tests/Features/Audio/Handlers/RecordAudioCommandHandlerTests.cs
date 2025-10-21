@@ -49,7 +49,7 @@ public sealed class RecordAudioCommandHandlerTests
         };
 
         _mockRecorder
-            .Setup(r => r.RecordAsync(outputPath, It.IsAny<CancellationToken>()))
+            .Setup(r => r.RecordAsync(outputPath, It.IsAny<int?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<AudioRecording>.Success(expectedRecording));
 
         var handler = CreateHandler();
@@ -85,7 +85,7 @@ public sealed class RecordAudioCommandHandlerTests
         };
 
         _mockRecorder
-            .Setup(r => r.RecordAsync(outputPath, It.IsAny<CancellationToken>()))
+            .Setup(r => r.RecordAsync(outputPath, It.IsAny<int?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<AudioRecording>.Success(recording));
 
         var handler = CreateHandler();
@@ -95,7 +95,7 @@ public sealed class RecordAudioCommandHandlerTests
 
         // Assert
         _mockRecorder.Verify(
-            r => r.RecordAsync(outputPath, It.IsAny<CancellationToken>()),
+            r => r.RecordAsync(outputPath, It.IsAny<int?>(), It.IsAny<CancellationToken>()),
             Times.Once,
             "Should call AudioRecorder.RecordAsync with the specified output path");
     }
@@ -107,7 +107,7 @@ public sealed class RecordAudioCommandHandlerTests
         var command = new RecordAudioCommand { OutputPath = "/path/to/recording.wav" };
 
         _mockRecorder
-            .Setup(r => r.RecordAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.RecordAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<AudioRecording>.Failure("FFmpeg not found"));
 
         var handler = CreateHandler();
@@ -141,7 +141,7 @@ public sealed class RecordAudioCommandHandlerTests
         };
 
         _mockRecorder
-            .Setup(r => r.RecordAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.RecordAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<AudioRecording>.Success(recording));
 
         var handler = CreateHandler();
@@ -177,7 +177,7 @@ public sealed class RecordAudioCommandHandlerTests
         };
 
         _mockRecorder
-            .Setup(r => r.RecordAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.RecordAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<AudioRecording>.Success(recording));
 
         var handler = CreateHandler();
@@ -201,7 +201,7 @@ public sealed class RecordAudioCommandHandlerTests
         cts.Cancel();
 
         _mockRecorder
-            .Setup(r => r.RecordAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.RecordAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new OperationCanceledException());
 
         var handler = CreateHandler();
@@ -264,7 +264,7 @@ public sealed class RecordAudioCommandHandlerTests
         };
 
         _mockRecorder
-            .Setup(r => r.RecordAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.RecordAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<AudioRecording>.Success(recording));
 
         var handler = CreateHandler();
