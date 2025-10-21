@@ -34,6 +34,11 @@ public sealed record ConfigurationSettings
     public OptionalConfiguration Optional { get; init; } = new();
 
     /// <summary>
+    /// Gets the audio recording and preprocessing configuration
+    /// </summary>
+    public AudioConfigurationDisplay Audio { get; init; } = new();
+
+    /// <summary>
     /// Gets the timestamp when configuration was created
     /// </summary>
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
@@ -173,4 +178,72 @@ public sealed record OptionalConfiguration
     /// Gets whether telemetry is enabled
     /// </summary>
     public bool EnableTelemetry { get; init; } = false;
+}
+
+/// <summary>
+/// Audio recording and preprocessing configuration (display model for config show)
+/// </summary>
+public sealed record AudioConfigurationDisplay
+{
+    /// <summary>
+    /// Gets the preferred Speech-to-Text engine
+    /// </summary>
+    public string PreferredStt { get; init; } = "auto";
+
+    /// <summary>
+    /// Gets whether to keep audio files after transcription
+    /// </summary>
+    public bool KeepFiles { get; init; } = true;
+
+    /// <summary>
+    /// Gets the audio recorder configuration
+    /// </summary>
+    public RecorderConfigurationDisplay Recorder { get; init; } = new();
+
+    /// <summary>
+    /// Gets the audio preprocessing configuration
+    /// </summary>
+    public PreprocessingConfigurationDisplay Preprocessing { get; init; } = new();
+}
+
+/// <summary>
+/// Audio recorder configuration (display model for config show)
+/// </summary>
+public sealed record RecorderConfigurationDisplay
+{
+    /// <summary>
+    /// Gets the input volume multiplier (0.0 to 2.0)
+    /// </summary>
+    public double InputVolume { get; init; } = 1.0;
+
+    /// <summary>
+    /// Gets whether noise reduction is enabled during recording
+    /// </summary>
+    public bool EnableNoiseReduction { get; init; } = true;
+
+    /// <summary>
+    /// Gets whether frequency filters are enabled during recording
+    /// </summary>
+    public bool EnableFrequencyFilters { get; init; } = true;
+}
+
+/// <summary>
+/// Audio preprocessing configuration (display model for config show)
+/// </summary>
+public sealed record PreprocessingConfigurationDisplay
+{
+    /// <summary>
+    /// Gets whether silence removal is enabled
+    /// </summary>
+    public bool RemoveSilence { get; init; } = true;
+
+    /// <summary>
+    /// Gets the silence detection threshold in decibels
+    /// </summary>
+    public int SilenceThresholdDb { get; init; } = -50;
+
+    /// <summary>
+    /// Gets the minimum silence duration to remove in milliseconds
+    /// </summary>
+    public int MinimumSilenceDurationMs { get; init; } = 500;
 }

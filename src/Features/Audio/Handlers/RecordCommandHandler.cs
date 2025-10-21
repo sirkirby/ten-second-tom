@@ -3,25 +3,29 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Audio.Commands;
 using TenSecondTom.Features.Audio.Models;
+using TenSecondTom.Features.Audio.Services;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Contracts;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Audio.Handlers;
 
 /// <summary>
 /// Handler for RecordCommand.
-/// Orchestrates: record audio → transcribe → save to recording/ directory.
+/// Orchestrates: record audio → preprocess (optional) → transcribe → save to recording/ directory.
 /// </summary>
 public sealed class RecordCommandHandler(
     RecordAudioCommandHandler recordHandler,
     TranscribeAudioCommandHandler transcribeHandler,
+    IAudioPreprocessor audioPreprocessor,
     IConfiguration configuration,
     ILogger<RecordCommandHandler> logger) : IRequestHandler<RecordCommand, Result<StoredRecording>>
 {
     private readonly RecordAudioCommandHandler _recordHandler = recordHandler ?? throw new ArgumentNullException(nameof(recordHandler));
     private readonly TranscribeAudioCommandHandler _transcribeHandler = transcribeHandler ?? throw new ArgumentNullException(nameof(transcribeHandler));
+    private readonly IAudioPreprocessor _audioPreprocessor = audioPreprocessor ?? throw new ArgumentNullException(nameof(audioPreprocessor));
     private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
     private readonly ILogger<RecordCommandHandler> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -86,7 +90,43 @@ public sealed class RecordCommandHandler(
         var recording = recordResult.Value;
         _logger.LogInformation("Audio recorded successfully: {Duration}s", recording.Duration.TotalSeconds);
 
-        // Step 2: Transcribe audio from the temp file
+        // Step 1.5: Preprocess audio (remove silence if configured)
+        var preprocessResult = await _audioPreprocessor.PreprocessAsync(
+            recording.FilePath,
+            replaceOriginal: true,
+            cancellationToken);
+
+        if (!preprocessResult.IsSuccess)
+        {
+            _logger.LogWarning("Audio preprocessing failed: {Error}. Continuing with original audio.", preprocessResult.Error);
+            // Continue with original audio - preprocessing failure is not fatal
+        }
+        else
+        {
+            var preprocStats = preprocessResult.Value;
+            _logger.LogInformation(
+                "Audio preprocessing completed: OriginalDuration={OriginalDuration}s, ProcessedDuration={ProcessedDuration}s, " +
+                "Reduction={Reduction:F1}%",
+                preprocStats.OriginalDuration.TotalSeconds,
+                preprocStats.ProcessedDuration.TotalSeconds,
+                preprocStats.DurationReductionPercent);
+
+            // Update recording metadata with preprocessed values
+            recording = new AudioRecording
+            {
+                Filename = recording.Filename,
+                FilePath = recording.FilePath,
+                Duration = preprocStats.ProcessedDuration,
+                SampleRate = recording.SampleRate,
+                Channels = recording.Channels,
+                Format = recording.Format,
+                Encoding = recording.Encoding,
+                RecordedAt = recording.RecordedAt,
+                FileSizeBytes = preprocStats.ProcessedSizeBytes
+            };
+        }
+
+        // Step 2: Transcribe audio from the (possibly preprocessed) temp file
         var transcribeCommand = new TranscribeAudioCommand
         {
             AudioFilePath = recording.FilePath,

@@ -76,7 +76,29 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
         string inputDevice = GetPlatformAudioInput();
         string inputFormat = GetPlatformInputFormat();
 
+        // Build audio filter chain based on configuration
+        var filters = new List<string>();
+
+        // Add frequency filters if enabled (recommended for voice)
+        if (_config.Recorder.EnableFrequencyFilters)
+        {
+            filters.Add("highpass=f=80");  // Remove low-frequency rumble
+            filters.Add("lowpass=f=8000"); // Remove high-frequency hiss
+        }
+
+        // Add volume adjustment
+        filters.Add($"volume={_config.Recorder.InputVolume}");
+
+        // Add noise reduction if enabled
+        if (_config.Recorder.EnableNoiseReduction)
+        {
+            filters.Add("anlmdn"); // Adaptive noise reduction
+        }
+
+        var audioFilter = string.Join(",", filters);
+
         var arguments = $"-f {inputFormat} -i {inputDevice} " +
+                       $"-af \"{audioFilter}\" " +
                        "-ar 16000 -ac 1 -acodec pcm_s16le " +
                        $"\"{outputPath}\"";
 

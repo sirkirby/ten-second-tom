@@ -65,6 +65,42 @@ public static class ConfigurationKeys
     /// </summary>
     public const string AudioSection = "TenSecondTom:Audio";
 
+    /// <summary>
+    /// Configuration key for audio recorder input volume (0.0 to 2.0).
+    /// Environment variable: TenSecondTom__Audio__Recorder__InputVolume
+    /// </summary>
+    public const string AudioRecorderInputVolume = "TenSecondTom:Audio:Recorder:InputVolume";
+
+    /// <summary>
+    /// Configuration key for enabling noise reduction during recording (boolean).
+    /// Environment variable: TenSecondTom__Audio__Recorder__EnableNoiseReduction
+    /// </summary>
+    public const string AudioRecorderEnableNoiseReduction = "TenSecondTom:Audio:Recorder:EnableNoiseReduction";
+
+    /// <summary>
+    /// Configuration key for enabling frequency filters during recording (boolean).
+    /// Environment variable: TenSecondTom__Audio__Recorder__EnableFrequencyFilters
+    /// </summary>
+    public const string AudioRecorderEnableFrequencyFilters = "TenSecondTom:Audio:Recorder:EnableFrequencyFilters";
+
+    /// <summary>
+    /// Configuration key for enabling silence removal preprocessing (boolean).
+    /// Environment variable: TenSecondTom__Audio__Preprocessing__RemoveSilence
+    /// </summary>
+    public const string AudioPreprocessingRemoveSilence = "TenSecondTom:Audio:Preprocessing:RemoveSilence";
+
+    /// <summary>
+    /// Configuration key for silence detection threshold in decibels (integer).
+    /// Environment variable: TenSecondTom__Audio__Preprocessing__SilenceThresholdDb
+    /// </summary>
+    public const string AudioPreprocessingSilenceThresholdDb = "TenSecondTom:Audio:Preprocessing:SilenceThresholdDb";
+
+    /// <summary>
+    /// Configuration key for minimum silence duration to remove in milliseconds (integer).
+    /// Environment variable: TenSecondTom__Audio__Preprocessing__MinimumSilenceDurationMs
+    /// </summary>
+    public const string AudioPreprocessingMinimumSilenceDurationMs = "TenSecondTom:Audio:Preprocessing:MinimumSilenceDurationMs";
+
     // ═══════════════════════════════════════════════════════════════
     // OTHER KEYS
     // ═══════════════════════════════════════════════════════════════

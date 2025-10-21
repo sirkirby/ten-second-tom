@@ -24,7 +24,10 @@
       "KeepFiles": true,
 
       "Recorder": {
-        "FfmpegPath": "ffmpeg"
+        "FfmpegPath": "ffmpeg",
+        "InputVolume": 1.0,
+        "EnableNoiseReduction": true,
+        "EnableFrequencyFilters": true
       },
 
       "LocalWhisper": {
@@ -33,8 +36,8 @@
       },
 
       "Preprocessing": {
-        "RemoveSilence": false,
-        "SilenceThresholdDb": -40,
+        "RemoveSilence": true,
+        "SilenceThresholdDb": -50,
         "MinimumSilenceDurationMs": 500
       },
 

@@ -26,6 +26,9 @@ public static class AudioFeatureExtensions
         // Register audio recorder implementation
         services.AddScoped<IAudioRecorder, FfmpegAudioRecorder>();
 
+        // Register audio preprocessor implementation
+        services.AddScoped<IAudioPreprocessor, FfmpegAudioPreprocessor>();
+
         // Register STT provider implementations
         services.AddScoped<LocalWhisperSttProvider>();
         services.AddScoped<OpenAiSttProvider>();

@@ -918,6 +918,23 @@ public static class CommandRegistry
         table.AddRow("Log Level", config.Optional.LogLevel.ToString());
         table.AddRow("Retention Days", config.Optional.RetentionDays.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
+        // Audio Configuration
+        table.AddRow("[yellow]Audio Settings[/]", "");
+        table.AddRow("  Preferred STT", config.Audio.PreferredStt);
+        table.AddRow("  Keep Files", config.Audio.KeepFiles ? "Yes" : "No");
+        
+        // Audio Recorder Configuration
+        table.AddRow("  [dim]Recorder:[/]", "");
+        table.AddRow("    Input Volume", config.Audio.Recorder.InputVolume.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture));
+        table.AddRow("    Noise Reduction", config.Audio.Recorder.EnableNoiseReduction ? "Enabled" : "Disabled");
+        table.AddRow("    Frequency Filters", config.Audio.Recorder.EnableFrequencyFilters ? "Enabled" : "Disabled");
+        
+        // Audio Preprocessing Configuration
+        table.AddRow("  [dim]Preprocessing:[/]", "");
+        table.AddRow("    Remove Silence", config.Audio.Preprocessing.RemoveSilence ? "Enabled" : "Disabled");
+        table.AddRow("    Silence Threshold", $"{config.Audio.Preprocessing.SilenceThresholdDb} dB");
+        table.AddRow("    Min Silence Duration", $"{config.Audio.Preprocessing.MinimumSilenceDurationMs} ms");
+
         // Metadata
         table.AddRow("[dim]Created[/]", $"[dim]{config.CreatedAt:yyyy-MM-dd HH:mm:ss}[/]");
         if (config.LastModifiedAt.HasValue)

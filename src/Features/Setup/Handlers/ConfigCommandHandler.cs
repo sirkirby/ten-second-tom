@@ -87,6 +87,16 @@ public sealed class ConfigCommandHandler
         string? envLogLevel = _configuration["TenSecondTom:Optional:LogLevel"];
         string? envRetentionDays = _configuration["TenSecondTom:Optional:RetentionDays"];
         string? envEnableTelemetry = _configuration["TenSecondTom:Optional:EnableTelemetry"];
+        
+        // Audio configuration from environment
+        string? envPreferredStt = _configuration["TenSecondTom:Audio:PreferredStt"];
+        string? envKeepFiles = _configuration["TenSecondTom:Audio:KeepFiles"];
+        string? envInputVolume = _configuration[ConfigurationKeys.AudioRecorderInputVolume];
+        string? envNoiseReduction = _configuration[ConfigurationKeys.AudioRecorderEnableNoiseReduction];
+        string? envFreqFilters = _configuration[ConfigurationKeys.AudioRecorderEnableFrequencyFilters];
+        string? envRemoveSilence = _configuration[ConfigurationKeys.AudioPreprocessingRemoveSilence];
+        string? envSilenceThreshold = _configuration[ConfigurationKeys.AudioPreprocessingSilenceThresholdDb];
+        string? envMinSilenceDuration = _configuration[ConfigurationKeys.AudioPreprocessingMinimumSilenceDurationMs];
 
         // If environment variables are set, they override user secrets
         bool hasSshOverrides = !string.IsNullOrWhiteSpace(envSshKeyPath) ||
@@ -100,8 +110,35 @@ public sealed class ConfigCommandHandler
         bool hasOptionalOverrides = !string.IsNullOrWhiteSpace(envLogLevel) ||
                                     !string.IsNullOrWhiteSpace(envRetentionDays) ||
                                     !string.IsNullOrWhiteSpace(envEnableTelemetry);
+        bool hasAudioOverrides = !string.IsNullOrWhiteSpace(envPreferredStt) ||
+                                !string.IsNullOrWhiteSpace(envKeepFiles) ||
+                                !string.IsNullOrWhiteSpace(envInputVolume) ||
+                                !string.IsNullOrWhiteSpace(envNoiseReduction) ||
+                                !string.IsNullOrWhiteSpace(envFreqFilters) ||
+                                !string.IsNullOrWhiteSpace(envRemoveSilence) ||
+                                !string.IsNullOrWhiteSpace(envSilenceThreshold) ||
+                                !string.IsNullOrWhiteSpace(envMinSilenceDuration);
 
-        if (hasSshOverrides || hasLlmOverrides || hasStorageOverrides || hasOptionalOverrides)
+        // Load audio configuration from IConfiguration (includes appsettings.json and env vars)
+        var audioConfig = new AudioConfigurationDisplay
+        {
+            PreferredStt = _configuration["TenSecondTom:Audio:PreferredStt"] ?? "auto",
+            KeepFiles = bool.TryParse(_configuration["TenSecondTom:Audio:KeepFiles"], out var keepFiles) ? keepFiles : true,
+            Recorder = new RecorderConfigurationDisplay
+            {
+                InputVolume = double.TryParse(_configuration[ConfigurationKeys.AudioRecorderInputVolume], out var inputVolume) ? inputVolume : 1.0,
+                EnableNoiseReduction = bool.TryParse(_configuration[ConfigurationKeys.AudioRecorderEnableNoiseReduction], out var noiseReduction) ? noiseReduction : true,
+                EnableFrequencyFilters = bool.TryParse(_configuration[ConfigurationKeys.AudioRecorderEnableFrequencyFilters], out var freqFilters) ? freqFilters : true
+            },
+            Preprocessing = new PreprocessingConfigurationDisplay
+            {
+                RemoveSilence = bool.TryParse(_configuration[ConfigurationKeys.AudioPreprocessingRemoveSilence], out var removeSilence) ? removeSilence : true,
+                SilenceThresholdDb = int.TryParse(_configuration[ConfigurationKeys.AudioPreprocessingSilenceThresholdDb], out var silenceThreshold) ? silenceThreshold : -50,
+                MinimumSilenceDurationMs = int.TryParse(_configuration[ConfigurationKeys.AudioPreprocessingMinimumSilenceDurationMs], out var minSilenceDuration) ? minSilenceDuration : 500
+            }
+        };
+
+        if (hasSshOverrides || hasLlmOverrides || hasStorageOverrides || hasOptionalOverrides || hasAudioOverrides)
         {
             config = config with
             {
@@ -139,10 +176,19 @@ public sealed class ConfigCommandHandler
                     EnableTelemetry = bool.TryParse(envEnableTelemetry, out var enableTelemetry)
                         ? enableTelemetry
                         : config.Optional.EnableTelemetry
-                }
+                },
+                Audio = audioConfig
             };
 
             _logger.LogDebug("Configuration overrides applied from environment variables");
+        }
+        else
+        {
+            // No overrides, but still need to populate audio config
+            config = config with
+            {
+                Audio = audioConfig
+            };
         }
 
         _logger.LogInformation("Displaying current configuration (ShowSecrets: {ShowSecrets})", 

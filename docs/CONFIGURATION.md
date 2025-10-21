@@ -4,6 +4,7 @@ This document explains how to configure Ten Second Tom using the built-in setup 
 
 > **Related Documentation:**
 > - [Authentication Setup](AUTHENTICATION.md) - SSH key configuration and agent setup
+> - [Audio Configuration](AUDIO.md) - Microphone settings, silence removal, and recording optimization
 > - [Security Policy](../SECURITY.md) - Security best practices and key management
 > - [Environment Setup](ENVIRONMENT.md) - Environment variables and deployment configuration
 

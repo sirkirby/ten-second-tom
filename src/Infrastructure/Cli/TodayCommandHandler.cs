@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Spectre.Console;
 using TenSecondTom.Features.Audio.Commands;
 using TenSecondTom.Features.Audio.Models;
+using TenSecondTom.Features.Audio.Services;
 using TenSecondTom.Features.Today.Commands;
 using TenSecondTom.Features.Today.Models;
 using TenSecondTom.Infrastructure.Auth;
@@ -317,6 +318,7 @@ public static class TodayCommandHandler
         // Resolve required services
         var recordHandler = serviceProvider.GetRequiredService<IRequestHandler<RecordAudioCommand, Result<AudioRecording>>>();
         var transcribeHandler = serviceProvider.GetRequiredService<IRequestHandler<TranscribeAudioCommand, Result<TranscriptionResult>>>();
+        var audioPreprocessor = serviceProvider.GetRequiredService<IAudioPreprocessor>();
         var voiceNoteHandler = serviceProvider.GetRequiredService<IRequestHandler<CreateVoiceNoteEntryCommand, Result<VoiceNoteEntry>>>();
         var configuration = serviceProvider.GetRequiredService<IConfiguration>();
         var logger = serviceProvider.GetRequiredService<ILogger<TodayHandlers.CreateVoiceNoteEntryHandler>>();
@@ -385,6 +387,47 @@ public static class TodayCommandHandler
             if (!jsonOutput)
             {
                 AnsiConsole.MarkupLine($"[green]✓[/] Recording complete ({recording.Duration.TotalSeconds:F1}s)");
+            }
+
+            // Step 1.5: Preprocess audio (remove silence if configured)
+            var preprocessResult = await audioPreprocessor.PreprocessAsync(
+                recording.FilePath,
+                replaceOriginal: true,
+                CancellationToken.None).ConfigureAwait(false);
+
+            if (!preprocessResult.IsSuccess)
+            {
+                logger.LogWarning("Audio preprocessing failed: {Error}. Continuing with original audio.", preprocessResult.Error);
+                // Continue with original audio - preprocessing failure is not fatal
+            }
+            else
+            {
+                var preprocStats = preprocessResult.Value;
+                logger.LogInformation(
+                    "Audio preprocessing completed: OriginalDuration={OriginalDuration}s, ProcessedDuration={ProcessedDuration}s, " +
+                    "Reduction={Reduction:F1}%",
+                    preprocStats.OriginalDuration.TotalSeconds,
+                    preprocStats.ProcessedDuration.TotalSeconds,
+                    preprocStats.DurationReductionPercent);
+
+                if (!jsonOutput && preprocStats.DurationReductionPercent > 0)
+                {
+                    AnsiConsole.MarkupLine($"[dim]  Removed {preprocStats.DurationReductionPercent:F1}% silence ({preprocStats.ProcessedDuration.TotalSeconds:F1}s remaining)[/]");
+                }
+
+                // Update recording metadata with preprocessed values
+                recording = new AudioRecording
+                {
+                    Filename = recording.Filename,
+                    FilePath = recording.FilePath,
+                    Duration = preprocStats.ProcessedDuration,
+                    SampleRate = recording.SampleRate,
+                    Channels = recording.Channels,
+                    Format = recording.Format,
+                    Encoding = recording.Encoding,
+                    RecordedAt = recording.RecordedAt,
+                    FileSizeBytes = preprocStats.ProcessedSizeBytes
+                };
             }
 
             // Parse STT selection
