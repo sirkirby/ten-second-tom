@@ -257,11 +257,15 @@ public sealed class ConfigurationValidationTests : IDisposable
         // Mock configuration storage
         var mockStorage = new Mock<IConfigurationStorageService>();
         services.AddSingleton(mockStorage.Object);
-        
+
+        // Mock app settings storage
+        var mockAppSettingsStorage = new Mock<IAppSettingsStorageService>();
+        services.AddSingleton(mockAppSettingsStorage.Object);
+
         // Add IConfiguration with empty configuration (no overrides)
         var configBuilder = new ConfigurationBuilder();
         services.AddSingleton<IConfiguration>(configBuilder.Build());
-        
+
         // Mock ISetupWizardUI (required by ConfigCommandHandler)
         var mockWizard = new Mock<ISetupWizardUI>();
         services.AddSingleton(mockWizard.Object);

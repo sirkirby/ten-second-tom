@@ -19,6 +19,7 @@ public sealed class ConfigCommandHandler
     private readonly IConfiguration _configuration;
     private readonly ISetupWizardUI _setupWizard;
     private readonly IEnumerable<IApiKeyValidator> _apiKeyValidators;
+    private readonly IAppSettingsStorageService _appSettingsStorage;
     private readonly ILogger<ConfigCommandHandler> _logger;
 
     public ConfigCommandHandler(
@@ -26,12 +27,14 @@ public sealed class ConfigCommandHandler
         IConfiguration configuration,
         ISetupWizardUI setupWizard,
         IEnumerable<IApiKeyValidator> apiKeyValidators,
+        IAppSettingsStorageService appSettingsStorage,
         ILogger<ConfigCommandHandler> logger)
     {
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _setupWizard = setupWizard ?? throw new ArgumentNullException(nameof(setupWizard));
         _apiKeyValidators = apiKeyValidators ?? throw new ArgumentNullException(nameof(apiKeyValidators));
+        _appSettingsStorage = appSettingsStorage ?? throw new ArgumentNullException(nameof(appSettingsStorage));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -211,6 +214,12 @@ public sealed class ConfigCommandHandler
         if (command.SettingName.Equals("llm", StringComparison.OrdinalIgnoreCase))
         {
             return await HandleInteractiveLlmConfigurationAsync(cancellationToken);
+        }
+
+        // Special handling for "audio" - interactive configuration
+        if (command.SettingName.Equals("audio", StringComparison.OrdinalIgnoreCase))
+        {
+            return await HandleInteractiveAudioConfigurationAsync(cancellationToken);
         }
 
         if (string.IsNullOrWhiteSpace(command.SettingValue))
@@ -528,6 +537,217 @@ public sealed class ConfigCommandHandler
         _setupWizard.ShowSuccess($"✓ LLM configuration updated: {providerName} - {selectedModel.DisplayName} [{selectedModel.CostTier}]");
 
         return Result<ConfigurationSettings>.Success(markedConfig);
+    }
+
+    private async Task<Result<ConfigurationSettings>> HandleInteractiveAudioConfigurationAsync(
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Starting interactive audio configuration");
+
+        // Load current audio configuration from appsettings.json
+        var loadResult = await _appSettingsStorage.LoadAudioConfigurationAsync(cancellationToken);
+
+        if (!loadResult.IsSuccess)
+        {
+            _setupWizard.ShowWarning("Could not load current audio configuration. Using defaults.");
+        }
+
+        var currentAudio = loadResult.IsSuccess ? loadResult.Value! : new AudioConfiguration();
+
+        const int totalSteps = 9;
+
+        // Step 1: Input Volume
+        _setupWizard.ShowStepHeader(1, totalSteps, "Input Volume");
+        var inputVolume = await _setupWizard.PromptForInputVolumeAsync(
+            currentAudio.Recorder.InputVolume,
+            cancellationToken);
+
+        if (!inputVolume.HasValue)
+        {
+            return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
+        }
+
+        // Step 2: Noise Reduction
+        _setupWizard.ShowStepHeader(2, totalSteps, "Noise Reduction");
+        var noiseReduction = await _setupWizard.PromptForBooleanAsync(
+            "Enable noise reduction during recording?",
+            currentAudio.Recorder.EnableNoiseReduction,
+            cancellationToken);
+
+        if (!noiseReduction.HasValue)
+        {
+            return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
+        }
+
+        // Step 3: Frequency Filters
+        _setupWizard.ShowStepHeader(3, totalSteps, "Frequency Filters");
+        var frequencyFilters = await _setupWizard.PromptForBooleanAsync(
+            "Enable frequency filters during recording?",
+            currentAudio.Recorder.EnableFrequencyFilters,
+            cancellationToken);
+
+        if (!frequencyFilters.HasValue)
+        {
+            return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
+        }
+
+        // Step 4: Silence Removal
+        _setupWizard.ShowStepHeader(4, totalSteps, "Silence Removal");
+        var removeSilence = await _setupWizard.PromptForBooleanAsync(
+            "Remove silence from recordings during preprocessing?",
+            currentAudio.Preprocessing.RemoveSilence,
+            cancellationToken);
+
+        if (!removeSilence.HasValue)
+        {
+            return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
+        }
+
+        // Step 5: Silence Threshold (only if silence removal enabled)
+        int silenceThresholdDb = currentAudio.Preprocessing.SilenceThresholdDb;
+        if (removeSilence.Value)
+        {
+            _setupWizard.ShowStepHeader(5, totalSteps, "Silence Detection Threshold");
+            var threshold = await _setupWizard.PromptForIntAsync(
+                "Silence threshold in decibels (-60 to -40):",
+                currentAudio.Preprocessing.SilenceThresholdDb,
+                -60,
+                -40,
+                cancellationToken);
+
+            if (!threshold.HasValue)
+            {
+                return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
+            }
+            silenceThresholdDb = threshold.Value;
+        }
+        else
+        {
+            _setupWizard.ShowStepHeader(5, totalSteps, "Silence Detection Threshold");
+            _setupWizard.ShowStatus("Skipped (silence removal disabled)");
+        }
+
+        // Step 6: Minimum Silence Duration (only if silence removal enabled)
+        int minSilenceDurationMs = currentAudio.Preprocessing.MinimumSilenceDurationMs;
+        if (removeSilence.Value)
+        {
+            _setupWizard.ShowStepHeader(6, totalSteps, "Minimum Silence Duration");
+            var duration = await _setupWizard.PromptForIntAsync(
+                "Minimum silence duration to remove (ms, 100-2000):",
+                currentAudio.Preprocessing.MinimumSilenceDurationMs,
+                100,
+                2000,
+                cancellationToken);
+
+            if (!duration.HasValue)
+            {
+                return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
+            }
+            minSilenceDurationMs = duration.Value;
+        }
+        else
+        {
+            _setupWizard.ShowStepHeader(6, totalSteps, "Minimum Silence Duration");
+            _setupWizard.ShowStatus("Skipped (silence removal disabled)");
+        }
+
+        // Step 7: Preferred STT Engine
+        _setupWizard.ShowStepHeader(7, totalSteps, "Speech-to-Text Engine");
+        var preferredStt = await _setupWizard.PromptForSttPreferenceAsync(
+            currentAudio.PreferredStt,
+            cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(preferredStt))
+        {
+            return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
+        }
+
+        // Step 8: Today Voice Timeout
+        _setupWizard.ShowStepHeader(8, totalSteps, "Today Voice Recording Timeout");
+        _setupWizard.ShowStatus("When this duration is reached, you'll be prompted to continue or finish recording.");
+        var todayTimeout = await _setupWizard.PromptForIntAsync(
+            "Time before prompting to continue 'today --voice' (seconds, 30-600):",
+            currentAudio.Timeouts.TodaySeconds,
+            30,
+            600,
+            cancellationToken);
+
+        if (!todayTimeout.HasValue)
+        {
+            return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
+        }
+
+        // Step 9: Record Command Timeout
+        _setupWizard.ShowStepHeader(9, totalSteps, "Record Command Timeout");
+        _setupWizard.ShowStatus("When this duration is reached, you'll be prompted to continue or finish recording.");
+        var recordTimeout = await _setupWizard.PromptForIntAsync(
+            "Time before prompting to continue 'record' (seconds, 60-1800):",
+            currentAudio.Timeouts.RecordSeconds,
+            60,
+            1800,
+            cancellationToken);
+
+        if (!recordTimeout.HasValue)
+        {
+            return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
+        }
+
+        // Build updated audio configuration
+        var updatedAudio = new AudioConfiguration
+        {
+            PreferredStt = preferredStt,
+            KeepFiles = currentAudio.KeepFiles, // Not modified interactively
+            Recorder = new RecorderConfiguration
+            {
+                FfmpegPath = currentAudio.Recorder.FfmpegPath, // Not modified interactively
+                InputVolume = inputVolume.Value,
+                EnableNoiseReduction = noiseReduction.Value,
+                EnableFrequencyFilters = frequencyFilters.Value
+            },
+            LocalWhisper = currentAudio.LocalWhisper, // Not modified interactively
+            Preprocessing = new PreprocessingConfiguration
+            {
+                RemoveSilence = removeSilence.Value,
+                SilenceThresholdDb = silenceThresholdDb,
+                MinimumSilenceDurationMs = minSilenceDurationMs
+            },
+            Timeouts = new RecordingTimeoutsConfiguration
+            {
+                TodaySeconds = todayTimeout.Value,
+                RecordSeconds = recordTimeout.Value
+            }
+        };
+
+        // Save to appsettings.json
+        var saveResult = await _appSettingsStorage.SaveAudioConfigurationAsync(updatedAudio, cancellationToken);
+
+        if (!saveResult.IsSuccess)
+        {
+            return Result<ConfigurationSettings>.Failure($"Failed to save audio configuration: {saveResult.Error}. Changes were not applied.");
+        }
+
+        _logger.LogInformation("Audio configuration updated successfully");
+
+        // Display success message with summary
+        _setupWizard.ShowSuccess("✓ Audio configuration saved successfully");
+        _setupWizard.ShowStatus($"  • Input volume: {inputVolume.Value:F1}");
+        _setupWizard.ShowStatus($"  • Noise reduction: {(noiseReduction.Value ? "Enabled" : "Disabled")}");
+        _setupWizard.ShowStatus($"  • Frequency filters: {(frequencyFilters.Value ? "Enabled" : "Disabled")}");
+        _setupWizard.ShowStatus($"  • Silence removal: {(removeSilence.Value ? "Enabled" : "Disabled")}");
+        if (removeSilence.Value)
+        {
+            _setupWizard.ShowStatus($"  • Silence threshold: {silenceThresholdDb} dB");
+            _setupWizard.ShowStatus($"  • Min silence duration: {minSilenceDurationMs} ms");
+        }
+        _setupWizard.ShowStatus($"  • Preferred STT: {preferredStt}");
+        _setupWizard.ShowStatus($"  • Today timeout: {todayTimeout.Value}s");
+        _setupWizard.ShowStatus($"  • Record timeout: {recordTimeout.Value}s");
+
+        // Return current configuration (audio config is stored separately in appsettings.json)
+        var configLoadResult = await _storageService.LoadAsync(cancellationToken);
+        return configLoadResult.IsSuccess
+            ? Result<ConfigurationSettings>.Success(configLoadResult.Value!)
+            : Result<ConfigurationSettings>.Failure("Audio configuration saved, but could not reload main configuration.");
     }
 
     private Task<Result<ConfigurationSettings>> HandleResetAsync(CancellationToken cancellationToken)

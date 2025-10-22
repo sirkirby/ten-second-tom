@@ -183,4 +183,31 @@ public sealed class SpectreConsoleSetupWizardTests
             // The fix ensures .EscapeMarkup() is called on the entire formatted string
         }
     }
+
+    #region Audio Configuration Prompt Tests
+
+    [Fact]
+    public void AudioPromptMethods_ShouldExistWithCorrectSignatures()
+    {
+        // Arrange & Act - Verify method exists and has correct signature
+        var inputVolumeMethod = typeof(SpectreConsoleSetupWizard).GetMethod("PromptForInputVolumeAsync");
+        var booleanMethod = typeof(SpectreConsoleSetupWizard).GetMethod("PromptForBooleanAsync");
+        var intMethod = typeof(SpectreConsoleSetupWizard).GetMethod("PromptForIntAsync");
+        var sttMethod = typeof(SpectreConsoleSetupWizard).GetMethod("PromptForSttPreferenceAsync");
+
+        // Assert
+        inputVolumeMethod.Should().NotBeNull("PromptForInputVolumeAsync method should exist");
+        inputVolumeMethod!.ReturnType.Should().Be<Task<double?>>();
+
+        booleanMethod.Should().NotBeNull("PromptForBooleanAsync method should exist");
+        booleanMethod!.ReturnType.Should().Be<Task<bool?>>();
+
+        intMethod.Should().NotBeNull("PromptForIntAsync method should exist");
+        intMethod!.ReturnType.Should().Be<Task<int?>>();
+
+        sttMethod.Should().NotBeNull("PromptForSttPreferenceAsync method should exist");
+        sttMethod!.ReturnType.Should().Be<Task<string?>>();
+    }
+
+    #endregion
 }

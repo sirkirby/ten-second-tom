@@ -24,6 +24,7 @@ public sealed class ConfigCommandHandlerTests
     private readonly Mock<ISetupWizardUI> _mockSetupWizard;
     private readonly Mock<IApiKeyValidator> _mockOpenAIValidator;
     private readonly Mock<IApiKeyValidator> _mockAnthropicValidator;
+    private readonly Mock<IAppSettingsStorageService> _mockAppSettingsStorage;
     private readonly Mock<ILogger<ConfigCommandHandler>> _mockLogger;
     private readonly ConfigCommandHandler _handler;
 
@@ -34,6 +35,7 @@ public sealed class ConfigCommandHandlerTests
         _mockSetupWizard = new Mock<ISetupWizardUI>();
         _mockOpenAIValidator = new Mock<IApiKeyValidator>();
         _mockAnthropicValidator = new Mock<IApiKeyValidator>();
+        _mockAppSettingsStorage = new Mock<IAppSettingsStorageService>();
         _mockLogger = new Mock<ILogger<ConfigCommandHandler>>();
 
         _mockOpenAIValidator.Setup(v => v.Provider).Returns(LlmProvider.OpenAI);
@@ -50,7 +52,8 @@ public sealed class ConfigCommandHandlerTests
             _mockStorageService.Object,
             _mockConfiguration.Object,
             _mockSetupWizard.Object,
-            validators, 
+            validators,
+            _mockAppSettingsStorage.Object,
             _mockLogger.Object);
     }
 
@@ -65,6 +68,7 @@ public sealed class ConfigCommandHandlerTests
             _mockConfiguration.Object,
             _mockSetupWizard.Object,
             new[] { _mockOpenAIValidator.Object },
+            _mockAppSettingsStorage.Object,
             _mockLogger.Object);
 
         act.Should().Throw<ArgumentNullException>()
@@ -80,6 +84,7 @@ public sealed class ConfigCommandHandlerTests
             _mockConfiguration.Object,
             null!,
             new[] { _mockOpenAIValidator.Object },
+            _mockAppSettingsStorage.Object,
             _mockLogger.Object);
 
         act.Should().Throw<ArgumentNullException>()
@@ -95,10 +100,27 @@ public sealed class ConfigCommandHandlerTests
             _mockConfiguration.Object,
             _mockSetupWizard.Object,
             null!,
+            _mockAppSettingsStorage.Object,
             _mockLogger.Object);
 
         act.Should().Throw<ArgumentNullException>()
             .WithParameterName("apiKeyValidators");
+    }
+
+    [Fact]
+    public void Constructor_WithNullAppSettingsStorage_ShouldThrowArgumentNullException()
+    {
+        // Arrange, Act & Assert
+        var act = () => new ConfigCommandHandler(
+            _mockStorageService.Object,
+            _mockConfiguration.Object,
+            _mockSetupWizard.Object,
+            new[] { _mockOpenAIValidator.Object },
+            null!,
+            _mockLogger.Object);
+
+        act.Should().Throw<ArgumentNullException>()
+            .WithParameterName("appSettingsStorage");
     }
 
     [Fact]
@@ -110,6 +132,7 @@ public sealed class ConfigCommandHandlerTests
             _mockConfiguration.Object,
             _mockSetupWizard.Object,
             new[] { _mockOpenAIValidator.Object },
+            _mockAppSettingsStorage.Object,
             null!);
 
         act.Should().Throw<ArgumentNullException>()

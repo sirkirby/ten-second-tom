@@ -95,4 +95,52 @@ public interface ISetupWizardUI
     /// Shows a warning message
     /// </summary>
     void ShowWarning(string message);
+
+    /// <summary>
+    /// Prompts user to enter input volume multiplier
+    /// </summary>
+    /// <param name="currentValue">Current input volume value</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Selected volume, or null if cancelled</returns>
+    Task<double?> PromptForInputVolumeAsync(
+        double? currentValue,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Prompts user for a boolean setting with enable/disable options
+    /// </summary>
+    /// <param name="prompt">The question to ask the user</param>
+    /// <param name="currentValue">Current boolean value</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Selected boolean value, or null if cancelled</returns>
+    Task<bool?> PromptForBooleanAsync(
+        string prompt,
+        bool? currentValue,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Prompts user to enter an integer value within a range
+    /// </summary>
+    /// <param name="prompt">The question to ask the user</param>
+    /// <param name="currentValue">Current integer value</param>
+    /// <param name="min">Minimum allowed value</param>
+    /// <param name="max">Maximum allowed value</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Selected integer, or null if cancelled</returns>
+    Task<int?> PromptForIntAsync(
+        string prompt,
+        int? currentValue,
+        int min,
+        int max,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Prompts user to select preferred STT engine
+    /// </summary>
+    /// <param name="currentValue">Current STT preference (auto/local/openai)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Selected STT preference, or null if cancelled</returns>
+    Task<string?> PromptForSttPreferenceAsync(
+        string? currentValue,
+        CancellationToken cancellationToken);
 }

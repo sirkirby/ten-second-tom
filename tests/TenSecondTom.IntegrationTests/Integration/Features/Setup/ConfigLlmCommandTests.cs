@@ -8,6 +8,7 @@ using TenSecondTom.Features.Setup.Handlers;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Setup.Validation;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.IntegrationTests.TestHelpers;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
@@ -16,15 +17,14 @@ namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
 /// Integration tests for 'tom config llm' command flow
 /// Tests end-to-end interactive model selection via config command
 /// </summary>
-public sealed class ConfigLlmCommandTests : IDisposable
+[Collection(UserSecretsCollection.Name)]
+public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
 {
     private readonly ServiceProvider _serviceProvider;
-    private readonly string _testSecretsId;
     private readonly Mock<ISetupWizardUI> _mockWizard;
 
     public ConfigLlmCommandTests()
     {
-        _testSecretsId = $"tom-test-{Guid.NewGuid()}";
         _mockWizard = new Mock<ISetupWizardUI>();
 
         // Setup common UI methods that don't affect test outcomes
@@ -32,26 +32,35 @@ public sealed class ConfigLlmCommandTests : IDisposable
         _mockWizard.Setup(w => w.ShowWarning(It.IsAny<string>()));
 
         var services = new ServiceCollection();
-        
+
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Debug));
         services.AddHttpClient(); // Required by API key validators
         services.AddSingleton(_mockWizard.Object);
+
+        // Use TestUserSecretsId from base fixture
         services.AddSingleton<IConfigurationStorageService>(sp =>
             new UserSecretsStorageService(
                 sp.GetRequiredService<ILogger<UserSecretsStorageService>>(),
-                _testSecretsId));
-        
+                TestUserSecretsId));
+
+        // Mock app settings storage (not tested in these LLM config tests)
+        var mockAppSettingsStorage = new Mock<IAppSettingsStorageService>();
+        services.AddSingleton(mockAppSettingsStorage.Object);
+
         // Add IConfiguration with empty configuration (no overrides)
         var configBuilder = new ConfigurationBuilder();
         services.AddSingleton<IConfiguration>(configBuilder.Build());
-        
+
         // Add required validators for ConfigCommandHandler
         services.AddTransient<IApiKeyValidator, OpenAIApiKeyValidator>();
         services.AddTransient<IApiKeyValidator, AnthropicApiKeyValidator>();
-        
+
         services.AddTransient<ConfigCommandHandler>();
 
         _serviceProvider = services.BuildServiceProvider();
+
+        // Set up logger for the base fixture
+        Logger = _serviceProvider.GetRequiredService<ILogger<UserSecretsTestFixture>>();
     }
 
     [Fact]
@@ -317,32 +326,13 @@ public sealed class ConfigLlmCommandTests : IDisposable
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    public void Dispose()
+    public override async Task DisposeAsync()
     {
-        // Cleanup test user secrets if created
-        var userSecretsPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Microsoft",
-            "UserSecrets",
-            _testSecretsId);
-        
-        if (Directory.Exists(userSecretsPath))
-        {
-            try
-            {
-                Directory.Delete(userSecretsPath, recursive: true);
-            }
-            catch (IOException)
-            {
-                // Best effort cleanup - directory may be in use
-            }
-            catch (UnauthorizedAccessException)
-            {
-                // Best effort cleanup - permissions issue
-            }
-        }
-        
+        // Dispose service provider
         _serviceProvider?.Dispose();
+
+        // Call base cleanup for UserSecrets
+        await base.DisposeAsync();
     }
 
     private static ConfigurationSettings CreateValidConfiguration()

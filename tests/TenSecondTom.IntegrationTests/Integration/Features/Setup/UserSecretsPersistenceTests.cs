@@ -16,55 +16,29 @@ namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
 /// Verifies configuration can be saved to and loaded from User Secrets.
 /// Each test uses a unique User Secrets ID to avoid interference.
 /// </summary>
-public sealed class UserSecretsPersistenceTests : IDisposable
+[Collection(UserSecretsCollection.Name)]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable", Justification = "IAsyncLifetime pattern used instead of IDisposable")]
+public sealed class UserSecretsPersistenceTests : UserSecretsTestFixture
 {
     private readonly TemporaryTestDirectory _testDirectory;
-    private readonly string _testUserSecretsId;
 
     public UserSecretsPersistenceTests()
     {
         _testDirectory = new TemporaryTestDirectory();
-        // Use a unique ID for each test instance to avoid interference
-        _testUserSecretsId = $"TenSecondTom-Test-{Guid.NewGuid()}";
+
+        // Set up logger for the base fixture
+        using var loggerFactory = LoggerFactory.Create(builder =>
+            builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
+        Logger = loggerFactory.CreateLogger<UserSecretsTestFixture>();
     }
 
-    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Cleanup must not throw")]
-    public void Dispose()
+    public override async Task DisposeAsync()
     {
         // Clean up temporary test directory
         _testDirectory.Dispose();
-        
-        // Clean up test UserSecrets directory
-        var userSecretsPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Microsoft",
-            "UserSecrets",
-            _testUserSecretsId);
 
-        if (Directory.Exists(userSecretsPath))
-        {
-            try
-            {
-                Directory.Delete(userSecretsPath, recursive: true);
-            }
-            catch (IOException)
-            {
-                // Retry after delay if directory is locked
-                Thread.Sleep(100);
-                try
-                {
-                    Directory.Delete(userSecretsPath, recursive: true);
-                }
-                catch
-                {
-                    // Ignore - cleanup script can handle orphaned directories
-                }
-            }
-            catch
-            {
-                // Ignore cleanup errors - don't fail tests because of cleanup
-            }
-        }
+        // Call base cleanup for UserSecrets
+        await base.DisposeAsync();
     }
 
     [Fact]
@@ -331,11 +305,11 @@ public sealed class UserSecretsPersistenceTests : IDisposable
             .AddConsole()
             .SetMinimumLevel(LogLevel.Warning));
 
-        // Add real User Secrets storage service with test-specific ID
+        // Add real User Secrets storage service with test-specific ID from base fixture
         services.AddSingleton<IConfigurationStorageService>(sp =>
         {
             var logger = sp.GetRequiredService<ILogger<UserSecretsStorageService>>();
-            return new UserSecretsStorageService(logger, _testUserSecretsId);
+            return new UserSecretsStorageService(logger, TestUserSecretsId);
         });
 
         return services.BuildServiceProvider();

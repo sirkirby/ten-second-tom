@@ -40,7 +40,8 @@ public static class SetupFeatureExtensions
         
         // Configuration Storage
         services.AddSingleton<IConfigurationStorageService, UserSecretsStorageService>();
-        
+        services.AddSingleton<IAppSettingsStorageService, AppSettingsStorageService>();
+
         // Setup Wizard UI
         services.AddTransient<ISetupWizardUI, SpectreConsoleSetupWizard>();
         
