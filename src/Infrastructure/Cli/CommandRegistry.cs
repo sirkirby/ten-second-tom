@@ -490,6 +490,12 @@ public static class CommandRegistry
                 return 1;
             }
 
+            // Show recording prompt (unless in JSON mode)
+            if (!jsonOutput)
+            {
+                AnsiConsole.MarkupLine("[cyan]🎤 Recording... Press Enter to stop.[/]");
+            }
+
             // Execute command with configured timeout
             var command = new TenSecondTom.Features.Audio.Commands.RecordCommand
             {
@@ -522,9 +528,32 @@ public static class CommandRegistry
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[green]✓[/] Recording saved to: [cyan]{recording.AudioFilePath.EscapeMarkup()}[/]");
-                    AnsiConsole.MarkupLine($"[green]✓[/] Transcription saved to: [cyan]{recording.TranscriptionFilePath.EscapeMarkup()}[/]");
-                    AnsiConsole.MarkupLine($"[dim]Duration:[/] {recording.Duration.TotalSeconds:F1}s | [dim]Words:[/] {recording.TranscriptionWordCount} | [dim]Engine:[/] {recording.SttEngine} ({recording.SttModel ?? "default"})");
+                    AnsiConsole.MarkupLine($"[green]✓[/] Recording complete ({recording.Duration.TotalSeconds:F1}s)");
+                    AnsiConsole.MarkupLine($"[green]✓[/] Transcription complete ({recording.TranscriptionWordCount} words, {recording.SttEngine})");
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.MarkupLine("[bold]Transcript:[/]");
+
+                    // Read and display the transcription text (strip YAML frontmatter)
+                    var transcriptContent = File.ReadAllText(recording.TranscriptionFilePath);
+                    var lines = transcriptContent.Split('\n');
+                    bool inFrontmatter = false;
+                    var transcriptText = new System.Text.StringBuilder();
+                    foreach (var line in lines)
+                    {
+                        if (line.Trim() == "---")
+                        {
+                            inFrontmatter = !inFrontmatter;
+                            continue;
+                        }
+                        if (!inFrontmatter && !string.IsNullOrWhiteSpace(line))
+                        {
+                            transcriptText.AppendLine(line);
+                        }
+                    }
+
+                    AnsiConsole.MarkupLine($"[dim]{transcriptText.ToString().Trim().EscapeMarkup()}[/]");
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.MarkupLine($"[dim]Audio saved: {recording.AudioFilePath.EscapeMarkup()}[/]");
                 }
                 return 0;
             }
@@ -873,9 +902,57 @@ public static class CommandRegistry
             }
         });
 
+        // Audio subcommand - interactive configuration for audio recording and processing
+        var audioCommand = new Command("audio", "Configure audio recording and processing settings interactively");
+        audioCommand.Options.Add(jsonOutputOption);
+
+        audioCommand.SetAction(async (parseResult) =>
+        {
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
+
+            var handler = serviceProvider.GetRequiredService<ConfigCommandHandler>();
+
+            var command = new ConfigCommand
+            {
+                Action = ConfigAction.Set,
+                SettingName = "audio",
+                SettingValue = null,
+                ShowSecrets = false
+            };
+
+            var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
+
+            if (result.IsSuccess)
+            {
+                if (jsonOutput)
+                {
+                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        success = true,
+                        message = "Audio configuration updated successfully"
+                    }));
+                }
+                // Success message already displayed by handler
+                return 0;
+            }
+            else
+            {
+                if (jsonOutput)
+                {
+                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { success = false, error = result.Error }));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error.EscapeMarkup()}");
+                }
+                return 1;
+            }
+        });
+
         configCommand.Subcommands.Add(showCommand);
         configCommand.Subcommands.Add(setCommand);
         configCommand.Subcommands.Add(llmCommand);
+        configCommand.Subcommands.Add(audioCommand);
         configCommand.Subcommands.Add(validateCommand);
 
         return configCommand;

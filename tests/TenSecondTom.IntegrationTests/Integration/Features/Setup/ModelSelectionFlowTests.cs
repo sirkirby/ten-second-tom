@@ -1,7 +1,8 @@
-using System.Diagnostics.CodeAnalysis;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.IntegrationTests.TestHelpers;
 using Xunit;
 
 namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
@@ -11,50 +12,15 @@ namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
 /// Verifies that model selection, storage, and retrieval work correctly.
 /// Each test uses a unique User Secrets ID to avoid interference with production configuration.
 /// </summary>
-public sealed class ModelSelectionFlowTests : IDisposable
+[Collection(UserSecretsCollection.Name)]
+public sealed class ModelSelectionFlowTests : UserSecretsTestFixture
 {
-    private readonly string _testUserSecretsId;
-
     public ModelSelectionFlowTests()
     {
-        // Use a unique ID for each test instance to avoid polluting production UserSecrets
-        _testUserSecretsId = $"TenSecondTom-Test-{Guid.NewGuid()}";
-    }
-
-    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Cleanup must not throw")]
-    public void Dispose()
-    {
-        // Clean up test UserSecrets directory
-        var userSecretsPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Microsoft",
-            "UserSecrets",
-            _testUserSecretsId);
-
-        if (Directory.Exists(userSecretsPath))
-        {
-            try
-            {
-                Directory.Delete(userSecretsPath, recursive: true);
-            }
-            catch (IOException)
-            {
-                // Retry after delay if directory is locked
-                Thread.Sleep(100);
-                try
-                {
-                    Directory.Delete(userSecretsPath, recursive: true);
-                }
-                catch
-                {
-                    // Ignore - cleanup script can handle orphaned directories
-                }
-            }
-            catch
-            {
-                // Ignore cleanup errors - don't fail tests because of cleanup
-            }
-        }
+        // Set up logger for the base fixture
+        using var loggerFactory = LoggerFactory.Create(builder =>
+            builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
+        Logger = loggerFactory.CreateLogger<UserSecretsTestFixture>();
     }
     [Fact]
     public async Task Setup_WithModelSelection_ShouldSaveModelToUserSecrets()
@@ -204,7 +170,7 @@ public sealed class ModelSelectionFlowTests : IDisposable
     private UserSecretsStorageService CreateStorageService()
     {
         var logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<UserSecretsStorageService>();
-        return new UserSecretsStorageService(logger, _testUserSecretsId);
+        return new UserSecretsStorageService(logger, TestUserSecretsId);
     }
 
     private static ConfigurationSettings CreateTestSettings(LlmProvider provider, string? modelId)

@@ -20,7 +20,6 @@
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/sirkirby/ten-second-tom?sort=semver)
 [![brew install](https://img.shields.io/badge/brew_install-sirkirby/ten--second--tom/ten--second--tom-informational)](https://github.com/sirkirby/homebrew-ten-second-tom)
 
-
 ---
 
 ## ✨ Features
@@ -35,7 +34,6 @@
 - 🔐 **SSH Authentication**: Secure session management with SSH keys
 - 🎨 **Beautiful Terminal UI**: Rich formatting with Spectre.Console
 - 📤 **JSON Output**: Programmatic access for automation and integrations
-- 🔄 **Retry Mechanism**: Recover from failed AI summaries
 - ⏰ **Auto-Purge**: Configurable data retention policies
 
 ---

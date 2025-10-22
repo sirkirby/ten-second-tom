@@ -302,6 +302,106 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         _console.MarkupLine($"[yellow]⚠️  {message.EscapeMarkup()}[/]");
     }
 
+    public Task<double?> PromptForInputVolumeAsync(
+        double? currentValue,
+        CancellationToken cancellationToken)
+    {
+        _console.MarkupLine("[grey]ℹ️  Input volume multiplier (0.0 to 2.0)[/]");
+        _console.MarkupLine("[grey]   • Laptop/built-in mics: 1.0-1.2[/]");
+        _console.MarkupLine("[grey]   • Dynamic mics (SM7B): 0.7-0.8[/]");
+        _console.MarkupLine("[grey]   • Condenser/USB mics: 0.9-1.0[/]");
+        _console.WriteLine();
+
+        var prompt = new TextPrompt<string>("Enter input volume (0.0 - 2.0):")
+            .DefaultValue((currentValue ?? 1.0).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))
+            .Validate(input =>
+            {
+                if (double.TryParse(input, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var volume))
+                {
+                    if (volume >= 0.0 && volume <= 2.0)
+                        return Spectre.Console.ValidationResult.Success();
+                    return Spectre.Console.ValidationResult.Error("[red]Volume must be between 0.0 and 2.0[/]");
+                }
+                return Spectre.Console.ValidationResult.Error("[red]Please enter a valid number[/]");
+            });
+
+        var input = _console.Prompt(prompt);
+        if (double.TryParse(input, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out var result))
+        {
+            return Task.FromResult<double?>(result);
+        }
+
+        return Task.FromResult<double?>(null);
+    }
+
+    public Task<bool?> PromptForBooleanAsync(
+        string prompt,
+        bool? currentValue,
+        CancellationToken cancellationToken)
+    {
+        var choices = new[] { "Enabled", "Disabled" };
+        var defaultChoice = (currentValue ?? true) ? "Enabled" : "Disabled";
+
+        var selectionPrompt = new SelectionPrompt<string>()
+            .Title(prompt)
+            .AddChoices(choices);
+
+        var selected = _console.Prompt(selectionPrompt);
+        return Task.FromResult<bool?>(selected == "Enabled");
+    }
+
+    public Task<int?> PromptForIntAsync(
+        string prompt,
+        int? currentValue,
+        int min,
+        int max,
+        CancellationToken cancellationToken)
+    {
+        var textPrompt = new TextPrompt<string>(prompt)
+            .DefaultValue((currentValue ?? min).ToString(System.Globalization.CultureInfo.InvariantCulture))
+            .Validate(input =>
+            {
+                if (int.TryParse(input, out var value))
+                {
+                    if (value >= min && value <= max)
+                        return Spectre.Console.ValidationResult.Success();
+                    return Spectre.Console.ValidationResult.Error($"[red]Value must be between {min} and {max}[/]");
+                }
+                return Spectre.Console.ValidationResult.Error("[red]Please enter a valid integer[/]");
+            });
+
+        var input = _console.Prompt(textPrompt);
+        if (int.TryParse(input, out var result))
+        {
+            return Task.FromResult<int?>(result);
+        }
+
+        return Task.FromResult<int?>(null);
+    }
+
+    public Task<string?> PromptForSttPreferenceAsync(
+        string? currentValue,
+        CancellationToken cancellationToken)
+    {
+        _console.MarkupLine("[grey]ℹ️  Speech-to-Text engine preference:[/]");
+        _console.MarkupLine("[grey]   • auto: Try local (whisper.cpp) first, fallback to OpenAI[/]");
+        _console.MarkupLine("[grey]   • local: Always use whisper.cpp (requires installation)[/]");
+        _console.MarkupLine("[grey]   • openai: Always use OpenAI Whisper API[/]");
+        _console.WriteLine();
+
+        var choices = new[] { "auto", "local", "openai" };
+        var defaultChoice = currentValue ?? "auto";
+
+        var prompt = new SelectionPrompt<string>()
+            .Title("Select STT preference:")
+            .AddChoices(choices);
+
+        var selected = _console.Prompt(prompt);
+        return Task.FromResult<string?>(selected);
+    }
+
     private static string MaskApiKey(string? apiKey)
     {
         if (string.IsNullOrEmpty(apiKey))

@@ -16,51 +16,28 @@ namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
 /// Tests User Story 3: Model Configuration via Environment Variables
 /// Verifies that environment variables override user secrets in the configuration hierarchy.
 /// </summary>
-public sealed class EnvironmentVariableConfigTests : IDisposable
+[Collection(UserSecretsCollection.Name)]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable", Justification = "IAsyncLifetime pattern used instead of IDisposable")]
+public sealed class EnvironmentVariableConfigTests : UserSecretsTestFixture
 {
     private readonly TemporaryTestDirectory _testDirectory;
-    private readonly string _testUserSecretsId;
 
     public EnvironmentVariableConfigTests()
     {
         _testDirectory = new TemporaryTestDirectory();
-        _testUserSecretsId = $"TenSecondTom-Test-EnvVar-{Guid.NewGuid()}";
+
+        // Set up logger for the base fixture
+        using var loggerFactory = LoggerFactory.Create(builder =>
+            builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
+        Logger = loggerFactory.CreateLogger<UserSecretsTestFixture>();
     }
 
-    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Cleanup must not throw")]
-    public void Dispose()
+    public override async Task DisposeAsync()
     {
         _testDirectory.Dispose();
-        
-        var userSecretsPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Microsoft",
-            "UserSecrets",
-            _testUserSecretsId);
 
-        if (Directory.Exists(userSecretsPath))
-        {
-            try
-            {
-                Directory.Delete(userSecretsPath, recursive: true);
-            }
-            catch (IOException)
-            {
-                Thread.Sleep(100);
-                try
-                {
-                    Directory.Delete(userSecretsPath, recursive: true);
-                }
-                catch
-                {
-                    // Ignore cleanup errors
-                }
-            }
-            catch
-            {
-                // Ignore cleanup errors
-            }
-        }
+        // Call base cleanup for UserSecrets
+        await base.DisposeAsync();
     }
 
     [Fact]
@@ -87,7 +64,7 @@ public sealed class EnvironmentVariableConfigTests : IDisposable
 
         // Act - Build configuration with environment variable override
         // Simulate loading from user secrets file, then override with environment variable
-        var userSecretsPath = SecretsHelper.GetUserSecretsPath(_testUserSecretsId);
+        var userSecretsPath = SecretsHelper.GetUserSecretsPath(TestUserSecretsId);
         
         var configWithEnvOverride = new ConfigurationBuilder()
             .AddJsonFile(userSecretsPath, optional: true)
@@ -265,21 +242,21 @@ public sealed class EnvironmentVariableConfigTests : IDisposable
     private ServiceProvider BuildTestServiceProvider()
     {
         var services = new ServiceCollection();
-        
-        // Configure with test user secrets ID
-        var userSecretsPath = SecretsHelper.GetUserSecretsPath(_testUserSecretsId);
+
+        // Configure with test user secrets ID from base fixture
+        var userSecretsPath = SecretsHelper.GetUserSecretsPath(TestUserSecretsId);
         var configuration = new ConfigurationBuilder()
             .AddJsonFile(userSecretsPath, optional: true)
             .Build();
 
         services.AddSingleton<IConfiguration>(configuration);
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
-        
+
         // Register storage service with test configuration
         services.AddSingleton<IConfigurationStorageService>(sp =>
         {
             var logger = sp.GetRequiredService<ILogger<UserSecretsStorageService>>();
-            return new UserSecretsStorageService(logger, _testUserSecretsId);
+            return new UserSecretsStorageService(logger, TestUserSecretsId);
         });
 
         return services.BuildServiceProvider();
