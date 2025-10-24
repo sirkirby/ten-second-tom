@@ -274,7 +274,7 @@ public sealed class EmbeddedPromptTemplateLoader : IPromptTemplateLoader
     /// <param name="templateId">The template ID to analyze.</param>
     /// <returns>
     /// The template type: Daily for "daily-summary", Weekly for "weekly-review",
-    /// or SystemPrompt for all other templates.
+    /// BusinessMeeting for "business-meeting", or SystemPrompt for all other templates.
     /// </returns>
     private static TemplateType DetermineTemplateType(string templateId)
     {
@@ -284,6 +284,7 @@ public sealed class EmbeddedPromptTemplateLoader : IPromptTemplateLoader
         {
             "daily-summary" => TemplateType.Daily,
             "weekly-review" => TemplateType.Weekly,
+            "business-meeting" => TemplateType.BusinessMeeting,
             _ => TemplateType.SystemPrompt
         };
     }

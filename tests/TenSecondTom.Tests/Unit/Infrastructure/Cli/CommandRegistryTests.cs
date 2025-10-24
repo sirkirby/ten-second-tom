@@ -2,6 +2,7 @@ using System.CommandLine;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using TenSecondTom.Features.Auth;
+using TenSecondTom.Features.Generate;
 using TenSecondTom.Features.Search;
 using TenSecondTom.Features.Setup;
 using TenSecondTom.Features.Shell;
@@ -37,6 +38,7 @@ public sealed class CommandRegistryTests : IDisposable
         services.AddTemplatesFeature();
         services.AddSetupFeature();
         services.AddShellFeature();
+        services.AddGenerateFeature();
         
         _serviceProvider = services.BuildServiceProvider();
     }
@@ -53,6 +55,7 @@ public sealed class CommandRegistryTests : IDisposable
         subcommandNames.Should().Contain("today", "today command should be registered");
         subcommandNames.Should().Contain("thisweek", "thisweek command should be registered");
         subcommandNames.Should().Contain("search", "search command should be registered");
+        subcommandNames.Should().Contain("generate", "generate command should be registered");
         subcommandNames.Should().Contain("login", "login command should be registered");
         subcommandNames.Should().Contain("logout", "logout command should be registered");
         subcommandNames.Should().Contain("setup", "setup command should be registered");
@@ -63,14 +66,14 @@ public sealed class CommandRegistryTests : IDisposable
     }
 
     [Fact]
-    public void BuildRootCommand_ShouldHaveExactlyElevenCommands()
+    public void BuildRootCommand_ShouldHaveExactlyTwelveCommands()
     {
         // Arrange & Act
         var rootCommand = CommandRegistry.BuildRootCommand(_serviceProvider);
 
         // Assert
-        rootCommand.Subcommands.Should().HaveCount(11, 
-            "root command should have exactly 11 subcommands: today, thisweek, search, record, login, logout, setup, config, shell, help, version");
+        rootCommand.Subcommands.Should().HaveCount(12,
+            "root command should have exactly 12 subcommands: today, thisweek, search, record, generate, login, logout, setup, config, shell, help, version");
     }
 
     [Fact]

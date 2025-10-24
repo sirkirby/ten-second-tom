@@ -33,6 +33,11 @@ public static class CommandNames
     public const string Logout = "logout";
 
     /// <summary>
+    /// Command name for generating output from recordings using LLM templates.
+    /// </summary>
+    public const string Generate = "generate";
+
+    /// <summary>
     /// Gets all valid command names.
     /// </summary>
     public static IReadOnlyList<string> All { get; } =
@@ -41,6 +46,7 @@ public static class CommandNames
         ThisWeek,
         Search,
         Login,
-        Logout
+        Logout,
+        Generate
     ];
 }

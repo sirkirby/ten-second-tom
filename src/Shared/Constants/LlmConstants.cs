@@ -82,4 +82,78 @@ internal static class LlmConstants
         internal const string ClaudeOpus4 = "Very high intelligence and capability for specialized tasks";
         internal const string Claude3Haiku = "Quick and accurate targeted performance at lowest cost";
     }
+
+    /// <summary>
+    /// Default maximum input tokens for OpenAI models (safe limit for 128K context).
+    /// GPT-4o and GPT-4o Mini both support 128K context windows.
+    /// </summary>
+    public const int DefaultMaxInputTokensOpenAI = 50_000;
+
+    /// <summary>
+    /// Default maximum input tokens for Anthropic models (safe limit for 200K context).
+    /// Claude 3/3.5/4 Haiku, Sonnet, and Opus support 200K standard context windows.
+    /// Note: Sonnet 4 can use up to 1M tokens via API at higher cost.
+    /// </summary>
+    public const int DefaultMaxInputTokensAnthropic = 80_000;
+
+    /// <summary>
+    /// Token estimation multiplier (conservative).
+    /// Estimated tokens = words * TokensPerWord
+    /// Based on typical English text tokenization.
+    /// </summary>
+    public const double TokensPerWord = 1.3;
+
+    /// <summary>
+    /// Truncation safety factor (keep input at 80% of limit).
+    /// Provides buffer for template content and prompt formatting.
+    /// </summary>
+    public const double TruncationSafetyFactor = 0.8;
+
+    /// <summary>
+    /// Maximum transcript file size in bytes (100 MB).
+    /// Files larger than this are likely corrupted or invalid.
+    /// </summary>
+    public const long MaxTranscriptFileSizeBytes = 100 * 1024 * 1024; // 100 MB
+
+    /// <summary>
+    /// Maximum output file size in bytes (10 MB).
+    /// Outputs larger than this may indicate processing errors.
+    /// </summary>
+    public const long MaxOutputFileSizeBytes = 10 * 1024 * 1024; // 10 MB
+
+    /// <summary>
+    /// Context window sizes by model (for reference and validation).
+    /// </summary>
+    public static class ContextWindows
+    {
+        // OpenAI Models
+        public const int Gpt4oMini = 128_000;        // 128K input + output combined
+        public const int Gpt4o = 128_000;            // 128K input + output combined
+
+        // Anthropic Models (standard context)
+        public const int Claude3Haiku = 200_000;     // 200K context
+        public const int Claude35Haiku = 200_000;    // 200K context
+        public const int ClaudeSonnet4 = 200_000;    // 200K standard (1M via API)
+        public const int ClaudeSonnet45 = 200_000;   // 200K standard (1M beta)
+        public const int ClaudeOpus4 = 200_000;      // 200K context
+        public const int ClaudeOpus41 = 200_000;     // 200K context
+    }
+
+    /// <summary>
+    /// Maximum output tokens by model (for reference).
+    /// </summary>
+    public static class MaxOutputTokens
+    {
+        // OpenAI Models
+        public const int Gpt4oMini = 16_384;
+        public const int Gpt4o = 16_384;
+
+        // Anthropic Models (typical output limits)
+        public const int Claude3Haiku = 8_192;
+        public const int Claude35Haiku = 8_192;
+        public const int ClaudeSonnet4 = 8_192;      // Typical, can be higher
+        public const int ClaudeSonnet45 = 8_192;     // Typical, can be higher
+        public const int ClaudeOpus4 = 8_192;        // Typical, can be higher
+        public const int ClaudeOpus41 = 8_192;       // Typical, can be higher
+    }
 }

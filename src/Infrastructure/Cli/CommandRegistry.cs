@@ -6,6 +6,7 @@ using TenSecondTom.Features.Search.Handlers;
 using TenSecondTom.Features.Setup.Commands;
 using TenSecondTom.Features.Setup.Handlers;
 using TenSecondTom.Features.Setup.Models;
+using TenSecondTom.Features.Shell.Models;
 using TenSecondTom.Features.Shell.Services;
 using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Features.Today.Handlers;
@@ -61,6 +62,7 @@ public static class CommandRegistry
         rootCommand.Subcommands.Add(BuildThisWeekCommand(serviceProvider, jsonOutputOption));
         rootCommand.Subcommands.Add(BuildSearchCommand(serviceProvider, jsonOutputOption));
         rootCommand.Subcommands.Add(BuildRecordCommand(serviceProvider, jsonOutputOption));
+        rootCommand.Subcommands.Add(BuildGenerateCommand(serviceProvider, jsonOutputOption));
         rootCommand.Subcommands.Add(BuildLoginCommand(serviceProvider, jsonOutputOption));
         rootCommand.Subcommands.Add(BuildLogoutCommand(serviceProvider, jsonOutputOption));
         rootCommand.Subcommands.Add(BuildSetupCommand(serviceProvider, jsonOutputOption));
@@ -117,56 +119,60 @@ public static class CommandRegistry
         helpCommand.SetAction((parseResult) =>
         {
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
-            
+
             if (jsonOutput)
             {
-                // JSON output for help
-                var commands = new List<object>
-                {
-                    new { command = "today", description = "Capture today's reflection with 3-5 prompts", requiresAuth = true },
-                    new { command = "thisweek", description = "Generate a weekly review from recent daily entries", requiresAuth = true },
-                    new { command = "search", description = "Search memory entries by text query", requiresAuth = true },
-                    new { command = "record", description = "Record audio with transcription and save to library", requiresAuth = true },
-                    new { command = "login", description = "Authenticate with SSH key and create a session", requiresAuth = false },
-                    new { command = "logout", description = "Log out and invalidate the current session", requiresAuth = true },
-                    new { command = "setup", description = "Run guided setup wizard to configure Ten Second Tom", requiresAuth = false },
-                    new { command = "config", description = "View and manage configuration settings", requiresAuth = false },
-                    new { command = "help", description = "Display available commands with descriptions", requiresAuth = false },
-                    new { command = "quit", description = "Exit the shell", requiresAuth = false, aliases = QuitAliases },
-                    new { command = "version", description = "Display version information", requiresAuth = false }
-                };
-                
+                // JSON output for help - read from CommandMetadata.CommandCatalog
+                var commands = CommandMetadata.CommandCatalog
+                    .Select(cmd => new
+                    {
+                        command = cmd.Name.TrimStart('/'), // Remove leading slash for JSON
+                        description = cmd.HelpText,
+                        requiresAuth = cmd.RequiresAuthentication,
+                        aliases = cmd.Aliases?.Select(a => a.TrimStart('/')).ToArray()
+                    })
+                    .ToList();
+
                 Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { success = true, commands }));
             }
             else
             {
-                // Pretty formatted help for human readers
+                // Pretty formatted help for human readers - read from CommandMetadata.CommandCatalog
                 AnsiConsole.MarkupLine("[bold cyan]Available Commands:[/]");
                 AnsiConsole.WriteLine();
-                
+
                 var table = new Table()
                     .Border(TableBorder.Rounded)
                     .AddColumn(new TableColumn("[bold]Command[/]"))
                     .AddColumn(new TableColumn("[bold]Description[/]"))
                     .AddColumn(new TableColumn("[bold]Auth Required[/]"));
-                
-                table.AddRow("[cyan]/today[/]", "Capture today's reflection with 3-5 prompts", "[green]Yes[/]");
-                table.AddRow("[cyan]/thisweek[/]", "Generate a weekly review from recent daily entries", "[green]Yes[/]");
-                table.AddRow("[cyan]/search[/] [dim]<query>[/]", "Search memory entries by text query", "[green]Yes[/]");
-                table.AddRow("[cyan]/record[/]", "Record audio with transcription and save to library", "[green]Yes[/]");
-                table.AddRow("[cyan]/login[/]", "Authenticate with SSH key and create a session", "[red]No[/]");
-                table.AddRow("[cyan]/logout[/]", "Log out and invalidate the current session", "[green]Yes[/]");
-                table.AddRow("[cyan]/setup[/]", "Run guided setup wizard to configure Ten Second Tom", "[red]No[/]");
-                table.AddRow("[cyan]/config[/]", "View and manage configuration settings", "[red]No[/]");
-                table.AddRow("[cyan]/help[/]", "Display available commands with descriptions", "[red]No[/]");
-                table.AddRow("[cyan]/quit[/] or [cyan]/exit[/]", "Exit the shell", "[red]No[/]");
-                table.AddRow("[cyan]/version[/]", "Display version information", "[red]No[/]");
-                
+
+                foreach (var cmd in CommandMetadata.CommandCatalog)
+                {
+                    // Format command name with aliases
+                    string commandDisplay = $"[cyan]{cmd.Name}[/]";
+                    if (cmd.Aliases?.Length > 0)
+                    {
+                        commandDisplay += $" or {string.Join(" or ", cmd.Aliases.Select(a => $"[cyan]{a}[/]"))}";
+                    }
+
+                    // Add special argument hint for search command
+                    if (cmd.Name == "/search")
+                    {
+                        commandDisplay += " [dim]<query>[/]";
+                    }
+
+                    // Format auth requirement with color
+                    string authDisplay = cmd.RequiresAuthentication ? "[green]Yes[/]" : "[red]No[/]";
+
+                    table.AddRow(commandDisplay, cmd.HelpText, authDisplay);
+                }
+
                 AnsiConsole.Write(table);
                 AnsiConsole.WriteLine();
                 AnsiConsole.MarkupLine("[dim]Tip: Type partial commands (e.g., /to) to see suggestions[/]");
             }
-            
+
             return 0;
         });
 
@@ -576,6 +582,35 @@ public static class CommandRegistry
         });
 
         return recordCommand;
+    }
+
+    private static Command BuildGenerateCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
+    {
+        var generateCommand = new Command("generate", "Generate output from a recording using a prompt template");
+
+        // T041: Add --template option with -t alias for non-interactive template selection
+        var templateOption = new Option<string?>("--template", "-t")
+        {
+            Description = "Template name for non-interactive execution. Automatically selects most recent recording."
+        };
+
+        generateCommand.Options.Add(templateOption);
+        generateCommand.Options.Add(jsonOutputOption);
+
+        generateCommand.SetAction(async (parseResult) =>
+        {
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
+            string? templateName = parseResult.GetValue(templateOption);
+
+            var exitCode = await TenSecondTom.Features.Generate.GenerateCommand.ExecuteAsync(
+                serviceProvider,
+                jsonOutput,
+                templateName);
+
+            return exitCode;
+        });
+
+        return generateCommand;
     }
 
     private static Command BuildLoginCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)

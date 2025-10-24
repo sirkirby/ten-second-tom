@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using TenSecondTom.Features.Audio;
 using TenSecondTom.Features.Auth;
+using TenSecondTom.Features.Generate;
 using TenSecondTom.Features.Search;
 using TenSecondTom.Features.Setup;
 using TenSecondTom.Features.Shell;
@@ -29,7 +30,8 @@ public static class FeatureRegistrationExtensions
         services.AddSearchFeature();
 
         // Audio & Voice features
-        services.AddFeatureAudioServices();
+        services.AddAudioFeature();
+        services.AddGenerateFeature();
 
         // Authentication & Security
         services.AddAuthFeature();

@@ -17,6 +17,14 @@ public static class TemplateConstants
     public const string WeeklyReviewTemplateId = "weekly-review";
 
     /// <summary>
+    /// Template identifier for bundled business meeting template.
+    /// This is the template FILENAME ("business-meeting" from "business-meeting.md"),
+    /// not the template TYPE (TemplateType.BusinessMeeting enum value).
+    /// Template selection and output filenames use the filename, not the type.
+    /// </summary>
+    public const string BusinessMeetingTemplateId = "business-meeting";
+
+    /// <summary>
     /// Maximum file size for template files (1MB).
     /// </summary>
     public const int MaxFileSizeBytes = 1_048_576;
@@ -69,6 +77,7 @@ public static class TemplateConstants
     public static bool IsDefaultTemplate(string templateId)
     {
         return templateId.Equals(DailySummaryTemplateId, StringComparison.OrdinalIgnoreCase) ||
-               templateId.Equals(WeeklyReviewTemplateId, StringComparison.OrdinalIgnoreCase);
+               templateId.Equals(WeeklyReviewTemplateId, StringComparison.OrdinalIgnoreCase) ||
+               templateId.Equals(BusinessMeetingTemplateId, StringComparison.OrdinalIgnoreCase);
     }
 }

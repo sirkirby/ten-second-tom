@@ -29,4 +29,10 @@ public static class DirectoryNames
     /// Located at: {root}/thisweek/
     /// </summary>
     public const string ThisWeek = "thisweek";
+
+    /// <summary>
+    /// Directory name for storing audio recordings and transcripts.
+    /// Located at: {root}/recording/
+    /// </summary>
+    public const string Recording = "recording";
 }
