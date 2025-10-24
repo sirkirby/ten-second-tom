@@ -7,6 +7,7 @@ using TenSecondTom.Features.Generate.Queries;
 using TenSecondTom.Features.Templates.Queries;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Models;
 
 namespace TenSecondTom.Features.Generate;
 
@@ -131,7 +132,17 @@ public static class GenerateCommand
             }
 
             // Step 4: Template selection (interactive, automatic, or by name)
-            var templates = templatesResult.Value.Templates;
+            // Only include templates compatible with single recording processing
+            // (Daily and BusinessMeeting types use {{USER_INPUT}} and {{DATE}} placeholders)
+            var compatibleTypes = new[] { TemplateType.Daily, TemplateType.BusinessMeeting };
+            var templates = templatesResult.Value.Templates
+                .Where(t => compatibleTypes.Contains(t.TemplateType))
+                .ToList();
+            
+            if (templates.Count == 0)
+            {
+                return HandleError(jsonOutput, "No compatible templates found for generate command.");
+            }
 
             Templates.Models.TemplateListItem selectedTemplate;
 
@@ -179,7 +190,14 @@ public static class GenerateCommand
             // Step 5: Load configuration for max input tokens
             var configuration = serviceProvider.GetRequiredService<IConfiguration>();
             var maxInputTokensConfig = configuration[ConfigurationKeys.LlmMaxInputTokens];
-            int maxInputTokens = 50000; // Default fallback
+            
+            // Get provider-specific default if not configured
+            var llmProvider = configuration[ConfigurationKeys.LlmProvider];
+            int defaultMaxTokens = llmProvider?.ToUpperInvariant() == "ANTHROPIC"
+                ? LlmConstants.DefaultMaxInputTokensAnthropic
+                : LlmConstants.DefaultMaxInputTokensOpenAI;
+
+            int maxInputTokens = defaultMaxTokens;
 
             if (!string.IsNullOrWhiteSpace(maxInputTokensConfig) &&
                 int.TryParse(maxInputTokensConfig, out int parsedTokens) &&

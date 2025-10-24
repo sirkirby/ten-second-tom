@@ -240,7 +240,7 @@ public sealed class GenerateOutputCommandHandlerTests
         // Arrange
         var command = CreateTestCommand();
         var transcriptContent = "My transcript content here.";
-        var templateContent = "Process this: {{TRANSCRIPT}}";
+        var templateContent = "Process this: {{USER_INPUT}}\nDate: {{DATE}}";
         string? capturedPrompt = null;
 
         SetupSuccessfulGeneration(
@@ -272,7 +272,9 @@ public sealed class GenerateOutputCommandHandlerTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         capturedPrompt.Should().Contain("Processed transcript content"); // From TranscriptProcessor
-        capturedPrompt.Should().NotContain("{{TRANSCRIPT}}");
+        capturedPrompt.Should().NotContain("{{USER_INPUT}}");
+        capturedPrompt.Should().NotContain("{{DATE}}");
+        capturedPrompt.Should().Contain("October 21, 2025"); // Parsed from test recording base name "10-21-2025_1"
     }
 
     #endregion

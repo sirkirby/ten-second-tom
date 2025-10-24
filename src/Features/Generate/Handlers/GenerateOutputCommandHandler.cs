@@ -121,8 +121,14 @@ public sealed class GenerateOutputCommandHandler
                 processed.FinalWordCount);
         }
 
-        // 6. Build prompt by substituting template variables
-        var prompt = template.Content.Replace("{{TRANSCRIPT}}", processed.Content);
+        // 6. Build prompt by substituting standard template variables
+        // Parse date from recording base name (format: M-D-Y_Increment)
+        DateTimeOffset recordingDate = ParseRecordingDate(request.RecordingBaseName);
+        string dateString = recordingDate.ToString("MMMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        
+        var prompt = template.Content
+            .Replace("{{USER_INPUT}}", processed.Content)
+            .Replace("{{DATE}}", dateString);
 
         // 7. Call LLM provider with comprehensive error handling
         Result<Infrastructure.Llm.LlmResponse> llmResult;
@@ -253,5 +259,29 @@ public sealed class GenerateOutputCommandHandler
             output.WasTruncated);
 
         return Result<GeneratedOutput>.Success(output);
+    }
+
+    /// <summary>
+    /// Parses the recording date from the base name format: M-D-Y_Increment (e.g., "10-22-2025_1").
+    /// </summary>
+    /// <param name="recordingBaseName">The recording base name.</param>
+    /// <returns>The parsed date as DateTimeOffset.</returns>
+    private static DateTimeOffset ParseRecordingDate(string recordingBaseName)
+    {
+        // Format: M-D-Y_Increment (e.g., "10-22-2025_1")
+        // Extract the date part before the underscore
+        var datepart = recordingBaseName.Split('_')[0];
+        var parts = datepart.Split('-');
+        
+        if (parts.Length == 3 &&
+            int.TryParse(parts[0], out int month) &&
+            int.TryParse(parts[1], out int day) &&
+            int.TryParse(parts[2], out int year))
+        {
+            return new DateTimeOffset(year, month, day, 0, 0, 0, TimeSpan.Zero);
+        }
+
+        // Fallback to current date if parsing fails
+        return DateTimeOffset.UtcNow;
     }
 }

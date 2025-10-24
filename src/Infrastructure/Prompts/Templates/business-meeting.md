@@ -10,9 +10,9 @@ author: Ten Second Tom
 
 You are an AI assistant helping to create a structured summary from a multi-speaker business meeting transcript.
 
-## Transcript
+## User Input
 
-{{TRANSCRIPT}}
+{{USER_INPUT}}
 
 ## Task
 

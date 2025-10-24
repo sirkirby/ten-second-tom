@@ -84,15 +84,17 @@ internal static class LlmConstants
     }
 
     /// <summary>
-    /// Default maximum input tokens for OpenAI models (safe limit for 128K context).
-    /// GPT-4o and GPT-4o Mini both support 128K context windows.
+    /// Default maximum input tokens for OpenAI models.
+    /// All current OpenAI models (GPT-4o, GPT-4o-mini, o1 series) support 128K context windows.
+    /// This limit is set to 50K to leave buffer for output tokens and system prompts.
     /// </summary>
     public const int DefaultMaxInputTokensOpenAI = 50_000;
 
     /// <summary>
-    /// Default maximum input tokens for Anthropic models (safe limit for 200K context).
-    /// Claude 3/3.5/4 Haiku, Sonnet, and Opus support 200K standard context windows.
-    /// Note: Sonnet 4 can use up to 1M tokens via API at higher cost.
+    /// Default maximum input tokens for Anthropic models.
+    /// All Anthropic models (Haiku, Sonnet, Opus across 3.x and 4.x series) support 200K context windows.
+    /// This limit is set to 80K to leave buffer for output tokens and system prompts.
+    /// Note: Some models like Sonnet 4.0 can use extended context (1M tokens) via API at higher cost.
     /// </summary>
     public const int DefaultMaxInputTokensAnthropic = 80_000;
 
@@ -122,38 +124,53 @@ internal static class LlmConstants
     public const long MaxOutputFileSizeBytes = 10 * 1024 * 1024; // 10 MB
 
     /// <summary>
-    /// Context window sizes by model (for reference and validation).
+    /// Context window sizes by provider and model class.
+    /// These represent the maximum total tokens (input + output) supported by each model class.
     /// </summary>
     public static class ContextWindows
     {
-        // OpenAI Models
-        public const int Gpt4oMini = 128_000;        // 128K input + output combined
-        public const int Gpt4o = 128_000;            // 128K input + output combined
+        /// <summary>
+        /// OpenAI models context window (all classes: standard, mini, thinking).
+        /// Applies to: GPT-4o, GPT-4o-mini, o1-preview, o1-mini.
+        /// </summary>
+        public const int OpenAI = 128_000;
 
-        // Anthropic Models (standard context)
-        public const int Claude3Haiku = 200_000;     // 200K context
-        public const int Claude35Haiku = 200_000;    // 200K context
-        public const int ClaudeSonnet4 = 200_000;    // 200K standard (1M via API)
-        public const int ClaudeSonnet45 = 200_000;   // 200K standard (1M beta)
-        public const int ClaudeOpus4 = 200_000;      // 200K context
-        public const int ClaudeOpus41 = 200_000;     // 200K context
+        /// <summary>
+        /// Anthropic Haiku models context window.
+        /// Applies to: Claude 3 Haiku, Claude 3.5 Haiku.
+        /// </summary>
+        public const int AnthropicHaiku = 200_000;
+
+        /// <summary>
+        /// Anthropic Sonnet models context window (standard).
+        /// Applies to: Claude 3.5 Sonnet, Claude 4.0 Sonnet, Claude 4.5 Sonnet.
+        /// Note: Can be extended to 1M tokens via API for some models.
+        /// </summary>
+        public const int AnthropicSonnet = 200_000;
+
+        /// <summary>
+        /// Anthropic Opus models context window.
+        /// Applies to: Claude 3 Opus, Claude 4.0 Opus, Claude 4.1 Opus.
+        /// </summary>
+        public const int AnthropicOpus = 200_000;
     }
 
     /// <summary>
-    /// Maximum output tokens by model (for reference).
+    /// Maximum output tokens by provider and model class.
+    /// These represent typical output limits for each model class.
     /// </summary>
     public static class MaxOutputTokens
     {
-        // OpenAI Models
-        public const int Gpt4oMini = 16_384;
-        public const int Gpt4o = 16_384;
+        /// <summary>
+        /// OpenAI models maximum output tokens (all classes).
+        /// Applies to: GPT-4o, GPT-4o-mini, o1-preview, o1-mini.
+        /// </summary>
+        public const int OpenAI = 16_384;
 
-        // Anthropic Models (typical output limits)
-        public const int Claude3Haiku = 8_192;
-        public const int Claude35Haiku = 8_192;
-        public const int ClaudeSonnet4 = 8_192;      // Typical, can be higher
-        public const int ClaudeSonnet45 = 8_192;     // Typical, can be higher
-        public const int ClaudeOpus4 = 8_192;        // Typical, can be higher
-        public const int ClaudeOpus41 = 8_192;       // Typical, can be higher
+        /// <summary>
+        /// Anthropic models maximum output tokens (all classes).
+        /// Applies to: All Haiku, Sonnet, and Opus models.
+        /// </summary>
+        public const int Anthropic = 8_192;
     }
 }
