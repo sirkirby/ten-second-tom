@@ -46,31 +46,34 @@ Analyze the meeting transcript and extract key information. Focus on actionable 
 
 ## Expected Output Format
 
-Your response must use exactly this markdown structure:
+Format your response using this structure:
 
-```markdown
 ## Meeting Topics
+
 - [First topic or agenda item]
 - [Second topic]
 - [Additional topics as needed]
 
 ## Key Decisions
+
 - [Decision with brief context and decision maker if known]
 - [Another decision]
 
 ## Action Items
+
 - [ ] [Task description] (Responsible party if identifiable)
 - [ ] [Another task] (Due date if mentioned: YYYY-MM-DD)
 
 ## Discussion Points
+
 - [Important point raised, concern, or insight]
 - [Another discussion point]
 - [Additional points as needed]
 
 ## Participants
+
 - [Person name or role - context about their participation if significant]
 - [Another participant]
-```
 
 ### Style Guidelines
 

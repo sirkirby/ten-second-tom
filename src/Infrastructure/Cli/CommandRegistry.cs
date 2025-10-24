@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
@@ -409,7 +410,23 @@ public static class CommandRegistry
                 return;
             }
 
-            SearchCommandHandler.ExecuteAsync(handler, authService, query, fromDate, toDate, jsonOutput)
+            var configuration = serviceProvider.GetService<IConfiguration>();
+            if (configuration is null)
+            {
+                if (jsonOutput)
+                {
+                    Console.WriteLine(JsonOutputFormatter.FormatFailure("search",
+                        "Configuration service not registered - cannot resolve file paths.",
+                        DateTimeOffset.UtcNow));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine("[red]Configuration unavailable:[/] service not registered.");
+                }
+                return;
+            }
+
+            SearchCommandHandler.ExecuteAsync(handler, authService, configuration, query, fromDate, toDate, jsonOutput)
                 .GetAwaiter().GetResult();
             Environment.ExitCode = 0; // success
         });

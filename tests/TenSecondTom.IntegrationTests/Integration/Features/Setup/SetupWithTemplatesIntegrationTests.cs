@@ -52,16 +52,18 @@ public sealed class SetupWithTemplatesIntegrationTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeNull();
-        result.Value.TemplatesInstalled.Should().Be(3);
+        result.Value.TemplatesInstalled.Should().Be(4);
         result.Value.TemplatesSkipped.Should().Be(0);
         result.Value.TemplatesFailed.Should().Be(0);
         result.Value.InstalledTemplateIds.Should().Contain("daily-summary");
+        result.Value.InstalledTemplateIds.Should().Contain("daily-standup");
         result.Value.InstalledTemplateIds.Should().Contain("weekly-review");
         result.Value.InstalledTemplateIds.Should().Contain("business-meeting");
 
         // Verify files were created
         _fileSystem.Directory.Exists(_testDirectory).Should().BeTrue();
         _fileSystem.File.Exists(_fileSystem.Path.Combine(_testDirectory, "daily-summary.md")).Should().BeTrue();
+        _fileSystem.File.Exists(_fileSystem.Path.Combine(_testDirectory, "daily-standup.md")).Should().BeTrue();
         _fileSystem.File.Exists(_fileSystem.Path.Combine(_testDirectory, "weekly-review.md")).Should().BeTrue();
         _fileSystem.File.Exists(_fileSystem.Path.Combine(_testDirectory, "business-meeting.md")).Should().BeTrue();
 
@@ -101,7 +103,7 @@ public sealed class SetupWithTemplatesIntegrationTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Value.TemplatesInstalled.Should().Be(0);
-        result.Value.TemplatesSkipped.Should().Be(3);
+        result.Value.TemplatesSkipped.Should().Be(4);
         result.Value.TemplatesFailed.Should().Be(0);
     }
 
@@ -131,7 +133,7 @@ public sealed class SetupWithTemplatesIntegrationTests
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.TemplatesInstalled.Should().Be(3);
+        result.Value.TemplatesInstalled.Should().Be(4);
         result.Value.TemplatesSkipped.Should().Be(0);
 
         // Verify content was replaced
@@ -155,7 +157,7 @@ public sealed class SetupWithTemplatesIntegrationTests
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().HaveCount(3);
+        result.Value.Should().HaveCount(4);
 
         var dailyTemplate = result.Value.First(t => t.TemplateId == "daily-summary");
         dailyTemplate.Metadata.Should().NotBeNull();

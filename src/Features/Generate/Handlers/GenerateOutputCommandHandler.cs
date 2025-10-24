@@ -7,6 +7,7 @@ using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Contracts;
+using TenSecondTom.Shared.Extensions;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Generate.Handlers;
@@ -201,10 +202,13 @@ public sealed class GenerateOutputCommandHandler
 
         var llmResponse = llmResult.Value;
 
-        // 8. Build GeneratedOutput
+        // 8. Strip markdown code block wrappers if present (defensive measure)
+        string cleanedContent = llmResponse.Content.StripMarkdownCodeBlock();
+
+        // 9. Build GeneratedOutput
         var output = new GeneratedOutput
         {
-            Content = llmResponse.Content,
+            Content = cleanedContent,
             RecordingBaseName = request.RecordingBaseName,
             TemplateId = template.TemplateId,
             TemplateTitle = template.Metadata?.Title ?? template.TemplateId,
@@ -217,7 +221,7 @@ public sealed class GenerateOutputCommandHandler
             OriginalWordCount = processed.OriginalWordCount
         };
 
-        // 9. Save output to filesystem
+        // 10. Save output to filesystem
         var saveResult = await _outputStorageService.SaveOutputAsync(
             output,
             cancellationToken);
@@ -229,7 +233,7 @@ public sealed class GenerateOutputCommandHandler
 
         output = output with { OutputFilePath = saveResult.Value };
 
-        // 10. Log completion with performance and audit trail
+        // 11. Log completion with performance and audit trail
         var duration = DateTimeOffset.UtcNow - startTime;
 
         _logger.LogInformation(

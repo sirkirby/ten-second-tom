@@ -102,13 +102,15 @@ public sealed class TemplateMigrationService
         // Check if required templates exist
         bool dailySummaryExists = directoryExists &&
             _fileSystem.File.Exists(_fileSystem.Path.Combine(templatesDirectory, "daily-summary.md"));
+        bool dailyStandupExists = directoryExists &&
+            _fileSystem.File.Exists(_fileSystem.Path.Combine(templatesDirectory, "daily-standup.md"));
         bool weeklyReviewExists = directoryExists &&
             _fileSystem.File.Exists(_fileSystem.Path.Combine(templatesDirectory, "weekly-review.md"));
         bool businessMeetingExists = directoryExists &&
             _fileSystem.File.Exists(_fileSystem.Path.Combine(templatesDirectory, "business-meeting.md"));
 
         // If all required templates exist, no migration needed
-        if (dailySummaryExists && weeklyReviewExists && businessMeetingExists)
+        if (dailySummaryExists && dailyStandupExists && weeklyReviewExists && businessMeetingExists)
         {
             _logger.LogDebug("Templates already configured, no migration needed");
             return Result<bool>.Success(false);
@@ -124,8 +126,9 @@ public sealed class TemplateMigrationService
         else
         {
             _logger.LogInformation(
-                "Default templates missing (DailySummary={DailySummary}, WeeklyReview={WeeklyReview}, BusinessMeeting={BusinessMeeting}), installing",
+                "Default templates missing (DailySummary={DailySummary}, DailyStandup={DailyStandup}, WeeklyReview={WeeklyReview}, BusinessMeeting={BusinessMeeting}), installing",
                 dailySummaryExists,
+                dailyStandupExists,
                 weeklyReviewExists,
                 businessMeetingExists);
         }

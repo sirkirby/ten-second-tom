@@ -22,7 +22,6 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
     private readonly string _baseDirectory;
     private readonly ILogger<FileSystemStorageProvider> _logger;
     private readonly MarkdownPipeline _markdownPipeline;
-    private readonly ISerializer _yamlSerializer;
     private readonly IDeserializer _yamlDeserializer;
 
     /// <summary>
@@ -46,10 +45,6 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
 
         _markdownPipeline = new MarkdownPipelineBuilder()
             .UseYamlFrontMatter()
-            .Build();
-
-        _yamlSerializer = new SerializerBuilder()
-            .WithNamingConvention(HyphenatedNamingConvention.Instance)
             .Build();
 
         _yamlDeserializer = new DeserializerBuilder()
@@ -374,42 +369,30 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
     /// <summary>
     /// Generates markdown content with YAML frontmatter for a memory entry.
     /// </summary>
-    private string GenerateMarkdownContent(MemoryEntry entry)
+    private static string GenerateMarkdownContent(MemoryEntry entry)
     {
-        var sb = new StringBuilder();
-
-        // YAML frontmatter
-        sb.AppendLine("---");
-        
         var frontmatter = new Dictionary<string, object>
         {
             ["entry-id"] = entry.EntryId,
             ["command"] = entry.Command,
-            ["timestamp"] = entry.Timestamp.ToString("o", CultureInfo.InvariantCulture),
+            ["timestamp"] = MarkdownFormatter.FormatTimestamp(entry.Timestamp),
             ["entry-number"] = entry.EntryNumber,
             ["llm-provider"] = entry.Metadata.LlmProvider,
             ["llm-model"] = entry.Metadata.LlmModel,
             ["tokens-used"] = entry.Metadata.TokensUsed,
-            ["processing-duration"] = entry.Metadata.ProcessingDuration.TotalSeconds
+            ["processing-duration"] = MarkdownFormatter.FormatDuration(entry.Metadata.ProcessingDuration)
         };
 
-        string yaml = _yamlSerializer.Serialize(frontmatter);
-        sb.Append(yaml);
-        sb.AppendLine("---");
-        sb.AppendLine();
+        var contentBody = new StringBuilder();
+        contentBody.AppendLine("## User Input");
+        contentBody.AppendLine();
+        contentBody.AppendLine(entry.UserInput);
+        contentBody.AppendLine();
+        contentBody.AppendLine("## Summary");
+        contentBody.AppendLine();
+        contentBody.Append(entry.LlmResponse);
 
-        // User input section
-        sb.AppendLine("## User Input");
-        sb.AppendLine();
-        sb.AppendLine(entry.UserInput);
-        sb.AppendLine();
-
-        // LLM response section
-        sb.AppendLine("## Summary");
-        sb.AppendLine();
-        sb.AppendLine(entry.LlmResponse);
-
-        return sb.ToString();
+        return MarkdownFormatter.FormatWithYamlFrontMatter(frontmatter, contentBody.ToString());
     }
 
     /// <summary>
@@ -437,11 +420,9 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
 
             var frontmatter = _yamlDeserializer.Deserialize<Dictionary<string, object>>(yamlContent);
 
-            // Extract content sections
-            string userInput = ExtractSection(content, "## User Input", "## Summary");
-            string llmResponse = ExtractSection(content, "## Summary", null);
+            string command = frontmatter.GetValueOrDefault("command")?.ToString() ?? CommandNames.Today;
 
-            // Build MemoryEntry
+            // Build metadata
             var metadata = new MemoryEntryMetadata
             {
                 LlmProvider = frontmatter.GetValueOrDefault("llm-provider")?.ToString() ?? "Unknown",
@@ -450,7 +431,29 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
                 ProcessingDuration = TimeSpan.FromSeconds(Convert.ToDouble(frontmatter.GetValueOrDefault("processing-duration") ?? 0, CultureInfo.InvariantCulture))
             };
 
-            string command = frontmatter.GetValueOrDefault("command")?.ToString() ?? CommandNames.Today;
+            // Handle different command types
+            if (command == CommandNames.Generate)
+            {
+                // For generate entries, the entire content after YAML is the generated output
+                string generatedContent = ExtractContentAfterYaml(content, yamlBlock);
+                string relativePath = Path.GetRelativePath(_baseDirectory, filePath);
+
+                return new MemoryEntry
+                {
+                    EntryId = frontmatter.GetValueOrDefault("entry-id")?.ToString() ?? string.Empty,
+                    Command = command,
+                    Timestamp = DateTimeOffset.Parse(frontmatter.GetValueOrDefault("timestamp")?.ToString() ?? DateTimeOffset.UtcNow.ToString("o", CultureInfo.InvariantCulture), CultureInfo.InvariantCulture),
+                    EntryNumber = Convert.ToInt32(frontmatter.GetValueOrDefault("entry-number") ?? 0, CultureInfo.InvariantCulture),
+                    UserInput = frontmatter.GetValueOrDefault("recording")?.ToString() ?? string.Empty, // Store recording name in UserInput for search
+                    LlmResponse = generatedContent.Trim(),
+                    Metadata = metadata,
+                    FilePath = relativePath
+                };
+            }
+
+            // Extract content sections for daily/weekly entries
+            string userInput = ExtractSection(content, "## User Input", "## Summary");
+            string llmResponse = ExtractSection(content, "## Summary", null);
 
             if (command == CommandNames.Today)
             {
@@ -502,6 +505,24 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
             _logger.LogError(ex, "Failed to parse markdown file: {FilePath}", filePath);
             return null;
         }
+    }
+
+    /// <summary>
+    /// Extracts all content that comes after the YAML frontmatter block.
+    /// </summary>
+    private static string ExtractContentAfterYaml(string content, YamlFrontMatterBlock yamlBlock)
+    {
+        // Find the end of the YAML block (after the closing ---)
+        int yamlEnd = yamlBlock.Span.End;
+        
+        // Skip to the next line after the closing ---
+        int contentStart = content.IndexOf('\n', yamlEnd);
+        if (contentStart == -1)
+        {
+            return string.Empty;
+        }
+        
+        return content.Substring(contentStart + 1);
     }
 
     /// <summary>

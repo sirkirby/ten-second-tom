@@ -10,6 +10,7 @@ using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Contracts;
+using TenSecondTom.Shared.Extensions;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 
@@ -228,10 +229,13 @@ public sealed class CreateVoiceNoteEntryHandler : IRequestHandler<CreateVoiceNot
             return Result<VoiceNoteEntry>.Failure($"LLM provider error: {llmResult.Error}. Voice transcription preserved.");
         }
 
-        // 9. Parse LLM response into DailySummary
-        DailySummary summary = ParseDailySummary(llmResult.Value.Content);
+        // 9. Strip markdown code block wrappers if present (defensive measure)
+        string cleanedResponse = llmResult.Value.Content.StripMarkdownCodeBlock();
 
-        // 10. Create VoiceNoteEntry with voice-specific metadata
+        // 10. Parse LLM response into DailySummary
+        DailySummary summary = ParseDailySummary(cleanedResponse);
+
+        // 11. Create VoiceNoteEntry with voice-specific metadata
         var entry = new VoiceNoteEntry
         {
             // Voice-specific properties
@@ -247,7 +251,7 @@ public sealed class CreateVoiceNoteEntryHandler : IRequestHandler<CreateVoiceNot
             Timestamp = DateTimeOffset.UtcNow,
             EntryNumber = entryNumber,
             UserInput = userInput,
-            LlmResponse = llmResult.Value.Content,
+            LlmResponse = cleanedResponse,
             Metadata = new MemoryEntryMetadata
             {
                 LlmProvider = llmProvider.ProviderName,
@@ -269,7 +273,7 @@ public sealed class CreateVoiceNoteEntryHandler : IRequestHandler<CreateVoiceNot
             Summary = summary
         };
 
-        // 11. Save to storage
+        // 12. Save to storage
         Result<MemoryEntry> saveResult = await _storage.SaveAsync(entry, cancellationToken).ConfigureAwait(false);
         if (!saveResult.IsSuccess)
         {

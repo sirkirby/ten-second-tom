@@ -71,10 +71,10 @@ public sealed class TemplateMigrationServiceTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<InstallDefaultTemplatesResult>.Success(new InstallDefaultTemplatesResult
             {
-                TemplatesInstalled = 2,
+                TemplatesInstalled = 4,
                 TemplatesSkipped = 0,
                 TemplatesFailed = 0,
-                InstalledTemplateIds = ["daily-summary", "weekly-review"]
+                InstalledTemplateIds = ["daily-summary", "daily-standup", "weekly-review", "business-meeting"]
             }));
 
         // Act

@@ -1,7 +1,9 @@
+using Microsoft.Extensions.Configuration;
 using Spectre.Console;
 using TenSecondTom.Features.Search.Handlers;
 using TenSecondTom.Features.Search.Queries;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.OutputFormatters;
 using TenSecondTom.Shared.Constants;
 
@@ -18,6 +20,7 @@ public static class SearchCommandHandler
     /// </summary>
     /// <param name="handler">The search query handler.</param>
     /// <param name="authService">The authentication service.</param>
+    /// <param name="configuration">Application configuration for accessing memory directory.</param>
     /// <param name="query">The search query text.</param>
     /// <param name="fromDate">Optional start date filter.</param>
     /// <param name="toDate">Optional end date filter.</param>
@@ -26,6 +29,7 @@ public static class SearchCommandHandler
     public static async Task ExecuteAsync(
         SearchMemoriesQueryHandler handler,
         IAuthenticationService authService,
+        IConfiguration configuration,
         string query,
         DateTime? fromDate = null,
         DateTime? toDate = null,
@@ -124,28 +128,49 @@ public static class SearchCommandHandler
 
                 AnsiConsole.MarkupLine($"[green]Found {result.Value.Count} result(s)[/]\n");
 
+                // Get memory directory for absolute path display
+                string memoryDirectory = configuration.GetMemoryDirectory(expandHomeDirectory: true);
+
                 // Sort by date (newest first) and display each result
                 var sortedResults = result.Value.OrderByDescending(e => e.Timestamp).ToList();
                 
                 for (int i = 0; i < sortedResults.Count; i++)
                 {
                     var entry = sortedResults[i];
-                    var entryType = entry.Command == "today" ? "Daily Entry" : "Weekly Review";
-                    var dateText = entry.Command == "today" 
-                        ? entry.Timestamp.ToString("MMM d, yyyy", System.Globalization.CultureInfo.CurrentCulture)
-                        : $"Week of {entry.Timestamp.ToString("MMM d, yyyy", System.Globalization.CultureInfo.CurrentCulture)}";
+                    var entryType = entry.Command switch
+                    {
+                        CommandNames.Today => "Daily Entry",
+                        CommandNames.ThisWeek => "Weekly Review",
+                        CommandNames.Generate => "Generated Output",
+                        _ => entry.Command
+                    };
+                    
+                    var dateText = entry.Command switch
+                    {
+                        CommandNames.Today => entry.Timestamp.ToString("MMM d, yyyy", System.Globalization.CultureInfo.CurrentCulture),
+                        CommandNames.ThisWeek => $"Week of {entry.Timestamp.ToString("MMM d, yyyy", System.Globalization.CultureInfo.CurrentCulture)}",
+                        CommandNames.Generate => entry.Timestamp.ToString("MMM d, yyyy", System.Globalization.CultureInfo.CurrentCulture),
+                        _ => entry.Timestamp.ToString("MMM d, yyyy", System.Globalization.CultureInfo.CurrentCulture)
+                    };
 
-                    // Create excerpt from user input (first 80 characters)
-                    var excerpt = entry.UserInput.Length > 80 
-                        ? Markup.Escape(entry.UserInput.Substring(0, 77)) + "..."
-                        : Markup.Escape(entry.UserInput);
+                    // Create excerpt from user input or LLM response (first 80 characters)
+                    var contentToExcerpt = !string.IsNullOrWhiteSpace(entry.UserInput) 
+                        ? entry.UserInput 
+                        : entry.LlmResponse ?? string.Empty;
+                    
+                    var excerpt = contentToExcerpt.Length > 80 
+                        ? Markup.Escape(contentToExcerpt.Substring(0, 77)) + "..."
+                        : Markup.Escape(contentToExcerpt);
+
+                    // Build full absolute path for display
+                    string fullPath = Path.Combine(memoryDirectory, entry.FilePath);
 
                     var panel = new Panel($"""
                         [bold]{entryType}[/] | [grey]{dateText}[/] | Entry #{entry.EntryNumber}
                         
                         {excerpt}
                         
-                        [grey]→ {Markup.Escape(entry.FilePath)}[/]
+                        [grey]→ {Markup.Escape(fullPath)}[/]
                         """)
                         .Border(BoxBorder.Rounded)
                         .BorderColor(Color.Grey)
