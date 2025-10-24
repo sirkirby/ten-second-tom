@@ -123,17 +123,17 @@ public sealed class ConfigurationTests
             .Build();
 
         // Act
-        string? maxTokens = configuration["TenSecondTom:Llm:MaxTokens"];
+        string? maxInputTokens = configuration["TenSecondTom:Llm:MaxInputTokens"];
         string? provider = configuration["TenSecondTom:Llm:Provider"];
 
         // Assert
         provider.Should().NotBeNullOrEmpty("LLM provider should be configured");
-        maxTokens.Should().NotBeNullOrEmpty("LLM max tokens should be configured");
+        maxInputTokens.Should().NotBeNullOrEmpty("LLM max input tokens should be configured");
         
-        // Validate max tokens is a valid integer
-        bool isValidInt = int.TryParse(maxTokens, out int tokens);
-        isValidInt.Should().BeTrue("max tokens should be a valid integer");
-        tokens.Should().BeGreaterThan(0, "max tokens should be positive");
+        // Validate max input tokens is a valid integer
+        bool isValidInt = int.TryParse(maxInputTokens, out int tokens);
+        isValidInt.Should().BeTrue("max input tokens should be a valid integer");
+        tokens.Should().BeGreaterThan(0, "max input tokens should be positive");
     }
 
     [Fact]

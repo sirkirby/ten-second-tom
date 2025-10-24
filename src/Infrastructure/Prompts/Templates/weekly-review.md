@@ -54,33 +54,36 @@ Analyze the daily entries and create a structured weekly review that identifies 
 
 ## Expected Output Format
 
-Your response must use exactly this markdown structure:
+Format your response using this structure:
 
-```markdown
 ## Top 3 Accomplishments
+
 1. [First accomplishment with context about why it matters - 2-3 sentences]
 2. [Second accomplishment with context - 2-3 sentences]
 3. [Third accomplishment with context - 2-3 sentences]
 
 ## Top 3 Challenges
+
 1. [First challenge with context and impact - 2-3 sentences]
 2. [Second challenge with context - 2-3 sentences]
 3. [Third challenge with context - 2-3 sentences]
 
 ## Recurring Themes
+
 - [Theme that appeared multiple times throughout the week]
 - [Another recurring theme]
 - [Additional theme if applicable]
 
 ## Interaction Patterns
+
 - [Pattern observed in collaborations or communications]
 - [Another interaction pattern]
 
 ## Next Week Suggestions
+
 - [Specific, actionable suggestion based on the week's patterns]
 - [Another suggestion]
 - [Additional suggestion]
-```
 
 ### Style Guidelines
 

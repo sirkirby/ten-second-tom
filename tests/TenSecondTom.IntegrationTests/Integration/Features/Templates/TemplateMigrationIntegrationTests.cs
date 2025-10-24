@@ -65,14 +65,22 @@ public sealed class TemplateMigrationIntegrationTests : IDisposable
         // Assert
         Directory.Exists(templatesDirectory).Should().BeTrue();
         File.Exists(Path.Combine(templatesDirectory, "daily-summary.md")).Should().BeTrue();
+        File.Exists(Path.Combine(templatesDirectory, "daily-standup.md")).Should().BeTrue();
         File.Exists(Path.Combine(templatesDirectory, "weekly-review.md")).Should().BeTrue();
+        File.Exists(Path.Combine(templatesDirectory, "business-meeting.md")).Should().BeTrue();
 
         // Verify content
         string dailyContent = await File.ReadAllTextAsync(Path.Combine(templatesDirectory, "daily-summary.md"));
         dailyContent.Should().Contain("Daily Summary");
 
+        string standupContent = await File.ReadAllTextAsync(Path.Combine(templatesDirectory, "daily-standup.md"));
+        standupContent.Should().Contain("Daily Standup");
+
         string weeklyContent = await File.ReadAllTextAsync(Path.Combine(templatesDirectory, "weekly-review.md"));
         weeklyContent.Should().Contain("Weekly Review");
+
+        string meetingContent = await File.ReadAllTextAsync(Path.Combine(templatesDirectory, "business-meeting.md"));
+        meetingContent.Should().Contain("Business Meeting");
     }
 
     [Fact]

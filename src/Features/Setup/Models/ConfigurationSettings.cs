@@ -141,6 +141,13 @@ public sealed record LlmConfiguration
     /// Only used when Provider is OpenAI. Defaults to "whisper-1".
     /// </summary>
     public string? SpeechToTextModel { get; init; }
+
+    /// <summary>
+    /// Gets the maximum number of input tokens to send to the LLM.
+    /// If null, uses provider-specific defaults (50K for OpenAI, 80K for Anthropic).
+    /// This limit helps control costs and ensures inputs fit within context windows.
+    /// </summary>
+    public int? MaxInputTokens { get; init; }
 }
 
 /// <summary>

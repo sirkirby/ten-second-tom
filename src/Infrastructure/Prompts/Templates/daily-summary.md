@@ -45,29 +45,32 @@ Analyze the user's input and extract the following information. Be concise but c
 
 ## Expected Output Format
 
-Your response must use exactly this markdown structure:
+Format your response using this structure:
 
-```markdown
 ## Key Events
+
 - [First key event with brief context]
 - [Second key event]
 
 ## Themes
+
 - [Theme or area of focus]
 - [Another theme]
 
 ## To-Do Items
+
 - [ ] [Task with optional due date: YYYY-MM-DD]
 - [ ] [Another task]
 
 ## Important People
+
 - [Person name - brief interaction context]
 - [Another person]
 
 ## Notable Tasks
+
 - [Task or project requiring attention]
 - [Another notable task]
-```
 
 ### Style Guidelines
 

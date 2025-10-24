@@ -11,6 +11,7 @@ using TenSecondTom.Infrastructure.Storage;
 using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Extensions;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Today.Handlers;
@@ -236,10 +237,13 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
             return Result<DailyEntry>.Failure($"LLM provider error: {llmResult.Error}. User input saved for retry.");
         }
 
-        // 8. Parse LLM response into DailySummary
-        DailySummary summary = ParseDailySummary(llmResult.Value.Content);
+        // 8. Strip markdown code block wrappers if present (defensive measure)
+        string cleanedResponse = llmResult.Value.Content.StripMarkdownCodeBlock();
 
-        // 9. Create DailyEntry
+        // 9. Parse LLM response into DailySummary
+        DailySummary summary = ParseDailySummary(cleanedResponse);
+
+        // 10. Create DailyEntry
         var entry = new DailyEntry
         {
             EntryId = $"{CommandNames.Today}-{today:MM-dd-yyyy}-{entryNumber}",
@@ -247,7 +251,7 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
             Timestamp = DateTimeOffset.UtcNow,
             EntryNumber = entryNumber,
             UserInput = userInput,
-            LlmResponse = llmResult.Value.Content,
+            LlmResponse = cleanedResponse,
             Metadata = CreateMetadata(
                 llmProvider.ProviderName, 
                 llmProvider.ModelName, 
@@ -256,7 +260,7 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
             Summary = summary
         };
 
-        // 10. Save to storage
+        // 11. Save to storage
         Result<MemoryEntry> saveResult = await _storage.SaveAsync(entry, cancellationToken).ConfigureAwait(false);
         if (!saveResult.IsSuccess)
         {

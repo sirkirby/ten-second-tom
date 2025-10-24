@@ -21,7 +21,7 @@ public static class AudioFeatureExtensions
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddFeatureAudioServices(this IServiceCollection services)
+    public static IServiceCollection AddAudioFeature(this IServiceCollection services)
     {
         // Register audio recorder implementation
         services.AddScoped<IAudioRecorder, FfmpegAudioRecorder>();

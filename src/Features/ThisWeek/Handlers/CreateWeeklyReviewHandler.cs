@@ -11,6 +11,7 @@ using TenSecondTom.Infrastructure.Storage;
 using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Extensions;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.ThisWeek.Handlers;
@@ -255,7 +256,10 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
                 $"Weekly review must contain exactly 3 top challenges, but found {summaryResult.Value.TopChallenges.Count}");
         }
 
-        // 11. Create WeeklyEntry
+        // 11. Strip markdown code block wrappers if present (defensive measure)
+        string cleanedResponse = completionResult.Value.Content.StripMarkdownCodeBlock();
+
+        // 12. Create WeeklyEntry
         int entryNumber = await GetNextEntryNumber(dateRange, cancellationToken).ConfigureAwait(false);
 
         WeeklyEntry weeklyEntry = new()
@@ -265,7 +269,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
             Timestamp = DateTimeOffset.UtcNow,
             EntryNumber = entryNumber,
             UserInput = $"Weekly review for {dateRange.StartDate:yyyy-MM-dd} to {dateRange.EndDate:yyyy-MM-dd} ({entriesResult.Value.Count} daily entries)",
-            LlmResponse = completionResult.Value.Content,
+            LlmResponse = cleanedResponse,
             Metadata = new MemoryEntryMetadata
             {
                 LlmProvider = llmProvider.ProviderName,
@@ -276,7 +280,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
             Summary = summaryResult.Value
         };
 
-        // 12. Save to storage
+        // 13. Save to storage
         Result<MemoryEntry> saveResult = await _storage.SaveAsync(weeklyEntry, cancellationToken).ConfigureAwait(false);
         if (!saveResult.IsSuccess)
         {

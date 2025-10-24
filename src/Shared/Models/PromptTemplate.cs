@@ -69,7 +69,12 @@ public enum TemplateType
     /// <summary>
     /// System-level prompt template.
     /// </summary>
-    SystemPrompt
+    SystemPrompt,
+
+    /// <summary>
+    /// Template for business meeting summarization.
+    /// </summary>
+    BusinessMeeting
 }
 
 /// <summary>

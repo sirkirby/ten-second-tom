@@ -267,7 +267,10 @@ public sealed class UserSecretsStorageService : IConfigurationStorageService
                     ? Enum.Parse<LlmProvider>(provider)
                     : LlmProvider.OpenAI,
                 ApiKey = data.TryGetValue(ConfigurationKeys.LlmApiKey, out var apiKey) ? apiKey : null,
-                Model = data.TryGetValue(ConfigurationKeys.LlmModel, out var model) ? model : null
+                Model = data.TryGetValue(ConfigurationKeys.LlmModel, out var model) ? model : null,
+                MaxInputTokens = data.TryGetValue(ConfigurationKeys.LlmMaxInputTokens, out var maxTokens) && int.TryParse(maxTokens, out var tokenLimit)
+                    ? tokenLimit
+                    : null
             },
             Storage = new StorageConfiguration
             {

@@ -157,6 +157,8 @@ public sealed class YamlFrontMatterParser(ILogger<YamlFrontMatterParser> logger)
             "daily" => TemplateType.Daily,
             "weekly" => TemplateType.Weekly,
             "systemprompt" => TemplateType.SystemPrompt,
+            "business-meeting" => TemplateType.BusinessMeeting,
+            "businessmeeting" => TemplateType.BusinessMeeting, // Support both formats
             _ => TemplateType.Daily
         };
     }

@@ -490,3 +490,10 @@ When making suggestions, prioritize in this order:
 **Last Updated**: 2025-10-21
 
 When in doubt, consult the constitution or ask the user for clarification.
+
+## Active Technologies
+- C# 12+ with .NET 9 + System.CommandLine 2.0-rc, Spectre.Console 0.51.1, FluentValidation 12.0.0, Serilog 4.3.0 (009-generate-recordings)
+- Local filesystem (recording directory for transcripts, template directory for prompt templates, memory directory for outputs) (009-generate-recordings)
+
+## Recent Changes
+- 009-generate-recordings: Added C# 12+ with .NET 9 + System.CommandLine 2.0-rc, Spectre.Console 0.51.1, FluentValidation 12.0.0, Serilog 4.3.0

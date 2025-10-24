@@ -41,6 +41,12 @@ public static class ConfigurationKeys
     public const string LlmModel = "TenSecondTom:Llm:Model";
 
     /// <summary>
+    /// Configuration key for maximum input tokens for LLM processing.
+    /// Environment variable: TenSecondTom__Llm__MaxInputTokens
+    /// </summary>
+    public const string LlmMaxInputTokens = "TenSecondTom:Llm:MaxInputTokens";
+
+    /// <summary>
     /// Configuration key for SSH key file path.
     /// Environment variable: TenSecondTom__Ssh__KeyPath
     /// </summary>
