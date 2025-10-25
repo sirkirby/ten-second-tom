@@ -38,9 +38,13 @@ public static class SetupFeatureExtensions
         services.AddTransient<IApiKeyValidator, OpenAIApiKeyValidator>();
         services.AddTransient<IApiKeyValidator, AnthropicApiKeyValidator>();
         
-        // Configuration Storage
-        services.AddSingleton<IConfigurationStorageService, UserSecretsStorageService>();
-        services.AddSingleton<IAppSettingsStorageService, AppSettingsStorageService>();
+        // Configuration Storage - Unified service manages all configuration in appsettings.json
+        services.AddSingleton<ConfigurationStorageService>();
+        services.AddSingleton<IConfigurationStorageService>(sp => sp.GetRequiredService<ConfigurationStorageService>());
+        services.AddSingleton<IAppSettingsStorageService>(sp => sp.GetRequiredService<ConfigurationStorageService>());
+
+        // Configuration Migration - Detects and cleans up legacy user secrets
+        services.AddSingleton<ConfigurationMigrationService>();
 
         // Setup Wizard UI
         services.AddTransient<ISetupWizardUI, SpectreConsoleSetupWizard>();

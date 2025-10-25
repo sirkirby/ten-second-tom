@@ -58,10 +58,24 @@ public sealed class SetupWizardConstantsTests
     }
 
     [Fact]
-    public void ProviderDisplayNames_AnthropicChoice_ShouldContainAnthropic()
+    public void ProviderDisplayNames_GetAvailableDisplayNames_ShouldOnlyContainOpenAI()
     {
-        // Assert
-        SetupWizardConstants.ProviderDisplayNames.GetDisplayNames().Should().Contain("Anthropic");
+        // Arrange & Act
+        var availableProviders = SetupWizardConstants.ProviderDisplayNames.GetAvailableDisplayNames();
+
+        // Assert - Only OpenAI should be available for configuration
+        availableProviders.Should().ContainSingle();
+        availableProviders.Should().Contain("OpenAI");
+        availableProviders.Should().NotContain("Anthropic",
+            "Anthropic is not available for configuration (code exists but not selectable)");
+    }
+
+    [Fact]
+    public void ProviderDisplayNames_AnthropicDisplayName_ShouldStillExist()
+    {
+        // Assert - Anthropic data still exists, just not shown in UI
+        SetupWizardConstants.ProviderDisplayNames.GetDisplayName(LlmProviders.Anthropic)
+            .Should().Be("Anthropic", "Anthropic code and data should remain intact");
     }
 
     [Fact]

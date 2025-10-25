@@ -37,11 +37,12 @@ public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
         services.AddHttpClient(); // Required by API key validators
         services.AddSingleton(_mockWizard.Object);
 
-        // Use TestUserSecretsId from base fixture
+        // Use test appsettings.json file
+        var testAppSettingsPath = Path.Combine(TestDirectory.BasePath, "appsettings.json");
         services.AddSingleton<IConfigurationStorageService>(sp =>
-            new UserSecretsStorageService(
-                sp.GetRequiredService<ILogger<UserSecretsStorageService>>(),
-                TestUserSecretsId));
+            new ConfigurationStorageService(
+                sp.GetRequiredService<ILogger<ConfigurationStorageService>>(),
+                testAppSettingsPath));
 
         // Mock app settings storage (not tested in these LLM config tests)
         var mockAppSettingsStorage = new Mock<IAppSettingsStorageService>();

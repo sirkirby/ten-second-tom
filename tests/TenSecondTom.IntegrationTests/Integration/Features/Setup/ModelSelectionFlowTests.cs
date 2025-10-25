@@ -167,10 +167,11 @@ public sealed class ModelSelectionFlowTests : UserSecretsTestFixture
         ModelRegistry.IsValid(anthropicDefault.Id, LlmProvider.Anthropic).Should().BeTrue();
     }
 
-    private UserSecretsStorageService CreateStorageService()
+    private ConfigurationStorageService CreateStorageService()
     {
-        var logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<UserSecretsStorageService>();
-        return new UserSecretsStorageService(logger, TestUserSecretsId);
+        var logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<ConfigurationStorageService>();
+        var testAppSettingsPath = Path.Combine(TestDirectory.BasePath, "appsettings.json");
+        return new ConfigurationStorageService(logger, testAppSettingsPath);
     }
 
     private static ConfigurationSettings CreateTestSettings(LlmProvider provider, string? modelId)

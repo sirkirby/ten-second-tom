@@ -9,7 +9,6 @@ using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.DependencyInjection;
 using TenSecondTom.Infrastructure.Logging;
 using TenSecondTom.Shared.Constants;
-using TenSecondTom.Shared.Secrets;
 
 namespace TenSecondTom;
 
@@ -59,21 +58,12 @@ internal static class Program
             }
 
             // Build configuration
-            var configurationBuilder = new ConfigurationBuilder()
+            // Priority (highest to lowest): Command line args > Environment variables > appsettings.{env}.json > appsettings.json
+            var configuration = new ConfigurationBuilder()
                 .SetBasePath(AppContext.BaseDirectory)
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                .AddJsonFile($"appsettings.{EnvironmentHelper.GetCurrentEnvironment()}.json", optional: true, reloadOnChange: true);
-            
-            // Add User Secrets explicitly (for self-contained/trimmed binaries)
-            // This doesn't rely on assembly reflection like AddUserSecrets<T>()
-            string userSecretsPath = SecretsHelper.GetUserSecretsPath(ConfigurationKeys.UserSecretsId);
-            if (File.Exists(userSecretsPath))
-            {
-                configurationBuilder.AddJsonFile(userSecretsPath, optional: true, reloadOnChange: true);
-            }
-            
-            var configuration = configurationBuilder
-                .AddEnvironmentVariables() // Load all environment variables
+                .AddJsonFile($"appsettings.{EnvironmentHelper.GetCurrentEnvironment()}.json", optional: true, reloadOnChange: true)
+                .AddEnvironmentVariables() // Load all environment variables (including from .env file loaded above)
                 .AddCommandLine(args)
                 .Build();
 

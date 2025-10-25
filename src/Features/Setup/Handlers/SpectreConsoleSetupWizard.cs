@@ -74,19 +74,23 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
     {
         var prompt = new SelectionPrompt<string>()
             .Title("Choose your AI provider:")
-            .AddChoices(SetupWizardConstants.ProviderDisplayNames.GetDisplayNames());
+            .AddChoices(SetupWizardConstants.ProviderDisplayNames.GetAvailableDisplayNames());
 
         if (currentProvider.HasValue)
         {
-            var currentChoice = currentProvider.Value == LlmProvider.OpenAI
-                ? "OpenAI (GPT-4, GPT-3.5)"
-                : "Anthropic (Claude 3.5)";
-            prompt.HighlightStyle(new Style(Color.Green));
+            // Only highlight if the current provider is available (OpenAI)
+            if (currentProvider.Value == LlmProvider.OpenAI)
+            {
+                prompt.HighlightStyle(new Style(Color.Green));
+            }
         }
 
         var selected = _console.Prompt(prompt);
-        var provider = selected.StartsWith("OpenAI", StringComparison.Ordinal) ? LlmProvider.OpenAI : LlmProvider.Anthropic;
-        
+
+        // Since only OpenAI is available, we know the selection must be OpenAI
+        // But we still parse it for consistency
+        var provider = selected.StartsWith("OpenAI", StringComparison.Ordinal) ? LlmProvider.OpenAI : LlmProvider.OpenAI;
+
         return Task.FromResult<LlmProvider?>(provider);
     }
 

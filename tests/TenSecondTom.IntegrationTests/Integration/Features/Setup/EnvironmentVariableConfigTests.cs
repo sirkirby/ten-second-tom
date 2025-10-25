@@ -7,14 +7,13 @@ using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.IntegrationTests.TestHelpers;
 using TenSecondTom.Shared.Results;
-using TenSecondTom.Shared.Secrets;
 
 namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
 
 /// <summary>
 /// Integration tests for environment variable configuration precedence.
 /// Tests User Story 3: Model Configuration via Environment Variables
-/// Verifies that environment variables override user secrets in the configuration hierarchy.
+/// Verifies that environment variables override appsettings.json in the configuration hierarchy.
 /// </summary>
 [Collection(UserSecretsCollection.Name)]
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable", Justification = "IAsyncLifetime pattern used instead of IDisposable")]
@@ -41,20 +40,23 @@ public sealed class EnvironmentVariableConfigTests : UserSecretsTestFixture
     }
 
     [Fact]
-    public async Task EnvironmentVariable_OverridesUserSecretsModel()
+    public async Task EnvironmentVariable_OverridesAppSettingsModel()
     {
-        // Arrange - Save configuration with one model to user secrets
-        using var serviceProvider = BuildTestServiceProvider();
-        var storageService = serviceProvider.GetRequiredService<IConfigurationStorageService>();
-        
+        // Arrange - Save configuration with one model to appsettings.json
+        var testAppSettingsPath = Path.Combine(_testDirectory.BasePath, "appsettings.json");
+
+        using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
+        var logger = loggerFactory.CreateLogger<ConfigurationStorageService>();
+        var storageService = new ConfigurationStorageService(logger, testAppSettingsPath);
+
         var configurationWithModel = new ConfigurationSettings
         {
             Ssh = new SshConfiguration { KeyPath = "/home/user/.ssh/id_ed25519" },
-            Llm = new LlmConfiguration 
-            { 
-                Provider = LlmProvider.OpenAI, 
+            Llm = new LlmConfiguration
+            {
+                Provider = LlmProvider.OpenAI,
                 ApiKey = "sk-test-key",
-                Model = "gpt-4o-mini" // User secrets model
+                Model = "gpt-4o-mini" // appsettings.json model
             },
             Storage = new StorageConfiguration { MemoryDirectory = _testDirectory.BasePath }
         };
@@ -63,11 +65,9 @@ public sealed class EnvironmentVariableConfigTests : UserSecretsTestFixture
         saveResult.IsSuccess.Should().BeTrue();
 
         // Act - Build configuration with environment variable override
-        // Simulate loading from user secrets file, then override with environment variable
-        var userSecretsPath = SecretsHelper.GetUserSecretsPath(TestUserSecretsId);
-        
+        // Load from appsettings.json, then override with environment variable
         var configWithEnvOverride = new ConfigurationBuilder()
-            .AddJsonFile(userSecretsPath, optional: true)
+            .AddJsonFile(testAppSettingsPath, optional: true)
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["TenSecondTom:Llm:Model"] = "gpt-4o" // Environment variable override
@@ -76,20 +76,20 @@ public sealed class EnvironmentVariableConfigTests : UserSecretsTestFixture
 
         var settings = configWithEnvOverride.GetSection("TenSecondTom").Get<ConfigurationSettings>();
 
-        // Assert - Environment variable should override user secrets
+        // Assert - Environment variable should override appsettings.json
         settings.Should().NotBeNull();
-        settings!.Llm.Model.Should().Be("gpt-4o", "environment variable should override user secrets model");
+        settings!.Llm.Model.Should().Be("gpt-4o", "environment variable should override appsettings.json model");
         settings.Llm.Provider.Should().Be(LlmProvider.OpenAI);
     }
 
     [Fact]
-    public void EnvironmentVariable_OverridesUserSecretsProvider()
+    public void EnvironmentVariable_OverridesAppSettingsProvider()
     {
-        // Arrange - Simulate user secrets with OpenAI provider
+        // Arrange - Simulate appsettings.json with OpenAI provider
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["TenSecondTom:Llm:Provider"] = "OpenAI", // User secrets
+                ["TenSecondTom:Llm:Provider"] = "OpenAI", // appsettings.json
                 ["TenSecondTom:Llm:ApiKey"] = "sk-test-key",
                 ["TenSecondTom:Llm:Model"] = "gpt-4o-mini",
                 ["TenSecondTom:Ssh:KeyPath"] = "/path/to/key",
@@ -112,17 +112,17 @@ public sealed class EnvironmentVariableConfigTests : UserSecretsTestFixture
     }
 
     [Fact]
-    public void EnvironmentVariable_PartialOverride_PreservesOtherUserSecretsValues()
+    public void EnvironmentVariable_PartialOverride_PreservesOtherAppSettingsValues()
     {
-        // Arrange - Only override model via environment, keep other settings from user secrets
+        // Arrange - Only override model via environment, keep other settings from appsettings.json
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                // User secrets layer
+                // appsettings.json layer
                 ["TenSecondTom:Llm:Provider"] = "OpenAI",
-                ["TenSecondTom:Llm:ApiKey"] = "sk-user-secrets-key",
+                ["TenSecondTom:Llm:ApiKey"] = "sk-appsettings-key",
                 ["TenSecondTom:Llm:Model"] = "gpt-4o-mini",
-                ["TenSecondTom:Ssh:KeyPath"] = "/user/secrets/key",
+                ["TenSecondTom:Ssh:KeyPath"] = "/appsettings/key",
                 ["TenSecondTom:MemoryDirectory"] = "/tmp/memory"
             })
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -138,21 +138,21 @@ public sealed class EnvironmentVariableConfigTests : UserSecretsTestFixture
         // Assert
         settings.Should().NotBeNull();
         settings!.Llm.Model.Should().Be("gpt-4o", "model should come from environment variable");
-        settings.Llm.Provider.Should().Be(LlmProvider.OpenAI, "provider should come from user secrets");
-        settings.Llm.ApiKey.Should().Be("sk-user-secrets-key", "API key should come from user secrets");
-        settings.Ssh.KeyPath.Should().Be("/user/secrets/key", "SSH key path should come from user secrets");
+        settings.Llm.Provider.Should().Be(LlmProvider.OpenAI, "provider should come from appsettings.json");
+        settings.Llm.ApiKey.Should().Be("sk-appsettings-key", "API key should come from appsettings.json");
+        settings.Ssh.KeyPath.Should().Be("/appsettings/key", "SSH key path should come from appsettings.json");
     }
 
     [Fact]
-    public void EnvironmentVariable_WithEmptyModel_OverridesUserSecretsToNull()
+    public void EnvironmentVariable_WithEmptyModel_OverridesAppSettingsToNull()
     {
-        // Arrange - Environment variable with empty string should clear user secrets value
+        // Arrange - Environment variable with empty string should clear appsettings.json value
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["TenSecondTom:Llm:Provider"] = "OpenAI",
                 ["TenSecondTom:Llm:ApiKey"] = "sk-test-key",
-                ["TenSecondTom:Llm:Model"] = "gpt-4o-mini", // User secrets
+                ["TenSecondTom:Llm:Model"] = "gpt-4o-mini", // appsettings.json
                 ["TenSecondTom:Ssh:KeyPath"] = "/path/to/key",
                 ["TenSecondTom:MemoryDirectory"] = "/tmp/memory"
             })
@@ -168,13 +168,13 @@ public sealed class EnvironmentVariableConfigTests : UserSecretsTestFixture
         // Assert
         settings.Should().NotBeNull();
         // Empty string from environment variable results in null binding
-        settings!.Llm.Model.Should().BeNullOrEmpty("empty environment variable should clear user secrets value");
+        settings!.Llm.Model.Should().BeNullOrEmpty("empty environment variable should clear appsettings.json value");
     }
 
     [Fact]
     public void ConfigurationHierarchy_ShowsCorrectPrecedence()
     {
-        // Arrange - Full configuration hierarchy: appsettings < user secrets < environment
+        // Arrange - Configuration hierarchy: appsettings.json < appsettings.{env}.json < environment variables
         var configuration = new ConfigurationBuilder()
             // Layer 1: appsettings.json
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -185,16 +185,16 @@ public sealed class EnvironmentVariableConfigTests : UserSecretsTestFixture
                 ["TenSecondTom:Ssh:KeyPath"] = "/default/key",
                 ["TenSecondTom:MemoryDirectory"] = "/tmp/memory"
             })
-            // Layer 2: user secrets
+            // Layer 2: appsettings.{environment}.json
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["TenSecondTom:Llm:Model"] = "user-secrets-model",
-                ["TenSecondTom:Llm:ApiKey"] = "user-secrets-key"
+                ["TenSecondTom:Llm:Model"] = "environment-file-model",
+                ["TenSecondTom:Llm:ApiKey"] = "environment-file-key"
             })
             // Layer 3: environment variables
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["TenSecondTom:Llm:Model"] = "environment-model"
+                ["TenSecondTom:Llm:Model"] = "environment-variable-model"
             })
             .Build();
 
@@ -203,8 +203,8 @@ public sealed class EnvironmentVariableConfigTests : UserSecretsTestFixture
 
         // Assert
         settings.Should().NotBeNull();
-        settings!.Llm.Model.Should().Be("environment-model", "environment variables have highest precedence");
-        settings.Llm.ApiKey.Should().Be("user-secrets-key", "API key should come from user secrets (not overridden by env)");
+        settings!.Llm.Model.Should().Be("environment-variable-model", "environment variables have highest precedence");
+        settings.Llm.ApiKey.Should().Be("environment-file-key", "API key should come from environment-specific appsettings (not overridden by env)");
         settings.Ssh.KeyPath.Should().Be("/default/key", "SSH key should come from appsettings (lowest precedence)");
     }
 
@@ -239,26 +239,4 @@ public sealed class EnvironmentVariableConfigTests : UserSecretsTestFixture
         settings.Llm.ApiKey.Should().Be("sk-ant-key", "API key should match new provider");
     }
 
-    private ServiceProvider BuildTestServiceProvider()
-    {
-        var services = new ServiceCollection();
-
-        // Configure with test user secrets ID from base fixture
-        var userSecretsPath = SecretsHelper.GetUserSecretsPath(TestUserSecretsId);
-        var configuration = new ConfigurationBuilder()
-            .AddJsonFile(userSecretsPath, optional: true)
-            .Build();
-
-        services.AddSingleton<IConfiguration>(configuration);
-        services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
-
-        // Register storage service with test configuration
-        services.AddSingleton<IConfigurationStorageService>(sp =>
-        {
-            var logger = sp.GetRequiredService<ILogger<UserSecretsStorageService>>();
-            return new UserSecretsStorageService(logger, TestUserSecretsId);
-        });
-
-        return services.BuildServiceProvider();
-    }
 }

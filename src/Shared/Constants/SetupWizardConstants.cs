@@ -26,11 +26,26 @@ public static class SetupWizardConstants
             };
         }
 
+        /// <summary>
+        /// Gets all provider display names (includes Anthropic).
+        /// For backward compatibility and internal use only.
+        /// </summary>
         public static string[] GetDisplayNames()
         {
             return LlmProviders.All
                 .Select(GetDisplayName)
                 .ToArray();
+        }
+
+        /// <summary>
+        /// Gets display names for providers available in the setup wizard.
+        /// Currently only OpenAI is available (Anthropic code exists but is not selectable).
+        /// </summary>
+        public static string[] GetAvailableDisplayNames()
+        {
+            // Only OpenAI is available for configuration
+            // Anthropic code remains but is not selectable in setup wizard
+            return [GetDisplayName(LlmProviders.OpenAI)];
         }
     }
 
