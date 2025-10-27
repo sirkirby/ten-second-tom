@@ -28,7 +28,7 @@ public sealed class RecordingServiceTests
 
         // Setup configuration to return test memory directory
         _mockConfiguration
-            .Setup(c => c[ConfigurationKeys.MemoryDirectory])
+            .Setup(c => c[ConfigurationKeys.MemoryDirectoryKey])
             .Returns(_testMemoryDirectory);
     }
 

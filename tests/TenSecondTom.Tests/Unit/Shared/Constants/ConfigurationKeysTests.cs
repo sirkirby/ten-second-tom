@@ -9,9 +9,9 @@ public sealed class ConfigurationKeysTests
     [Fact]
     public void ConfigurationKeys_All_AreNotNullOrEmpty()
     {
-        ConfigurationKeys.LlmApiKey.Should().NotBeNullOrWhiteSpace();
-        ConfigurationKeys.LlmProvider.Should().NotBeNullOrWhiteSpace();
-        ConfigurationKeys.LlmModel.Should().NotBeNullOrWhiteSpace();
+        ConfigurationKeys.LlmApiKeyKey.Should().NotBeNullOrWhiteSpace();
+        ConfigurationKeys.LlmProviderKey.Should().NotBeNullOrWhiteSpace();
+        ConfigurationKeys.LlmModelKey.Should().NotBeNullOrWhiteSpace();
         ConfigurationKeys.DotNetEnvironment.Should().NotBeNullOrWhiteSpace();
     }
 }

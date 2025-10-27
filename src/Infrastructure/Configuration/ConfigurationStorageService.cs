@@ -7,70 +7,45 @@ using TenSecondTom.Shared.Results;
 namespace TenSecondTom.Infrastructure.Configuration;
 
 /// <summary>
-/// Unified configuration storage service that manages all application configuration in appsettings.json.
-/// Provides atomic updates with proper error handling and file locking.
-/// Environment variables can override any configuration value via .env file or exported environment variables.
+/// Unified configuration storage service using idiomatic C# JSON serialization.
+/// Manages configuration in config.json with atomic updates and proper error handling.
+/// Environment variables can override any configuration value.
 /// </summary>
 public sealed class ConfigurationStorageService : IConfigurationStorageService, IAppSettingsStorageService, IDisposable
 {
     private readonly ILogger<ConfigurationStorageService> _logger;
-    private readonly string _appSettingsPath;
+    private readonly string _configPath;
     private readonly SemaphoreSlim _fileLock = new(1, 1);
     private bool _disposed;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        // Default PascalCase naming matches .NET configuration system
+        PropertyNameCaseInsensitive = true
     };
 
-    /// <summary>
-    /// Creates a new instance of ConfigurationStorageService.
-    /// </summary>
-    /// <param name="logger">Logger instance</param>
-    /// <param name="configuration">Configuration to read the Memory/app root directory</param>
-    /// <param name="appSettingsPath">Optional override path. If null, uses {MemoryDirectory}/config/config.json</param>
     public ConfigurationStorageService(
         ILogger<ConfigurationStorageService> logger,
         Microsoft.Extensions.Configuration.IConfiguration configuration,
-        string? appSettingsPath = null)
+        string? configPath = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _appSettingsPath = appSettingsPath ?? GetUserConfigPath(configuration);
+        _configPath = configPath ?? GetUserConfigPath(configuration);
     }
 
-    /// <summary>
-    /// Gets the user configuration file path within the app root (Memory) directory.
-    /// This ensures all user data lives under one root, separate from the binary location.
-    /// </summary>
-    /// <param name="configuration">Configuration to read Memory directory setting</param>
-    /// <returns>Path to user configuration file (e.g., ~/ten-second-tom/config/config.json)</returns>
     private static string GetUserConfigPath(Microsoft.Extensions.Configuration.IConfiguration configuration)
     {
-        // Get the Memory directory (app root) from configuration
-        // Falls back to ~/ten-second-tom if not configured
-        var memoryDir = configuration[ConfigurationKeys.MemoryDirectory];
-
-        if (string.IsNullOrWhiteSpace(memoryDir))
+        var path = ConfigurationHelpers.GetUserConfigPath(configuration);
+        
+        // Ensure the config directory exists
+        var configDir = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(configDir))
         {
-            // First run: Use default location
-            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            memoryDir = Path.Combine(home, "ten-second-tom");
-        }
-        else if (memoryDir.StartsWith("~/", StringComparison.Ordinal))
-        {
-            // Expand ~ to home directory
-            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            memoryDir = Path.Combine(home, memoryDir[2..]);
+            Directory.CreateDirectory(configDir);
         }
 
-        // User config lives in {MemoryDirectory}/config/config.json (not appsettings.json)
-        var configDir = Path.Combine(memoryDir, "config");
-
-        // Ensure directory exists
-        Directory.CreateDirectory(configDir);
-
-        return Path.Combine(configDir, "config.json");
+        return path;
     }
 
     public async Task<Result<string>> SaveAsync(
@@ -82,137 +57,45 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
         await _fileLock.WaitAsync(cancellationToken);
         try
         {
-            _logger.LogInformation("Saving configuration to {Path}", _appSettingsPath);
+            _logger.LogInformation("Saving configuration to {Path}", _configPath);
 
-            // Load existing JSON or create new
-            JsonDocument? existingDoc = null;
-            if (File.Exists(_appSettingsPath))
+            // Load existing root configuration (preserves other sections like Serilog)
+            ConfigurationRoot root;
+            if (File.Exists(_configPath))
             {
                 try
                 {
-                    var existingJson = await File.ReadAllTextAsync(_appSettingsPath, cancellationToken);
-                    existingDoc = JsonDocument.Parse(existingJson);
+                    var existingJson = await File.ReadAllTextAsync(_configPath, cancellationToken);
+                    root = JsonSerializer.Deserialize<ConfigurationRoot>(existingJson, JsonOptions) ?? new ConfigurationRoot();
                 }
                 catch (JsonException ex)
                 {
-                    _logger.LogWarning(ex, "Existing appsettings.json is invalid, creating new file");
+                    _logger.LogWarning(ex, "Existing config.json is invalid, creating new file");
+                    root = new ConfigurationRoot();
                 }
             }
-
-            // Build new JSON structure
-            var root = new Dictionary<string, object>();
-
-            // Preserve all existing sections except TenSecondTom
-            if (existingDoc != null)
+            else
             {
-                foreach (var property in existingDoc.RootElement.EnumerateObject())
-                {
-                    if (property.Name != ConfigurationKeys.Root)
-                    {
-                        // Preserve non-TenSecondTom sections (e.g., Serilog)
-                        root[property.Name] = JsonSerializer.Deserialize<object>(property.Value.GetRawText(), JsonOptions)
-                            ?? new object();
-                    }
-                }
+                root = new ConfigurationRoot();
             }
 
-            // Build TenSecondTom configuration section
-            // Use AudioConfiguration defaults to get audio settings
-            var audioDefaults = new AudioConfiguration();
+            // Serialize settings to JsonElement for the TenSecondTom section
+            root.TenSecondTom = SerializeToJsonElement(settings);
 
-            root[ConfigurationKeys.Root] = new
-            {
-                MemoryDirectory = settings.Storage.MemoryDirectory,
-                Auth = new
-                {
-                    SshAgentProvider = SshConstants.DefaultAgentProvider,
-                    PublicKeyPath = settings.Ssh.KeyPath
-                },
-                Ssh = new
-                {
-                    KeyPath = settings.Ssh.KeyPath,
-                    KeySource = settings.Ssh.KeySource?.ToString(),
-                    AgentSocketPath = settings.Ssh.AgentSocketPath,
-                    KeyDisplayName = settings.Ssh.KeyDisplayName
-                },
-                Llm = new
-                {
-                    Provider = settings.Llm.Provider.ToString(),
-                    ApiKey = settings.Llm.ApiKey,
-                    Model = settings.Llm.Model,
-                    MaxInputTokens = settings.Llm.MaxInputTokens
-                },
-                Audio = new
-                {
-                    SttProvider = audioDefaults.SttProvider,
-                    SttBinaryPath = audioDefaults.SttBinaryPath,
-                    SttModel = audioDefaults.SttModel,
-                    SttApiKey = audioDefaults.SttApiKey,
-                    SttFallbackEnabled = audioDefaults.SttFallbackEnabled,
-                    SttFallbackProvider = audioDefaults.SttFallbackProvider,
-                    SttFallbackBinaryPath = audioDefaults.SttFallbackBinaryPath,
-                    SttFallbackModel = audioDefaults.SttFallbackModel,
-                    SttFallbackApiKey = audioDefaults.SttFallbackApiKey,
-                    KeepFiles = audioDefaults.KeepFiles,
-                    Recorder = new
-                    {
-                        FfmpegPath = audioDefaults.Recorder.FfmpegPath,
-                        InputVolume = audioDefaults.Recorder.InputVolume,
-                        EnableNoiseReduction = audioDefaults.Recorder.EnableNoiseReduction,
-                        EnableFrequencyFilters = audioDefaults.Recorder.EnableFrequencyFilters
-                    },
-                    Preprocessing = new
-                    {
-                        RemoveSilence = audioDefaults.Preprocessing.RemoveSilence,
-                        SilenceThresholdDb = audioDefaults.Preprocessing.SilenceThresholdDb,
-                        MinimumSilenceDurationMs = audioDefaults.Preprocessing.MinimumSilenceDurationMs
-                    },
-                    Timeouts = new
-                    {
-                        TodaySeconds = audioDefaults.Timeouts.TodaySeconds,
-                        RecordSeconds = audioDefaults.Timeouts.RecordSeconds
-                    }
-                },
-                DataRetention = new
-                {
-                    DefaultPolicy = DataRetentionConstants.DefaultPolicy,
-                    AutoPurgeEnabled = DataRetentionConstants.DefaultAutoPurgeEnabled
-                },
-                Setup = new
-                {
-                    SshKeyDetectionTimeoutSeconds = SetupWizardConstants.Timeouts.SshKeyDetectionSeconds,
-                    ApiValidationTimeoutSeconds = SetupWizardConstants.Timeouts.ApiValidationSeconds,
-                    TotalSetupTimeoutSeconds = SetupWizardConstants.Timeouts.TotalSetupSeconds
-                },
-                Optional = new
-                {
-                    LogLevel = settings.Optional.LogLevel.ToString(),
-                    RetentionDays = settings.Optional.RetentionDays,
-                    EnableTelemetry = settings.Optional.EnableTelemetry
-                },
-                Configuration = new
-                {
-                    CreatedAt = settings.CreatedAt.ToString("O"),
-                    LastModifiedAt = settings.LastModifiedAt?.ToString("O"),
-                    Version = settings.ConfigurationVersion
-                }
-            };
-
-            // Write atomically (temp file + rename)
-            var tempPath = _appSettingsPath + ".tmp";
+            // Serialize and save atomically
+            var tempPath = _configPath + ".tmp";
             var json = JsonSerializer.Serialize(root, JsonOptions);
             await File.WriteAllTextAsync(tempPath, json, cancellationToken);
 
-            // Atomic replace
-            File.Move(tempPath, _appSettingsPath, overwrite: true);
+            File.Move(tempPath, _configPath, overwrite: true);
 
-            _logger.LogInformation("Configuration saved successfully to {Path}", _appSettingsPath);
-            return Result<string>.Success(_appSettingsPath);
+            _logger.LogInformation("Configuration saved successfully to {Path}", _configPath);
+            return Result<string>.Success(_configPath);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to save configuration");
-            return Result<string>.Failure($"Config.SaveFailed: Failed to save configuration: {ex.Message}");
+            return Result<string>.Failure($"Config.SaveFailed: {ex.Message}");
         }
         finally
         {
@@ -225,32 +108,31 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
         await _fileLock.WaitAsync(cancellationToken);
         try
         {
-            if (!File.Exists(_appSettingsPath))
+            if (!File.Exists(_configPath))
             {
-                _logger.LogInformation("appsettings.json not found, returning default configuration");
+                _logger.LogInformation("Config file not found, returning defaults");
                 return Result<ConfigurationSettings>.Success(CreateDefaultConfiguration());
             }
 
-            var json = await File.ReadAllTextAsync(_appSettingsPath, cancellationToken);
-            using var doc = JsonDocument.Parse(json);
+            var json = await File.ReadAllTextAsync(_configPath, cancellationToken);
+            var root = JsonSerializer.Deserialize<ConfigurationRoot>(json, JsonOptions);
 
-            // Navigate to TenSecondTom section
-            if (!doc.RootElement.TryGetProperty(ConfigurationKeys.Root, out var tenSecondTomSection))
+            if (root == null || root.TenSecondTom.ValueKind == JsonValueKind.Null || root.TenSecondTom.ValueKind == JsonValueKind.Undefined)
             {
-                _logger.LogDebug("TenSecondTom configuration section not found, returning defaults");
+                _logger.LogDebug("TenSecondTom section not found, returning defaults");
                 return Result<ConfigurationSettings>.Success(CreateDefaultConfiguration());
             }
 
-            // Parse configuration sections
-            var settings = ParseConfigurationFromJson(tenSecondTomSection);
+            // Deserialize the JsonElement to ConfigurationSettings, handling the structural differences
+            var settings = DeserializeFromJsonElement(root.TenSecondTom);
 
-            _logger.LogDebug("Configuration loaded successfully from {Path}", _appSettingsPath);
+            _logger.LogDebug("Configuration loaded successfully from {Path}", _configPath);
             return Result<ConfigurationSettings>.Success(settings);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load configuration");
-            return Result<ConfigurationSettings>.Failure($"Config.LoadFailed: Failed to load configuration: {ex.Message}");
+            return Result<ConfigurationSettings>.Failure($"Config.LoadFailed: {ex.Message}");
         }
         finally
         {
@@ -258,10 +140,7 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
         }
     }
 
-    public string GetStorageLocation()
-    {
-        return _appSettingsPath;
-    }
+    public string GetStorageLocation() => _configPath;
 
     public async Task<Result<string>> SaveAudioConfigurationAsync(
         AudioConfiguration audioConfig,
@@ -270,93 +149,43 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
         await _fileLock.WaitAsync(cancellationToken);
         try
         {
-            _logger.LogInformation("Saving audio configuration to {Path}", _appSettingsPath);
+            _logger.LogInformation("Saving audio configuration to {Path}", _configPath);
 
-            // Load existing JSON or create new
-            JsonDocument? existingDoc = null;
-            if (File.Exists(_appSettingsPath))
+            // Load existing root configuration
+            ConfigurationRoot root;
+            if (File.Exists(_configPath))
             {
-                try
-                {
-                    var existingJson = await File.ReadAllTextAsync(_appSettingsPath, cancellationToken);
-                    existingDoc = JsonDocument.Parse(existingJson);
-                }
-                catch (JsonException ex)
-                {
-                    _logger.LogWarning(ex, "Existing appsettings.json is invalid, creating new file");
-                }
+                var existingJson = await File.ReadAllTextAsync(_configPath, cancellationToken);
+                root = JsonSerializer.Deserialize<ConfigurationRoot>(existingJson, JsonOptions) ?? new ConfigurationRoot();
+            }
+            else
+            {
+                root = new ConfigurationRoot();
             }
 
-            // Build new JSON structure
-            var root = new Dictionary<string, object>();
-
-            // Preserve all existing sections
-            if (existingDoc != null)
+            // If no TenSecondTom section exists, create minimal structure
+            if (root.TenSecondTom.ValueKind == JsonValueKind.Null || root.TenSecondTom.ValueKind == JsonValueKind.Undefined)
             {
-                foreach (var property in existingDoc.RootElement.EnumerateObject())
-                {
-                    root[property.Name] = JsonSerializer.Deserialize<object>(property.Value.GetRawText(), JsonOptions)
-                        ?? new object();
-                }
+                root.TenSecondTom = JsonSerializer.SerializeToElement(new { Audio = audioConfig }, JsonOptions);
+            }
+            else
+            {
+                // Merge audio config into existing TenSecondTom section
+                var tenSecondTomDict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(
+                    root.TenSecondTom.GetRawText(), JsonOptions) ?? new Dictionary<string, JsonElement>();
+                
+                tenSecondTomDict["Audio"] = JsonSerializer.SerializeToElement(audioConfig, JsonOptions);
+                root.TenSecondTom = JsonSerializer.SerializeToElement(tenSecondTomDict, JsonOptions);
             }
 
-            // Get or create TenSecondTom section
-            if (!root.TryGetValue(ConfigurationKeys.Root, out var tenSecondTomObj))
-            {
-                tenSecondTomObj = new Dictionary<string, object>();
-                root[ConfigurationKeys.Root] = tenSecondTomObj;
-            }
-
-            // Update audio section
-            var tenSecondTom = tenSecondTomObj as Dictionary<string, object>
-                ?? JsonSerializer.Deserialize<Dictionary<string, object>>(
-                    JsonSerializer.Serialize(tenSecondTomObj, JsonOptions), JsonOptions)
-                ?? new Dictionary<string, object>();
-
-            tenSecondTom["Audio"] = new
-            {
-                SttProvider = audioConfig.SttProvider,
-                SttBinaryPath = audioConfig.SttBinaryPath,
-                SttModel = audioConfig.SttModel,
-                SttApiKey = audioConfig.SttApiKey,
-                SttFallbackEnabled = audioConfig.SttFallbackEnabled,
-                SttFallbackProvider = audioConfig.SttFallbackProvider,
-                SttFallbackBinaryPath = audioConfig.SttFallbackBinaryPath,
-                SttFallbackModel = audioConfig.SttFallbackModel,
-                SttFallbackApiKey = audioConfig.SttFallbackApiKey,
-                KeepFiles = audioConfig.KeepFiles,
-                Recorder = new
-                {
-                    FfmpegPath = audioConfig.Recorder.FfmpegPath,
-                    InputVolume = audioConfig.Recorder.InputVolume,
-                    EnableNoiseReduction = audioConfig.Recorder.EnableNoiseReduction,
-                    EnableFrequencyFilters = audioConfig.Recorder.EnableFrequencyFilters
-                },
-                Preprocessing = new
-                {
-                    RemoveSilence = audioConfig.Preprocessing.RemoveSilence,
-                    SilenceThresholdDb = audioConfig.Preprocessing.SilenceThresholdDb,
-                    MinimumSilenceDurationMs = audioConfig.Preprocessing.MinimumSilenceDurationMs
-                },
-                Timeouts = new
-                {
-                    TodaySeconds = audioConfig.Timeouts.TodaySeconds,
-                    RecordSeconds = audioConfig.Timeouts.RecordSeconds
-                }
-            };
-
-            root[ConfigurationKeys.Root] = tenSecondTom;
-
-            // Write atomically (temp file + rename)
-            var tempPath = _appSettingsPath + ".tmp";
+            // Save atomically
+            var tempPath = _configPath + ".tmp";
             var json = JsonSerializer.Serialize(root, JsonOptions);
             await File.WriteAllTextAsync(tempPath, json, cancellationToken);
-
-            // Atomic replace
-            File.Move(tempPath, _appSettingsPath, overwrite: true);
+            File.Move(tempPath, _configPath, overwrite: true);
 
             _logger.LogInformation("Audio configuration saved successfully");
-            return Result<string>.Success(_appSettingsPath);
+            return Result<string>.Success(_configPath);
         }
         catch (Exception ex)
         {
@@ -375,28 +204,26 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
         await _fileLock.WaitAsync(cancellationToken);
         try
         {
-            if (!File.Exists(_appSettingsPath))
-            {
-                _logger.LogInformation("appsettings.json not found, returning default audio configuration");
-                return Result<AudioConfiguration>.Success(new AudioConfiguration());
-            }
-
-            var json = await File.ReadAllTextAsync(_appSettingsPath, cancellationToken);
-            using var doc = JsonDocument.Parse(json);
-
-            // Navigate to TenSecondTom:Audio section
-            if (!doc.RootElement.TryGetProperty(ConfigurationKeys.Root, out var tenSecondTomSection))
+            if (!File.Exists(_configPath))
             {
                 return Result<AudioConfiguration>.Success(new AudioConfiguration());
             }
 
-            if (!tenSecondTomSection.TryGetProperty("audio", out var audioSection))
+            var json = await File.ReadAllTextAsync(_configPath, cancellationToken);
+            var root = JsonSerializer.Deserialize<ConfigurationRoot>(json, JsonOptions);
+
+            if (root == null || root.TenSecondTom.ValueKind == JsonValueKind.Null || root.TenSecondTom.ValueKind == JsonValueKind.Undefined)
             {
                 return Result<AudioConfiguration>.Success(new AudioConfiguration());
             }
 
-            // Deserialize audio configuration
-            var audioConfig = JsonSerializer.Deserialize<AudioConfiguration>(audioSection.GetRawText(), JsonOptions);
+            // Try to extract Audio section from TenSecondTom
+            if (!root.TenSecondTom.TryGetProperty("Audio", out var audioElement))
+            {
+                return Result<AudioConfiguration>.Success(new AudioConfiguration());
+            }
+
+            var audioConfig = JsonSerializer.Deserialize<AudioConfiguration>(audioElement.GetRawText(), JsonOptions);
 
             return Result<AudioConfiguration>.Success(audioConfig ?? new AudioConfiguration());
         }
@@ -420,155 +247,118 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
         }
     }
 
-    private static ConfigurationSettings CreateDefaultConfiguration()
+    // ═══════════════════════════════════════════════════════════════
+    // Private Serialization Methods
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Serializes ConfigurationSettings to a JsonElement for the TenSecondTom section.
+    /// Handles structural differences between domain model and JSON format.
+    /// </summary>
+    private static JsonElement SerializeToJsonElement(ConfigurationSettings settings)
     {
-        return new ConfigurationSettings
+        var audioDefaults = new AudioConfiguration();
+        
+        // Build the JSON structure with all required sections
+        var tenSecondTomSection = new
         {
-            Ssh = new SshConfiguration { KeyPath = null },
-            Llm = new LlmConfiguration
+            MemoryDirectory = settings.Storage.MemoryDirectory,
+            Ssh = settings.Ssh,
+            Llm = settings.Llm,
+            Optional = settings.Optional,
+            Audio = audioDefaults,
+            Auth = new
             {
-                Provider = LlmProvider.OpenAI,
-                ApiKey = null,
-                MaxInputTokens = LlmConstants.DefaultMaxInputTokensOpenAI
+                SshAgentProvider = SshConstants.DefaultAgentProvider,
+                PublicKeyPath = settings.Ssh.KeyPath
             },
-            Storage = new StorageConfiguration
+            DataRetention = new
             {
-                MemoryDirectory = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    ".memory",
-                    "ten-second-tom"),
-                CreateIfMissing = true
+                DefaultPolicy = DataRetentionConstants.DefaultPolicy,
+                AutoPurgeEnabled = DataRetentionConstants.DefaultAutoPurgeEnabled
             },
-            Optional = new OptionalConfiguration
+            Setup = new
             {
-                LogLevel = Microsoft.Extensions.Logging.LogLevel.Information,
-                RetentionDays = 30,
-                EnableTelemetry = false
+                SshKeyDetectionTimeoutSeconds = SetupWizardConstants.Timeouts.SshKeyDetectionSeconds,
+                ApiValidationTimeoutSeconds = SetupWizardConstants.Timeouts.ApiValidationSeconds,
+                TotalSetupTimeoutSeconds = SetupWizardConstants.Timeouts.TotalSetupSeconds
             },
-            CreatedAt = DateTime.UtcNow,
-            ConfigurationVersion = "1.0"
+            Configuration = new
+            {
+                CreatedAt = settings.CreatedAt.ToString("O"),
+                LastModifiedAt = settings.LastModifiedAt?.ToString("O"),
+                Version = settings.ConfigurationVersion
+            }
         };
+
+        return JsonSerializer.SerializeToElement(tenSecondTomSection, JsonOptions);
     }
 
-    private static ConfigurationSettings ParseConfigurationFromJson(JsonElement tenSecondTomSection)
+    /// <summary>
+    /// Deserializes a JsonElement from the TenSecondTom section to ConfigurationSettings.
+    /// Handles structural differences and provides defaults for missing values.
+    /// </summary>
+    private static ConfigurationSettings DeserializeFromJsonElement(JsonElement tenSecondTomSection)
     {
-        // Parse Ssh section
-        var sshConfig = new SshConfiguration { KeyPath = null };
-        if (tenSecondTomSection.TryGetProperty("ssh", out var sshSection))
+        // Extract core configuration sections
+        var sshConfig = tenSecondTomSection.TryGetProperty("Ssh", out var sshElement)
+            ? JsonSerializer.Deserialize<SshConfiguration>(sshElement.GetRawText(), JsonOptions) ?? new SshConfiguration()
+            : new SshConfiguration();
+
+        var llmConfig = tenSecondTomSection.TryGetProperty("Llm", out var llmElement)
+            ? JsonSerializer.Deserialize<LlmConfiguration>(llmElement.GetRawText(), JsonOptions) ?? new LlmConfiguration()
+            : new LlmConfiguration();
+
+        var optionalConfig = tenSecondTomSection.TryGetProperty("Optional", out var optionalElement)
+            ? JsonSerializer.Deserialize<OptionalConfiguration>(optionalElement.GetRawText(), JsonOptions) ?? new OptionalConfiguration()
+            : new OptionalConfiguration();
+
+        // Extract MemoryDirectory (can be at root or in Storage section for backwards compatibility)
+        string? memoryDirectory = null;
+        if (tenSecondTomSection.TryGetProperty("MemoryDirectory", out var memoryDirElement))
         {
-            sshConfig = new SshConfiguration
-            {
-                KeyPath = TryGetStringProperty(sshSection, "keyPath"),
-                KeySource = TryGetEnumProperty<SshKeySource>(sshSection, "keySource"),
-                AgentSocketPath = TryGetStringProperty(sshSection, "agentSocketPath"),
-                KeyDisplayName = TryGetStringProperty(sshSection, "keyDisplayName")
-            };
+            memoryDirectory = memoryDirElement.GetString();
+        }
+        else if (tenSecondTomSection.TryGetProperty("Storage", out var storageElement) 
+                 && storageElement.TryGetProperty("MemoryDirectory", out var storageMemDirElement))
+        {
+            memoryDirectory = storageMemDirElement.GetString();
         }
 
-        // Parse Llm section
-        var llmConfig = new LlmConfiguration
-        {
-            Provider = LlmProvider.OpenAI,
-            ApiKey = null,
-            MaxInputTokens = LlmConstants.DefaultMaxInputTokensOpenAI
-        };
-        if (tenSecondTomSection.TryGetProperty("llm", out var llmSection))
-        {
-            var provider = TryGetEnumProperty<LlmProvider>(llmSection, "provider") ?? LlmProvider.OpenAI;
-            var maxInputTokens = TryGetIntProperty(llmSection, "maxInputTokens");
-
-            // Use provider-specific default if not explicitly set
-            if (!maxInputTokens.HasValue)
-            {
-                maxInputTokens = provider == LlmProvider.Anthropic
-                    ? LlmConstants.DefaultMaxInputTokensAnthropic
-                    : LlmConstants.DefaultMaxInputTokensOpenAI;
-            }
-
-            llmConfig = new LlmConfiguration
-            {
-                Provider = provider,
-                ApiKey = TryGetStringProperty(llmSection, "apiKey"),
-                Model = TryGetStringProperty(llmSection, "model"),
-                MaxInputTokens = maxInputTokens
-            };
-        }
-
-        // Parse Storage section (supports both new format at root and legacy "storage" section)
-        var storageConfig = new StorageConfiguration
-        {
-            MemoryDirectory = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".memory",
-                "ten-second-tom"),
-            CreateIfMissing = true
-        };
-
-        // Try new format first (MemoryDirectory at root level)
-        var memoryDirectory = TryGetStringProperty(tenSecondTomSection, "memoryDirectory");
-
-        // Fall back to legacy "storage" section for backwards compatibility
-        if (string.IsNullOrWhiteSpace(memoryDirectory) && tenSecondTomSection.TryGetProperty("storage", out var storageSection))
-        {
-            memoryDirectory = TryGetStringProperty(storageSection, "memoryDirectory");
-        }
-
-        storageConfig = new StorageConfiguration
-        {
-            MemoryDirectory = memoryDirectory ?? storageConfig.MemoryDirectory,
-            CreateIfMissing = true // Always true for now
-        };
-
-        // Parse Optional section
-        var optionalConfig = new OptionalConfiguration
-        {
-            LogLevel = Microsoft.Extensions.Logging.LogLevel.Information,
-            RetentionDays = 30,
-            EnableTelemetry = false
-        };
-        if (tenSecondTomSection.TryGetProperty("optional", out var optionalSection))
-        {
-            optionalConfig = new OptionalConfiguration
-            {
-                LogLevel = TryGetEnumProperty<Microsoft.Extensions.Logging.LogLevel>(optionalSection, "logLevel")
-                    ?? Microsoft.Extensions.Logging.LogLevel.Information,
-                RetentionDays = TryGetIntProperty(optionalSection, "retentionDays") ?? 30,
-                EnableTelemetry = TryGetBoolProperty(optionalSection, "enableTelemetry") ?? false
-            };
-        }
-
-        // Parse Configuration metadata
-        var createdAt = DateTime.UtcNow;
+        // Extract metadata
+        DateTime createdAt = DateTime.UtcNow;
         DateTime? lastModifiedAt = null;
-        var version = "1.0";
+        string version = "1.0";
 
-        if (tenSecondTomSection.TryGetProperty("configuration", out var configSection))
+        if (tenSecondTomSection.TryGetProperty("Configuration", out var configElement))
         {
-            if (configSection.TryGetProperty("createdAt", out var createdAtElement))
+            if (configElement.TryGetProperty("CreatedAt", out var createdElement) 
+                && DateTime.TryParse(createdElement.GetString(), out var parsedCreated))
             {
-                if (DateTime.TryParse(createdAtElement.GetString(), out var parsedCreated))
-                {
-                    createdAt = parsedCreated;
-                }
+                createdAt = parsedCreated;
             }
-
-            if (configSection.TryGetProperty("lastModifiedAt", out var modifiedAtElement))
+            
+            if (configElement.TryGetProperty("LastModifiedAt", out var modifiedElement) 
+                && DateTime.TryParse(modifiedElement.GetString(), out var modified))
             {
-                var modifiedStr = modifiedAtElement.GetString();
-                if (!string.IsNullOrEmpty(modifiedStr) && DateTime.TryParse(modifiedStr, out var parsedModified))
-                {
-                    lastModifiedAt = parsedModified;
-                }
+                lastModifiedAt = modified;
             }
-
-            version = TryGetStringProperty(configSection, "version") ?? "1.0";
+            
+            if (configElement.TryGetProperty("Version", out var versionElement))
+            {
+                version = versionElement.GetString() ?? "1.0";
+            }
         }
 
         return new ConfigurationSettings
         {
             Ssh = sshConfig,
             Llm = llmConfig,
-            Storage = storageConfig,
+            Storage = new StorageConfiguration
+            {
+                MemoryDirectory = memoryDirectory 
+                    ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), DirectoryNames.ApplicationRoot)
+            },
             Optional = optionalConfig,
             CreatedAt = createdAt,
             LastModifiedAt = lastModifiedAt,
@@ -576,44 +366,26 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
         };
     }
 
-    private static string? TryGetStringProperty(JsonElement element, string propertyName)
+    private static ConfigurationSettings CreateDefaultConfiguration()
     {
-        if (element.TryGetProperty(propertyName, out var prop))
+        return new ConfigurationSettings
         {
-            return prop.ValueKind == JsonValueKind.String ? prop.GetString() : null;
-        }
-        return null;
-    }
-
-    private static TEnum? TryGetEnumProperty<TEnum>(JsonElement element, string propertyName) where TEnum : struct, Enum
-    {
-        var stringValue = TryGetStringProperty(element, propertyName);
-        if (!string.IsNullOrEmpty(stringValue) && Enum.TryParse<TEnum>(stringValue, ignoreCase: true, out var result))
-        {
-            return result;
-        }
-        return null;
-    }
-
-    private static int? TryGetIntProperty(JsonElement element, string propertyName)
-    {
-        if (element.TryGetProperty(propertyName, out var prop))
-        {
-            if (prop.ValueKind == JsonValueKind.Number && prop.TryGetInt32(out var intValue))
+            Ssh = new SshConfiguration(),
+            Llm = new LlmConfiguration
             {
-                return intValue;
-            }
-        }
-        return null;
-    }
-
-    private static bool? TryGetBoolProperty(JsonElement element, string propertyName)
-    {
-        if (element.TryGetProperty(propertyName, out var prop))
-        {
-            if (prop.ValueKind == JsonValueKind.True) return true;
-            if (prop.ValueKind == JsonValueKind.False) return false;
-        }
-        return null;
+                Provider = LlmProvider.OpenAI,
+                MaxInputTokens = LlmConstants.DefaultMaxInputTokensOpenAI
+            },
+            Storage = new StorageConfiguration
+            {
+                MemoryDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    DirectoryNames.ApplicationRoot)
+            },
+            Optional = new OptionalConfiguration(),
+            CreatedAt = DateTime.UtcNow,
+            ConfigurationVersion = "1.0"
+        };
     }
 }
+

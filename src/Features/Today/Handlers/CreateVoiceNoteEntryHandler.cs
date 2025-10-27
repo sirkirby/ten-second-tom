@@ -189,7 +189,7 @@ public sealed class CreateVoiceNoteEntryHandler : IRequestHandler<CreateVoiceNot
         }
         else
         {
-            string? configuredProvider = _configuration[ConfigurationKeys.LlmProvider];
+            string? configuredProvider = _configuration[ConfigurationKeys.LlmProviderKey];
             if (!string.IsNullOrWhiteSpace(configuredProvider))
             {
                 provider = configuredProvider;

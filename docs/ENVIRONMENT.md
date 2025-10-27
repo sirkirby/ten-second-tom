@@ -89,8 +89,17 @@ TenSecondTom__Llm__Model=gpt-4o-mini
 
 **Storage Configuration:**
 ```bash
+# Absolute path (recommended for production)
+TenSecondTom__MemoryDirectory=/Users/chris/Documents/tom-data
+
+# Home-relative path (portable across users)
 TenSecondTom__MemoryDirectory=~/ten-second-tom
+
+# Relative path (resolved from current working directory)
+TenSecondTom__MemoryDirectory=./.memory
 ```
+
+> **Path Resolution:** Relative paths (e.g., `./data`) are resolved from the **current working directory** where you run the app, not the binary location. For production, use absolute (`/path/to/data`) or home-relative (`~/data`) paths.
 
 **Audio Configuration:**
 ```bash

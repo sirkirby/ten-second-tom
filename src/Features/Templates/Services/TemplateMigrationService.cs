@@ -48,7 +48,7 @@ public sealed class TemplateMigrationService
 
         // Get memory directory using standard .NET configuration
         // TenSecondTom:MemoryDirectory is the root containing templates/, today/, thisweek/, etc.
-            string? rootDirectory = configuration[ConfigurationKeys.MemoryDirectory];
+            string? rootDirectory = configuration[ConfigurationKeys.MemoryDirectoryKey];
         _logger.LogDebug("Root directory from configuration: {RootDirectory}", rootDirectory);
 
         if (string.IsNullOrWhiteSpace(rootDirectory))

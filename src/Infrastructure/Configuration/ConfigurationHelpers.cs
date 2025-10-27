@@ -30,7 +30,7 @@ public static class ConfigurationHelpers
         bool expandHomeDirectory = true)
     {
         // Get TenSecondTom:MemoryDirectory with .NET's built-in precedence
-        var memoryDir = configuration[ConfigurationKeys.MemoryDirectory] ??
+        var memoryDir = configuration[ConfigurationKeys.MemoryDirectoryKey] ??
                         Path.Combine(".", DirectoryNames.ApplicationRoot);
 
         if (expandHomeDirectory && memoryDir.Contains('~'))
@@ -78,6 +78,46 @@ public static class ConfigurationHelpers
 
         // Return default
         return defaultValue;
+    }
+
+    /// <summary>
+    /// Gets the user configuration file path with flexible path resolution.
+    /// 
+    /// Path Resolution Rules:
+    /// - Absolute paths: Used as-is (e.g., /Users/chris/tom-data)
+    /// - Tilde paths: Expanded to user home (e.g., ~/tom-data)
+    /// - Relative paths: Resolved from CURRENT WORKING DIRECTORY (e.g., ./.memory)
+    /// 
+    /// For production, use absolute or tilde paths to avoid current-directory dependencies.
+    /// See docs/ENVIRONMENT.md for detailed path resolution rules.
+    /// </summary>
+    /// <param name="configuration">Configuration to read MemoryDirectory setting</param>
+    /// <returns>Absolute path to user configuration file (e.g., ~/ten-second-tom/config/config.json)</returns>
+    public static string GetUserConfigPath(IConfiguration configuration)
+    {
+        var memoryDir = configuration[ConfigurationKeys.MemoryDirectoryKey];
+
+        if (string.IsNullOrWhiteSpace(memoryDir))
+        {
+            // Default: ~/ten-second-tom
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            memoryDir = Path.Combine(home, DirectoryNames.ApplicationRoot);
+        }
+        else if (memoryDir.StartsWith("~/", StringComparison.Ordinal))
+        {
+            // Tilde path: expand to home directory
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            memoryDir = Path.Combine(home, memoryDir[2..]);
+        }
+        else if (!Path.IsPathRooted(memoryDir))
+        {
+            // Relative path: resolve from current working directory (not binary location)
+            memoryDir = Path.GetFullPath(memoryDir, Directory.GetCurrentDirectory());
+        }
+
+        // User config lives in {MemoryDirectory}/config/config.json
+        var configDir = Path.Combine(memoryDir, "config");
+        return Path.Combine(configDir, "config.json");
     }
 }
 

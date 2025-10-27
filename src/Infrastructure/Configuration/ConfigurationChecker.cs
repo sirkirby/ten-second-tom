@@ -24,11 +24,11 @@ public static class ConfigurationChecker
     {
         // Check for required configuration keys using standard TenSecondTom:* namespace
         // Note: Either Ssh:KeyPath OR Ssh:KeySource must be present (agents don't need KeyPath)
-        string? sshKeyPath = configuration[ConfigurationKeys.SshKeyPath];
-        string? sshKeySource = configuration[ConfigurationKeys.SshKeySource];
-        string? llmProvider = configuration[ConfigurationKeys.LlmProvider];
-        string? llmApiKey = configuration[ConfigurationKeys.LlmApiKey];
-        string? memoryDirectory = configuration[ConfigurationKeys.MemoryDirectory];
+        string? sshKeyPath = configuration[ConfigurationKeys.SshKeyPathKey];
+        string? sshKeySource = configuration[ConfigurationKeys.SshKeySourceKey];
+        string? llmProvider = configuration[ConfigurationKeys.LlmProviderKey];
+        string? llmApiKey = configuration[ConfigurationKeys.LlmApiKeyKey];
+        string? memoryDirectory = configuration[ConfigurationKeys.MemoryDirectoryKey];
 
         // SSH is configured if either KeyPath is set OR KeySource is set
         bool hasSshConfiguration = !string.IsNullOrWhiteSpace(sshKeyPath) || 
@@ -64,8 +64,8 @@ public static class ConfigurationChecker
     /// <returns>True if model is valid or not configured, false if invalid</returns>
     public static bool ValidateModel(IConfiguration configuration, ILogger logger)
     {
-        string? provider = configuration[ConfigurationKeys.LlmProvider];
-        string? model = configuration[ConfigurationKeys.LlmModel];
+        string? provider = configuration[ConfigurationKeys.LlmProviderKey];
+        string? model = configuration[ConfigurationKeys.LlmModelKey];
         
         // If no model is configured, validation passes (model is optional in some scenarios)
         if (string.IsNullOrWhiteSpace(model))
@@ -114,8 +114,8 @@ public static class ConfigurationChecker
     /// <returns>Error message string, or null if validation would pass</returns>
     public static string? GetModelValidationError(IConfiguration configuration)
     {
-        string? provider = configuration[ConfigurationKeys.LlmProvider];
-        string? model = configuration[ConfigurationKeys.LlmModel];
+        string? provider = configuration[ConfigurationKeys.LlmProviderKey];
+        string? model = configuration[ConfigurationKeys.LlmModelKey];
         
         // If no model is configured, no error
         if (string.IsNullOrWhiteSpace(model))
@@ -174,7 +174,7 @@ public static class ConfigurationChecker
         cancellationToken.ThrowIfCancellationRequested();
 
         // Get memory directory using standard .NET configuration
-        string memoryDirectory = configuration[ConfigurationKeys.MemoryDirectory] ?? "./.memory";
+        string memoryDirectory = configuration[ConfigurationKeys.MemoryDirectoryKey] ?? "./.memory";
 
         string templatesDirectory = fileSystem.Path.Combine(memoryDirectory, "templates");
 

@@ -194,7 +194,7 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
         else
         {
             // Read from IConfiguration which includes environment variable overrides
-            string? configuredProvider = _configuration[ConfigurationKeys.LlmProvider];
+            string? configuredProvider = _configuration[ConfigurationKeys.LlmProviderKey];
             if (!string.IsNullOrWhiteSpace(configuredProvider))
             {
                 provider = configuredProvider;

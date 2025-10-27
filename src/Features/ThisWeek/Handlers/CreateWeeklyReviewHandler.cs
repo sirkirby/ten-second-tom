@@ -179,7 +179,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
         else
         {
             // Read from IConfiguration which includes environment variable overrides
-            string? configuredProvider = _configuration[ConfigurationKeys.LlmProvider];
+            string? configuredProvider = _configuration[ConfigurationKeys.LlmProviderKey];
             if (!string.IsNullOrWhiteSpace(configuredProvider))
             {
                 provider = configuredProvider;

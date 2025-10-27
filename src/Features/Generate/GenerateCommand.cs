@@ -189,10 +189,10 @@ public static class GenerateCommand
 
             // Step 5: Load configuration for max input tokens
             var configuration = serviceProvider.GetRequiredService<IConfiguration>();
-            var maxInputTokensConfig = configuration[ConfigurationKeys.LlmMaxInputTokens];
+            var maxInputTokensConfig = configuration[ConfigurationKeys.LlmMaxInputTokensKey];
             
             // Get provider-specific default if not configured
-            var llmProvider = configuration[ConfigurationKeys.LlmProvider];
+            var llmProvider = configuration[ConfigurationKeys.LlmProviderKey];
             int defaultMaxTokens = llmProvider?.ToUpperInvariant() == "ANTHROPIC"
                 ? LlmConstants.DefaultMaxInputTokensAnthropic
                 : LlmConstants.DefaultMaxInputTokensOpenAI;

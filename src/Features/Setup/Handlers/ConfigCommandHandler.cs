@@ -79,13 +79,13 @@ public sealed class ConfigCommandHandler
 
         // Apply environment variable overrides from IConfiguration
         // This shows the effective configuration that will be used at runtime
-        string? envSshKeyPath = _configuration[ConfigurationKeys.SshKeyPath];
-        string? envSshKeySource = _configuration[ConfigurationKeys.SshKeySource];
-        string? envSshAgentSocketPath = _configuration[ConfigurationKeys.SshAgentSocketPath];
-        string? envProvider = _configuration[ConfigurationKeys.LlmProvider];
-        string? envApiKey = _configuration[ConfigurationKeys.LlmApiKey];
-        string? envModel = _configuration[ConfigurationKeys.LlmModel];
-        string? envMemoryDir = _configuration[ConfigurationKeys.MemoryDirectory];
+        string? envSshKeyPath = _configuration[ConfigurationKeys.SshKeyPathKey];
+        string? envSshKeySource = _configuration[ConfigurationKeys.SshKeySourceKey];
+        string? envSshAgentSocketPath = _configuration[ConfigurationKeys.SshAgentSocketPathKey];
+        string? envProvider = _configuration[ConfigurationKeys.LlmProviderKey];
+        string? envApiKey = _configuration[ConfigurationKeys.LlmApiKeyKey];
+        string? envModel = _configuration[ConfigurationKeys.LlmModelKey];
+        string? envMemoryDir = _configuration[ConfigurationKeys.MemoryDirectoryKey];
         string? envCreateIfMissing = _configuration["TenSecondTom:CreateIfMissing"];
         string? envLogLevel = _configuration["TenSecondTom:Optional:LogLevel"];
         string? envRetentionDays = _configuration["TenSecondTom:Optional:RetentionDays"];
@@ -96,12 +96,12 @@ public sealed class ConfigCommandHandler
         string? envSttApiKey = _configuration["TenSecondTom:Audio:SttApiKey"];
         string? envSttFallbackEnabled = _configuration["TenSecondTom:Audio:SttFallbackEnabled"];
         string? envKeepFiles = _configuration["TenSecondTom:Audio:KeepFiles"];
-        string? envInputVolume = _configuration[ConfigurationKeys.AudioRecorderInputVolume];
-        string? envNoiseReduction = _configuration[ConfigurationKeys.AudioRecorderEnableNoiseReduction];
-        string? envFreqFilters = _configuration[ConfigurationKeys.AudioRecorderEnableFrequencyFilters];
-        string? envRemoveSilence = _configuration[ConfigurationKeys.AudioPreprocessingRemoveSilence];
-        string? envSilenceThreshold = _configuration[ConfigurationKeys.AudioPreprocessingSilenceThresholdDb];
-        string? envMinSilenceDuration = _configuration[ConfigurationKeys.AudioPreprocessingMinimumSilenceDurationMs];
+        string? envInputVolume = _configuration[ConfigurationKeys.AudioRecorderInputVolumeKey];
+        string? envNoiseReduction = _configuration[ConfigurationKeys.AudioRecorderEnableNoiseReductionKey];
+        string? envFreqFilters = _configuration[ConfigurationKeys.AudioRecorderEnableFrequencyFiltersKey];
+        string? envRemoveSilence = _configuration[ConfigurationKeys.AudioPreprocessingRemoveSilenceKey];
+        string? envSilenceThreshold = _configuration[ConfigurationKeys.AudioPreprocessingSilenceThresholdDbKey];
+        string? envMinSilenceDuration = _configuration[ConfigurationKeys.AudioPreprocessingMinimumSilenceDurationMsKey];
 
         // If environment variables are set, they override user secrets
         bool hasSshOverrides = !string.IsNullOrWhiteSpace(envSshKeyPath) ||
@@ -137,15 +137,15 @@ public sealed class ConfigCommandHandler
             KeepFiles = bool.TryParse(_configuration["TenSecondTom:Audio:KeepFiles"], out var keepFiles) ? keepFiles : true,
             Recorder = new RecorderConfigurationDisplay
             {
-                InputVolume = double.TryParse(_configuration[ConfigurationKeys.AudioRecorderInputVolume], out var inputVolume) ? inputVolume : 1.0,
-                EnableNoiseReduction = bool.TryParse(_configuration[ConfigurationKeys.AudioRecorderEnableNoiseReduction], out var noiseReduction) ? noiseReduction : true,
-                EnableFrequencyFilters = bool.TryParse(_configuration[ConfigurationKeys.AudioRecorderEnableFrequencyFilters], out var freqFilters) ? freqFilters : true
+                InputVolume = double.TryParse(_configuration[ConfigurationKeys.AudioRecorderInputVolumeKey], out var inputVolume) ? inputVolume : 1.0,
+                EnableNoiseReduction = bool.TryParse(_configuration[ConfigurationKeys.AudioRecorderEnableNoiseReductionKey], out var noiseReduction) ? noiseReduction : true,
+                EnableFrequencyFilters = bool.TryParse(_configuration[ConfigurationKeys.AudioRecorderEnableFrequencyFiltersKey], out var freqFilters) ? freqFilters : true
             },
             Preprocessing = new PreprocessingConfigurationDisplay
             {
-                RemoveSilence = bool.TryParse(_configuration[ConfigurationKeys.AudioPreprocessingRemoveSilence], out var removeSilence) ? removeSilence : true,
-                SilenceThresholdDb = int.TryParse(_configuration[ConfigurationKeys.AudioPreprocessingSilenceThresholdDb], out var silenceThreshold) ? silenceThreshold : -50,
-                MinimumSilenceDurationMs = int.TryParse(_configuration[ConfigurationKeys.AudioPreprocessingMinimumSilenceDurationMs], out var minSilenceDuration) ? minSilenceDuration : 500
+                RemoveSilence = bool.TryParse(_configuration[ConfigurationKeys.AudioPreprocessingRemoveSilenceKey], out var removeSilence) ? removeSilence : true,
+                SilenceThresholdDb = int.TryParse(_configuration[ConfigurationKeys.AudioPreprocessingSilenceThresholdDbKey], out var silenceThreshold) ? silenceThreshold : -50,
+                MinimumSilenceDurationMs = int.TryParse(_configuration[ConfigurationKeys.AudioPreprocessingMinimumSilenceDurationMsKey], out var minSilenceDuration) ? minSilenceDuration : 500
             }
         };
 
