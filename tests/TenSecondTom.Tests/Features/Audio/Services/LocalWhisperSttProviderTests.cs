@@ -25,11 +25,8 @@ public sealed class LocalWhisperSttProviderTests
         _mockLogger = new Mock<ILogger<LocalWhisperSttProvider>>();
         _config = new AudioConfiguration
         {
-            LocalWhisper = new LocalWhisperConfiguration
-            {
-                BinaryPath = "whisper-cpp",
-                ModelPath = "/path/to/ggml-base.en.bin"
-            }
+            SttBinaryPath = "whisper-cpp",
+            SttModel = "/path/to/ggml-base.en.bin"
         };
     }
 
@@ -67,11 +64,8 @@ public sealed class LocalWhisperSttProviderTests
         // Arrange
         var invalidConfig = new AudioConfiguration
         {
-            LocalWhisper = new LocalWhisperConfiguration
-            {
-                BinaryPath = "nonexistent-whisper-binary",
-                ModelPath = "/path/to/ggml-base.en.bin"
-            }
+            SttBinaryPath = "nonexistent-whisper-binary",
+            SttModel = "/path/to/ggml-base.en.bin"
         };
         var provider = CreateProvider(invalidConfig);
 
@@ -90,11 +84,8 @@ public sealed class LocalWhisperSttProviderTests
         // Arrange
         var invalidConfig = new AudioConfiguration
         {
-            LocalWhisper = new LocalWhisperConfiguration
-            {
-                BinaryPath = "whisper-cpp",
-                ModelPath = string.Empty
-            }
+            SttBinaryPath = "whisper-cpp",
+            SttModel = string.Empty
         };
         var provider = CreateProvider(invalidConfig);
 
@@ -113,11 +104,8 @@ public sealed class LocalWhisperSttProviderTests
         // Arrange
         var invalidConfig = new AudioConfiguration
         {
-            LocalWhisper = new LocalWhisperConfiguration
-            {
-                BinaryPath = "whisper-cpp",
-                ModelPath = "/nonexistent/model.bin"
-            }
+            SttBinaryPath = "whisper-cpp",
+            SttModel = "/nonexistent/model.bin"
         };
         var provider = CreateProvider(invalidConfig);
 

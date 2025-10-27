@@ -1,4 +1,5 @@
 using TenSecondTom.Features.Audio.Models;
+using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Results;
 
@@ -11,10 +12,10 @@ namespace TenSecondTom.Features.Audio.Commands;
 public sealed record RecordCommand : IRequest<Result<StoredRecording>>
 {
     /// <summary>
-    /// Gets the STT selection strategy (auto, local, or openai).
-    /// Defaults to Auto for automatic selection.
+    /// Gets the audio configuration for STT provider selection.
+    /// This includes the STT provider, API key, and fallback settings.
     /// </summary>
-    public SttSelection SttSelection { get; init; } = SttSelection.Auto;
+    public required AudioConfiguration AudioConfig { get; init; }
 
     /// <summary>
     /// Gets the maximum recording duration in seconds.

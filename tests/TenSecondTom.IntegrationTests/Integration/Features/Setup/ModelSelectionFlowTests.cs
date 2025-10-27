@@ -13,10 +13,15 @@ namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
 /// Each test uses a unique User Secrets ID to avoid interference with production configuration.
 /// </summary>
 [Collection(UserSecretsCollection.Name)]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable", Justification = "IAsyncLifetime pattern used instead of IDisposable")]
 public sealed class ModelSelectionFlowTests : UserSecretsTestFixture
 {
+    private readonly TemporaryTestDirectory _testDirectory;
+
     public ModelSelectionFlowTests()
     {
+        _testDirectory = new TemporaryTestDirectory();
+
         // Set up logger for the base fixture
         using var loggerFactory = LoggerFactory.Create(builder =>
             builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
@@ -167,10 +172,12 @@ public sealed class ModelSelectionFlowTests : UserSecretsTestFixture
         ModelRegistry.IsValid(anthropicDefault.Id, LlmProvider.Anthropic).Should().BeTrue();
     }
 
-    private UserSecretsStorageService CreateStorageService()
+    private ConfigurationStorageService CreateStorageService()
     {
-        var logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<UserSecretsStorageService>();
-        return new UserSecretsStorageService(logger, TestUserSecretsId);
+        var logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<ConfigurationStorageService>();
+        var testAppSettingsPath = Path.Combine(_testDirectory.BasePath, "appsettings.json");
+        var configuration = new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build();
+        return new ConfigurationStorageService(logger, configuration, testAppSettingsPath);
     }
 
     private static ConfigurationSettings CreateTestSettings(LlmProvider provider, string? modelId)
@@ -197,5 +204,13 @@ public sealed class ModelSelectionFlowTests : UserSecretsTestFixture
                 RetentionDays = -1
             }
         };
+    }
+
+    public override async Task DisposeAsync()
+    {
+        _testDirectory.Dispose();
+
+        // Call base cleanup for UserSecrets
+        await base.DisposeAsync();
     }
 }

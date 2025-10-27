@@ -164,7 +164,10 @@ public sealed class SetupCommandHandler
                 {
                     Provider = selectedProvider.Value,
                     ApiKey = apiKey,
-                    Model = modelId // Set the selected or default model
+                    Model = modelId, // Set the selected or default model
+                    MaxInputTokens = selectedProvider.Value == LlmProvider.Anthropic
+                        ? LlmConstants.DefaultMaxInputTokensAnthropic
+                        : LlmConstants.DefaultMaxInputTokensOpenAI
                 },
                 Storage = new StorageConfiguration
                 {

@@ -18,13 +18,16 @@ namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
 /// Tests end-to-end interactive model selection via config command
 /// </summary>
 [Collection(UserSecretsCollection.Name)]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable", Justification = "IAsyncLifetime pattern used instead of IDisposable")]
 public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
 {
     private readonly ServiceProvider _serviceProvider;
     private readonly Mock<ISetupWizardUI> _mockWizard;
+    private readonly TemporaryTestDirectory _testDirectory;
 
     public ConfigLlmCommandTests()
     {
+        _testDirectory = new TemporaryTestDirectory();
         _mockWizard = new Mock<ISetupWizardUI>();
 
         // Setup common UI methods that don't affect test outcomes
@@ -37,11 +40,13 @@ public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
         services.AddHttpClient(); // Required by API key validators
         services.AddSingleton(_mockWizard.Object);
 
-        // Use TestUserSecretsId from base fixture
+        // Use test appsettings.json file
+        var testAppSettingsPath = Path.Combine(_testDirectory.BasePath, "appsettings.json");
         services.AddSingleton<IConfigurationStorageService>(sp =>
-            new UserSecretsStorageService(
-                sp.GetRequiredService<ILogger<UserSecretsStorageService>>(),
-                TestUserSecretsId));
+            new ConfigurationStorageService(
+                sp.GetRequiredService<ILogger<ConfigurationStorageService>>(),
+                sp.GetRequiredService<IConfiguration>(),
+                testAppSettingsPath));
 
         // Mock app settings storage (not tested in these LLM config tests)
         var mockAppSettingsStorage = new Mock<IAppSettingsStorageService>();
@@ -326,15 +331,6 @@ public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    public override async Task DisposeAsync()
-    {
-        // Dispose service provider
-        _serviceProvider?.Dispose();
-
-        // Call base cleanup for UserSecrets
-        await base.DisposeAsync();
-    }
-
     private static ConfigurationSettings CreateValidConfiguration()
     {
         return new ConfigurationSettings
@@ -366,5 +362,14 @@ public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
             LastModifiedAt = null,
             ConfigurationVersion = "1.0"
         };
+    }
+
+    public override async Task DisposeAsync()
+    {
+        _testDirectory.Dispose();
+        _serviceProvider.Dispose();
+
+        // Call base cleanup for UserSecrets
+        await base.DisposeAsync();
     }
 }

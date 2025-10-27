@@ -1,5 +1,5 @@
-using System.Diagnostics.CodeAnalysis;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using TenSecondTom.Features.Setup.Models;
@@ -9,55 +9,34 @@ using Xunit;
 namespace TenSecondTom.Tests.Unit.Infrastructure.Configuration;
 
 /// <summary>
-/// Unit tests for UserSecretsStorageService
-/// Tests User Secrets write/read, fallback to appsettings.json, and error handling
-/// Note: These are actually integration tests as they perform real I/O operations.
-/// Each test uses a unique User Secrets ID to avoid polluting production configuration.
+/// Unit tests for ConfigurationStorageService
+/// Tests unified configuration storage to appsettings.json with atomic operations
 /// </summary>
-public sealed class UserSecretsStorageServiceTests : IDisposable
+public sealed class ConfigurationStorageServiceTests : IDisposable
 {
-    private readonly Mock<ILogger<UserSecretsStorageService>> _loggerMock;
-    private readonly string _testUserSecretsId;
+    private readonly string _testDirectory;
+    private readonly string _testAppSettingsPath;
+    private readonly Mock<ILogger<ConfigurationStorageService>> _mockLogger;
 
-    public UserSecretsStorageServiceTests()
+    public ConfigurationStorageServiceTests()
     {
-        _loggerMock = new Mock<ILogger<UserSecretsStorageService>>();
-        // Use a unique ID for each test instance to avoid polluting production UserSecrets
-        _testUserSecretsId = $"TenSecondTom-Test-{Guid.NewGuid()}";
+        _testDirectory = Path.Combine(Path.GetTempPath(), $"tom-test-{Guid.NewGuid()}");
+        Directory.CreateDirectory(_testDirectory);
+        _testAppSettingsPath = Path.Combine(_testDirectory, "appsettings.json");
+        _mockLogger = new Mock<ILogger<ConfigurationStorageService>>();
     }
 
-    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Cleanup must not throw")]
     public void Dispose()
     {
-        // Clean up test UserSecrets directory
-        var userSecretsPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Microsoft",
-            "UserSecrets",
-            _testUserSecretsId);
-
-        if (Directory.Exists(userSecretsPath))
+        if (Directory.Exists(_testDirectory))
         {
             try
             {
-                Directory.Delete(userSecretsPath, recursive: true);
-            }
-            catch (IOException)
-            {
-                // Retry after delay if directory is locked
-                Thread.Sleep(100);
-                try
-                {
-                    Directory.Delete(userSecretsPath, recursive: true);
-                }
-                catch
-                {
-                    // Ignore - cleanup script can handle orphaned directories
-                }
+                Directory.Delete(_testDirectory, recursive: true);
             }
             catch
             {
-                // Ignore cleanup errors - don't fail tests because of cleanup
+                // Best effort cleanup
             }
         }
     }
@@ -65,8 +44,11 @@ public sealed class UserSecretsStorageServiceTests : IDisposable
     [Fact]
     public void Constructor_WithNullLogger_ThrowsArgumentNullException()
     {
+        // Arrange
+        var config = CreateMockConfiguration();
+
         // Act
-        var act = () => new UserSecretsStorageService(null!);
+        var act = () => new ConfigurationStorageService(null!, config);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -77,7 +59,8 @@ public sealed class UserSecretsStorageServiceTests : IDisposable
     public async Task SaveAsync_WithValidSettings_SavesSuccessfully()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
         var settings = CreateValidConfigurationSettings();
 
         // Act
@@ -86,14 +69,30 @@ public sealed class UserSecretsStorageServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().NotBeNullOrEmpty();
+        result.Value.Should().Be(_testAppSettingsPath);
+        File.Exists(_testAppSettingsPath).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SaveAsync_WithNullSettings_ThrowsArgumentNullException()
+    {
+        // Arrange
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
+
+        // Act
+        var act = async () => await service.SaveAsync(null!, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<ArgumentNullException>();
     }
 
     [Fact]
     public async Task SaveAsync_WithCancellationToken_RespectsCancellation()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
         var settings = CreateValidConfigurationSettings();
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
@@ -102,8 +101,6 @@ public sealed class UserSecretsStorageServiceTests : IDisposable
         var act = async () => await service.SaveAsync(settings, cts.Token);
 
         // Assert
-        // Service may or may not throw depending on cancellation timing
-        // Just verify it handles cancellation token
         try
         {
             await act.Invoke();
@@ -118,7 +115,8 @@ public sealed class UserSecretsStorageServiceTests : IDisposable
     public async Task LoadAsync_AfterSave_ReturnsConfigurationSettings()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
         var originalSettings = CreateValidConfigurationSettings();
 
         // Save first
@@ -138,14 +136,11 @@ public sealed class UserSecretsStorageServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task LoadAsync_WithNoConfiguration_ReturnsFailure()
+    public async Task LoadAsync_WithNoConfiguration_ReturnsDefaults()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
-
-        // Note: This test assumes a clean state where no configuration exists
-        // In practice, if configuration exists from previous tests, this may succeed
-        // The service should handle missing configuration gracefully
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
 
         // Act
         var result = await service.LoadAsync(CancellationToken.None);
@@ -158,48 +153,34 @@ public sealed class UserSecretsStorageServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveAsync_WithNullSettings_ReturnsFailure()
+    public async Task LoadAsync_WithCancellationToken_RespectsCancellation()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
 
         // Act
-        var act = async () => await service.SaveAsync(null!, CancellationToken.None);
+        var act = async () => await service.LoadAsync(cts.Token);
 
         // Assert
-        await act.Should().ThrowAsync<ArgumentNullException>();
-    }
-
-    [Fact]
-    public async Task SaveAsync_LogsStorageLocation()
-    {
-        // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
-        var settings = CreateValidConfigurationSettings();
-
-        // Act
-        var result = await service.SaveAsync(settings, CancellationToken.None);
-
-        // Assert
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().NotBeNullOrEmpty();
-        
-        // Verify logging occurred
-        _loggerMock.Verify(
-            x => x.Log(
-                It.IsAny<LogLevel>(),
-                It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => true),
-                It.IsAny<Exception>(),
-                It.Is<Func<It.IsAnyType, Exception?, string>>((v, t) => true)),
-            Times.AtLeastOnce);
+        try
+        {
+            await act.Invoke();
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected - cancellation was respected
+        }
     }
 
     [Fact]
     public async Task SaveAsync_WithComplexConfiguration_PreservesAllFields()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
         var settings = new ConfigurationSettings
         {
             Ssh = new SshConfiguration
@@ -211,7 +192,8 @@ public sealed class UserSecretsStorageServiceTests : IDisposable
             Llm = new LlmConfiguration
             {
                 Provider = LlmProvider.Anthropic,
-                ApiKey = "sk-ant-api03-test1234567890abcdefghijklmnopqrstuvwxyz"
+                ApiKey = "sk-ant-api03-test1234567890abcdefghijklmnopqrstuvwxyz",
+                Model = "claude-3-5-sonnet-20241022"
             },
             Storage = new StorageConfiguration
             {
@@ -233,145 +215,81 @@ public sealed class UserSecretsStorageServiceTests : IDisposable
         // Assert - All fields preserved
         loadResult.IsSuccess.Should().BeTrue();
         var loaded = loadResult.Value;
-        
+
         loaded.Ssh.KeyPath.Should().Be(settings.Ssh.KeyPath);
         loaded.Ssh.KeySource.Should().Be(settings.Ssh.KeySource);
-        
+
         loaded.Llm.Provider.Should().Be(settings.Llm.Provider);
         loaded.Llm.ApiKey.Should().Be(settings.Llm.ApiKey);
-        
+        loaded.Llm.Model.Should().Be(settings.Llm.Model);
+
         loaded.Storage.MemoryDirectory.Should().Be(settings.Storage.MemoryDirectory);
         loaded.Optional.LogLevel.Should().Be(settings.Optional.LogLevel);
         loaded.Optional.RetentionDays.Should().Be(settings.Optional.RetentionDays);
     }
 
     [Fact]
-    public async Task LoadAsync_WithCancellationToken_RespectsCancellation()
+    public async Task SaveAsync_ShouldPreserveOtherSections()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
-        using var cts = new CancellationTokenSource();
-        await cts.CancelAsync();
-
-        // Act
-        var act = async () => await service.LoadAsync(cts.Token);
-
-        // Assert
-        try
+        var initialJson = """
         {
-            await act.Invoke();
+          "Serilog": {
+            "MinimumLevel": "Debug"
+          }
         }
-        catch (OperationCanceledException)
-        {
-            // Expected - cancellation was respected
-        }
-    }
+        """;
+        await File.WriteAllTextAsync(_testAppSettingsPath, initialJson);
 
-    [Fact]
-    public async Task SaveAsync_CreatesDirectoryIfNotExists()
-    {
-        // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
         var settings = CreateValidConfigurationSettings();
 
         // Act
         var result = await service.SaveAsync(settings, CancellationToken.None);
 
         // Assert
-        result.Should().NotBeNull();
         result.IsSuccess.Should().BeTrue();
-        
-        // Directory should have been created - verify via storage location
-        result.Value.Should().NotBeNullOrEmpty();
-        var directory = Path.GetDirectoryName(result.Value);
-        if (!string.IsNullOrEmpty(directory))
+        var content = await File.ReadAllTextAsync(_testAppSettingsPath);
+        content.Should().Contain("Serilog");
+        content.Should().Contain("MinimumLevel");
+        content.Should().Contain("Debug");
+    }
+
+    [Fact]
+    public async Task SaveAsync_WithConcurrentWrites_ShouldNotCorruptFile()
+    {
+        // Arrange
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
+        var settings1 = CreateValidConfigurationSettings() with
         {
-            Directory.Exists(directory).Should().BeTrue();
-        }
-    }
-
-    [Fact]
-    public async Task GetStorageLocation_AfterSave_ReturnsUserSecretsPath()
-    {
-        // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
-        var settings = CreateValidConfigurationSettings();
-
-        // Act
-        var saveResult = await service.SaveAsync(settings, CancellationToken.None);
-        var location = service.GetStorageLocation();
-
-        // Assert
-        saveResult.IsSuccess.Should().BeTrue();
-        location.Should().NotBeNullOrEmpty();
-        location.Should().Contain("usersecrets");
-        location.Should().EndWith("secrets.json");
-    }
-
-    [Fact]
-    public void GetStorageLocation_BeforeSave_ReturnsDefaultPath()
-    {
-        // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
-
-        // Act
-        var location = service.GetStorageLocation();
-
-        // Assert
-        location.Should().NotBeNullOrEmpty();
-        location.Should().Contain("usersecrets");
-        location.Should().EndWith("secrets.json");
-    }
-
-    [Fact]
-    public async Task LoadAsync_WithPartialConfiguration_ReturnsDefaults()
-    {
-        // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
-        
-        // Save a minimal configuration with only required fields
-        var minimalSettings = new ConfigurationSettings
+            Llm = new LlmConfiguration { Provider = LlmProvider.OpenAI, ApiKey = "sk-key1" }
+        };
+        var settings2 = CreateValidConfigurationSettings() with
         {
-            Ssh = new SshConfiguration
-            {
-                KeyPath = "/test/key"
-            },
-            Llm = new LlmConfiguration
-            {
-                Provider = LlmProvider.OpenAI,
-                ApiKey = "sk-test123"
-            },
-            Storage = new StorageConfiguration
-            {
-                MemoryDirectory = "/test/memory"
-            },
-            Optional = new OptionalConfiguration()
+            Llm = new LlmConfiguration { Provider = LlmProvider.Anthropic, ApiKey = "sk-ant-key2" }
         };
 
-        var saveResult = await service.SaveAsync(minimalSettings, CancellationToken.None);
-        saveResult.IsSuccess.Should().BeTrue();
-
         // Act
-        var loadResult = await service.LoadAsync(CancellationToken.None);
+        var task1 = service.SaveAsync(settings1, CancellationToken.None);
+        var task2 = service.SaveAsync(settings2, CancellationToken.None);
+        var results = await Task.WhenAll(task1, task2);
 
         // Assert
+        results.Should().AllSatisfy(r => r.IsSuccess.Should().BeTrue());
+
+        // File should be valid JSON (not corrupted)
+        var loadResult = await service.LoadAsync(CancellationToken.None);
         loadResult.IsSuccess.Should().BeTrue();
-        var loaded = loadResult.Value;
-        
-        // Core fields should be preserved
-        loaded.Ssh.KeyPath.Should().Be("/test/key");
-        loaded.Llm.ApiKey.Should().Be("sk-test123");
-        
-        // Optional fields should have defaults
-        loaded.Optional.LogLevel.Should().Be(Microsoft.Extensions.Logging.LogLevel.Information);
-        loaded.Optional.RetentionDays.Should().Be(30);
     }
 
     [Fact]
     public async Task SaveAsync_WithNullOptionalFields_HandlesGracefully()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
         var settings = new ConfigurationSettings
         {
             Ssh = new SshConfiguration
@@ -402,7 +320,7 @@ public sealed class UserSecretsStorageServiceTests : IDisposable
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        
+
         // Load and verify null fields are handled
         var loadResult = await service.LoadAsync(CancellationToken.None);
         loadResult.IsSuccess.Should().BeTrue();
@@ -415,7 +333,8 @@ public sealed class UserSecretsStorageServiceTests : IDisposable
     public async Task SaveAsync_WithDifferentProviders_PreservesProviderChoice()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
 
         // Test OpenAI
         var openAiSettings = CreateValidConfigurationSettings() with
@@ -450,7 +369,8 @@ public sealed class UserSecretsStorageServiceTests : IDisposable
     public async Task SaveAsync_WithDifferentSshKeySources_PreservesSource()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
 
         // Test each SSH key source
         var sources = new[]
@@ -486,10 +406,11 @@ public sealed class UserSecretsStorageServiceTests : IDisposable
     public async Task SaveAsync_WithTimestamps_PreservesTimestamps()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
         var createdAt = DateTime.UtcNow.AddDays(-7);
         var modifiedAt = DateTime.UtcNow;
-        
+
         var settings = CreateValidConfigurationSettings() with
         {
             CreatedAt = createdAt,
@@ -514,7 +435,8 @@ public sealed class UserSecretsStorageServiceTests : IDisposable
     public async Task SaveAsync_WithUnlimitedRetention_PreservesNegativeValue()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
         var settings = CreateValidConfigurationSettings() with
         {
             Optional = new OptionalConfiguration
@@ -534,45 +456,12 @@ public sealed class UserSecretsStorageServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveAsync_LogsWarningOnFallback()
-    {
-        // Note: Testing actual fallback to appsettings.json is difficult in unit tests
-        // as it requires forcing User Secrets to fail. This test verifies the
-        // warning logging behavior is set up correctly.
-        
-        // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
-        var settings = CreateValidConfigurationSettings();
-
-        // Act
-        await service.SaveAsync(settings, CancellationToken.None);
-
-        // Assert
-        // Verify that if Information level logging occurred (successful save)
-        _loggerMock.Verify(
-            x => x.Log(
-                LogLevel.Information,
-                It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => true),
-                It.IsAny<Exception>(),
-                It.Is<Func<It.IsAnyType, Exception?, string>>((v, t) => true)),
-            Times.AtLeastOnce);
-    }
-
-    [Fact]
     public async Task LoadAsync_WithCorruptedData_ReturnsFailure()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
-        
-        // Write corrupted JSON directly to User Secrets path
-        var location = service.GetStorageLocation();
-        var directory = Path.GetDirectoryName(location);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-            await File.WriteAllTextAsync(location, "{ this is not valid json }", CancellationToken.None);
-        }
+        await File.WriteAllTextAsync(_testAppSettingsPath, "{ this is not valid json }", CancellationToken.None);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
 
         // Act
         var result = await service.LoadAsync(CancellationToken.None);
@@ -580,20 +469,15 @@ public sealed class UserSecretsStorageServiceTests : IDisposable
         // Assert
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("LoadFailed");
-        
-        // Clean up
-        if (File.Exists(location))
-        {
-            File.Delete(location);
-        }
     }
 
     [Fact]
     public async Task SaveAsync_MultipleTimesSequentially_UpdatesConfiguration()
     {
         // Arrange
-        var service = new UserSecretsStorageService(_loggerMock.Object, _testUserSecretsId);
-        
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
+
         var settings1 = CreateValidConfigurationSettings() with
         {
             Llm = new LlmConfiguration
@@ -627,7 +511,103 @@ public sealed class UserSecretsStorageServiceTests : IDisposable
         loaded2.Value.Llm.ApiKey.Should().Be("sk-ant-second-key");
     }
 
+    [Fact]
+    public void GetStorageLocation_ReturnsAppSettingsPath()
+    {
+        // Arrange
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
+
+        // Act
+        var location = service.GetStorageLocation();
+
+        // Assert
+        location.Should().Be(_testAppSettingsPath);
+    }
+
+    [Fact]
+    public async Task SaveAsync_LogsStorageLocation()
+    {
+        // Arrange
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
+        var settings = CreateValidConfigurationSettings();
+
+        // Act
+        var result = await service.SaveAsync(settings, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+
+        // Verify logging occurred
+        _mockLogger.Verify(
+            x => x.Log(
+                It.IsAny<LogLevel>(),
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => true),
+                It.IsAny<Exception>(),
+                It.Is<Func<It.IsAnyType, Exception?, string>>((v, t) => true)),
+            Times.AtLeastOnce);
+    }
+
+    [Fact]
+    public async Task LoadAsync_WithPartialConfiguration_ReturnsDefaults()
+    {
+        // Arrange
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
+
+        // Save a minimal configuration with only required fields
+        var minimalSettings = new ConfigurationSettings
+        {
+            Ssh = new SshConfiguration
+            {
+                KeyPath = "/test/key"
+            },
+            Llm = new LlmConfiguration
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "sk-test123"
+            },
+            Storage = new StorageConfiguration
+            {
+                MemoryDirectory = "/test/memory"
+            },
+            Optional = new OptionalConfiguration()
+        };
+
+        var saveResult = await service.SaveAsync(minimalSettings, CancellationToken.None);
+        saveResult.IsSuccess.Should().BeTrue();
+
+        // Act
+        var loadResult = await service.LoadAsync(CancellationToken.None);
+
+        // Assert
+        loadResult.IsSuccess.Should().BeTrue();
+        var loaded = loadResult.Value;
+
+        // Core fields should be preserved
+        loaded.Ssh.KeyPath.Should().Be("/test/key");
+        loaded.Llm.ApiKey.Should().Be("sk-test123");
+
+        // Optional fields should have defaults
+        loaded.Optional.LogLevel.Should().Be(Microsoft.Extensions.Logging.LogLevel.Information);
+        loaded.Optional.RetentionDays.Should().Be(30);
+    }
+
     #region Helper Methods
+
+    private static IConfiguration CreateMockConfiguration(string? memoryDirectory = null)
+    {
+        var configData = new Dictionary<string, string?>
+        {
+            ["TenSecondTom:MemoryDirectory"] = memoryDirectory ?? Path.Combine(Path.GetTempPath(), "ten-second-tom-test")
+        };
+
+        return new ConfigurationBuilder()
+            .AddInMemoryCollection(configData)
+            .Build();
+    }
 
     private static ConfigurationSettings CreateValidConfigurationSettings()
     {

@@ -1,13 +1,13 @@
 using Microsoft.Extensions.Logging;
-using TenSecondTom.Features.Audio.Models;
+using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
-using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Audio.Services;
 
 /// <summary>
 /// Factory for creating and selecting STT provider instances.
-/// Implements the STT selection strategy (auto, local, or remote).
+/// Implements the STT selection strategy based on configuration.
 /// </summary>
 public sealed class SttProviderFactory : ISttProviderFactory
 {
@@ -44,17 +44,33 @@ public sealed class SttProviderFactory : ISttProviderFactory
 
     /// <inheritdoc/>
     public async Task<ISttProvider?> GetProviderAsync(
-        SttSelection selection = SttSelection.Auto,
+        AudioConfiguration configuration,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("Getting STT provider for selection: {Selection}", selection);
+        ArgumentNullException.ThrowIfNull(configuration);
 
-        return selection switch
+        var provider = configuration.SttProvider;
+        var fallbackEnabled = configuration.SttFallbackEnabled;
+
+        _logger.LogDebug(
+            "Getting STT provider: Provider={Provider}, CloudFallback={FallbackEnabled}",
+            provider,
+            fallbackEnabled);
+
+        // Normalize provider name for case-insensitive comparison
+        var normalizedProvider = provider?.ToLowerInvariant();
+
+        return normalizedProvider switch
         {
-            SttSelection.Auto => await GetAutoProviderAsync(cancellationToken),
-            SttSelection.Local => await GetLocalProviderAsync(cancellationToken),
-            SttSelection.OpenAI => await GetOpenAiProviderAsync(cancellationToken),
-            _ => throw new ArgumentOutOfRangeException(nameof(selection), selection, "Invalid STT selection")
+            SttProviders.WhisperCpp when fallbackEnabled =>
+                await GetWhisperCppWithFallbackAsync(cancellationToken),
+            SttProviders.WhisperCpp =>
+                await GetWhisperCppOnlyAsync(cancellationToken),
+            SttProviders.OpenAI =>
+                await GetOpenAiProviderAsync(cancellationToken),
+            _ => throw new ArgumentException(
+                $"Invalid STT provider: {provider}. Valid values: {string.Join(", ", SttProviders.All)}",
+                nameof(configuration))
         };
     }
 
@@ -69,33 +85,33 @@ public sealed class SttProviderFactory : ISttProviderFactory
         };
     }
 
-    private async Task<ISttProvider?> GetAutoProviderAsync(CancellationToken cancellationToken)
+    private async Task<ISttProvider?> GetWhisperCppWithFallbackAsync(CancellationToken cancellationToken)
     {
         // Try local first
         if (await _localProvider.IsAvailableAsync(cancellationToken))
         {
-            _logger.LogInformation("Auto-selection: Using local whisper.cpp provider");
+            _logger.LogInformation("Using local whisper.cpp provider (fallback enabled)");
             return _localProvider;
         }
 
-        _logger.LogDebug("Local whisper.cpp not available, fallback to OpenAI");
+        _logger.LogDebug("Local whisper.cpp not available, attempting fallback to OpenAI");
 
         // Fallback to OpenAI
         if (await _openAiProvider.IsAvailableAsync(cancellationToken))
         {
-            _logger.LogInformation("Auto-selection: Fallback to OpenAI Whisper API provider (local unavailable)");
+            _logger.LogInformation("Using OpenAI Whisper API provider (fallback from whisper.cpp)");
             return _openAiProvider;
         }
 
-        _logger.LogWarning("No STT providers available (auto-selection)");
+        _logger.LogWarning("No STT providers available (whisper.cpp unavailable, fallback failed)");
         return null;
     }
 
-    private async Task<ISttProvider?> GetLocalProviderAsync(CancellationToken cancellationToken)
+    private async Task<ISttProvider?> GetWhisperCppOnlyAsync(CancellationToken cancellationToken)
     {
         if (await _localProvider.IsAvailableAsync(cancellationToken))
         {
-            _logger.LogInformation("Using local whisper.cpp provider (explicit selection)");
+            _logger.LogInformation("Using local whisper.cpp provider (fallback disabled)");
             return _localProvider;
         }
 
@@ -107,7 +123,7 @@ public sealed class SttProviderFactory : ISttProviderFactory
     {
         if (await _openAiProvider.IsAvailableAsync(cancellationToken))
         {
-            _logger.LogInformation("Using OpenAI Whisper API provider (explicit selection)");
+            _logger.LogInformation("Using OpenAI Whisper API provider");
             return _openAiProvider;
         }
 

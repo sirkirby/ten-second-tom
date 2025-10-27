@@ -4,6 +4,8 @@ using Moq;
 using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Features.Audio.Services;
+using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Constants;
 
 namespace TenSecondTom.Tests.Features.Audio.Services;
 
@@ -37,9 +39,14 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(true);
 
         var factory = CreateFactory();
+        var config = new AudioConfiguration
+        {
+            SttProvider = SttProviders.WhisperCpp,
+            SttFallbackEnabled = true
+        };
 
         // Act
-        var provider = await factory.GetProviderAsync(SttSelection.Auto);
+        var provider = await factory.GetProviderAsync(config);
 
         // Assert
         provider.Should().NotBeNull();
@@ -60,9 +67,14 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(true);
 
         var factory = CreateFactory();
+        var config = new AudioConfiguration
+        {
+            SttProvider = SttProviders.WhisperCpp,
+            SttFallbackEnabled = true
+        };
 
         // Act
-        var provider = await factory.GetProviderAsync(SttSelection.Auto);
+        var provider = await factory.GetProviderAsync(config);
 
         // Assert
         provider.Should().NotBeNull();
@@ -84,9 +96,14 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(false);
 
         var factory = CreateFactory();
+        var config = new AudioConfiguration
+        {
+            SttProvider = SttProviders.WhisperCpp,
+            SttFallbackEnabled = true
+        };
 
         // Act
-        var provider = await factory.GetProviderAsync(SttSelection.Auto);
+        var provider = await factory.GetProviderAsync(config);
 
         // Assert
         provider.Should().BeNull();
@@ -103,9 +120,14 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(true);
 
         var factory = CreateFactory();
+        var config = new AudioConfiguration
+        {
+            SttProvider = SttProviders.WhisperCpp,
+            SttFallbackEnabled = false
+        };
 
         // Act
-        var provider = await factory.GetProviderAsync(SttSelection.Local);
+        var provider = await factory.GetProviderAsync(config);
 
         // Assert
         provider.Should().NotBeNull();
@@ -123,9 +145,14 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(false);
 
         var factory = CreateFactory();
+        var config = new AudioConfiguration
+        {
+            SttProvider = SttProviders.WhisperCpp,
+            SttFallbackEnabled = false
+        };
 
         // Act
-        var provider = await factory.GetProviderAsync(SttSelection.Local);
+        var provider = await factory.GetProviderAsync(config);
 
         // Assert
         provider.Should().BeNull();
@@ -143,9 +170,14 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(true);
 
         var factory = CreateFactory();
+        var config = new AudioConfiguration
+        {
+            SttProvider = SttProviders.OpenAI,
+            SttFallbackEnabled = false
+        };
 
         // Act
-        var provider = await factory.GetProviderAsync(SttSelection.OpenAI);
+        var provider = await factory.GetProviderAsync(config);
 
         // Assert
         provider.Should().NotBeNull();
@@ -164,9 +196,14 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(true);
 
         var factory = CreateFactory();
+        var config = new AudioConfiguration
+        {
+            SttProvider = SttProviders.WhisperCpp,
+            SttFallbackEnabled = true
+        };
 
         // Act
-        await factory.GetProviderAsync(SttSelection.Auto);
+        await factory.GetProviderAsync(config);
 
         // Assert
         // Verify structured logging occurred (implementation should log engine selection)
@@ -186,9 +223,14 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(true);
 
         var factory = CreateFactory();
+        var config = new AudioConfiguration
+        {
+            SttProvider = SttProviders.WhisperCpp,
+            SttFallbackEnabled = true
+        };
 
         // Act
-        await factory.GetProviderAsync(SttSelection.Auto);
+        await factory.GetProviderAsync(config);
 
         // Assert
         _mockLogger.Invocations.Should().Contain(i =>
@@ -236,9 +278,14 @@ public sealed class SttProviderFactoryTests
             .ThrowsAsync(new OperationCanceledException());
 
         var factory = CreateFactory();
+        var config = new AudioConfiguration
+        {
+            SttProvider = SttProviders.WhisperCpp,
+            SttFallbackEnabled = true
+        };
 
         // Act
-        var act = () => factory.GetProviderAsync(SttSelection.Auto, cts.Token);
+        var act = () => factory.GetProviderAsync(config, cts.Token);
 
         // Assert
         await act.Should().ThrowAsync<OperationCanceledException>();

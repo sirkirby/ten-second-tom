@@ -1,0 +1,56 @@
+{
+  "TenSecondTom": {
+    "MemoryDirectory": "~/ten-second-tom",
+    "Auth": {
+      "SshAgentProvider": "Auto",
+      "PublicKeyPath": "~/.ssh/id_ed25519.pub"
+    },
+    "Llm": {
+      "Provider": "OpenAI",
+      "ApiKey": "sk-your-api-key-here",
+      "Model": "gpt-5-mini",
+      "MaxInputTokens": 50000,
+      "SpeechToTextModel": "whisper-1"
+    },
+    "Audio": {
+      "SttProvider": "whisper-cpp",
+      "SttApiKey": null,
+      "SttFallbackEnabled": true,
+      "SttFallbackProvider": "openai",
+      "SttFallbackApiKey": "sk-fallback-api-key-here",
+      "KeepFiles": true,
+
+      "Recorder": {
+        "FfmpegPath": "ffmpeg",
+        "InputVolume": 1.0,
+        "EnableNoiseReduction": true,
+        "EnableFrequencyFilters": true
+      },
+
+      "LocalWhisper": {
+        "BinaryPath": "whisper-cli",
+        "ModelPath": "~/.cache/whisper/ggml-base.en.bin"
+      },
+
+      "Preprocessing": {
+        "RemoveSilence": true,
+        "SilenceThresholdDb": -50,
+        "MinimumSilenceDurationMs": 500
+      },
+
+      "Timeouts": {
+        "TodaySeconds": 180,
+        "RecordSeconds": 900
+      }
+    },
+    "DataRetention": {
+      "DefaultPolicy": "Indefinite",
+      "AutoPurgeEnabled": false
+    },
+    "Setup": {
+      "SshKeyDetectionTimeoutSeconds": 5,
+      "ApiValidationTimeoutSeconds": 10,
+      "TotalSetupTimeoutSeconds": 120
+    }
+  }
+}

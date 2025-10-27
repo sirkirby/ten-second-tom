@@ -1,31 +1,30 @@
-using TenSecondTom.Features.Audio.Models;
+using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Models;
-using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Audio.Services;
 
 /// <summary>
 /// Factory for creating and selecting STT provider instances.
-/// Implements the STT selection strategy (auto, local, or remote).
+/// Implements the STT selection strategy based on configuration.
 /// </summary>
 public interface ISttProviderFactory
 {
     /// <summary>
-    /// Gets the appropriate STT provider based on the selection strategy.
+    /// Gets the appropriate STT provider based on the audio configuration.
     /// </summary>
-    /// <param name="selection">The STT selection strategy to use.</param>
+    /// <param name="configuration">The audio configuration containing provider and fallback settings.</param>
     /// <param name="cancellationToken">Cancellation token for async operation.</param>
     /// <returns>
     /// The selected STT provider instance, or null if no suitable provider is available.
     /// </returns>
     /// <remarks>
     /// Selection logic:
-    /// - <see cref="SttSelection.Auto"/>: Try local first, fallback to OpenAI if unavailable.
-    /// - <see cref="SttSelection.Local"/>: Return local provider only (null if unavailable).
-    /// - <see cref="SttSelection.OpenAI"/>: Return OpenAI provider only.
+    /// - If SttProvider is "whisper-cpp" and SttFallbackEnabled is true: Try local first, fallback to configured provider if unavailable.
+    /// - If SttProvider is "whisper-cpp" and SttFallbackEnabled is false: Return local provider only (null if unavailable).
+    /// - If SttProvider is "openai": Return OpenAI provider only.
     /// </remarks>
     Task<ISttProvider?> GetProviderAsync(
-        SttSelection selection = SttSelection.Auto,
+        AudioConfiguration configuration,
         CancellationToken cancellationToken = default);
 
     /// <summary>

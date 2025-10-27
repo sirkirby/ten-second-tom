@@ -156,8 +156,12 @@ public sealed class SetupCommandCliTests : IDisposable
 
         // Assert
         exitCode.Should().NotBe(0, "invalid flag should produce non-zero exit code");
-        var combinedOutput = output + error;
-        combinedOutput.Should().Contain("invalid", "output should indicate invalid flag");
+        var combinedOutput = (output + error).ToLowerInvariant();
+
+        // System.CommandLine may use different error messages across versions
+        // Check for common error indicators
+        combinedOutput.Should().MatchRegex("(invalid|unrecognized|unknown)",
+            "output should indicate an error with the flag");
     }
 
     [Fact]
@@ -213,8 +217,12 @@ public sealed class SetupCommandCliTests : IDisposable
 
         // Assert
         exitCode.Should().NotBe(0, "invalid subcommand should produce non-zero exit code");
-        var combinedOutput = output + error;
-        combinedOutput.Should().Contain("invalid", "output should indicate invalid subcommand");
+        var combinedOutput = (output + error).ToLowerInvariant();
+
+        // System.CommandLine may use different error messages across versions
+        // Check for common error indicators
+        combinedOutput.Should().MatchRegex("(invalid|unrecognized|unknown|required command)",
+            "output should indicate an error with the command");
     }
 
     [Fact]

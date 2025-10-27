@@ -32,6 +32,16 @@ public sealed class LocalWhisperSttProvider : ISttProvider
     /// <inheritdoc/>
     public SttEngine Engine => SttEngine.Local;
 
+    /// <summary>
+    /// Gets the binary path for whisper-cli from configuration.
+    /// </summary>
+    private string GetBinaryPath() => _config.SttBinaryPath;
+
+    /// <summary>
+    /// Gets the model path for whisper model from configuration.
+    /// </summary>
+    private string? GetModelPath() => _config.SttModel;
+
     /// <inheritdoc/>
     public async Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
     {
@@ -40,7 +50,7 @@ public sealed class LocalWhisperSttProvider : ISttProvider
         {
             var startInfo = new ProcessStartInfo
             {
-                FileName = _config.LocalWhisper.BinaryPath,
+                FileName = GetBinaryPath(),
                 Arguments = "--help",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -57,14 +67,15 @@ public sealed class LocalWhisperSttProvider : ISttProvider
             await process.WaitForExitAsync(cancellationToken);
 
             // Check if model is configured and exists
-            if (string.IsNullOrWhiteSpace(_config.LocalWhisper.ModelPath))
+            var configuredModelPath = GetModelPath();
+            if (string.IsNullOrWhiteSpace(configuredModelPath))
             {
                 _logger.LogDebug("Local whisper model path not configured");
                 return false;
             }
 
             // Expand user home directory if needed
-            var modelPath = _config.LocalWhisper.ModelPath.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+            var modelPath = configuredModelPath.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
             if (!File.Exists(modelPath))
             {
@@ -93,13 +104,14 @@ public sealed class LocalWhisperSttProvider : ISttProvider
             return Result<TranscriptionResult>.Failure($"Audio file not found: {audioFilePath}");
         }
 
-        if (string.IsNullOrWhiteSpace(_config.LocalWhisper.ModelPath))
+        var configuredModelPath = GetModelPath();
+        if (string.IsNullOrWhiteSpace(configuredModelPath))
         {
             return Result<TranscriptionResult>.Failure("Local whisper model path not configured");
         }
 
         // Expand user home directory if needed
-        var modelPath = _config.LocalWhisper.ModelPath.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        var modelPath = configuredModelPath.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
         if (!File.Exists(modelPath))
         {
@@ -116,12 +128,12 @@ public sealed class LocalWhisperSttProvider : ISttProvider
 
         _logger.LogDebug(
             "Starting whisper.cpp transcription: {BinaryPath} {Arguments}",
-            _config.LocalWhisper.BinaryPath,
+            GetBinaryPath(),
             arguments);
 
         var startInfo = new ProcessStartInfo
         {
-            FileName = _config.LocalWhisper.BinaryPath,
+            FileName = GetBinaryPath(),
             Arguments = arguments,
             RedirectStandardOutput = true,
             RedirectStandardError = true,

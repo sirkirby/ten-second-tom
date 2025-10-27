@@ -467,14 +467,14 @@ public sealed class ConfigurationCheckerTests
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             [ConfigurationKeys.LlmProvider] = "OpenAI",
-            [ConfigurationKeys.LlmModel] = "gpt-4o-mini-2024-07-18"
+            [ConfigurationKeys.LlmModel] = LlmConstants.OpenAIModels.GPTMini
         });
 
         // Act
         var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
 
         // Assert
-        result.Should().BeTrue("gpt-4o-mini-2024-07-18 is a valid OpenAI model");
+        result.Should().BeTrue($"{LlmConstants.OpenAIModels.GPTMini} is a valid OpenAI model");
     }
 
     [Fact]
@@ -484,14 +484,14 @@ public sealed class ConfigurationCheckerTests
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             [ConfigurationKeys.LlmProvider] = "Anthropic",
-            [ConfigurationKeys.LlmModel] = "claude-3-5-haiku-20241022"
+            [ConfigurationKeys.LlmModel] = LlmConstants.AnthropicModels.ClaudeHaiku
         });
 
         // Act
         var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
 
         // Assert
-        result.Should().BeTrue("claude-3-5-haiku-20241022 is a valid Anthropic model");
+        result.Should().BeTrue($"{LlmConstants.AnthropicModels.ClaudeHaiku} is a valid Anthropic model");
     }
 
     [Fact]
@@ -501,7 +501,7 @@ public sealed class ConfigurationCheckerTests
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             [ConfigurationKeys.LlmProvider] = "OpenAI",
-            [ConfigurationKeys.LlmModel] = "claude-3-5-haiku-20241022" // Anthropic model with OpenAI provider
+            [ConfigurationKeys.LlmModel] = LlmConstants.AnthropicModels.ClaudeHaiku // Anthropic model with OpenAI provider
         });
 
         // Act
@@ -509,7 +509,7 @@ public sealed class ConfigurationCheckerTests
 
         // Assert
         result.Should().BeFalse("claude model should not be valid for OpenAI provider");
-        VerifyLogContains(LogLevel.Error, "Invalid model 'claude-3-5-haiku-20241022' configured for provider OpenAI");
+        VerifyLogContains(LogLevel.Error, $"Invalid model '{LlmConstants.AnthropicModels.ClaudeHaiku}' configured for provider OpenAI");
     }
 
     [Fact]
@@ -626,7 +626,7 @@ public sealed class ConfigurationCheckerTests
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             [ConfigurationKeys.LlmProvider] = "OpenAI",
-            [ConfigurationKeys.LlmModel] = "gpt-4o-mini-2024-07-18"
+            [ConfigurationKeys.LlmModel] = LlmConstants.OpenAIModels.GPTMini
         });
 
         // Act
@@ -643,7 +643,7 @@ public sealed class ConfigurationCheckerTests
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             [ConfigurationKeys.LlmProvider] = "OpenAI",
-            [ConfigurationKeys.LlmModel] = "claude-3-5-haiku-20241022" // Anthropic model
+            [ConfigurationKeys.LlmModel] = LlmConstants.AnthropicModels.ClaudeHaiku // Anthropic model
         });
 
         // Act
@@ -723,9 +723,9 @@ public sealed class ConfigurationCheckerTests
 
         // Assert
         result.Should().NotBeNullOrEmpty();
-        result.Should().Contain("gpt-4o-mini-2024-07-18");
-        result.Should().Contain("gpt-4o-2024-11-20");
-        result.Should().Contain("chatgpt-4o-latest");
+        result.Should().Contain(LlmConstants.OpenAIModels.GPTMini);
+        result.Should().Contain(LlmConstants.OpenAIModels.GPTStandard);
+        result.Should().Contain(LlmConstants.OpenAIModels.GPTNano);
     }
 
     #endregion

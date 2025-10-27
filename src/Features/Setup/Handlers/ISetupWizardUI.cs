@@ -135,12 +135,44 @@ public interface ISetupWizardUI
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Prompts user to select preferred STT engine
+    /// Prompts user to select a speech-to-text provider
     /// </summary>
-    /// <param name="currentValue">Current STT preference (auto/local/openai)</param>
+    /// <param name="currentProvider">Current STT provider</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Selected STT preference, or null if cancelled</returns>
-    Task<string?> PromptForSttPreferenceAsync(
-        string? currentValue,
+    /// <returns>Selected STT provider, or null if cancelled</returns>
+    Task<string?> PromptForSttProviderAsync(
+        string? currentProvider,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Prompts user to enter an API key for the STT provider
+    /// </summary>
+    /// <param name="provider">The STT provider requiring an API key</param>
+    /// <param name="currentApiKey">Current API key, if any</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>API key, or null if cancelled</returns>
+    Task<string?> PromptForSttApiKeyAsync(
+        string provider,
+        string? currentApiKey,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Prompts user whether to enable fallback to a secondary STT provider
+    /// </summary>
+    /// <param name="currentValue">Current fallback enabled state</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True if fallback should be enabled, false otherwise, null if cancelled</returns>
+    Task<bool?> PromptForSttFallbackAsync(
+        bool? currentValue,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Prompts user to select a fallback STT provider
+    /// </summary>
+    /// <param name="currentProvider">Current fallback provider</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Selected fallback provider, or null if cancelled</returns>
+    Task<string?> PromptForSttFallbackProviderAsync(
+        string? currentProvider,
         CancellationToken cancellationToken);
 }

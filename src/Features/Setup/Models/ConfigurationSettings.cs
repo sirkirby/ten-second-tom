@@ -137,12 +137,6 @@ public sealed record LlmConfiguration
     public string? Model { get; init; }
 
     /// <summary>
-    /// Gets the model to use for speech-to-text transcription.
-    /// Only used when Provider is OpenAI. Defaults to "whisper-1".
-    /// </summary>
-    public string? SpeechToTextModel { get; init; }
-
-    /// <summary>
     /// Gets the maximum number of input tokens to send to the LLM.
     /// If null, uses provider-specific defaults (50K for OpenAI, 80K for Anthropic).
     /// This limit helps control costs and ensures inputs fit within context windows.
@@ -193,9 +187,29 @@ public sealed record OptionalConfiguration
 public sealed record AudioConfigurationDisplay
 {
     /// <summary>
-    /// Gets the preferred Speech-to-Text engine
+    /// Gets the speech-to-text provider
     /// </summary>
-    public string PreferredStt { get; init; } = "auto";
+    public string SttProvider { get; init; } = SttProviders.WhisperCpp;
+
+    /// <summary>
+    /// Gets the API key for the STT provider (masked for display)
+    /// </summary>
+    public string? SttApiKey { get; init; }
+
+    /// <summary>
+    /// Gets whether fallback to a secondary STT provider is enabled
+    /// </summary>
+    public bool SttFallbackEnabled { get; init; }
+
+    /// <summary>
+    /// Gets the fallback STT provider (e.g., openai)
+    /// </summary>
+    public string? SttFallbackProvider { get; init; }
+
+    /// <summary>
+    /// Gets the API key for the fallback STT provider (masked for display)
+    /// </summary>
+    public string? SttFallbackApiKey { get; init; }
 
     /// <summary>
     /// Gets whether to keep audio files after transcription

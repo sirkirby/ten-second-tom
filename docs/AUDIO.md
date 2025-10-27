@@ -4,19 +4,142 @@ This guide covers audio recording, preprocessing, and transcription configuratio
 
 ## Overview
 
-Ten Second Tom supports extensive audio configuration for different microphone types and recording environments. All settings can be configured via:
+Ten Second Tom supports extensive audio configuration for different microphone types, recording environments, and speech-to-text (STT) providers. All settings can be configured via:
 
-1. **Environment Variables** (recommended for production/Homebrew installs)
-2. **User Secrets** (development only)
-3. **appsettings.json** (fallback)
+1. **Interactive setup wizard** (`tom config audio`) - Recommended for most users
+2. **Configuration file** (`~/ten-second-tom/config/config.json`) - Automatically managed by setup wizard
+3. **Environment variables** - For advanced users and CI/CD environments
+
+### Key Features
+
+- **Multiple STT Providers**: Support for local (whisper-cpp) and cloud (OpenAI) speech-to-text
+- **STT Fallback**: Automatic fallback to secondary provider if primary fails
+- **Recording Optimization**: Microphone presets for different hardware types
+- **Silence Removal**: Intelligent preprocessing to compress recordings
+- **Noise Reduction**: Adaptive filtering for cleaner audio
 
 ## Configuration Priority
 
 Settings are applied in this order (highest priority first):
 
-1. Environment variables (`TenSecondTom__*`)
-2. .NET User Secrets (development only)
-3. appsettings.json (defaults)
+1. **Environment variables** (`TenSecondTom__Audio__*`)
+2. **User configuration** (`~/ten-second-tom/config/config.json`)
+3. **appsettings.json** (framework defaults only)
+
+## Speech-to-Text (STT) Provider Configuration
+
+### STT Provider Selection
+
+Choose between local and cloud speech-to-text providers:
+
+**Local Provider (whisper-cpp):**
+- **Pros**: No API costs, works offline, privacy-focused
+- **Cons**: Requires local installation, slower on some hardware
+- **Best for**: Privacy-conscious users, offline usage, cost optimization
+
+**Cloud Provider (OpenAI):**
+- **Pros**: Fast, highly accurate, no local setup
+- **Cons**: Requires API key, costs per minute, requires internet
+- **Best for**: Best accuracy, cloud-native workflows
+
+### STT Provider Settings
+
+#### Primary STT Provider
+
+- **Environment Variable:** `TenSecondTom__Audio__SttProvider`
+- **Type:** String (`whisper-cpp` or `openai`)
+- **Default:** `whisper-cpp`
+- **Purpose:** Select primary speech-to-text engine
+
+**Example:**
+```bash
+export TenSecondTom__Audio__SttProvider=whisper-cpp  # Local
+export TenSecondTom__Audio__SttProvider=openai       # Cloud
+```
+
+#### STT API Key (Cloud Providers)
+
+- **Environment Variable:** `TenSecondTom__Audio__SttApiKey`
+- **Type:** String (API key)
+- **Default:** `null`
+- **Purpose:** API key for cloud STT provider (required when using OpenAI)
+
+**Example:**
+```bash
+export TenSecondTom__Audio__SttApiKey=sk-your-openai-api-key-here
+```
+
+### STT Fallback Configuration
+
+Configure automatic fallback to a secondary STT provider if the primary fails.
+
+#### Enable STT Fallback
+
+- **Environment Variable:** `TenSecondTom__Audio__SttFallbackEnabled`
+- **Type:** Boolean (`true` or `false`)
+- **Default:** `false`
+- **Purpose:** Enable automatic fallback to secondary provider
+
+**Example:**
+```bash
+export TenSecondTom__Audio__SttFallbackEnabled=true
+```
+
+#### Fallback STT Provider
+
+- **Environment Variable:** `TenSecondTom__Audio__SttFallbackProvider`
+- **Type:** String (`whisper-cpp` or `openai`)
+- **Default:** `null`
+- **Purpose:** Secondary STT provider to use if primary fails
+
+**Example:**
+```bash
+# Use OpenAI as fallback when local whisper-cpp fails
+export TenSecondTom__Audio__SttFallbackProvider=openai
+```
+
+#### Fallback STT API Key
+
+- **Environment Variable:** `TenSecondTom__Audio__SttFallbackApiKey`
+- **Type:** String (API key)
+- **Default:** `null`
+- **Purpose:** API key for fallback cloud provider
+
+**Example:**
+```bash
+export TenSecondTom__Audio__SttFallbackApiKey=sk-fallback-api-key-here
+```
+
+### Common STT Configurations
+
+**Local-only (no fallback):**
+```bash
+export TenSecondTom__Audio__SttProvider=whisper-cpp
+export TenSecondTom__Audio__SttFallbackEnabled=false
+```
+
+**Local with cloud fallback:**
+```bash
+export TenSecondTom__Audio__SttProvider=whisper-cpp
+export TenSecondTom__Audio__SttFallbackEnabled=true
+export TenSecondTom__Audio__SttFallbackProvider=openai
+export TenSecondTom__Audio__SttFallbackApiKey=sk-...
+```
+
+**Cloud-only:**
+```bash
+export TenSecondTom__Audio__SttProvider=openai
+export TenSecondTom__Audio__SttApiKey=sk-...
+export TenSecondTom__Audio__SttFallbackEnabled=false
+```
+
+**Cloud with local fallback:**
+```bash
+export TenSecondTom__Audio__SttProvider=openai
+export TenSecondTom__Audio__SttApiKey=sk-...
+export TenSecondTom__Audio__SttFallbackEnabled=true
+export TenSecondTom__Audio__SttFallbackProvider=whisper-cpp
+```
 
 ## Microphone Type Presets
 
@@ -164,9 +287,15 @@ export TenSecondTom__Audio__Preprocessing__MinimumSilenceDurationMs=500
 
 ## Complete Environment Variable Example
 
-For a typical MacBook Pro user:
+For a typical MacBook Pro user with local STT and cloud fallback:
 
 ```bash
+# STT Provider Configuration
+export TenSecondTom__Audio__SttProvider=whisper-cpp
+export TenSecondTom__Audio__SttFallbackEnabled=true
+export TenSecondTom__Audio__SttFallbackProvider=openai
+export TenSecondTom__Audio__SttFallbackApiKey=sk-your-api-key-here
+
 # Audio recording settings (laptop mic optimized)
 export TenSecondTom__Audio__Recorder__InputVolume=1.0
 export TenSecondTom__Audio__Recorder__EnableNoiseReduction=true
@@ -235,9 +364,19 @@ For local development, you can create a `.env` file in your home directory:
 
 ```bash
 # ~/.tom.env
+
+# STT Configuration
+TenSecondTom__Audio__SttProvider=whisper-cpp
+TenSecondTom__Audio__SttFallbackEnabled=true
+TenSecondTom__Audio__SttFallbackProvider=openai
+TenSecondTom__Audio__SttFallbackApiKey=sk-your-fallback-api-key
+
+# Recording Settings
 TenSecondTom__Audio__Recorder__InputVolume=0.75
 TenSecondTom__Audio__Recorder__EnableNoiseReduction=false
 TenSecondTom__Audio__Recorder__EnableFrequencyFilters=true
+
+# Preprocessing Settings
 TenSecondTom__Audio__Preprocessing__RemoveSilence=true
 TenSecondTom__Audio__Preprocessing__SilenceThresholdDb=-50
 TenSecondTom__Audio__Preprocessing__MinimumSilenceDurationMs=500
@@ -248,6 +387,8 @@ Then source it before running:
 source ~/.tom.env
 tom record
 ```
+
+**Recommended:** Use `tom config audio` for interactive configuration instead of manually creating `.env` files.
 
 ## See Also
 

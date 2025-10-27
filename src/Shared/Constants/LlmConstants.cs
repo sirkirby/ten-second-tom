@@ -21,9 +21,15 @@ internal static class LlmConstants
     /// </summary>
     internal static class OpenAIModels
     {
-        internal const string ChatGpt4oLatest = "chatgpt-4o-latest";
-        internal const string Gpt4o = "gpt-4o-2024-11-20";
-        internal const string Gpt4oMini = "gpt-4o-mini-2024-07-18";
+        internal const string GPTStandard = "gpt-5";
+        internal const string GPTStandardDisplayName = "GPT-5 Standard";
+        internal const string GPTStandardDescription = "Flagship model for coding, reasoning, and agentic tasks";
+        internal const string GPTMini = "gpt-5-mini";
+        internal const string GPTMiniDisplayName = "GPT-5 Mini";
+        internal const string GPTMiniDescription = "Faster, cost-efficient version for well-defined tasks";
+        internal const string GPTNano = "gpt-5-nano";
+        internal const string GPTNanoDisplayName = "GPT-5 Nano";
+        internal const string GPTNanoDescription = "Fastest, cheapest model for summarization and classification";
     }
 
     /// <summary>
@@ -32,55 +38,15 @@ internal static class LlmConstants
     /// </summary>
     internal static class AnthropicModels
     {
-        // Claude 4 Series - Latest
-        internal const string ClaudeSonnet45 = "claude-sonnet-4-5-20250929";
-        internal const string ClaudeOpus41 = "claude-opus-4-1-20250805";
-        internal const string Claude35Haiku = "claude-3-5-haiku-20241022";
-        
-        // Claude 4.0 Series - Stable
-        internal const string ClaudeSonnet4 = "claude-sonnet-4-20250514";
-        internal const string ClaudeOpus4 = "claude-opus-4-20250514";
-        
-        // Claude 3 Series - Legacy Budget
-        internal const string Claude3Haiku = "claude-3-haiku-20240307";
-    }
-
-    /// <summary>
-    /// Display names for models shown in UI
-    /// </summary>
-    internal static class DisplayNames
-    {
-        // OpenAI Models
-        internal const string ChatGpt4oLatest = "ChatGPT-4o (Latest)";
-        internal const string Gpt4o = "GPT-4o (2024-11-20)";
-        internal const string Gpt4oMini = "GPT-4o Mini (2024-07-18)";
-
-        // Anthropic Claude 4 Series
-        internal const string ClaudeSonnet45 = "Claude Sonnet 4.5 (2025-09-29)";
-        internal const string ClaudeOpus41 = "Claude Opus 4.1 (2025-08-05)";
-        internal const string Claude35Haiku = "Claude 3.5 Haiku (2024-10-22)";
-        internal const string ClaudeSonnet4 = "Claude Sonnet 4.0 (2025-05-14)";
-        internal const string ClaudeOpus4 = "Claude Opus 4.0 (2025-05-14)";
-        internal const string Claude3Haiku = "Claude 3 Haiku (2024-03-07)";
-    }
-
-    /// <summary>
-    /// Descriptions of model capabilities
-    /// </summary>
-    internal static class Descriptions
-    {
-        // OpenAI Models
-        internal const string ChatGpt4oLatest = "Always points to the newest ChatGPT-4o version";
-        internal const string Gpt4o = "High-performance model with excellent reasoning";
-        internal const string Gpt4oMini = "Fast, affordable, and efficient for most tasks";
-
-        // Anthropic Claude 4 Series
-        internal const string ClaudeSonnet45 = "Best model for complex agents and coding with highest intelligence";
-        internal const string ClaudeOpus41 = "Exceptional model for specialized complex tasks requiring advanced reasoning";
-        internal const string Claude35Haiku = "Fast and compact model for near-instant responsiveness";
-        internal const string ClaudeSonnet4 = "High-performance model with balanced capabilities";
-        internal const string ClaudeOpus4 = "Very high intelligence and capability for specialized tasks";
-        internal const string Claude3Haiku = "Quick and accurate targeted performance at lowest cost";
+        internal const string ClaudeSonnet = "claude-sonnet-4-5";
+        internal const string ClaudeSonnetDisplayName = "Claude Sonnet 4.5";
+        internal const string ClaudeSonnetDescription = "Best model for complex agents and coding with highest intelligence";
+        internal const string ClaudeOpus = "claude-opus-4-1";
+        internal const string ClaudeOpusDisplayName = "Claude Opus 4.1";
+        internal const string ClaudeOpusDescription = "Exceptional model for specialized complex tasks requiring advanced reasoning";
+        internal const string ClaudeHaiku = "claude-haiku-4-5";
+        internal const string ClaudeHaikuDisplayName = "Claude Haiku 4.5";
+        internal const string ClaudeHaikuDescription = "Fast and compact model for near-instant responsiveness";
     }
 
     /// <summary>

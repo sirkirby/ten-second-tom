@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenAI;
@@ -18,22 +17,22 @@ namespace TenSecondTom.Features.Audio.Services;
 /// </summary>
 public sealed class OpenAiSttProvider : ISttProvider
 {
-    private readonly IConfiguration _configuration;
+    private readonly AudioConfiguration _audioConfig;
     private readonly ConfigurationSettings _configSettings;
     private readonly ILogger<OpenAiSttProvider> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="OpenAiSttProvider"/> class.
     /// </summary>
-    /// <param name="configuration">Application configuration (for API keys and provider).</param>
-    /// <param name="configSettings">User configuration settings (for LLM provider and STT model).</param>
+    /// <param name="audioConfig">Audio configuration (for STT provider and API key).</param>
+    /// <param name="configSettings">User configuration settings (for STT model).</param>
     /// <param name="logger">Logger instance.</param>
     public OpenAiSttProvider(
-        IConfiguration configuration,
+        IOptions<AudioConfiguration> audioConfig,
         IOptions<ConfigurationSettings> configSettings,
         ILogger<OpenAiSttProvider> logger)
     {
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        _audioConfig = audioConfig?.Value ?? throw new ArgumentNullException(nameof(audioConfig));
         _configSettings = configSettings?.Value ?? throw new ArgumentNullException(nameof(configSettings));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -44,14 +43,14 @@ public sealed class OpenAiSttProvider : ISttProvider
     /// <inheritdoc/>
     public Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
     {
-        // Only available if provider is OpenAI and API key is configured
-        if (_configSettings.Llm.Provider != LlmProvider.OpenAI)
+        // Only available if STT provider is OpenAI and API key is configured
+        if (_audioConfig.SttProvider != SttProviders.OpenAI)
         {
-            _logger.LogDebug("OpenAI STT not available: Provider is {Provider}, not OpenAI", _configSettings.Llm.Provider);
+            _logger.LogDebug("OpenAI STT not available: Provider is {Provider}, not OpenAI", _audioConfig.SttProvider);
             return Task.FromResult(false);
         }
 
-        var apiKey = _configuration[ConfigurationKeys.LlmApiKey];
+        var apiKey = _audioConfig.SttApiKey;
         var isAvailable = !string.IsNullOrWhiteSpace(apiKey);
 
         if (!isAvailable)
@@ -74,21 +73,23 @@ public sealed class OpenAiSttProvider : ISttProvider
             return Result<TranscriptionResult>.Failure($"Audio file not found: {audioFilePath}");
         }
 
-        // Verify provider is OpenAI
-        if (_configSettings.Llm.Provider != LlmProvider.OpenAI)
+        // Verify STT provider is OpenAI
+        if (_audioConfig.SttProvider != SttProviders.OpenAI)
         {
             return Result<TranscriptionResult>.Failure(
-                $"Cannot use OpenAI STT: Current provider is {_configSettings.Llm.Provider}. Change to OpenAI in 'tom config llm'.");
+                $"Cannot use OpenAI STT: Current STT provider is {_audioConfig.SttProvider}. Change to OpenAI in 'tom config audio'.");
         }
 
-        var apiKey = _configuration[ConfigurationKeys.LlmApiKey];
+        var apiKey = _audioConfig.SttApiKey;
         if (string.IsNullOrWhiteSpace(apiKey))
         {
-            return Result<TranscriptionResult>.Failure("OpenAI API key not configured. Run 'tom setup' to configure your API key.");
+            return Result<TranscriptionResult>.Failure("OpenAI STT API key not configured. Run 'tom config audio' to configure your API key.");
         }
 
-        // Get STT model from config or use default
-        var model = _configSettings.Llm.SpeechToTextModel ?? "whisper-1";
+        // Get STT model from audio config or use default
+        var model = string.IsNullOrWhiteSpace(_audioConfig.SttModel)
+            ? SttProviders.OpenAIDefaultSTTModel
+            : _audioConfig.SttModel;
 
         var startTime = DateTimeOffset.UtcNow;
         var stopwatch = Stopwatch.StartNew();

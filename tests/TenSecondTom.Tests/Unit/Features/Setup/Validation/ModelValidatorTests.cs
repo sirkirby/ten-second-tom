@@ -12,9 +12,9 @@ namespace TenSecondTom.Tests.Unit.Features.Setup.Validation;
 public sealed class ModelValidatorTests
 {
     [Theory]
-    [InlineData(LlmConstants.OpenAIModels.Gpt4oMini, LlmProvider.OpenAI)]
-    [InlineData(LlmConstants.OpenAIModels.Gpt4o, LlmProvider.OpenAI)]
-    [InlineData(LlmConstants.OpenAIModels.ChatGpt4oLatest, LlmProvider.OpenAI)]
+    [InlineData(LlmConstants.OpenAIModels.GPTMini, LlmProvider.OpenAI)]
+    [InlineData(LlmConstants.OpenAIModels.GPTNano, LlmProvider.OpenAI)]
+    [InlineData(LlmConstants.OpenAIModels.GPTStandard, LlmProvider.OpenAI)]
     public void Validate_WithValidOpenAIModel_ShouldReturnSuccess(string modelId, LlmProvider provider)
     {
         // Act
@@ -26,9 +26,9 @@ public sealed class ModelValidatorTests
     }
 
     [Theory]
-    [InlineData(LlmConstants.AnthropicModels.Claude35Haiku, LlmProvider.Anthropic)]
-    [InlineData(LlmConstants.AnthropicModels.ClaudeSonnet4, LlmProvider.Anthropic)]
-    [InlineData(LlmConstants.AnthropicModels.ClaudeOpus4, LlmProvider.Anthropic)]
+    [InlineData(LlmConstants.AnthropicModels.ClaudeHaiku, LlmProvider.Anthropic)]
+    [InlineData(LlmConstants.AnthropicModels.ClaudeSonnet, LlmProvider.Anthropic)]
+    [InlineData(LlmConstants.AnthropicModels.ClaudeOpus, LlmProvider.Anthropic)]
     public void Validate_WithValidAnthropicModel_ShouldReturnSuccess(string modelId, LlmProvider provider)
     {
         // Act
@@ -88,7 +88,7 @@ public sealed class ModelValidatorTests
     public void Validate_WithWrongProviderForModel_ShouldReturnFailure()
     {
         // Arrange - Use a valid OpenAI model with Anthropic provider
-        const string openAiModelId = LlmConstants.OpenAIModels.Gpt4oMini;
+        const string openAiModelId = LlmConstants.OpenAIModels.GPTMini;
 
         // Act
         var (isValid, errorMessage) = ModelValidator.Validate(openAiModelId, LlmProvider.Anthropic);
@@ -120,9 +120,9 @@ public sealed class ModelValidatorTests
         isValid.Should().BeFalse();
         // Error should contain at least one known OpenAI model
         errorMessage.Should().ContainAny(
-            LlmConstants.OpenAIModels.Gpt4oMini, 
-            LlmConstants.OpenAIModels.Gpt4o, 
-            LlmConstants.OpenAIModels.ChatGpt4oLatest);
+            LlmConstants.OpenAIModels.GPTMini, 
+            LlmConstants.OpenAIModels.GPTStandard, 
+            LlmConstants.OpenAIModels.GPTNano);
     }
 
     [Theory]
@@ -142,7 +142,7 @@ public sealed class ModelValidatorTests
     public void ValidateOrThrow_WithValidModel_ShouldNotThrow()
     {
         // Arrange
-        const string validModel = LlmConstants.OpenAIModels.Gpt4oMini;
+        const string validModel = LlmConstants.OpenAIModels.GPTMini;
 
         // Act
         var act = () => ModelValidator.ValidateOrThrow(validModel, LlmProvider.OpenAI);
@@ -169,7 +169,7 @@ public sealed class ModelValidatorTests
     public void GetEffectiveModel_WithValidModel_ShouldReturnProvidedModel()
     {
         // Arrange
-        const string validModel = LlmConstants.OpenAIModels.Gpt4oMini;
+        const string validModel = LlmConstants.OpenAIModels.GPTMini;
 
         // Act
         var effectiveModel = ModelValidator.GetEffectiveModel(validModel, LlmProvider.OpenAI);
@@ -247,7 +247,7 @@ public sealed class ModelValidatorTests
     public void Validate_WithProviderMismatch_ShouldSuggestConfigCommand()
     {
         // Arrange - OpenAI model with Anthropic provider
-        const string openAiModel = LlmConstants.OpenAIModels.Gpt4oMini;
+        const string openAiModel = LlmConstants.OpenAIModels.GPTMini;
 
         // Act
         var (isValid, errorMessage) = ModelValidator.Validate(openAiModel, LlmProvider.Anthropic);
@@ -261,7 +261,7 @@ public sealed class ModelValidatorTests
     public void Validate_WithAnthropicModelForOpenAI_ShouldProvideActionableError()
     {
         // Arrange - Anthropic model with OpenAI provider
-        const string anthropicModel = LlmConstants.AnthropicModels.Claude35Haiku;
+        const string anthropicModel = LlmConstants.AnthropicModels.ClaudeHaiku;
 
         // Act
         var (isValid, errorMessage) = ModelValidator.Validate(anthropicModel, LlmProvider.OpenAI);
