@@ -27,7 +27,7 @@ public sealed class OutputStorageServiceTests
         _testMemoryDirectory = "/test/memory";
 
         _mockConfiguration
-            .Setup(c => c[ConfigurationKeys.MemoryDirectory])
+            .Setup(c => c[ConfigurationKeys.MemoryDirectoryKey])
             .Returns(_testMemoryDirectory);
     }
 

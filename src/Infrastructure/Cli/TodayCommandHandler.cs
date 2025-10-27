@@ -85,7 +85,7 @@ public static class TodayCommandHandler
         if (useVoice)
         {
             // Validate audio configuration before proceeding with voice input
-            var audioConfig = configuration.GetSection(ConfigurationKeys.AudioSection).Get<AudioConfiguration>()
+            var audioConfig = configuration.GetSection(ConfigurationKeys.AudioSectionKey).Get<AudioConfiguration>()
                 ?? new AudioConfiguration();
             var audioValidator = serviceProvider.GetRequiredService<IAudioConfigurationValidator>();
             var audioConfigResult = AudioConfigurationHelper.EnsureAudioConfigured(

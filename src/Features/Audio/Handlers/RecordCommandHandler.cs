@@ -62,7 +62,7 @@ public sealed class RecordCommandHandler(
         }
 
         // Get audio configuration for timeout
-        var audioConfig = _configuration.GetSection(ConfigurationKeys.AudioSection).Get<AudioConfiguration>()
+        var audioConfig = _configuration.GetSection(ConfigurationKeys.AudioSectionKey).Get<AudioConfiguration>()
             ?? new AudioConfiguration();
 
         // Determine timeout: use command-specific value or fall back to config default

@@ -42,9 +42,9 @@ public sealed class ConfigCommandHandlerTests
         _mockAnthropicValidator.Setup(v => v.Provider).Returns(LlmProvider.Anthropic);
 
         // Setup default configuration values
-        _mockConfiguration.Setup(c => c[ConfigurationKeys.LlmProvider]).Returns((string?)null);
-        _mockConfiguration.Setup(c => c[ConfigurationKeys.LlmApiKey]).Returns((string?)null);
-        _mockConfiguration.Setup(c => c[ConfigurationKeys.LlmModel]).Returns((string?)null);
+        _mockConfiguration.Setup(c => c[ConfigurationKeys.LlmProviderKey]).Returns((string?)null);
+        _mockConfiguration.Setup(c => c[ConfigurationKeys.LlmApiKeyKey]).Returns((string?)null);
+        _mockConfiguration.Setup(c => c[ConfigurationKeys.LlmModelKey]).Returns((string?)null);
 
         var validators = new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object };
 

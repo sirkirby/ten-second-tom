@@ -56,7 +56,7 @@ public sealed class GenerateOutputCommandHandler
             request.TemplateId);
 
         // Get LLM provider from configuration
-        string? providerName = _configuration[ConfigurationKeys.LlmProvider];
+        string? providerName = _configuration[ConfigurationKeys.LlmProviderKey];
         if (string.IsNullOrWhiteSpace(providerName))
         {
             return Result<GeneratedOutput>.Failure(

@@ -27,7 +27,7 @@ public sealed class SelfHealingTests
         // Create configuration with memory directory
         var configData = new Dictionary<string, string?>
         {
-            [ConfigurationKeys.MemoryDirectory] = "/.memory",
+            [ConfigurationKeys.MemoryDirectoryKey] = "/.memory",
             ["Llm:Provider"] = "OpenAI",
             ["Llm:ApiKey"] = "test-key"
         };
@@ -287,7 +287,7 @@ public sealed class SelfHealingTests
         var customConfig = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                [ConfigurationKeys.MemoryDirectory] = memoryDirectory,
+                [ConfigurationKeys.MemoryDirectoryKey] = memoryDirectory,
                 ["Llm:Provider"] = "OpenAI",
                 ["Llm:ApiKey"] = "test-key"
             })

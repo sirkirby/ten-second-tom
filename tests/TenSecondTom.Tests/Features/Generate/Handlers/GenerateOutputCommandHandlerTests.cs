@@ -46,7 +46,7 @@ public sealed class GenerateOutputCommandHandlerTests
         _mockLlmProvider.Setup(p => p.ModelName).Returns("test-model");
 
         // Setup configuration to return a valid provider name
-        _mockConfiguration.Setup(c => c[ConfigurationKeys.LlmProvider]).Returns("OpenAI");
+        _mockConfiguration.Setup(c => c[ConfigurationKeys.LlmProviderKey]).Returns("OpenAI");
 
         // Setup factory to return the mock provider
         _mockLlmProviderFactory

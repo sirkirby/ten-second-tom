@@ -40,7 +40,7 @@ public sealed class SearchCommandHandlerJsonOutputTests : IDisposable
         var mockLogger = new Mock<ILogger<SearchMemoriesQueryHandler>>();
         
         mockConfiguration
-            .Setup(x => x[ConfigurationKeys.MemoryDirectory])
+            .Setup(x => x[ConfigurationKeys.MemoryDirectoryKey])
             .Returns("/Users/test/.memory");
         
         var handler = new SearchMemoriesQueryHandler(
@@ -89,7 +89,7 @@ public sealed class SearchCommandHandlerJsonOutputTests : IDisposable
         var mockLogger = new Mock<ILogger<SearchMemoriesQueryHandler>>();
         
         mockConfiguration
-            .Setup(x => x[ConfigurationKeys.MemoryDirectory])
+            .Setup(x => x[ConfigurationKeys.MemoryDirectoryKey])
             .Returns("/Users/test/.memory");
         
         var handler = new SearchMemoriesQueryHandler(
