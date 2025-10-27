@@ -153,14 +153,14 @@ Save this configuration? (Y/n): _
 
 ### Step 8: Save Configuration
 
-Your configuration is securely saved to .NET User Secrets (or `appsettings.json` as a fallback).
+Your configuration is securely saved to `~/ten-second-tom/config/config.json`.
 
 ```
 Step 8 of 8: Saving Configuration
 
 Saving configuration...
 ✓ Setup complete!
-Configuration saved to: /Users/you/.microsoft/usersecrets/...
+Configuration saved to: ~/ten-second-tom/config/config.json
 
 You can view your configuration anytime with: tom config show
 To change individual settings, use: tom config set <setting-name> <value>
@@ -317,11 +317,11 @@ Run 'tom setup' to reconfigure.
 
 **Note:** The `reset` action is implemented in the backend but not currently exposed as a CLI command. To reset your configuration, you can:
 
-1. Delete the User Secrets file manually and re-run setup:
+1. Delete the configuration file manually and re-run setup:
    ```bash
-   # Find and delete User Secrets
-   rm ~/.microsoft/usersecrets/*/secrets.json
-   
+   # Delete user configuration
+   rm ~/ten-second-tom/config/config.json
+
    # Re-run setup wizard
    tom setup
    ```
@@ -353,26 +353,32 @@ The wizard will show your current values and allow you to change any setting.
 
 ## Configuration Storage
 
-### .NET User Secrets (Primary)
+### User Configuration File (Primary)
 
-Ten Second Tom uses [.NET User Secrets](https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets) to securely store sensitive configuration like API keys. User Secrets are stored outside the repository in your user profile directory.
+Ten Second Tom stores all user configuration in `~/ten-second-tom/config/config.json`. This file is automatically created and managed by the setup wizard (`tom config`).
 
-**User Secrets location:**
+**Configuration file location:**
 
-- **macOS/Linux**: `~/.microsoft/usersecrets/<user-secrets-id>/secrets.json`
-- **Windows**: `%APPDATA%\Microsoft\UserSecrets\<user-secrets-id>\secrets.json`
+- **macOS/Linux**: `~/ten-second-tom/config/config.json`
+- **Windows**: `%USERPROFILE%\ten-second-tom\config\config.json`
 
 **Advantages:**
-- ✅ Secrets are stored outside the project directory
-- ✅ Not accidentally committed to version control
-- ✅ Per-user configuration on shared machines
-- ✅ Encrypted by the operating system
+- ✅ All settings in one predictable location
+- ✅ Easy to backup and restore
+- ✅ Supports nested configuration sections
+- ✅ Automatically created by setup wizard
+- ✅ Protected by file system permissions
 
-### appsettings.json (Fallback)
+### Shipped Configuration (Framework Settings Only)
 
-If .NET User Secrets cannot be written (e.g., permissions issues), configuration is saved to `appsettings.json` in the application directory.
+The application ships with `appsettings.json` containing **only framework-level configuration** (Serilog logging). All application-specific settings are managed through `config.json`.
 
-**Security warning:** The fallback method stores API keys in plain text. Use User Secrets whenever possible.
+**Shipped files contain:**
+- ✅ Serilog logging configuration
+- ✅ Framework defaults
+- ❌ **NO** application secrets or user settings
+
+**Security:** User configuration is separated from shipped files to prevent accidental commits and maintain clean separation of concerns.
 
 ### Environment Variables (Advanced)
 
@@ -400,9 +406,9 @@ Ten Second Tom follows standard .NET configuration patterns with a hierarchical 
 
 1. **Command-line arguments** - Highest priority, runtime overrides
 2. **Environment variables** - System or session configuration
-3. **User Secrets** - Secure local storage (`~/.microsoft/usersecrets/ten-second-tom-secrets/secrets.json`)
+3. **User Configuration** - User-specific settings (`~/ten-second-tom/config/config.json`)
 4. **appsettings.{Environment}.json** - Environment-specific settings (Development, Production, etc.)
-5. **appsettings.json** - Default configuration, lowest priority
+5. **appsettings.json** - Framework defaults (logging only), lowest priority
 
 ### Configuration Keys
 
@@ -410,19 +416,55 @@ Ten Second Tom stores configuration using a structured hierarchy:
 
 ```json
 {
-  "Llm": {
-    "Provider": "Anthropic",
-    "ApiKey": "your-api-key",
-    "Model": "claude-3-5-sonnet-20241022"
-  },
-  "Ssh": {
-    "KeyPath": "~/.ssh/id_ed25519",
-    "KeySource": "OnePasswordAgent",
-    "AgentSocketPath": "/path/to/agent.sock"
-  },
-  "Storage": {
-    "MemoryDirectory": "~/.memory/ten-second-tom",
-    "CreateIfMissing": true
+  "TenSecondTom": {
+    "MemoryDirectory": "~/ten-second-tom",
+    "Auth": {
+      "SshAgentProvider": "Auto",
+      "PublicKeyPath": "~/.ssh/id_ed25519.pub"
+    },
+    "Llm": {
+      "Provider": "OpenAI",
+      "ApiKey": "your-api-key",
+      "Model": "gpt-5-nano",
+      "MaxInputTokens": 50000,
+      "SpeechToTextModel": "whisper-1"
+    },
+    "Audio": {
+      "SttProvider": "whisper-cpp",
+      "SttApiKey": null,
+      "SttFallbackEnabled": true,
+      "SttFallbackProvider": "openai",
+      "SttFallbackApiKey": "sk-...",
+      "KeepFiles": true,
+      "Recorder": {
+        "FfmpegPath": "ffmpeg",
+        "InputVolume": 1.0,
+        "EnableNoiseReduction": true,
+        "EnableFrequencyFilters": true
+      },
+      "LocalWhisper": {
+        "BinaryPath": "whisper-cli",
+        "ModelPath": "~/.cache/whisper/ggml-base.en.bin"
+      },
+      "Preprocessing": {
+        "RemoveSilence": true,
+        "SilenceThresholdDb": -50,
+        "MinimumSilenceDurationMs": 500
+      },
+      "Timeouts": {
+        "TodaySeconds": 180,
+        "RecordSeconds": 900
+      }
+    },
+    "DataRetention": {
+      "DefaultPolicy": "Indefinite",
+      "AutoPurgeEnabled": false
+    },
+    "Setup": {
+      "SshKeyDetectionTimeoutSeconds": 5,
+      "ApiValidationTimeoutSeconds": 10,
+      "TotalSetupTimeoutSeconds": 120
+    }
   }
 }
 ```
@@ -432,15 +474,29 @@ Ten Second Tom stores configuration using a structured hierarchy:
 Following .NET conventions, use double underscores (`__`) to specify nested keys:
 
 ```bash
-# Standard .NET pattern
-Llm__Provider=Anthropic
-Llm__ApiKey=your-api-key-here
-Llm__Model=claude-3-5-sonnet-20241022
+# LLM Configuration
+TenSecondTom__Llm__Provider=Anthropic
+TenSecondTom__Llm__ApiKey=your-api-key-here
+TenSecondTom__Llm__Model=claude-sonnet-4-20250514
 
-Ssh__KeySource=ManualPath
-Ssh__KeyPath=~/.ssh/id_ed25519
+# Memory Directory
+TenSecondTom__MemoryDirectory=~/ten-second-tom
 
-Storage__MemoryDirectory=~/.memory/ten-second-tom
+# Audio Configuration (STT)
+TenSecondTom__Audio__SttProvider=whisper-cpp
+TenSecondTom__Audio__SttApiKey=sk-...
+TenSecondTom__Audio__SttFallbackEnabled=true
+TenSecondTom__Audio__SttFallbackProvider=openai
+TenSecondTom__Audio__SttFallbackApiKey=sk-...
+
+# Audio Recording Settings
+TenSecondTom__Audio__Recorder__InputVolume=1.0
+TenSecondTom__Audio__Recorder__EnableNoiseReduction=true
+TenSecondTom__Audio__Recorder__EnableFrequencyFilters=true
+
+# SSH/Auth Configuration
+TenSecondTom__Auth__SshAgentProvider=Auto
+TenSecondTom__Auth__PublicKeyPath=~/.ssh/id_ed25519.pub
 ```
 
 The double underscore (`__`) in environment variables maps to a colon (`:`) in configuration keys,
@@ -467,7 +523,7 @@ All configuration in Ten Second Tom uses the **TenSecondTom:** namespace for con
 
 Ten Second Tom uses standard .NET configuration patterns:
 
-**Files (appsettings.json, User Secrets)** - Use colons (`:`) for hierarchy:
+**Configuration Files (config.json, appsettings.json)** - Use colons (`:`) for hierarchy:
 ```json
 {
   "TenSecondTom": {
@@ -496,30 +552,41 @@ TenSecondTom__Llm__ApiKey=sk-...
 
 SSH key detection and API validation operations have configurable timeouts to prevent the setup wizard from hanging.
 
-**Default timeouts (in `appsettings.json`):**
+**Default timeouts (in `~/ten-second-tom/config/config.json`):**
 
 ```json
 {
-  "Setup": {
-    "SshKeyDetectionTimeoutSeconds": 5,
-    "ApiValidationTimeoutSeconds": 10,
-    "TotalSetupTimeoutSeconds": 120
+  "TenSecondTom": {
+    "Setup": {
+      "SshKeyDetectionTimeoutSeconds": 5,
+      "ApiValidationTimeoutSeconds": 10,
+      "TotalSetupTimeoutSeconds": 120
+    }
   }
 }
 ```
 
 **Adjust timeouts:**
 
-Edit `appsettings.json` in the application directory:
+Edit `~/ten-second-tom/config/config.json` or use environment variables:
 
 ```json
 {
-  "Setup": {
-    "SshKeyDetectionTimeoutSeconds": 10,  // Increase if SSH detection times out
-    "ApiValidationTimeoutSeconds": 20,    // Increase for slow networks
-    "TotalSetupTimeoutSeconds": 180       // Overall setup timeout
+  "TenSecondTom": {
+    "Setup": {
+      "SshKeyDetectionTimeoutSeconds": 10,  // Increase if SSH detection times out
+      "ApiValidationTimeoutSeconds": 20,    // Increase for slow networks
+      "TotalSetupTimeoutSeconds": 180       // Overall setup timeout
+    }
   }
 }
+```
+
+Or via environment variables:
+```bash
+export TenSecondTom__Setup__SshKeyDetectionTimeoutSeconds=10
+export TenSecondTom__Setup__ApiValidationTimeoutSeconds=20
+export TenSecondTom__Setup__TotalSetupTimeoutSeconds=180
 ```
 
 ## Troubleshooting
@@ -596,21 +663,25 @@ tom setup --force
 
 **Solutions:**
 
-1. **Check User Secrets location:**
+1. **Check configuration file location:**
    ```bash
    # The setup wizard shows the save location at the end
    # Verify the file exists:
-   ls ~/.microsoft/usersecrets/*/secrets.json
+   ls ~/ten-second-tom/config/config.json
    ```
 
 2. **Check file permissions:**
    ```bash
    # Ensure you have write permissions
-   ls -la ~/.microsoft/usersecrets/
+   ls -la ~/ten-second-tom/config/
+
+   # Fix if needed
+   mkdir -p ~/ten-second-tom/config
+   chmod 755 ~/ten-second-tom/config
    ```
 
-3. **Use fallback storage:**
-   If User Secrets fails, configuration falls back to `appsettings.json`. Check for warnings in the setup output.
+3. **Check for errors:**
+   Review the setup output for any error messages about file creation or permissions.
 
 4. **Re-run setup:**
    ```bash
@@ -623,29 +694,28 @@ tom setup --force
 
 **Solutions:**
 
-1. **Show configuration:**
+1. **Standard location:**
+   ```bash
+   # macOS/Linux
+   cat ~/ten-second-tom/config/config.json
+
+   # Windows
+   type %USERPROFILE%\ten-second-tom\config\config.json
+   ```
+
+2. **Show configuration:**
    ```bash
    tom config show
    # The output includes the storage location
    ```
 
-2. **Find User Secrets directory:**
+3. **Backup configuration:**
    ```bash
-   # macOS/Linux
-   find ~/.microsoft/usersecrets -name "secrets.json"
-   
-   # Windows (PowerShell)
-   Get-ChildItem -Path $env:APPDATA\Microsoft\UserSecrets -Recurse -Filter secrets.json
-   ```
+   # Create backup
+   cp ~/ten-second-tom/config/config.json ~/ten-second-tom/config/config.backup.json
 
-3. **Check appsettings.json fallback:**
-   If User Secrets failed, check the application directory:
-   ```bash
-   # macOS/Linux (Homebrew install)
-   cat /usr/local/bin/TenSecondTom/appsettings.json
-   
-   # Windows (default install)
-   type "C:\Program Files\TenSecondTom\appsettings.json"
+   # Or backup to another location
+   cp ~/ten-second-tom/config/config.json ~/backups/tom-config-$(date +%Y%m%d).json
    ```
 
 ## Rollback and Recovery
@@ -675,26 +745,26 @@ If you need to restore a previous configuration:
    # ... etc.
    ```
 
-3. **Manual User Secrets restore:**
+3. **Manual configuration restore:**
    ```bash
-   # Find User Secrets location
-   tom config show  # Shows path at bottom
-   
-   # Copy backup over existing file
-   cp config-backup.json ~/.microsoft/usersecrets/<id>/secrets.json
+   # Restore from backup
+   cp ~/backups/tom-config-20251026.json ~/ten-second-tom/config/config.json
+
+   # Or restore from local backup
+   cp ~/ten-second-tom/config/config.backup.json ~/ten-second-tom/config/config.json
    ```
 
 ### Start Fresh
 
 To completely reset configuration and start over:
 
-1. **Delete User Secrets file:**
+1. **Delete configuration file:**
    ```bash
    # macOS/Linux
-   rm ~/.microsoft/usersecrets/*/secrets.json
-   
+   rm ~/ten-second-tom/config/config.json
+
    # Windows (PowerShell)
-   Remove-Item -Path $env:APPDATA\Microsoft\UserSecrets\*\secrets.json
+   Remove-Item -Path $env:USERPROFILE\ten-second-tom\config\config.json
    ```
 
 2. **Re-run setup:**
@@ -704,45 +774,60 @@ To completely reset configuration and start over:
 
 ## Advanced Configuration
 
-### Manual User Secrets Management (For Developers)
+### Manual Configuration File Editing
 
-If you're developing Ten Second Tom, you can use `dotnet user-secrets` commands directly:
+You can directly edit the configuration file if needed:
 
 ```bash
-cd src
-
-# Set secrets
-dotnet user-secrets set "TenSecondTom:OpenAI:ApiKey" "your-key"
-dotnet user-secrets set "TenSecondTom:Anthropic:ApiKey" "your-key"
-
-# List secrets
-dotnet user-secrets list
-
-# Clear all secrets
-dotnet user-secrets clear
+# Open in your preferred editor
+nano ~/ten-second-tom/config/config.json
+# or
+vim ~/ten-second-tom/config/config.json
+# or
+code ~/ten-second-tom/config/config.json
 ```
 
-**Note:** For regular users, always use `tom setup` and `tom config` instead of manual commands.
+**Important:** The configuration file must be valid JSON. Invalid JSON will cause the application to fail on startup.
+
+**Recommended:** Use `tom config` commands instead of manual editing to ensure proper validation and formatting.
+
+### Configuration File Structure
+
+The configuration file uses the TenSecondTom namespace for all application settings:
+
+```json
+{
+  "TenSecondTom": {
+    "MemoryDirectory": "~/ten-second-tom",
+    "Auth": { "PublicKeyPath": "~/.ssh/id_ed25519.pub" },
+    "Llm": { "Provider": "OpenAI", "ApiKey": "sk-..." },
+    "Audio": { "SttProvider": "whisper-cpp", ... }
+  }
+}
+```
 
 ## Related Documentation
 
-- [.NET User Secrets Documentation](https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets)
 - [.NET Configuration Documentation](https://learn.microsoft.com/en-us/dotnet/core/extensions/configuration)
 - [OpenAI API Keys](https://platform.openai.com/api-keys)
 - [Anthropic API Keys](https://console.anthropic.com/settings/keys)
 - [GitHub SSH Documentation](https://docs.github.com/en/authentication/connecting-to-github-with-ssh)
+- [Audio Configuration](AUDIO.md) - Microphone and STT settings
+- [Authentication Setup](AUTHENTICATION.md) - SSH key configuration
+- [Environment Variables](ENVIRONMENT.md) - Environment-based configuration
 
 ## Security Best Practices
 
 - ✅ **DO** use the built-in setup wizard (`tom setup`)
-- ✅ **DO** use User Secrets for local development
+- ✅ **DO** protect `~/ten-second-tom/config/config.json` with proper file permissions
 - ✅ **DO** use environment variables for production/CI/CD
 - ✅ **DO** regularly rotate API keys
 - ✅ **DO** back up configuration before making changes
+- ✅ **DO** add `config.json` to `.gitignore` if versioning your memory directory
 - ❌ **DO NOT** commit API keys to version control
-- ❌ **DO NOT** share User Secrets files
-- ❌ **DO NOT** store secrets in plain text files
-- ❌ **DO NOT** put secrets in `appsettings.json` (use as fallback only)
+- ❌ **DO NOT** share configuration files containing secrets
+- ❌ **DO NOT** store configuration in publicly accessible locations
+- ❌ **DO NOT** put secrets in shipped `appsettings.json` files
 
 ---
 

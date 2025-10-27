@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
+using TenSecondTom.Features.Audio;
 using TenSecondTom.Features.Audio.Commands;
 using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Features.Audio.Services;
@@ -83,6 +84,22 @@ public static class TodayCommandHandler
         // Handle voice input mode
         if (useVoice)
         {
+            // Validate audio configuration before proceeding with voice input
+            var audioConfig = configuration.GetSection(ConfigurationKeys.AudioSection).Get<AudioConfiguration>()
+                ?? new AudioConfiguration();
+            var audioValidator = serviceProvider.GetRequiredService<IAudioConfigurationValidator>();
+            var audioConfigResult = AudioConfigurationHelper.EnsureAudioConfigured(
+                audioValidator,
+                audioConfig,
+                CommandNames.Today,
+                jsonOutput);
+
+            if (!audioConfigResult.IsSuccess)
+            {
+                return; // Audio configuration incomplete
+            }
+
+
             await ExecuteVoiceInputAsync(
                 serviceProvider,
                 useDefaultTemplate,
@@ -430,23 +447,29 @@ public static class TodayCommandHandler
                 };
             }
 
-            // Parse STT selection
-            SttSelection selection = ParseSttSelection(sttSelection ?? audioConfig.PreferredStt);
+            // Parse STT selection string to enum
+            var selection = ParseSttSelection(sttSelection);
+
+            // Convert CLI selection to AudioConfiguration
+            var transcribeConfig = ConvertSttSelectionToConfig(selection, audioConfig);
 
             // Step 2: Transcribe audio
             if (!jsonOutput)
             {
-                AnsiConsole.MarkupLine($"[cyan]✍️  Transcribing with {selection}...[/]");
+                var providerDisplay = transcribeConfig.SttProvider == SttProviders.OpenAI ? "OpenAI" : "local";
+                var fallbackInfo = transcribeConfig.SttFallbackEnabled ? $" (fallback to {transcribeConfig.SttFallbackProvider})" : "";
+                AnsiConsole.MarkupLine($"[cyan]✍️  Transcribing with {providerDisplay}{fallbackInfo}...[/]");
             }
             else
             {
-                logger.LogInformation("Transcribing audio with {Selection}", selection);
+                logger.LogInformation("Transcribing audio with {Provider}, FallbackEnabled={FallbackEnabled}",
+                    transcribeConfig.SttProvider, transcribeConfig.SttFallbackEnabled);
             }
 
             var transcribeCommand = new TranscribeAudioCommand
             {
                 AudioFilePath = audioFilePath,
-                Selection = selection
+                AudioConfig = transcribeConfig
             };
 
             Result<TranscriptionResult> transcribeResult;
@@ -717,6 +740,65 @@ public static class TodayCommandHandler
             "local" => SttSelection.Local,
             "openai" => SttSelection.OpenAI,
             _ => SttSelection.Auto
+        };
+    }
+
+    /// <summary>
+    /// Converts CLI SttSelection intent to AudioConfiguration.
+    /// Maps user-friendly CLI options (auto/local/openai) to the proper configuration.
+    /// </summary>
+    private static AudioConfiguration ConvertSttSelectionToConfig(SttSelection selection, AudioConfiguration baseConfig)
+    {
+        return selection switch
+        {
+            // Auto: Try local provider first, fallback to OpenAI cloud if enabled
+            SttSelection.Auto => new AudioConfiguration
+            {
+                SttProvider = baseConfig.SttProvider,
+                SttBinaryPath = baseConfig.SttBinaryPath,
+                SttModel = baseConfig.SttModel,
+                SttApiKey = baseConfig.SttApiKey,
+                SttFallbackEnabled = true,
+                SttFallbackProvider = baseConfig.SttFallbackProvider,
+                SttFallbackBinaryPath = baseConfig.SttFallbackBinaryPath,
+                SttFallbackModel = baseConfig.SttFallbackModel,
+                SttFallbackApiKey = baseConfig.SttFallbackApiKey,
+                Recorder = baseConfig.Recorder,
+                KeepFiles = baseConfig.KeepFiles,
+                Preprocessing = baseConfig.Preprocessing,
+                Timeouts = baseConfig.Timeouts
+            },
+
+            // Local: Use only the configured local provider (no fallback)
+            SttSelection.Local => new AudioConfiguration
+            {
+                SttProvider = baseConfig.SttProvider,
+                SttBinaryPath = baseConfig.SttBinaryPath,
+                SttModel = baseConfig.SttModel,
+                SttApiKey = baseConfig.SttApiKey,
+                SttFallbackEnabled = false,
+                Recorder = baseConfig.Recorder,
+                KeepFiles = baseConfig.KeepFiles,
+                Preprocessing = baseConfig.Preprocessing,
+                Timeouts = baseConfig.Timeouts
+            },
+
+            // OpenAI: Force OpenAI provider, no fallback
+            SttSelection.OpenAI => new AudioConfiguration
+            {
+                SttProvider = SttProviders.OpenAI,
+                SttBinaryPath = baseConfig.SttBinaryPath,
+                SttModel = baseConfig.SttModel,
+                SttApiKey = baseConfig.SttApiKey,
+                SttFallbackEnabled = false,
+                Recorder = baseConfig.Recorder,
+                KeepFiles = baseConfig.KeepFiles,
+                Preprocessing = baseConfig.Preprocessing,
+                Timeouts = baseConfig.Timeouts
+            },
+
+            _ => throw new ArgumentOutOfRangeException(nameof(selection), selection,
+                $"Unsupported STT selection: {selection}")
         };
     }
 }

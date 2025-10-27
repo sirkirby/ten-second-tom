@@ -14,75 +14,54 @@ public static class ModelRegistry
     private static readonly List<SupportedModel> _openAIModels =
     [
         new SupportedModel(
-            Id: LlmConstants.OpenAIModels.Gpt4oMini,
-            DisplayName: LlmConstants.DisplayNames.Gpt4oMini,
+            Id: LlmConstants.OpenAIModels.GPTNano,
+            DisplayName: LlmConstants.OpenAIModels.GPTNanoDisplayName,
             Provider: LlmProvider.OpenAI,
             CostTier: LlmConstants.CostTiers.Budget,
-            Description: LlmConstants.Descriptions.Gpt4oMini,
-            IsDefault: true),
-        new SupportedModel(
-            Id: LlmConstants.OpenAIModels.Gpt4o,
-            DisplayName: LlmConstants.DisplayNames.Gpt4o,
-            Provider: LlmProvider.OpenAI,
-            CostTier: LlmConstants.CostTiers.Balanced,
-            Description: LlmConstants.Descriptions.Gpt4o,
+            Description: LlmConstants.OpenAIModels.GPTNanoDescription,
             IsDefault: false),
         new SupportedModel(
-            Id: LlmConstants.OpenAIModels.ChatGpt4oLatest,
-            DisplayName: LlmConstants.DisplayNames.ChatGpt4oLatest,
+            Id: LlmConstants.OpenAIModels.GPTMini,
+            DisplayName: LlmConstants.OpenAIModels.GPTMiniDisplayName,
             Provider: LlmProvider.OpenAI,
             CostTier: LlmConstants.CostTiers.Balanced,
-            Description: LlmConstants.Descriptions.ChatGpt4oLatest,
+            Description: LlmConstants.OpenAIModels.GPTMiniDescription,
+            IsDefault: true),
+        new SupportedModel(
+            Id: LlmConstants.OpenAIModels.GPTStandard,
+            DisplayName: LlmConstants.OpenAIModels.GPTStandardDisplayName,
+            Provider: LlmProvider.OpenAI,
+            CostTier: LlmConstants.CostTiers.Premium,
+            Description: LlmConstants.OpenAIModels.GPTStandardDescription,
             IsDefault: false)
     ];
 
-    // Initialize Anthropic models (Claude 4 series with budget, balanced, and premium options)
+        // Initialize Anthropic models (Claude 4 series)
     private static readonly List<SupportedModel> _anthropicModels =
     [
         // Budget tier
         new SupportedModel(
-            Id: LlmConstants.AnthropicModels.Claude3Haiku,
-            DisplayName: LlmConstants.DisplayNames.Claude3Haiku,
+            Id: LlmConstants.AnthropicModels.ClaudeHaiku,
+            DisplayName: LlmConstants.AnthropicModels.ClaudeHaikuDisplayName,
             Provider: LlmProvider.Anthropic,
             CostTier: LlmConstants.CostTiers.Budget,
-            Description: LlmConstants.Descriptions.Claude3Haiku,
+            Description: LlmConstants.AnthropicModels.ClaudeHaikuDescription,
             IsDefault: true),
-        new SupportedModel(
-            Id: LlmConstants.AnthropicModels.Claude35Haiku,
-            DisplayName: LlmConstants.DisplayNames.Claude35Haiku,
-            Provider: LlmProvider.Anthropic,
-            CostTier: LlmConstants.CostTiers.Budget,
-            Description: LlmConstants.Descriptions.Claude35Haiku,
-            IsDefault: false),
         // Balanced tier
         new SupportedModel(
-            Id: LlmConstants.AnthropicModels.ClaudeSonnet4,
-            DisplayName: LlmConstants.DisplayNames.ClaudeSonnet4,
+            Id: LlmConstants.AnthropicModels.ClaudeSonnet,
+            DisplayName: LlmConstants.AnthropicModels.ClaudeSonnetDisplayName,
             Provider: LlmProvider.Anthropic,
             CostTier: LlmConstants.CostTiers.Balanced,
-            Description: LlmConstants.Descriptions.ClaudeSonnet4,
-            IsDefault: false),
-        new SupportedModel(
-            Id: LlmConstants.AnthropicModels.ClaudeSonnet45,
-            DisplayName: LlmConstants.DisplayNames.ClaudeSonnet45,
-            Provider: LlmProvider.Anthropic,
-            CostTier: LlmConstants.CostTiers.Balanced,
-            Description: LlmConstants.Descriptions.ClaudeSonnet45,
+            Description: LlmConstants.AnthropicModels.ClaudeSonnetDescription,
             IsDefault: false),
         // Premium tier
         new SupportedModel(
-            Id: LlmConstants.AnthropicModels.ClaudeOpus4,
-            DisplayName: LlmConstants.DisplayNames.ClaudeOpus4,
+            Id: LlmConstants.AnthropicModels.ClaudeOpus,
+            DisplayName: LlmConstants.AnthropicModels.ClaudeOpusDisplayName,
             Provider: LlmProvider.Anthropic,
             CostTier: LlmConstants.CostTiers.Premium,
-            Description: LlmConstants.Descriptions.ClaudeOpus4,
-            IsDefault: false),
-        new SupportedModel(
-            Id: LlmConstants.AnthropicModels.ClaudeOpus41,
-            DisplayName: LlmConstants.DisplayNames.ClaudeOpus41,
-            Provider: LlmProvider.Anthropic,
-            CostTier: LlmConstants.CostTiers.Premium,
-            Description: LlmConstants.Descriptions.ClaudeOpus41,
+            Description: LlmConstants.AnthropicModels.ClaudeOpusDescription,
             IsDefault: false)
     ];
 

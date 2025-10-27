@@ -385,25 +385,87 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         return Task.FromResult<int?>(null);
     }
 
-    public Task<string?> PromptForSttPreferenceAsync(
-        string? currentValue,
+    public Task<string?> PromptForSttProviderAsync(
+        string? currentProvider,
         CancellationToken cancellationToken)
     {
-        _console.MarkupLine("[grey]ℹ️  Speech-to-Text engine preference:[/]");
-        _console.MarkupLine("[grey]   • auto: Try local (whisper.cpp) first, fallback to OpenAI[/]");
-        _console.MarkupLine("[grey]   • local: Always use whisper.cpp (requires installation)[/]");
-        _console.MarkupLine("[grey]   • openai: Always use OpenAI Whisper API[/]");
+        _console.MarkupLine("[grey]ℹ️  Speech-to-Text provider options:[/]");
+        _console.MarkupLine("[grey]   • whisper.cpp: Local, free, requires installation (Homebrew recommended)[/]");
+        _console.MarkupLine("[grey]   • OpenAI Whisper API: Cloud-based, requires API key, pay-per-use[/]");
         _console.WriteLine();
 
-        var choices = new[] { "auto", "local", "openai" };
-        var defaultChoice = currentValue ?? "auto";
+        var choices = new Dictionary<string, string>
+        {
+            ["whisper.cpp (Local, free)"] = SttProviders.WhisperCpp,
+            ["OpenAI Whisper API (Cloud, requires key)"] = SttProviders.OpenAI
+        };
 
         var prompt = new SelectionPrompt<string>()
-            .Title("Select STT preference:")
+            .Title("Select your speech-to-text provider:")
+            .AddChoices(choices.Keys);
+
+        var selected = _console.Prompt(prompt);
+        return Task.FromResult<string?>(choices[selected]);
+    }
+
+    public Task<string?> PromptForSttApiKeyAsync(
+        string provider,
+        string? currentApiKey,
+        CancellationToken cancellationToken)
+    {
+        // Prompt for API key
+        var providerName = provider == SttProviders.OpenAI ? "OpenAI" : provider;
+        var prompt = new TextPrompt<string>($"Enter your {providerName} API key for STT:")
+            .Secret();
+
+        if (!string.IsNullOrEmpty(currentApiKey))
+        {
+            prompt.DefaultValue(MaskApiKey(currentApiKey));
+        }
+
+        var apiKey = _console.Prompt(prompt);
+        return Task.FromResult<string?>(apiKey);
+    }
+
+    public Task<bool?> PromptForSttFallbackAsync(
+        bool? currentValue,
+        CancellationToken cancellationToken)
+    {
+        _console.MarkupLine("[grey]ℹ️  STT Fallback Provider:[/]");
+        _console.MarkupLine("[grey]   When enabled, automatically falls back to a secondary STT provider if the primary provider fails.[/]");
+        _console.MarkupLine("[grey]   Requires configuring a fallback provider and API key. Useful for reliability but may incur costs.[/]");
+        _console.WriteLine();
+
+        var choices = new[] { "Enabled", "Disabled" };
+        var defaultChoice = (currentValue ?? false) ? "Enabled" : "Disabled";
+
+        var prompt = new SelectionPrompt<string>()
+            .Title("Enable STT fallback provider?")
             .AddChoices(choices);
 
         var selected = _console.Prompt(prompt);
-        return Task.FromResult<string?>(selected);
+        return Task.FromResult<bool?>(selected == "Enabled");
+    }
+
+    public Task<string?> PromptForSttFallbackProviderAsync(
+        string? currentProvider,
+        CancellationToken cancellationToken)
+    {
+        _console.MarkupLine("[grey]ℹ️  Select fallback STT provider:[/]");
+        _console.WriteLine();
+
+        // Currently only OpenAI is supported, but this is extensible
+        var choices = new Dictionary<string, string>
+        {
+            ["OpenAI Whisper API"] = SttProviders.OpenAI
+        };
+
+        var prompt = new SelectionPrompt<string>()
+            .Title("Fallback STT provider:")
+            .AddChoices(choices.Keys);
+
+        var selected = _console.Prompt(prompt);
+        return Task.FromResult<string?>(choices[selected]);
     }
 
     private static string MaskApiKey(string? apiKey)

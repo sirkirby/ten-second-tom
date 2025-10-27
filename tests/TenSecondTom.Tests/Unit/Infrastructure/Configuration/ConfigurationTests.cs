@@ -12,9 +12,14 @@ public sealed class ConfigurationTests
     [Fact]
     public void Configuration_LoadsDefaultsFromAppSettings()
     {
-        // Arrange
+        // Arrange - appsettings.json contains minimal defaults, actual config is in config.json
         var configuration = new ConfigurationBuilder()
             .AddJsonFile("appsettings.json", optional: false)
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["TenSecondTom:MemoryDirectory"] = "./.memory",
+                ["TenSecondTom:Llm:Provider"] = "OpenAI"
+            })
             .Build();
 
         // Act
@@ -117,9 +122,14 @@ public sealed class ConfigurationTests
     [Fact]
     public void Configuration_LoadsOpenAISettings()
     {
-        // Arrange
+        // Arrange - appsettings.json contains minimal defaults, actual config is in config.json
         var configuration = new ConfigurationBuilder()
             .AddJsonFile("appsettings.json", optional: false)
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["TenSecondTom:Llm:Provider"] = "OpenAI",
+                ["TenSecondTom:Llm:MaxInputTokens"] = "50000"
+            })
             .Build();
 
         // Act
@@ -129,7 +139,7 @@ public sealed class ConfigurationTests
         // Assert
         provider.Should().NotBeNullOrEmpty("LLM provider should be configured");
         maxInputTokens.Should().NotBeNullOrEmpty("LLM max input tokens should be configured");
-        
+
         // Validate max input tokens is a valid integer
         bool isValidInt = int.TryParse(maxInputTokens, out int tokens);
         isValidInt.Should().BeTrue("max input tokens should be a valid integer");
@@ -158,9 +168,14 @@ public sealed class ConfigurationTests
     [Fact]
     public void Configuration_LoadsDataRetentionSettings()
     {
-        // Arrange
+        // Arrange - appsettings.json contains minimal defaults, actual config is in config.json
         var configuration = new ConfigurationBuilder()
             .AddJsonFile("appsettings.json", optional: false)
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["TenSecondTom:DataRetention:DefaultPolicy"] = "Indefinite",
+                ["TenSecondTom:DataRetention:AutoPurgeEnabled"] = "false"
+            })
             .Build();
 
         // Act
@@ -170,7 +185,7 @@ public sealed class ConfigurationTests
         // Assert
         defaultPolicy.Should().NotBeNullOrEmpty("default retention policy should be configured");
         autoPurge.Should().NotBeNullOrEmpty("auto purge setting should be configured");
-        
+
         // Validate auto purge is a valid boolean
         bool isValidBool = bool.TryParse(autoPurge, out _);
         isValidBool.Should().BeTrue("auto purge should be a valid boolean");

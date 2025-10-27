@@ -28,13 +28,49 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
     /// Creates a new instance of ConfigurationStorageService.
     /// </summary>
     /// <param name="logger">Logger instance</param>
-    /// <param name="appSettingsPath">Optional path to appsettings.json. Defaults to AppContext.BaseDirectory/appsettings.json</param>
+    /// <param name="configuration">Configuration to read the Memory/app root directory</param>
+    /// <param name="appSettingsPath">Optional override path. If null, uses {MemoryDirectory}/config/config.json</param>
     public ConfigurationStorageService(
         ILogger<ConfigurationStorageService> logger,
+        Microsoft.Extensions.Configuration.IConfiguration configuration,
         string? appSettingsPath = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _appSettingsPath = appSettingsPath ?? Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+        _appSettingsPath = appSettingsPath ?? GetUserConfigPath(configuration);
+    }
+
+    /// <summary>
+    /// Gets the user configuration file path within the app root (Memory) directory.
+    /// This ensures all user data lives under one root, separate from the binary location.
+    /// </summary>
+    /// <param name="configuration">Configuration to read Memory directory setting</param>
+    /// <returns>Path to user configuration file (e.g., ~/ten-second-tom/config/config.json)</returns>
+    private static string GetUserConfigPath(Microsoft.Extensions.Configuration.IConfiguration configuration)
+    {
+        // Get the Memory directory (app root) from configuration
+        // Falls back to ~/ten-second-tom if not configured
+        var memoryDir = configuration[ConfigurationKeys.MemoryDirectory];
+
+        if (string.IsNullOrWhiteSpace(memoryDir))
+        {
+            // First run: Use default location
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            memoryDir = Path.Combine(home, "ten-second-tom");
+        }
+        else if (memoryDir.StartsWith("~/", StringComparison.Ordinal))
+        {
+            // Expand ~ to home directory
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            memoryDir = Path.Combine(home, memoryDir[2..]);
+        }
+
+        // User config lives in {MemoryDirectory}/config/config.json (not appsettings.json)
+        var configDir = Path.Combine(memoryDir, "config");
+
+        // Ensure directory exists
+        Directory.CreateDirectory(configDir);
+
+        return Path.Combine(configDir, "config.json");
     }
 
     public async Task<Result<string>> SaveAsync(
@@ -81,8 +117,17 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
             }
 
             // Build TenSecondTom configuration section
+            // Use AudioConfiguration defaults to get audio settings
+            var audioDefaults = new AudioConfiguration();
+
             root[ConfigurationKeys.Root] = new
             {
+                MemoryDirectory = settings.Storage.MemoryDirectory,
+                Auth = new
+                {
+                    SshAgentProvider = SshConstants.DefaultAgentProvider,
+                    PublicKeyPath = settings.Ssh.KeyPath
+                },
                 Ssh = new
                 {
                     KeyPath = settings.Ssh.KeyPath,
@@ -95,13 +140,49 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
                     Provider = settings.Llm.Provider.ToString(),
                     ApiKey = settings.Llm.ApiKey,
                     Model = settings.Llm.Model,
-                    SpeechToTextModel = settings.Llm.SpeechToTextModel,
                     MaxInputTokens = settings.Llm.MaxInputTokens
                 },
-                Storage = new
+                Audio = new
                 {
-                    MemoryDirectory = settings.Storage.MemoryDirectory,
-                    CreateIfMissing = settings.Storage.CreateIfMissing
+                    SttProvider = audioDefaults.SttProvider,
+                    SttBinaryPath = audioDefaults.SttBinaryPath,
+                    SttModel = audioDefaults.SttModel,
+                    SttApiKey = audioDefaults.SttApiKey,
+                    SttFallbackEnabled = audioDefaults.SttFallbackEnabled,
+                    SttFallbackProvider = audioDefaults.SttFallbackProvider,
+                    SttFallbackBinaryPath = audioDefaults.SttFallbackBinaryPath,
+                    SttFallbackModel = audioDefaults.SttFallbackModel,
+                    SttFallbackApiKey = audioDefaults.SttFallbackApiKey,
+                    KeepFiles = audioDefaults.KeepFiles,
+                    Recorder = new
+                    {
+                        FfmpegPath = audioDefaults.Recorder.FfmpegPath,
+                        InputVolume = audioDefaults.Recorder.InputVolume,
+                        EnableNoiseReduction = audioDefaults.Recorder.EnableNoiseReduction,
+                        EnableFrequencyFilters = audioDefaults.Recorder.EnableFrequencyFilters
+                    },
+                    Preprocessing = new
+                    {
+                        RemoveSilence = audioDefaults.Preprocessing.RemoveSilence,
+                        SilenceThresholdDb = audioDefaults.Preprocessing.SilenceThresholdDb,
+                        MinimumSilenceDurationMs = audioDefaults.Preprocessing.MinimumSilenceDurationMs
+                    },
+                    Timeouts = new
+                    {
+                        TodaySeconds = audioDefaults.Timeouts.TodaySeconds,
+                        RecordSeconds = audioDefaults.Timeouts.RecordSeconds
+                    }
+                },
+                DataRetention = new
+                {
+                    DefaultPolicy = DataRetentionConstants.DefaultPolicy,
+                    AutoPurgeEnabled = DataRetentionConstants.DefaultAutoPurgeEnabled
+                },
+                Setup = new
+                {
+                    SshKeyDetectionTimeoutSeconds = SetupWizardConstants.Timeouts.SshKeyDetectionSeconds,
+                    ApiValidationTimeoutSeconds = SetupWizardConstants.Timeouts.ApiValidationSeconds,
+                    TotalSetupTimeoutSeconds = SetupWizardConstants.Timeouts.TotalSetupSeconds
                 },
                 Optional = new
                 {
@@ -232,9 +313,17 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
                     JsonSerializer.Serialize(tenSecondTomObj, JsonOptions), JsonOptions)
                 ?? new Dictionary<string, object>();
 
-            tenSecondTom["audio"] = new
+            tenSecondTom["Audio"] = new
             {
-                PreferredStt = audioConfig.PreferredStt,
+                SttProvider = audioConfig.SttProvider,
+                SttBinaryPath = audioConfig.SttBinaryPath,
+                SttModel = audioConfig.SttModel,
+                SttApiKey = audioConfig.SttApiKey,
+                SttFallbackEnabled = audioConfig.SttFallbackEnabled,
+                SttFallbackProvider = audioConfig.SttFallbackProvider,
+                SttFallbackBinaryPath = audioConfig.SttFallbackBinaryPath,
+                SttFallbackModel = audioConfig.SttFallbackModel,
+                SttFallbackApiKey = audioConfig.SttFallbackApiKey,
                 KeepFiles = audioConfig.KeepFiles,
                 Recorder = new
                 {
@@ -242,11 +331,6 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
                     InputVolume = audioConfig.Recorder.InputVolume,
                     EnableNoiseReduction = audioConfig.Recorder.EnableNoiseReduction,
                     EnableFrequencyFilters = audioConfig.Recorder.EnableFrequencyFilters
-                },
-                LocalWhisper = new
-                {
-                    BinaryPath = audioConfig.LocalWhisper.BinaryPath,
-                    ModelPath = audioConfig.LocalWhisper.ModelPath
                 },
                 Preprocessing = new
                 {
@@ -341,7 +425,12 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
         return new ConfigurationSettings
         {
             Ssh = new SshConfiguration { KeyPath = null },
-            Llm = new LlmConfiguration { Provider = LlmProvider.OpenAI, ApiKey = null },
+            Llm = new LlmConfiguration
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = null,
+                MaxInputTokens = LlmConstants.DefaultMaxInputTokensOpenAI
+            },
             Storage = new StorageConfiguration
             {
                 MemoryDirectory = Path.Combine(
@@ -377,20 +466,35 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
         }
 
         // Parse Llm section
-        var llmConfig = new LlmConfiguration { Provider = LlmProvider.OpenAI, ApiKey = null };
+        var llmConfig = new LlmConfiguration
+        {
+            Provider = LlmProvider.OpenAI,
+            ApiKey = null,
+            MaxInputTokens = LlmConstants.DefaultMaxInputTokensOpenAI
+        };
         if (tenSecondTomSection.TryGetProperty("llm", out var llmSection))
         {
+            var provider = TryGetEnumProperty<LlmProvider>(llmSection, "provider") ?? LlmProvider.OpenAI;
+            var maxInputTokens = TryGetIntProperty(llmSection, "maxInputTokens");
+
+            // Use provider-specific default if not explicitly set
+            if (!maxInputTokens.HasValue)
+            {
+                maxInputTokens = provider == LlmProvider.Anthropic
+                    ? LlmConstants.DefaultMaxInputTokensAnthropic
+                    : LlmConstants.DefaultMaxInputTokensOpenAI;
+            }
+
             llmConfig = new LlmConfiguration
             {
-                Provider = TryGetEnumProperty<LlmProvider>(llmSection, "provider") ?? LlmProvider.OpenAI,
+                Provider = provider,
                 ApiKey = TryGetStringProperty(llmSection, "apiKey"),
                 Model = TryGetStringProperty(llmSection, "model"),
-                SpeechToTextModel = TryGetStringProperty(llmSection, "speechToTextModel"),
-                MaxInputTokens = TryGetIntProperty(llmSection, "maxInputTokens")
+                MaxInputTokens = maxInputTokens
             };
         }
 
-        // Parse Storage section
+        // Parse Storage section (supports both new format at root and legacy "storage" section)
         var storageConfig = new StorageConfiguration
         {
             MemoryDirectory = Path.Combine(
@@ -399,15 +503,21 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
                 "ten-second-tom"),
             CreateIfMissing = true
         };
-        if (tenSecondTomSection.TryGetProperty("storage", out var storageSection))
+
+        // Try new format first (MemoryDirectory at root level)
+        var memoryDirectory = TryGetStringProperty(tenSecondTomSection, "memoryDirectory");
+
+        // Fall back to legacy "storage" section for backwards compatibility
+        if (string.IsNullOrWhiteSpace(memoryDirectory) && tenSecondTomSection.TryGetProperty("storage", out var storageSection))
         {
-            storageConfig = new StorageConfiguration
-            {
-                MemoryDirectory = TryGetStringProperty(storageSection, "memoryDirectory")
-                    ?? storageConfig.MemoryDirectory,
-                CreateIfMissing = TryGetBoolProperty(storageSection, "createIfMissing") ?? true
-            };
+            memoryDirectory = TryGetStringProperty(storageSection, "memoryDirectory");
         }
+
+        storageConfig = new StorageConfiguration
+        {
+            MemoryDirectory = memoryDirectory ?? storageConfig.MemoryDirectory,
+            CreateIfMissing = true // Always true for now
+        };
 
         // Parse Optional section
         var optionalConfig = new OptionalConfiguration

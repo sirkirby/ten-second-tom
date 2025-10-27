@@ -120,7 +120,7 @@ Examples:
 
 ### Standalone Recording
 
-Record and save audio with transcription for later use:
+Record and save audio with transcription for later use with the `generate` command:
 
 ```
 tom record [options]
@@ -130,16 +130,23 @@ Options:
   --output-json     Output results in JSON format
 
 Files saved to:
-  <memory-dir>/recording/recording-YYYYMMdd-HHmmss.wav
-  <memory-dir>/recording/recording-YYYYMMdd-HHmmss.txt
+  <memory-dir>/recording/MM-dd-yyyy_N.wav
+  <memory-dir>/recording/MM-dd-yyyy_N.txt
 ```
+
+**Note:** The `record` command requires SSH authentication (like other commands that create data). Recordings are saved with metadata in YAML frontmatter including timestamp, duration, STT engine used, and word count.
 
 ### Audio Configuration
 
-Ten Second Tom provides extensive audio configuration for different microphone types and recording scenarios. All settings can be configured via **environment variables** (recommended for Homebrew users) or configuration files.
+Ten Second Tom provides extensive audio configuration for different microphone types and recording scenarios. All settings can be configured via:
+
+1. **Interactive setup wizard** (`tom config`) - Recommended for most users
+2. **Environment variables** - For advanced users and CI/CD
+3. **Configuration file** (`~/ten-second-tom/config/config.json`) - Automatically managed by setup wizard
 
 #### Key Features
 
+- **STT Fallback Provider**: Configure automatic fallback from local to cloud STT if primary provider fails
 - **Microphone Optimization**: Presets for laptop/built-in mics, professional dynamic mics, condenser/USB mics, and studio setups
 - **Silence Removal**: Automatically compress long silence gaps in recordings (enabled by default)
 - **Noise Reduction**: Adaptive noise reduction during recording (enabled by default for laptop mics)
@@ -170,6 +177,9 @@ tom today --voice
 
 | Setting | Environment Variable | Default | Description |
 |---------|---------------------|---------|-------------|
+| STT Provider | `TenSecondTom__Audio__SttProvider` | `whisper-cpp` | Primary STT provider |
+| STT Fallback | `TenSecondTom__Audio__SttFallbackEnabled` | `false` | Enable fallback provider |
+| Fallback Provider | `TenSecondTom__Audio__SttFallbackProvider` | `null` | Secondary STT provider |
 | Input Volume | `TenSecondTom__Audio__Recorder__InputVolume` | `1.0` | Volume multiplier (0.0-2.0) |
 | Noise Reduction | `TenSecondTom__Audio__Recorder__EnableNoiseReduction` | `true` | Adaptive noise filter |
 | Frequency Filters | `TenSecondTom__Audio__Recorder__EnableFrequencyFilters` | `true` | High/low-pass filters |
@@ -355,57 +365,56 @@ tom config set api-key "your-new-key"
 
 See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for complete configuration guide.
 
-**Option 3: Configuration File**
+**Configuration Storage:**
 
-You can also use an `appsettings.json` file for non-sensitive configuration. **API keys should not be stored here.**
+All user configuration is stored in `~/ten-second-tom/config/config.json` and managed automatically by the setup wizard. The shipped application files contain only logging configuration.
 
-```json
-{
-  "TenSecondTom": {
-    "LlmProvider": "OpenAI",
-    "OpenAI": {
-      "Model": "gpt-4",
-      "MaxTokens": 2000,
-      "Temperature": 0.7
-    },
-    "Anthropic": {
-      "Model": "claude-3-5-sonnet-20241022",
-      "MaxTokens": 2000
-    }
-  }
-}
-```
+Configuration precedence (highest to lowest):
+1. **Environment variables** - Runtime overrides
+2. **User configuration** (`~/ten-second-tom/config/config.json`) - Managed by `tom config`
+3. **Shipped defaults** (logging only)
 
-⚠️ **Never commit API keys to version control!** For installed applications, environment variables are the recommended way to configure secrets. See [SECURITY.md](SECURITY.md) for more details.
+⚠️ **Never commit API keys to version control!** Use the setup wizard or environment variables for secrets. See [SECURITY.md](SECURITY.md) for more details.
 
 ### Memory Directory
 
-By default, memories are stored in `~/ten-second-tom/` in your home directory. To customize:
+By default, memories and configuration are stored in `~/ten-second-tom/` in your home directory:
 
-```json
-{
-  "TenSecondTom": {
-    "MemoryDirectory": "~/Documents/my-memories"
-  }
-}
+```
+~/ten-second-tom/
+├── config/
+│   └── config.json        # Your configuration (from setup wizard)
+├── templates/              # Prompt templates
+├── today/                  # Daily entries
+├── thisweek/              # Weekly reviews
+└── recording/             # Voice recordings
+```
+
+To customize the memory directory location, use the setup wizard:
+
+```bash
+tom config
+# Select "Storage" to change memory directory location
+```
+
+Or set via environment variable:
+
+```bash
+export TenSecondTom__MemoryDirectory="~/Documents/my-memories"
 ```
 
 ### Data Retention
 
-Configure automatic cleanup of old entries:
+Configure automatic cleanup of old entries via the setup wizard:
 
-```json
-{
-  "TenSecondTom": {
-    "DataRetention": {
-      "DefaultPolicy": "OneYear",
-      "AutoPurgeEnabled": true
-    }
-  }
-}
+```bash
+tom config
+# Select "Optional Settings" → "Data Retention"
 ```
 
 **Available Policies**: `Indefinite`, `Days30`, `Days90`, `OneYear`, `TwoYears`
+
+Automatic purging can be enabled/disabled independently from the retention policy.
 
 ---
 
@@ -681,10 +690,12 @@ Use single command mode for:
 
 ## �📁 File Structure
 
-Your memories are stored as plain markdown files:
+Your memories are stored as plain markdown files in your configured memory directory:
 
 ```
 ~/ten-second-tom/
+├── config/
+│   └── config.json         # Your configuration (SSH, LLM, Audio settings)
 ├── templates/              # Prompt templates (customizable!)
 │   ├── daily-summary.md   # Default daily template
 │   ├── weekly-review.md   # Default weekly template
@@ -694,9 +705,13 @@ Your memories are stored as plain markdown files:
 │   ├── 10-01-2025_2.md    # Multiple entries per day supported
 │   ├── 10-02-2025_1.md
 │   └── 10-03-2025_1.md
-└── thisweek/
-    ├── 2025-40-Mon-1.md    # Week 40 of 2025, Monday, entry 1
-    └── 2025-41-Fri-1.md    # Week 41 of 2025, Friday, entry 1
+├── thisweek/
+│   ├── 2025-40-Mon-1.md    # Week 40 of 2025, Monday, entry 1
+│   └── 2025-41-Fri-1.md    # Week 41 of 2025, Friday, entry 1
+└── recording/              # Voice recordings (if using --voice or record)
+    ├── 10-21-2025_1.wav   # Audio file
+    ├── 10-21-2025_1.txt   # Transcription with metadata
+    └── 10-21-2025_2.wav   # Multiple recordings per day supported
 ```
 
 **File Format:**

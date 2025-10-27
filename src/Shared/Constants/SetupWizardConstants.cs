@@ -116,4 +116,29 @@ public static class SetupWizardConstants
         /// </summary>
         public const string Days = "days";
     }
+
+    /// <summary>
+    /// Timeout values specific to the setup wizard flow.
+    /// These control how long the wizard waits for various setup steps.
+    /// </summary>
+    public static class Timeouts
+    {
+        /// <summary>
+        /// Timeout for SSH key detection step (in seconds).
+        /// Maximum time to wait for SSH agent detection and key discovery.
+        /// </summary>
+        public const int SshKeyDetectionSeconds = 5;
+
+        /// <summary>
+        /// Timeout for API validation step (in seconds).
+        /// Maximum time to wait when validating LLM provider API keys.
+        /// </summary>
+        public const int ApiValidationSeconds = 10;
+
+        /// <summary>
+        /// Total setup wizard timeout (in seconds).
+        /// Maximum time allowed for the entire setup process.
+        /// </summary>
+        public const int TotalSetupSeconds = 120;
+    }
 }

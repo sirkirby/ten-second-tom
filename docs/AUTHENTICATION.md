@@ -13,6 +13,17 @@ Ten Second Tom supports two authentication methods:
 
 The application automatically selects the best available authentication method.
 
+### Commands Requiring Authentication
+
+The following commands create or modify data and require SSH authentication:
+
+- `tom today` - Create daily entry
+- `tom thisweek` - Create weekly review
+- `tom record` - Record and save audio with transcription
+- `tom generate` - Generate content from recordings
+
+**Note:** The `record` command requires authentication because it creates data (recordings and transcriptions) that will be used by other authenticated commands. This ensures consistent identity verification across all data-creating operations.
+
 ### Setup Wizard (Recommended)
 
 The easiest way to configure authentication is through the setup wizard:

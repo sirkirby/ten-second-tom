@@ -1,6 +1,9 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TenSecondTom.Features.Audio.Commands;
 using TenSecondTom.Features.Audio.Services;
+using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
@@ -14,25 +17,29 @@ namespace TenSecondTom.Features.Audio.Handlers;
 public sealed class TranscribeAudioCommandHandler : IRequestHandler<TranscribeAudioCommand, Result<TranscriptionResult>>
 {
     private readonly ISttProviderFactory _providerFactory;
+    private readonly AudioConfiguration _audioConfig;
     private readonly ILogger<TranscribeAudioCommandHandler> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TranscribeAudioCommandHandler"/> class.
     /// </summary>
     /// <param name="providerFactory">The STT provider factory.</param>
+    /// <param name="audioConfig">The audio configuration.</param>
     /// <param name="logger">The logger instance.</param>
     public TranscribeAudioCommandHandler(
         ISttProviderFactory providerFactory,
+        IOptions<AudioConfiguration> audioConfig,
         ILogger<TranscribeAudioCommandHandler> logger)
     {
         _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
+        _audioConfig = audioConfig?.Value ?? throw new ArgumentNullException(nameof(audioConfig));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
     /// Handles the TranscribeAudioCommand to transcribe an audio file.
     /// </summary>
-    /// <param name="request">The command containing the audio file path and selection strategy.</param>
+    /// <param name="request">The command containing the audio file path and audio configuration.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A Result containing the TranscriptionResult or an error.</returns>
     public async Task<Result<TranscriptionResult>> Handle(
@@ -47,17 +54,18 @@ public sealed class TranscribeAudioCommandHandler : IRequestHandler<TranscribeAu
         }
 
         _logger.LogInformation(
-            "Transcribing audio file {AudioFile} using {Selection} selection",
+            "Transcribing audio file {AudioFile} using provider {Provider} (CloudFallback={CloudFallback})",
             request.AudioFilePath,
-            request.Selection);
+            request.AudioConfig.SttProvider,
+            request.AudioConfig.SttFallbackEnabled);
 
-        // Get the appropriate STT provider based on selection strategy
-        var provider = await _providerFactory.GetProviderAsync(request.Selection, cancellationToken);
+        // Get the appropriate STT provider based on configuration
+        var provider = await _providerFactory.GetProviderAsync(request.AudioConfig, cancellationToken);
 
         if (provider == null)
         {
             return Result<TranscriptionResult>.Failure(
-                $"No STT provider available for selection strategy: {request.Selection}");
+                $"No STT provider available for provider: {request.AudioConfig.SttProvider}");
         }
 
         _logger.LogInformation("Using STT engine: {SttEngine}", provider.Engine);

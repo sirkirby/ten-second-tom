@@ -47,7 +47,8 @@ public sealed class EnvironmentVariableConfigTests : UserSecretsTestFixture
 
         using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
         var logger = loggerFactory.CreateLogger<ConfigurationStorageService>();
-        var storageService = new ConfigurationStorageService(logger, testAppSettingsPath);
+        var configuration = new ConfigurationBuilder().Build();
+        var storageService = new ConfigurationStorageService(logger, configuration, testAppSettingsPath);
 
         var configurationWithModel = new ConfigurationSettings
         {

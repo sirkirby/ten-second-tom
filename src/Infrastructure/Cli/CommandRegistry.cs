@@ -12,6 +12,7 @@ using TenSecondTom.Features.Shell.Services;
 using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.OutputFormatters;
 using AuthLoginHandler = TenSecondTom.Features.Auth.Handlers.LoginCommandHandler;
 using AuthLogoutHandler = TenSecondTom.Features.Auth.Handlers.LogoutCommandHandler;
@@ -453,7 +454,7 @@ public static class CommandRegistry
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
             string? stt = parseResult.GetValue(sttOption);
 
-            // Get AudioConfiguration to read default PreferredStt and timeout
+            // Get AudioConfiguration to read default SttProvider and timeout
             var audioConfig = serviceProvider.GetService<IOptions<Configuration.AudioConfiguration>>()?.Value
                 ?? new Configuration.AudioConfiguration();
             
@@ -463,9 +464,9 @@ public static class CommandRegistry
             // If no --stt flag provided, use configuration default
             if (string.IsNullOrWhiteSpace(stt))
             {
-                if (audioConfig.PreferredStt is not null)
+                if (audioConfig.SttProvider is not null)
                 {
-                    if (!Enum.TryParse<TenSecondTom.Features.Audio.Models.SttSelection>(audioConfig.PreferredStt, ignoreCase: true, out sttSelection))
+                    if (!Enum.TryParse<TenSecondTom.Features.Audio.Models.SttSelection>(audioConfig.SttProvider, ignoreCase: true, out sttSelection))
                     {
                         // Invalid config value, fall back to Auto
                         sttSelection = TenSecondTom.Features.Audio.Models.SttSelection.Auto;
@@ -492,6 +493,40 @@ public static class CommandRegistry
                     }
                     return 1;
                 }
+            }
+
+            // Authenticate first (record command creates data that will be used by authenticated commands)
+            var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
+
+            // Show warning if using mock authentication (only in non-JSON mode)
+            if (!jsonOutput && authService is MockAuthenticationService)
+            {
+                AnsiConsole.MarkupLine("[yellow]⚠ Development Mode: Authentication bypassed[/]");
+                AnsiConsole.WriteLine();
+            }
+
+            var authResult = await AuthenticationHelper.EnsureAuthenticatedAsync(
+                authService,
+                CommandNames.Record,
+                jsonOutput,
+                CancellationToken.None);
+
+            if (!authResult.IsSuccess)
+            {
+                return 1; // Authentication failed
+            }
+
+            // Validate audio configuration
+            var audioValidator = serviceProvider.GetRequiredService<TenSecondTom.Features.Audio.Services.IAudioConfigurationValidator>();
+            var audioConfigResult = TenSecondTom.Features.Audio.AudioConfigurationHelper.EnsureAudioConfigured(
+                audioValidator,
+                audioConfig,
+                CommandNames.Record,
+                jsonOutput);
+
+            if (!audioConfigResult.IsSuccess)
+            {
+                return 1; // Audio configuration incomplete
             }
 
             // Get handler
@@ -522,7 +557,7 @@ public static class CommandRegistry
             // Execute command with configured timeout
             var command = new TenSecondTom.Features.Audio.Commands.RecordCommand
             {
-                SttSelection = sttSelection,
+                AudioConfig = ConvertSttSelectionToConfig(sttSelection, audioConfig),
                 MaxDurationSeconds = audioConfig.Timeouts.RecordSeconds  // Use configured timeout
             };
 
@@ -1049,7 +1084,7 @@ public static class CommandRegistry
 
         // Audio Configuration
         table.AddRow("[yellow]Audio Settings[/]", "");
-        table.AddRow("  Preferred STT", config.Audio.PreferredStt);
+        table.AddRow("  STT Provider", config.Audio.SttProvider);
         table.AddRow("  Keep Files", config.Audio.KeepFiles ? "Yes" : "No");
         
         // Audio Recorder Configuration
@@ -1083,6 +1118,68 @@ public static class CommandRegistry
             return "••••";
 
         return $"••••{apiKey[^4..]}";
+    }
+
+    /// <summary>
+    /// Converts CLI SttSelection intent to AudioConfiguration.
+    /// Maps user-friendly CLI options (auto/local/openai) to the proper configuration.
+    /// </summary>
+    /// <param name="selection">The STT selection from CLI (auto, local, or openai)</param>
+    /// <param name="baseConfig">The base audio configuration from appsettings</param>
+    /// <returns>AudioConfiguration with appropriate provider and fallback settings</returns>
+    private static Configuration.AudioConfiguration ConvertSttSelectionToConfig(TenSecondTom.Features.Audio.Models.SttSelection selection, Configuration.AudioConfiguration baseConfig)
+    {
+        return selection switch
+        {
+            // Auto: Try local provider first, fallback to OpenAI cloud if enabled
+            TenSecondTom.Features.Audio.Models.SttSelection.Auto => new Configuration.AudioConfiguration
+            {
+                SttProvider = baseConfig.SttProvider,
+                SttBinaryPath = baseConfig.SttBinaryPath,
+                SttModel = baseConfig.SttModel,
+                SttApiKey = baseConfig.SttApiKey,
+                SttFallbackEnabled = true,
+                SttFallbackProvider = baseConfig.SttFallbackProvider,
+                SttFallbackBinaryPath = baseConfig.SttFallbackBinaryPath,
+                SttFallbackModel = baseConfig.SttFallbackModel,
+                SttFallbackApiKey = baseConfig.SttFallbackApiKey,
+                Recorder = baseConfig.Recorder,
+                KeepFiles = baseConfig.KeepFiles,
+                Preprocessing = baseConfig.Preprocessing,
+                Timeouts = baseConfig.Timeouts
+            },
+
+            // Local: Use only the configured local provider (whisper.cpp, ollama, etc.) - no fallback
+            TenSecondTom.Features.Audio.Models.SttSelection.Local => new Configuration.AudioConfiguration
+            {
+                SttProvider = baseConfig.SttProvider,
+                SttBinaryPath = baseConfig.SttBinaryPath,
+                SttModel = baseConfig.SttModel,
+                SttApiKey = baseConfig.SttApiKey,
+                SttFallbackEnabled = false,
+                Recorder = baseConfig.Recorder,
+                KeepFiles = baseConfig.KeepFiles,
+                Preprocessing = baseConfig.Preprocessing,
+                Timeouts = baseConfig.Timeouts
+            },
+
+            // OpenAI: Force OpenAI provider, no fallback
+            TenSecondTom.Features.Audio.Models.SttSelection.OpenAI => new Configuration.AudioConfiguration
+            {
+                SttProvider = SttProviders.OpenAI,
+                SttBinaryPath = baseConfig.SttBinaryPath,
+                SttModel = baseConfig.SttModel,
+                SttApiKey = baseConfig.SttApiKey,
+                SttFallbackEnabled = false,
+                Recorder = baseConfig.Recorder,
+                KeepFiles = baseConfig.KeepFiles,
+                Preprocessing = baseConfig.Preprocessing,
+                Timeouts = baseConfig.Timeouts
+            },
+
+            _ => throw new ArgumentOutOfRangeException(nameof(selection), selection,
+                $"Unsupported STT selection: {selection}")
+        };
     }
 }
 

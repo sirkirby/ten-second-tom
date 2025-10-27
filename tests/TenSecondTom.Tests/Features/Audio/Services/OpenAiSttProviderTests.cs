@@ -3,7 +3,6 @@
 using OpenAI;
 using OpenAI.Audio;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -32,8 +31,7 @@ public sealed class OpenAiSttProviderTests
         {
             Llm = new LlmConfiguration
             {
-                Provider = LlmProvider.OpenAI,
-                SpeechToTextModel = "whisper-1"
+                Provider = LlmProvider.OpenAI
             }
         };
     }
@@ -308,15 +306,13 @@ public sealed class OpenAiSttProviderTests
     public async Task TranscribeAsync_UsesConfiguredModel()
     {
         // Arrange
-        var customSettings = new ConfigurationSettings
+        var customAudioConfig = new AudioConfiguration
         {
-            Llm = new LlmConfiguration
-            {
-                Provider = LlmProvider.OpenAI,
-                SpeechToTextModel = "whisper-2" // Future model version
-            }
+            SttProvider = SttProviders.OpenAI,
+            SttModel = "whisper-2", // Future model version
+            SttApiKey = "test-api-key"
         };
-        var provider = CreateProvider(customSettings);
+        var provider = CreateProvider(audioConfig: customAudioConfig);
         var _audioPath = "/path/to/audio.wav";
 
         // Act
@@ -412,13 +408,18 @@ public sealed class OpenAiSttProviderTests
         await Task.CompletedTask;
     }
 
-    private OpenAiSttProvider CreateProvider(ConfigurationSettings? settings = null)
+    private OpenAiSttProvider CreateProvider(ConfigurationSettings? settings = null, AudioConfiguration? audioConfig = null)
     {
-        var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c[ConfigurationKeys.LlmApiKey]).Returns("test-api-key");
+        audioConfig ??= new AudioConfiguration
+        {
+            SttProvider = SttProviders.OpenAI,
+            SttModel = "whisper-1",
+            SttApiKey = "test-api-key"
+        };
 
+        var audioConfigOptions = Options.Create(audioConfig);
         var configOptions = Options.Create(settings ?? _configSettings);
 
-        return new OpenAiSttProvider(mockConfiguration.Object, configOptions, _mockLogger.Object);
+        return new OpenAiSttProvider(audioConfigOptions, configOptions, _mockLogger.Object);
     }
 }

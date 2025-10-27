@@ -120,11 +120,11 @@ public sealed class SpectreConsoleSetupWizardTests
     }
 
     [Theory]
-    [InlineData("Claude Sonnet 4.5 (2025-09-29)", "Balanced", "Best model for complex agents and coding with highest intelligence")]
-    [InlineData("GPT-4o Mini (2024-07-18)", "Budget", "Fast, affordable, and efficient for most tasks")]
+    [InlineData("Claude Sonnet 4.5", "Balanced", "Best model for complex agents and coding with highest intelligence")]
+    [InlineData("GPT-5 Nano", "Budget", "Fastest, cheapest model for summarization and classification")]
     public void ModelRegistry_FormattedChoiceStrings_ShouldBeHandledCorrectly(
-        string displayName, 
-        string costTier, 
+        string displayName,
+        string costTier,
         string description)
     {
         // This test verifies that model selection can handle display names with parentheses
@@ -193,7 +193,9 @@ public sealed class SpectreConsoleSetupWizardTests
         var inputVolumeMethod = typeof(SpectreConsoleSetupWizard).GetMethod("PromptForInputVolumeAsync");
         var booleanMethod = typeof(SpectreConsoleSetupWizard).GetMethod("PromptForBooleanAsync");
         var intMethod = typeof(SpectreConsoleSetupWizard).GetMethod("PromptForIntAsync");
-        var sttMethod = typeof(SpectreConsoleSetupWizard).GetMethod("PromptForSttPreferenceAsync");
+        var sttProviderMethod = typeof(SpectreConsoleSetupWizard).GetMethod("PromptForSttProviderAsync");
+        var sttApiKeyMethod = typeof(SpectreConsoleSetupWizard).GetMethod("PromptForSttApiKeyAsync");
+        var sttFallbackMethod = typeof(SpectreConsoleSetupWizard).GetMethod("PromptForSttFallbackAsync");
 
         // Assert
         inputVolumeMethod.Should().NotBeNull("PromptForInputVolumeAsync method should exist");
@@ -205,8 +207,14 @@ public sealed class SpectreConsoleSetupWizardTests
         intMethod.Should().NotBeNull("PromptForIntAsync method should exist");
         intMethod!.ReturnType.Should().Be<Task<int?>>();
 
-        sttMethod.Should().NotBeNull("PromptForSttPreferenceAsync method should exist");
-        sttMethod!.ReturnType.Should().Be<Task<string?>>();
+        sttProviderMethod.Should().NotBeNull("PromptForSttProviderAsync method should exist");
+        sttProviderMethod!.ReturnType.Should().Be<Task<string?>>();
+
+        sttApiKeyMethod.Should().NotBeNull("PromptForSttApiKeyAsync method should exist");
+        sttApiKeyMethod!.ReturnType.Should().Be<Task<string?>>();
+
+        sttFallbackMethod.Should().NotBeNull("PromptForSttFallbackAsync method should exist");
+        sttFallbackMethod!.ReturnType.Should().Be<Task<bool?>>();
     }
 
     #endregion

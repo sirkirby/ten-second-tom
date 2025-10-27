@@ -27,8 +27,8 @@ tom config show
 ```
 
 **Configuration is stored in:**
-- **Primary:** User Secrets (`~/.microsoft/usersecrets/ten-second-tom-secrets/secrets.json`)
-- **Fallback:** `appsettings.json` (with security warnings)
+- **Primary:** User configuration file (`~/ten-second-tom/config/config.json`)
+- **Fallback:** `appsettings.json` (framework defaults only)
 
 This document covers **environment variable overrides** and **advanced scenarios**.
 
@@ -38,9 +38,9 @@ This document covers **environment variable overrides** and **advanced scenarios
 
 Settings are loaded in this order (later sources override earlier ones):
 
-1. `appsettings.json` (defaults)
+1. `appsettings.json` (framework defaults)
 2. `appsettings.{Environment}.json` (environment-specific)
-3. **User Secrets** (`~/.microsoft/usersecrets/ten-second-tom-secrets/secrets.json`)
+3. **User Configuration** (`~/ten-second-tom/config/config.json`)
 4. **Environment Variables** (runtime overrides)
 5. Command-line arguments (highest priority)
 
@@ -89,7 +89,29 @@ TenSecondTom__Llm__Model=gpt-4o-mini
 
 **Storage Configuration:**
 ```bash
-TenSecondTom__Storage__MemoryDirectory=~/Documents/tom-memories
+TenSecondTom__MemoryDirectory=~/ten-second-tom
+```
+
+**Audio Configuration:**
+```bash
+# STT Provider Selection
+TenSecondTom__Audio__SttProvider=whisper-cpp  # or openai
+TenSecondTom__Audio__SttApiKey=sk-your-api-key-here
+
+# STT Fallback Configuration
+TenSecondTom__Audio__SttFallbackEnabled=true
+TenSecondTom__Audio__SttFallbackProvider=openai
+TenSecondTom__Audio__SttFallbackApiKey=sk-fallback-api-key-here
+
+# Recording Settings
+TenSecondTom__Audio__Recorder__InputVolume=1.0
+TenSecondTom__Audio__Recorder__EnableNoiseReduction=true
+TenSecondTom__Audio__Recorder__EnableFrequencyFilters=true
+
+# Preprocessing Settings
+TenSecondTom__Audio__Preprocessing__RemoveSilence=true
+TenSecondTom__Audio__Preprocessing__SilenceThresholdDb=-50
+TenSecondTom__Audio__Preprocessing__MinimumSilenceDurationMs=500
 ```
 
 **SSH Configuration:**
@@ -195,8 +217,8 @@ Llm__ApiKey=sk-ant-your-key-here
 **Notes:**
 - `.env` files are automatically loaded at startup
 - Already in `.gitignore` to prevent committing secrets
-- Supplementary to User Secrets (doesn't replace them)
-- Environment variables in `.env` override User Secrets
+- Supplementary to user configuration (doesn't replace config.json)
+- Environment variables in `.env` override configuration file settings
 
 ⚠️ **Security Warning:** The `.env` file approach stores secrets in plain text. For production, use proper secrets management.
 
@@ -229,12 +251,12 @@ You'll see:
 ### Example Development Setup
 
 ```bash
-# Create .env file (optional, supplementary to User Secrets)
+# Create .env file (optional, supplementary to config.json)
 cat > .env << EOF
 DOTNET_ENVIRONMENT=Development
 EOF
 
-# Run setup wizard (stores config in User Secrets)
+# Run setup wizard (stores config in ~/ten-second-tom/config/config.json)
 tom setup
 
 # Run the app
@@ -249,8 +271,8 @@ tom today
 
 1. **Install via package manager** (Homebrew, Winget, etc.)
 2. **Use environment variables** for any runtime overrides
-3. **Use User Secrets** for local development configuration
-4. **Use configuration files** only for non-sensitive settings
+3. **Use configuration file** (`~/ten-second-tom/config/config.json`) for persistent settings
+4. **Use shipped configuration files** only for framework defaults (logging)
 
 ### CI/CD Example (GitHub Actions)
 
@@ -336,7 +358,7 @@ tom thisweek
 1. **Restart your shell** - Environment variables are set at shell startup
 2. **Check spelling** - Variable names are case-sensitive
 3. **Verify double underscores** - Use `__` not `:` in env vars
-4. **Check hierarchy** - User Secrets may be overriding your environment variables
+4. **Check hierarchy** - Configuration file may be overriding your environment variables
 
 ```bash
 # View all environment variables
@@ -378,15 +400,15 @@ Llm__ApiKey="sk-test"    # ⚠️ quotes usually not needed
 tom config show
 
 # Look for the storage location at the bottom:
-# "Configuration loaded from: /Users/you/.microsoft/usersecrets/.../secrets.json"
+# "Configuration loaded from: ~/ten-second-tom/config/config.json"
 ```
 
-### Environment vs User Secrets Priority
+### Environment vs Configuration File Priority
 
-**Remember:** Environment variables **override** User Secrets.
+**Remember:** Environment variables **override** configuration file settings.
 
 ```bash
-# User Secrets has: Llm__Provider=OpenAI
+# config.json has: Llm__Provider=OpenAI
 # Environment sets:
 export Llm__Provider=Anthropic
 
@@ -400,10 +422,11 @@ tom config show
 
 ### ✅ DO
 
-- Use `tom setup` for local development (stores in User Secrets)
+- Use `tom setup` for local development (stores in `~/ten-second-tom/config/config.json`)
 - Use environment variables for production deployments
 - Store secrets in CI/CD secret managers
 - Keep `.env` in `.gitignore`
+- Protect `config.json` with proper file permissions
 - Regularly rotate API keys
 - Use minimal permission scopes
 
@@ -421,9 +444,9 @@ tom config show
 ## Summary
 
 ### For Local Development
-✅ **Recommended:** `tom setup` → User Secrets
+✅ **Recommended:** `tom setup` → `~/ten-second-tom/config/config.json`
 - Interactive wizard
-- Secure storage
+- Centralized configuration
 - Easy to update with `tom config`
 
 ### For Production

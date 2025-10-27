@@ -23,6 +23,9 @@ public static class AudioFeatureExtensions
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddAudioFeature(this IServiceCollection services)
     {
+        // Register audio configuration validator
+        services.AddSingleton<IAudioConfigurationValidator, AudioConfigurationValidator>();
+
         // Register audio recorder implementation
         services.AddScoped<IAudioRecorder, FfmpegAudioRecorder>();
 

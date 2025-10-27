@@ -38,6 +38,11 @@ public static class CommandNames
     public const string Generate = "generate";
 
     /// <summary>
+    /// Command name for recording audio with transcription.
+    /// </summary>
+    public const string Record = "record";
+
+    /// <summary>
     /// Gets all valid command names.
     /// </summary>
     public static IReadOnlyList<string> All { get; } =
@@ -47,6 +52,7 @@ public static class CommandNames
         Search,
         Login,
         Logout,
-        Generate
+        Generate,
+        Record
     ];
 }

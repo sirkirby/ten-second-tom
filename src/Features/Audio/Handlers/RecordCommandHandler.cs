@@ -68,8 +68,8 @@ public sealed class RecordCommandHandler(
         // Determine timeout: use command-specific value or fall back to config default
         int? maxDurationSeconds = request.MaxDurationSeconds ?? audioConfig.Timeouts.RecordSeconds;
 
-        _logger.LogInformation("Starting record command with STT selection: {SttSelection}, Target directory: {RecordingDir}, Max duration: {MaxDuration}s",
-            request.SttSelection, recordingDir, maxDurationSeconds);
+        _logger.LogInformation("Starting record command with STT provider: {Provider}, Target directory: {RecordingDir}, Max duration: {MaxDuration}s",
+            request.AudioConfig.SttProvider, recordingDir, maxDurationSeconds);
 
         // Step 1: Record audio - the recorder will save to a temp file first, then we move it
         var tempAudioPath = Path.Combine(Path.GetTempPath(), $"tom-recording-{Guid.NewGuid()}.wav");
@@ -130,7 +130,7 @@ public sealed class RecordCommandHandler(
         var transcribeCommand = new TranscribeAudioCommand
         {
             AudioFilePath = recording.FilePath,
-            Selection = request.SttSelection
+            AudioConfig = request.AudioConfig
         };
 
         var transcribeResult = await _transcribeHandler.Handle(transcribeCommand, cancellationToken);

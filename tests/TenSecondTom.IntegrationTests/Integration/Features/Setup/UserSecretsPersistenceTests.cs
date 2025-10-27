@@ -306,11 +306,12 @@ public sealed class UserSecretsPersistenceTests : UserSecretsTestFixture
             .SetMinimumLevel(LogLevel.Warning));
 
         // Add real configuration storage service with test-specific appsettings.json
-        var testAppSettingsPath = Path.Combine(TestDirectory.BasePath, "appsettings.json");
+        var testAppSettingsPath = Path.Combine(_testDirectory.BasePath, "appsettings.json");
         services.AddSingleton<IConfigurationStorageService>(sp =>
         {
             var logger = sp.GetRequiredService<ILogger<ConfigurationStorageService>>();
-            return new ConfigurationStorageService(logger, testAppSettingsPath);
+            var configuration = new ConfigurationBuilder().Build();
+            return new ConfigurationStorageService(logger, configuration, testAppSettingsPath);
         });
 
         return services.BuildServiceProvider();

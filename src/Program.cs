@@ -57,12 +57,26 @@ internal static class Program
                 Env.Load(envFilePath);
             }
 
-            // Build configuration
-            // Priority (highest to lowest): Command line args > Environment variables > appsettings.{env}.json > appsettings.json
+            // Build configuration in two stages to resolve MemoryDirectory for user config path
+
+            // Stage 1: Load defaults and environment variables to determine MemoryDirectory
+            var tempConfig = new ConfigurationBuilder()
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .AddJsonFile($"appsettings.{EnvironmentHelper.GetCurrentEnvironment()}.json", optional: true, reloadOnChange: true)
+                .AddEnvironmentVariables()
+                .Build();
+
+            // Stage 2: Now we can determine user config path and rebuild with all sources
+            // Priority (highest to lowest): Command line args > Environment variables > User config > appsettings.{env}.json > appsettings.json (defaults)
+            var userConfigPath = GetUserConfigPath(tempConfig);
             var configuration = new ConfigurationBuilder()
                 .SetBasePath(AppContext.BaseDirectory)
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                // Default configuration shipped with binary (logging, defaults)
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                 .AddJsonFile($"appsettings.{EnvironmentHelper.GetCurrentEnvironment()}.json", optional: true, reloadOnChange: true)
+                // User configuration (written by setup, lives in Memory/app root directory)
+                .AddJsonFile(userConfigPath, optional: true, reloadOnChange: true)
                 .AddEnvironmentVariables() // Load all environment variables (including from .env file loaded above)
                 .AddCommandLine(args)
                 .Build();
@@ -142,5 +156,36 @@ internal static class Program
             // Ensure all log messages are flushed
             LoggingConfiguration.CloseAndFlush();
         }
+    }
+
+    /// <summary>
+    /// Gets the user configuration file path within the app root (Memory) directory.
+    /// This ensures all user data lives under one root, separate from the binary location.
+    /// </summary>
+    /// <param name="configuration">Configuration to read Memory directory setting</param>
+    /// <returns>Path to user configuration file (e.g., ~/ten-second-tom/config/config.json)</returns>
+    private static string GetUserConfigPath(IConfiguration configuration)
+    {
+        // Get the Memory directory (app root) from configuration
+        // Falls back to ~/ten-second-tom if not configured
+        var memoryDir = configuration[ConfigurationKeys.MemoryDirectory];
+
+        if (string.IsNullOrWhiteSpace(memoryDir))
+        {
+            // First run: Use default location
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            memoryDir = Path.Combine(home, "ten-second-tom");
+        }
+        else if (memoryDir.StartsWith("~/", StringComparison.Ordinal))
+        {
+            // Expand ~ to home directory
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            memoryDir = Path.Combine(home, memoryDir[2..]);
+        }
+
+        // User config lives in {MemoryDirectory}/config/config.json (not appsettings.json)
+        var configDir = Path.Combine(memoryDir, "config");
+
+        return Path.Combine(configDir, "config.json");
     }
 }

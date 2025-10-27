@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using TenSecondTom.Features.Audio.Commands;
 using TenSecondTom.Features.Audio.Handlers;
@@ -7,6 +8,8 @@ using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Features.Audio.Services;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Constants;
 
 namespace TenSecondTom.Tests.Features.Audio.Handlers;
 
@@ -19,6 +22,7 @@ public sealed class TranscribeAudioCommandHandlerTests
     private readonly Mock<ISttProviderFactory> _mockFactory;
     private readonly Mock<ISttProvider> _mockLocalProvider;
     private readonly Mock<ISttProvider> _mockOpenAiProvider;
+    private readonly Mock<IOptions<AudioConfiguration>> _mockAudioConfig;
     private readonly Mock<ILogger<TranscribeAudioCommandHandler>> _mockLogger;
 
     public TranscribeAudioCommandHandlerTests()
@@ -26,10 +30,14 @@ public sealed class TranscribeAudioCommandHandlerTests
         _mockFactory = new Mock<ISttProviderFactory>();
         _mockLocalProvider = new Mock<ISttProvider>();
         _mockOpenAiProvider = new Mock<ISttProvider>();
+        _mockAudioConfig = new Mock<IOptions<AudioConfiguration>>();
         _mockLogger = new Mock<ILogger<TranscribeAudioCommandHandler>>();
 
         _mockLocalProvider.Setup(p => p.Engine).Returns(SttEngine.Local);
         _mockOpenAiProvider.Setup(p => p.Engine).Returns(SttEngine.OpenAI);
+
+        // Setup default audio configuration
+        _mockAudioConfig.Setup(c => c.Value).Returns(CreateDefaultAudioConfiguration());
     }
 
     [Fact]
@@ -40,13 +48,15 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudioCommand
         {
             AudioFilePath = audioPath,
-            Selection = SttSelection.Auto
+            AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
         };
 
         var transcription = CreateSampleTranscription(audioPath, SttEngine.Local);
 
         _mockFactory
-            .Setup(f => f.GetProviderAsync(SttSelection.Auto, It.IsAny<CancellationToken>()))
+            .Setup(f => f.GetProviderAsync(
+                It.Is<AudioConfiguration>(c => c.SttFallbackEnabled == true),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(_mockLocalProvider.Object);
 
         _mockLocalProvider
@@ -62,7 +72,9 @@ public sealed class TranscribeAudioCommandHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.SttEngine.Should().Be(SttEngine.Local);
         _mockFactory.Verify(
-            f => f.GetProviderAsync(SttSelection.Auto, It.IsAny<CancellationToken>()),
+            f => f.GetProviderAsync(
+                It.Is<AudioConfiguration>(c => c.SttFallbackEnabled == true),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -74,13 +86,15 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudioCommand
         {
             AudioFilePath = audioPath,
-            Selection = SttSelection.Local
+            AudioConfig = CreateTestAudioConfig()
         };
 
         var transcription = CreateSampleTranscription(audioPath, SttEngine.Local);
 
         _mockFactory
-            .Setup(f => f.GetProviderAsync(SttSelection.Local, It.IsAny<CancellationToken>()))
+            .Setup(f => f.GetProviderAsync(
+                It.Is<AudioConfiguration>(c => c.SttFallbackEnabled == false),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(_mockLocalProvider.Object);
 
         _mockLocalProvider
@@ -105,13 +119,15 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudioCommand
         {
             AudioFilePath = audioPath,
-            Selection = SttSelection.OpenAI
+            AudioConfig = CreateTestAudioConfig(sttProvider: SttProviders.OpenAI)
         };
 
         var transcription = CreateSampleTranscription(audioPath, SttEngine.OpenAI);
 
         _mockFactory
-            .Setup(f => f.GetProviderAsync(SttSelection.OpenAI, It.IsAny<CancellationToken>()))
+            .Setup(f => f.GetProviderAsync(
+                It.Is<AudioConfiguration>(c => c.SttProvider == SttProviders.OpenAI),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(_mockOpenAiProvider.Object);
 
         _mockOpenAiProvider
@@ -135,11 +151,11 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudioCommand
         {
             AudioFilePath = "/path/to/audio.wav",
-            Selection = SttSelection.Local
+            AudioConfig = CreateTestAudioConfig()
         };
 
         _mockFactory
-            .Setup(f => f.GetProviderAsync(SttSelection.Local, It.IsAny<CancellationToken>()))
+            .Setup(f => f.GetProviderAsync(It.IsAny<AudioConfiguration>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ISttProvider?)null);
 
         var handler = CreateHandler();
@@ -161,11 +177,11 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudioCommand
         {
             AudioFilePath = audioPath,
-            Selection = SttSelection.Auto
+            AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
         };
 
         _mockFactory
-            .Setup(f => f.GetProviderAsync(SttSelection.Auto, It.IsAny<CancellationToken>()))
+            .Setup(f => f.GetProviderAsync(It.IsAny<AudioConfiguration>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(_mockLocalProvider.Object);
 
         _mockLocalProvider
@@ -190,13 +206,13 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudioCommand
         {
             AudioFilePath = audioPath,
-            Selection = SttSelection.Auto
+            AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
         };
 
         var transcription = CreateSampleTranscription(audioPath, SttEngine.Local);
 
         _mockFactory
-            .Setup(f => f.GetProviderAsync(SttSelection.Auto, It.IsAny<CancellationToken>()))
+            .Setup(f => f.GetProviderAsync(It.IsAny<AudioConfiguration>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(_mockLocalProvider.Object);
 
         _mockLocalProvider
@@ -222,13 +238,13 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudioCommand
         {
             AudioFilePath = audioPath,
-            Selection = SttSelection.Auto
+            AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
         };
 
         var transcription = CreateSampleTranscription(audioPath, SttEngine.Local);
 
         _mockFactory
-            .Setup(f => f.GetProviderAsync(SttSelection.Auto, It.IsAny<CancellationToken>()))
+            .Setup(f => f.GetProviderAsync(It.IsAny<AudioConfiguration>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(_mockLocalProvider.Object);
 
         _mockLocalProvider
@@ -255,7 +271,7 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudioCommand
         {
             AudioFilePath = audioPath,
-            Selection = SttSelection.Auto
+            AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
         };
 
         var transcription = new TranscriptionResult
@@ -270,7 +286,7 @@ public sealed class TranscribeAudioCommandHandlerTests
         };
 
         _mockFactory
-            .Setup(f => f.GetProviderAsync(SttSelection.Auto, It.IsAny<CancellationToken>()))
+            .Setup(f => f.GetProviderAsync(It.IsAny<AudioConfiguration>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(_mockLocalProvider.Object);
 
         _mockLocalProvider
@@ -296,13 +312,13 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudioCommand
         {
             AudioFilePath = audioPath,
-            Selection = SttSelection.Auto
+            AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
         };
 
         var transcription = CreateSampleTranscription(audioPath, SttEngine.Local);
 
         _mockFactory
-            .Setup(f => f.GetProviderAsync(SttSelection.Auto, It.IsAny<CancellationToken>()))
+            .Setup(f => f.GetProviderAsync(It.IsAny<AudioConfiguration>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(_mockLocalProvider.Object);
 
         _mockLocalProvider
@@ -327,14 +343,14 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudioCommand
         {
             AudioFilePath = "/path/to/audio.wav",
-            Selection = SttSelection.Auto
+            AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
         };
 
         var cts = new CancellationTokenSource();
         cts.Cancel();
 
         _mockFactory
-            .Setup(f => f.GetProviderAsync(It.IsAny<SttSelection>(), It.IsAny<CancellationToken>()))
+            .Setup(f => f.GetProviderAsync(It.IsAny<AudioConfiguration>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new OperationCanceledException());
 
         var handler = CreateHandler();
@@ -353,7 +369,7 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudioCommand
         {
             AudioFilePath = string.Empty,
-            Selection = SttSelection.Auto
+            AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
         };
 
         var handler = CreateHandler();
@@ -368,7 +384,55 @@ public sealed class TranscribeAudioCommandHandlerTests
 
     private TranscribeAudioCommandHandler CreateHandler()
     {
-        return new TranscribeAudioCommandHandler(_mockFactory.Object, _mockLogger.Object);
+        return new TranscribeAudioCommandHandler(_mockFactory.Object, _mockAudioConfig.Object, _mockLogger.Object);
+    }
+
+    private static AudioConfiguration CreateDefaultAudioConfiguration()
+    {
+        return new AudioConfiguration
+        {
+            SttProvider = SttProviders.WhisperCpp,
+            SttApiKey = null,
+            SttFallbackEnabled = false,
+            KeepFiles = true,
+            Recorder = new RecorderConfiguration(),
+            Preprocessing = new PreprocessingConfiguration(),
+            Timeouts = new RecordingTimeoutsConfiguration()
+        };
+    }
+
+    private static AudioConfiguration CreateTestAudioConfig(
+        string sttProvider = SttProviders.WhisperCpp,
+        string? sttApiKey = null,
+        bool cloudFallbackEnabled = false)
+    {
+        return new AudioConfiguration
+        {
+            SttProvider = sttProvider,
+            SttApiKey = sttApiKey,
+            SttFallbackEnabled = cloudFallbackEnabled,
+            KeepFiles = false,
+            Recorder = new RecorderConfiguration
+            {
+                FfmpegPath = "ffmpeg",
+                InputVolume = 1.0,
+                EnableNoiseReduction = true,
+                EnableFrequencyFilters = true
+            },
+            SttBinaryPath = "whisper-cli",
+            SttModel = "models/ggml-base.en.bin",
+            Preprocessing = new PreprocessingConfiguration
+            {
+                RemoveSilence = true,
+                SilenceThresholdDb = -50,
+                MinimumSilenceDurationMs = 500
+            },
+            Timeouts = new RecordingTimeoutsConfiguration
+            {
+                TodaySeconds = 300,
+                RecordSeconds = 600
+            }
+        };
     }
 
     private static TranscriptionResult CreateSampleTranscription(string audioPath, SttEngine engine)

@@ -1,4 +1,4 @@
-using TenSecondTom.Features.Audio.Models;
+using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
@@ -16,7 +16,8 @@ public sealed record TranscribeAudioCommand : IRequest<Result<TranscriptionResul
     public required string AudioFilePath { get; init; }
 
     /// <summary>
-    /// Gets the STT engine selection strategy.
+    /// Gets the audio configuration for STT provider selection.
+    /// This includes the STT provider, API key, and fallback settings.
     /// </summary>
-    public SttSelection Selection { get; init; } = SttSelection.Auto;
+    public required AudioConfiguration AudioConfig { get; init; }
 }

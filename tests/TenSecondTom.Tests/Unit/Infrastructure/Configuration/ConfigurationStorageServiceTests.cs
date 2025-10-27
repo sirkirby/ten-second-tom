@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using TenSecondTom.Features.Setup.Models;
@@ -43,8 +44,11 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     [Fact]
     public void Constructor_WithNullLogger_ThrowsArgumentNullException()
     {
+        // Arrange
+        var config = CreateMockConfiguration();
+
         // Act
-        var act = () => new ConfigurationStorageService(null!);
+        var act = () => new ConfigurationStorageService(null!, config);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -55,7 +59,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     public async Task SaveAsync_WithValidSettings_SavesSuccessfully()
     {
         // Arrange
-        var service = new ConfigurationStorageService(_mockLogger.Object, _testAppSettingsPath);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
         var settings = CreateValidConfigurationSettings();
 
         // Act
@@ -72,7 +77,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     public async Task SaveAsync_WithNullSettings_ThrowsArgumentNullException()
     {
         // Arrange
-        var service = new ConfigurationStorageService(_mockLogger.Object, _testAppSettingsPath);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
 
         // Act
         var act = async () => await service.SaveAsync(null!, CancellationToken.None);
@@ -85,7 +91,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     public async Task SaveAsync_WithCancellationToken_RespectsCancellation()
     {
         // Arrange
-        var service = new ConfigurationStorageService(_mockLogger.Object, _testAppSettingsPath);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
         var settings = CreateValidConfigurationSettings();
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
@@ -108,7 +115,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     public async Task LoadAsync_AfterSave_ReturnsConfigurationSettings()
     {
         // Arrange
-        var service = new ConfigurationStorageService(_mockLogger.Object, _testAppSettingsPath);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
         var originalSettings = CreateValidConfigurationSettings();
 
         // Save first
@@ -131,7 +139,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     public async Task LoadAsync_WithNoConfiguration_ReturnsDefaults()
     {
         // Arrange
-        var service = new ConfigurationStorageService(_mockLogger.Object, _testAppSettingsPath);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
 
         // Act
         var result = await service.LoadAsync(CancellationToken.None);
@@ -147,7 +156,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     public async Task LoadAsync_WithCancellationToken_RespectsCancellation()
     {
         // Arrange
-        var service = new ConfigurationStorageService(_mockLogger.Object, _testAppSettingsPath);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
@@ -169,7 +179,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     public async Task SaveAsync_WithComplexConfiguration_PreservesAllFields()
     {
         // Arrange
-        var service = new ConfigurationStorageService(_mockLogger.Object, _testAppSettingsPath);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
         var settings = new ConfigurationSettings
         {
             Ssh = new SshConfiguration
@@ -230,7 +241,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
         """;
         await File.WriteAllTextAsync(_testAppSettingsPath, initialJson);
 
-        var service = new ConfigurationStorageService(_mockLogger.Object, _testAppSettingsPath);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
         var settings = CreateValidConfigurationSettings();
 
         // Act
@@ -248,7 +260,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     public async Task SaveAsync_WithConcurrentWrites_ShouldNotCorruptFile()
     {
         // Arrange
-        var service = new ConfigurationStorageService(_mockLogger.Object, _testAppSettingsPath);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
         var settings1 = CreateValidConfigurationSettings() with
         {
             Llm = new LlmConfiguration { Provider = LlmProvider.OpenAI, ApiKey = "sk-key1" }
@@ -275,7 +288,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     public async Task SaveAsync_WithNullOptionalFields_HandlesGracefully()
     {
         // Arrange
-        var service = new ConfigurationStorageService(_mockLogger.Object, _testAppSettingsPath);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
         var settings = new ConfigurationSettings
         {
             Ssh = new SshConfiguration
@@ -319,7 +333,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     public async Task SaveAsync_WithDifferentProviders_PreservesProviderChoice()
     {
         // Arrange
-        var service = new ConfigurationStorageService(_mockLogger.Object, _testAppSettingsPath);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
 
         // Test OpenAI
         var openAiSettings = CreateValidConfigurationSettings() with
@@ -354,7 +369,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     public async Task SaveAsync_WithDifferentSshKeySources_PreservesSource()
     {
         // Arrange
-        var service = new ConfigurationStorageService(_mockLogger.Object, _testAppSettingsPath);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
 
         // Test each SSH key source
         var sources = new[]
@@ -390,7 +406,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     public async Task SaveAsync_WithTimestamps_PreservesTimestamps()
     {
         // Arrange
-        var service = new ConfigurationStorageService(_mockLogger.Object, _testAppSettingsPath);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
         var createdAt = DateTime.UtcNow.AddDays(-7);
         var modifiedAt = DateTime.UtcNow;
 
@@ -418,7 +435,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     public async Task SaveAsync_WithUnlimitedRetention_PreservesNegativeValue()
     {
         // Arrange
-        var service = new ConfigurationStorageService(_mockLogger.Object, _testAppSettingsPath);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
         var settings = CreateValidConfigurationSettings() with
         {
             Optional = new OptionalConfiguration
@@ -442,7 +460,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     {
         // Arrange
         await File.WriteAllTextAsync(_testAppSettingsPath, "{ this is not valid json }", CancellationToken.None);
-        var service = new ConfigurationStorageService(_mockLogger.Object, _testAppSettingsPath);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
 
         // Act
         var result = await service.LoadAsync(CancellationToken.None);
@@ -456,7 +475,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     public async Task SaveAsync_MultipleTimesSequentially_UpdatesConfiguration()
     {
         // Arrange
-        var service = new ConfigurationStorageService(_mockLogger.Object, _testAppSettingsPath);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
 
         var settings1 = CreateValidConfigurationSettings() with
         {
@@ -495,7 +515,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     public void GetStorageLocation_ReturnsAppSettingsPath()
     {
         // Arrange
-        var service = new ConfigurationStorageService(_mockLogger.Object, _testAppSettingsPath);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
 
         // Act
         var location = service.GetStorageLocation();
@@ -508,7 +529,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     public async Task SaveAsync_LogsStorageLocation()
     {
         // Arrange
-        var service = new ConfigurationStorageService(_mockLogger.Object, _testAppSettingsPath);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
         var settings = CreateValidConfigurationSettings();
 
         // Act
@@ -532,7 +554,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     public async Task LoadAsync_WithPartialConfiguration_ReturnsDefaults()
     {
         // Arrange
-        var service = new ConfigurationStorageService(_mockLogger.Object, _testAppSettingsPath);
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
 
         // Save a minimal configuration with only required fields
         var minimalSettings = new ConfigurationSettings
@@ -573,6 +596,18 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
     }
 
     #region Helper Methods
+
+    private static IConfiguration CreateMockConfiguration(string? memoryDirectory = null)
+    {
+        var configData = new Dictionary<string, string?>
+        {
+            ["TenSecondTom:MemoryDirectory"] = memoryDirectory ?? Path.Combine(Path.GetTempPath(), "ten-second-tom-test")
+        };
+
+        return new ConfigurationBuilder()
+            .AddInMemoryCollection(configData)
+            .Build();
+    }
 
     private static ConfigurationSettings CreateValidConfigurationSettings()
     {

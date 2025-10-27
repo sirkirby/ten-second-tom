@@ -92,7 +92,9 @@ public sealed class ConfigCommandHandler
         string? envEnableTelemetry = _configuration["TenSecondTom:Optional:EnableTelemetry"];
         
         // Audio configuration from environment
-        string? envPreferredStt = _configuration["TenSecondTom:Audio:PreferredStt"];
+        string? envSttProvider = _configuration["TenSecondTom:Audio:SttProvider"];
+        string? envSttApiKey = _configuration["TenSecondTom:Audio:SttApiKey"];
+        string? envSttFallbackEnabled = _configuration["TenSecondTom:Audio:SttFallbackEnabled"];
         string? envKeepFiles = _configuration["TenSecondTom:Audio:KeepFiles"];
         string? envInputVolume = _configuration[ConfigurationKeys.AudioRecorderInputVolume];
         string? envNoiseReduction = _configuration[ConfigurationKeys.AudioRecorderEnableNoiseReduction];
@@ -113,7 +115,9 @@ public sealed class ConfigCommandHandler
         bool hasOptionalOverrides = !string.IsNullOrWhiteSpace(envLogLevel) ||
                                     !string.IsNullOrWhiteSpace(envRetentionDays) ||
                                     !string.IsNullOrWhiteSpace(envEnableTelemetry);
-        bool hasAudioOverrides = !string.IsNullOrWhiteSpace(envPreferredStt) ||
+        bool hasAudioOverrides = !string.IsNullOrWhiteSpace(envSttProvider) ||
+                                !string.IsNullOrWhiteSpace(envSttApiKey) ||
+                                !string.IsNullOrWhiteSpace(envSttFallbackEnabled) ||
                                 !string.IsNullOrWhiteSpace(envKeepFiles) ||
                                 !string.IsNullOrWhiteSpace(envInputVolume) ||
                                 !string.IsNullOrWhiteSpace(envNoiseReduction) ||
@@ -125,7 +129,11 @@ public sealed class ConfigCommandHandler
         // Load audio configuration from IConfiguration (includes appsettings.json and env vars)
         var audioConfig = new AudioConfigurationDisplay
         {
-            PreferredStt = _configuration["TenSecondTom:Audio:PreferredStt"] ?? "auto",
+            SttProvider = _configuration["TenSecondTom:Audio:SttProvider"] ?? SttProviders.WhisperCpp,
+            SttApiKey = _configuration["TenSecondTom:Audio:SttApiKey"],
+            SttFallbackEnabled = bool.TryParse(_configuration["TenSecondTom:Audio:SttFallbackEnabled"], out var fallback) ? fallback : false,
+            SttFallbackProvider = _configuration["TenSecondTom:Audio:SttFallbackProvider"],
+            SttFallbackApiKey = _configuration["TenSecondTom:Audio:SttFallbackApiKey"],
             KeepFiles = bool.TryParse(_configuration["TenSecondTom:Audio:KeepFiles"], out var keepFiles) ? keepFiles : true,
             Recorder = new RecorderConfigurationDisplay
             {
@@ -296,7 +304,13 @@ public sealed class ConfigCommandHandler
 
         var newConfig = currentConfig with
         {
-            Llm = currentConfig.Llm with { Provider = provider }
+            Llm = currentConfig.Llm with
+            {
+                Provider = provider,
+                MaxInputTokens = provider == LlmProvider.Anthropic
+                    ? LlmConstants.DefaultMaxInputTokensAnthropic
+                    : LlmConstants.DefaultMaxInputTokensOpenAI
+            }
         };
 
         return Result<ConfigurationSettings>.Success(newConfig);
@@ -509,11 +523,14 @@ public sealed class ConfigCommandHandler
         // Update configuration
         var updatedConfig = currentConfig with
         {
-            Llm = currentConfig.Llm with 
-            { 
+            Llm = currentConfig.Llm with
+            {
                 Provider = selectedProvider.Value,
                 Model = selectedModel.Id,
-                ApiKey = apiKey
+                ApiKey = apiKey,
+                MaxInputTokens = selectedProvider.Value == LlmProvider.Anthropic
+                    ? LlmConstants.DefaultMaxInputTokensAnthropic
+                    : LlmConstants.DefaultMaxInputTokensOpenAI
             }
         };
 
@@ -651,15 +668,86 @@ public sealed class ConfigCommandHandler
             _setupWizard.ShowStatus("Skipped (silence removal disabled)");
         }
 
-        // Step 7: Preferred STT Engine
-        _setupWizard.ShowStepHeader(7, totalSteps, "Speech-to-Text Engine");
-        var preferredStt = await _setupWizard.PromptForSttPreferenceAsync(
-            currentAudio.PreferredStt,
+        // Step 7: Speech-to-Text Provider
+        _setupWizard.ShowStepHeader(7, totalSteps, "Speech-to-Text Provider");
+        var sttProvider = await _setupWizard.PromptForSttProviderAsync(
+            currentAudio.SttProvider,
             cancellationToken);
 
-        if (string.IsNullOrWhiteSpace(preferredStt))
+        if (sttProvider == null)
         {
             return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
+        }
+
+        // Step 7a: STT API Key (if provider requires it)
+        string? sttApiKey = currentAudio.SttApiKey;
+        if (SttProviders.RequiresApiKey(sttProvider))
+        {
+            sttApiKey = await _setupWizard.PromptForSttApiKeyAsync(
+                sttProvider,
+                currentAudio.SttApiKey,
+                cancellationToken);
+
+            if (sttApiKey == null)
+            {
+                return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
+            }
+        }
+
+        // Step 7b: STT Fallback Provider
+        bool sttFallbackEnabled = currentAudio.SttFallbackEnabled;
+        string? sttFallbackProvider = currentAudio.SttFallbackProvider;
+        string? sttFallbackApiKey = currentAudio.SttFallbackApiKey;
+
+        if (SttProviders.SupportsFallback(sttProvider))
+        {
+            var fallback = await _setupWizard.PromptForSttFallbackAsync(
+                currentAudio.SttFallbackEnabled,
+                cancellationToken);
+
+            if (!fallback.HasValue)
+            {
+                return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
+            }
+
+            sttFallbackEnabled = fallback.Value;
+
+            // If fallback is enabled, prompt for provider and API key
+            if (sttFallbackEnabled)
+            {
+                // Prompt for fallback provider
+                var fallbackProvider = await _setupWizard.PromptForSttFallbackProviderAsync(
+                    currentAudio.SttFallbackProvider,
+                    cancellationToken);
+
+                if (fallbackProvider == null)
+                {
+                    return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
+                }
+
+                sttFallbackProvider = fallbackProvider;
+
+                // Prompt for fallback API key
+                _setupWizard.ShowStatus($"Fallback provider '{fallbackProvider}' requires an API key.");
+
+                var fallbackApiKey = await _setupWizard.PromptForSttApiKeyAsync(
+                    fallbackProvider,
+                    currentAudio.SttFallbackApiKey,
+                    cancellationToken);
+
+                if (fallbackApiKey == null)
+                {
+                    return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
+                }
+
+                sttFallbackApiKey = fallbackApiKey;
+            }
+            else
+            {
+                // Fallback is disabled, clear the provider and API key
+                sttFallbackProvider = null;
+                sttFallbackApiKey = null;
+            }
         }
 
         // Step 8: Today Voice Timeout
@@ -695,7 +783,13 @@ public sealed class ConfigCommandHandler
         // Build updated audio configuration
         var updatedAudio = new AudioConfiguration
         {
-            PreferredStt = preferredStt,
+            SttProvider = sttProvider,
+            SttApiKey = sttApiKey,
+            SttFallbackEnabled = sttFallbackEnabled,
+            SttFallbackProvider = sttFallbackProvider,
+            SttFallbackBinaryPath = currentAudio.SttFallbackBinaryPath, // Not modified interactively
+            SttFallbackModel = currentAudio.SttFallbackModel, // Not modified interactively
+            SttFallbackApiKey = sttFallbackApiKey,
             KeepFiles = currentAudio.KeepFiles, // Not modified interactively
             Recorder = new RecorderConfiguration
             {
@@ -704,7 +798,8 @@ public sealed class ConfigCommandHandler
                 EnableNoiseReduction = noiseReduction.Value,
                 EnableFrequencyFilters = frequencyFilters.Value
             },
-            LocalWhisper = currentAudio.LocalWhisper, // Not modified interactively
+            SttBinaryPath = currentAudio.SttBinaryPath, // Not modified interactively
+            SttModel = currentAudio.SttModel, // Not modified interactively
             Preprocessing = new PreprocessingConfiguration
             {
                 RemoveSilence = removeSilence.Value,
@@ -739,7 +834,12 @@ public sealed class ConfigCommandHandler
             _setupWizard.ShowStatus($"  • Silence threshold: {silenceThresholdDb} dB");
             _setupWizard.ShowStatus($"  • Min silence duration: {minSilenceDurationMs} ms");
         }
-        _setupWizard.ShowStatus($"  • Preferred STT: {preferredStt}");
+        var sttProviderDisplay = sttProvider == SttProviders.WhisperCpp ? "whisper.cpp (local)" : "OpenAI Whisper API (cloud)";
+        _setupWizard.ShowStatus($"  • STT provider: {sttProviderDisplay}");
+        if (sttFallbackEnabled)
+        {
+            _setupWizard.ShowStatus($"  • STT fallback provider: Enabled ({sttFallbackProvider})");
+        }
         _setupWizard.ShowStatus($"  • Today timeout: {todayTimeout.Value}s");
         _setupWizard.ShowStatus($"  • Record timeout: {recordTimeout.Value}s");
 
