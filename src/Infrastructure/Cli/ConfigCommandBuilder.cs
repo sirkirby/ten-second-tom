@@ -1,0 +1,410 @@
+using System.CommandLine;
+using Microsoft.Extensions.DependencyInjection;
+using Spectre.Console;
+using TenSecondTom.Features.Setup.Commands;
+using TenSecondTom.Features.Setup.Handlers;
+using TenSecondTom.Features.Setup.Models;
+using TenSecondTom.Infrastructure.Configuration;
+
+namespace TenSecondTom.Infrastructure.Cli;
+
+/// <summary>
+/// Builds the config command and its subcommands.
+/// Separated from CommandRegistry to improve maintainability.
+/// </summary>
+internal static class ConfigCommandBuilder
+{
+    public static Command BuildConfigCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
+    {
+        var configCommand = new Command("config", "View and manage Ten Second Tom configuration");
+
+        // Show subcommand
+        var showCommand = new Command("show", "Display current configuration");
+        var showSecretsOption = new Option<bool>("--show-secrets")
+        {
+            Description = "Show full API keys (last 4 characters by default)"
+        };
+        showCommand.Options.Add(showSecretsOption);
+        showCommand.Options.Add(jsonOutputOption);
+
+        showCommand.SetAction(async (parseResult) =>
+        {
+            bool showSecrets = parseResult.GetValue(showSecretsOption);
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
+
+            var handler = serviceProvider.GetRequiredService<ConfigCommandHandler>();
+            var storageService = serviceProvider.GetRequiredService<IConfigurationStorageService>();
+
+            var command = new ConfigCommand
+            {
+                Action = ConfigAction.Show,
+                SettingName = null,
+                SettingValue = null,
+                ShowSecrets = showSecrets
+            };
+
+            var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
+
+            if (result.IsSuccess)
+            {
+                if (jsonOutput)
+                {
+                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(result.Value));
+                }
+                else
+                {
+                    var configPath = storageService.GetStorageLocation();
+                    DisplayConfiguration(result.Value!, showSecrets, configPath);
+                }
+                return 0;
+            }
+            else
+            {
+                if (jsonOutput)
+                {
+                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { success = false, error = result.Error }));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error.EscapeMarkup()}");
+                }
+                return 1;
+            }
+        });
+
+        // Set subcommand
+        var setCommand = new Command("set", "Update a configuration setting");
+        var settingNameArg = new Argument<string>("setting")
+        {
+            Description = "Setting name (llm-provider, api-key, memory-directory, ssh-key-path, log-level, retention-days)"
+        };
+        var settingValueArg = new Argument<string>("value")
+        {
+            Description = "New value for the setting"
+        };
+
+        setCommand.Arguments.Add(settingNameArg);
+        setCommand.Arguments.Add(settingValueArg);
+        setCommand.Options.Add(jsonOutputOption);
+
+        setCommand.SetAction(async (parseResult) =>
+        {
+            string settingName = parseResult.GetValue(settingNameArg)!;
+            string settingValue = parseResult.GetValue(settingValueArg)!;
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
+
+            var handler = serviceProvider.GetRequiredService<ConfigCommandHandler>();
+
+            var command = new ConfigCommand
+            {
+                Action = ConfigAction.Set,
+                SettingName = settingName,
+                SettingValue = settingValue,
+                ShowSecrets = false
+            };
+
+            var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
+
+            if (result.IsSuccess)
+            {
+                if (jsonOutput)
+                {
+                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { success = true, message = $"Updated {settingName}" }));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[green]✓[/] Updated [yellow]{settingName.EscapeMarkup()}[/] successfully");
+                }
+                return 0;
+            }
+            else
+            {
+                if (jsonOutput)
+                {
+                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { success = false, error = result.Error }));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error.EscapeMarkup()}");
+                }
+                return 1;
+            }
+        });
+
+        // LLM subcommand - interactive configuration for LLM provider and model
+        var llmCommand = new Command("llm", "Configure LLM provider and model interactively");
+        llmCommand.Options.Add(jsonOutputOption);
+
+        llmCommand.SetAction(async (parseResult) =>
+        {
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
+
+            var handler = serviceProvider.GetRequiredService<ConfigCommandHandler>();
+
+            var command = new ConfigCommand
+            {
+                Action = ConfigAction.Set,
+                SettingName = "llm",
+                SettingValue = null,
+                ShowSecrets = false
+            };
+
+            var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
+
+            if (result.IsSuccess)
+            {
+                if (jsonOutput)
+                {
+                    var config = result.Value!;
+                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        success = true,
+                        provider = config.Llm.Provider.ToString(),
+                        model = config.Llm.Model
+                    }));
+                }
+                // Success message already displayed by handler
+                return 0;
+            }
+            else
+            {
+                if (jsonOutput)
+                {
+                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { success = false, error = result.Error }));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error.EscapeMarkup()}");
+                }
+                return 1;
+            }
+        });
+
+        // Validate subcommand
+        var validateCommand = new Command("validate", "Validate current configuration");
+        validateCommand.Options.Add(jsonOutputOption);
+
+        validateCommand.SetAction(async (parseResult) =>
+        {
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
+
+            var handler = serviceProvider.GetRequiredService<ConfigCommandHandler>();
+
+            var command = new ConfigCommand
+            {
+                Action = ConfigAction.Validate,
+                SettingName = null,
+                SettingValue = null,
+                ShowSecrets = false
+            };
+
+            var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
+
+            if (result.IsSuccess)
+            {
+                if (jsonOutput)
+                {
+                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { success = true, message = "Configuration is valid" }));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine("[green]✓[/] Configuration is valid");
+                }
+                return 0;
+            }
+            else
+            {
+                if (jsonOutput)
+                {
+                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { success = false, error = result.Error }));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error.EscapeMarkup()}");
+                }
+                return 1;
+            }
+        });
+
+        // Audio subcommand - interactive configuration for audio recording and processing
+        var audioCommand = new Command("audio", "Configure audio recording and processing settings interactively");
+        audioCommand.Options.Add(jsonOutputOption);
+
+        audioCommand.SetAction(async (parseResult) =>
+        {
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
+
+            var handler = serviceProvider.GetRequiredService<ConfigCommandHandler>();
+
+            var command = new ConfigCommand
+            {
+                Action = ConfigAction.Set,
+                SettingName = "audio",
+                SettingValue = null,
+                ShowSecrets = false
+            };
+
+            var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
+
+            if (result.IsSuccess)
+            {
+                if (jsonOutput)
+                {
+                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        success = true,
+                        message = "Audio configuration updated successfully"
+                    }));
+                }
+                // Success message already displayed by handler
+                return 0;
+            }
+            else
+            {
+                if (jsonOutput)
+                {
+                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { success = false, error = result.Error }));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error.EscapeMarkup()}");
+                }
+                return 1;
+            }
+        });
+
+        configCommand.Subcommands.Add(showCommand);
+        configCommand.Subcommands.Add(setCommand);
+        configCommand.Subcommands.Add(llmCommand);
+        configCommand.Subcommands.Add(audioCommand);
+        configCommand.Subcommands.Add(validateCommand);
+
+        return configCommand;
+    }
+
+    private static void DisplayConfiguration(ConfigurationSettings config, bool showSecrets, string configFilePath)
+    {
+        var table = new Spectre.Console.Table()
+            .Border(TableBorder.Rounded)
+            .AddColumn("[yellow]Setting[/]")
+            .AddColumn("[yellow]Value[/]");
+
+        // SSH Configuration
+        table.AddRow("[yellow]SSH Configuration[/]", "");
+        table.AddRow("  Key Path", config.Ssh.KeyPath?.EscapeMarkup() ?? "[dim]Not set[/]");
+        table.AddRow("  Key Source", config.Ssh.KeySource?.ToString() ?? "[dim]Not set[/]");
+        if (!string.IsNullOrWhiteSpace(config.Ssh.AgentSocketPath))
+        {
+            table.AddRow("  Agent Socket", config.Ssh.AgentSocketPath.EscapeMarkup());
+        }
+
+        // LLM Configuration
+        table.AddRow("[yellow]LLM Configuration[/]", "");
+        table.AddRow("  Provider", config.Llm.Provider.ToString());
+
+        // Model - show friendly name if available
+        string modelDisplay = "[dim]Not set[/]";
+        if (!string.IsNullOrEmpty(config.Llm.Model))
+        {
+            var model = ModelRegistry.GetById(config.Llm.Model);
+            modelDisplay = model != null
+                ? $"{model.DisplayName.EscapeMarkup()} ({model.CostTier})"
+                : config.Llm.Model.EscapeMarkup();
+        }
+        table.AddRow("  Model", modelDisplay);
+
+        string apiKeyDisplay = showSecrets
+            ? config.Llm.ApiKey ?? "[dim]Not set[/]"
+            : MaskApiKey(config.Llm.ApiKey);
+        table.AddRow("  API Key", apiKeyDisplay);
+
+        // Max Input Tokens
+        var maxTokensDisplay = config.Llm.MaxInputTokens.HasValue
+            ? config.Llm.MaxInputTokens.Value.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)
+            : "[dim]Not set[/]";
+        table.AddRow("  Max Input Tokens", maxTokensDisplay);
+
+        // Storage Configuration
+        table.AddRow("[yellow]Storage Configuration[/]", "");
+        table.AddRow("  Memory Directory", config.Storage.MemoryDirectory?.EscapeMarkup() ?? "[dim]Not set[/]");
+        table.AddRow("  Create If Missing", config.Storage.CreateIfMissing ? "Yes" : "No");
+
+        // Optional Configuration
+        table.AddRow("[yellow]Optional Configuration[/]", "");
+        table.AddRow("  Log Level", config.Optional.LogLevel.ToString());
+        table.AddRow("  Retention Days", config.Optional.RetentionDays == -1
+            ? "Unlimited"
+            : config.Optional.RetentionDays.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        table.AddRow("  Telemetry", config.Optional.EnableTelemetry ? "Enabled" : "Disabled");
+
+        // Audio Configuration
+        table.AddRow("[yellow]Audio Configuration[/]", "");
+        table.AddRow("  STT Provider", config.Audio.SttProvider);
+
+        if (!string.IsNullOrWhiteSpace(config.Audio.SttApiKey))
+        {
+            string sttApiKeyDisplay = showSecrets
+                ? config.Audio.SttApiKey
+                : MaskApiKey(config.Audio.SttApiKey);
+            table.AddRow("  STT API Key", sttApiKeyDisplay);
+        }
+
+        table.AddRow("  STT Fallback", config.Audio.SttFallbackEnabled ? "Enabled" : "Disabled");
+
+        if (config.Audio.SttFallbackEnabled && !string.IsNullOrWhiteSpace(config.Audio.SttFallbackProvider))
+        {
+            table.AddRow("  Fallback Provider", config.Audio.SttFallbackProvider);
+
+            if (!string.IsNullOrWhiteSpace(config.Audio.SttFallbackApiKey))
+            {
+                string fallbackApiKeyDisplay = showSecrets
+                    ? config.Audio.SttFallbackApiKey
+                    : MaskApiKey(config.Audio.SttFallbackApiKey);
+                table.AddRow("  Fallback API Key", fallbackApiKeyDisplay);
+            }
+        }
+
+        table.AddRow("  Keep Files", config.Audio.KeepFiles ? "Yes" : "No");
+
+        // Audio Recorder Configuration
+        table.AddRow("  [dim]Recorder:[/]", "");
+        table.AddRow("    Input Volume", config.Audio.Recorder.InputVolume.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture));
+        table.AddRow("    Noise Reduction", config.Audio.Recorder.EnableNoiseReduction ? "Enabled" : "Disabled");
+        table.AddRow("    Frequency Filters", config.Audio.Recorder.EnableFrequencyFilters ? "Enabled" : "Disabled");
+
+        // Audio Preprocessing Configuration
+        table.AddRow("  [dim]Preprocessing:[/]", "");
+        table.AddRow("    Remove Silence", config.Audio.Preprocessing.RemoveSilence ? "Enabled" : "Disabled");
+        if (config.Audio.Preprocessing.RemoveSilence)
+        {
+            table.AddRow("    Silence Threshold", $"{config.Audio.Preprocessing.SilenceThresholdDb} dB");
+            table.AddRow("    Min Silence Duration", $"{config.Audio.Preprocessing.MinimumSilenceDurationMs} ms");
+        }
+
+        // Metadata
+        table.AddRow("[yellow]Metadata[/]", "");
+        table.AddRow("  Created", $"{config.CreatedAt:yyyy-MM-dd HH:mm:ss}");
+        if (config.LastModifiedAt.HasValue)
+        {
+            table.AddRow("  Modified", $"{config.LastModifiedAt.Value:yyyy-MM-dd HH:mm:ss}");
+        }
+        table.AddRow("  Version", config.ConfigurationVersion ?? "[dim]1.0[/]");
+
+        AnsiConsole.Write(table);
+
+        // Add clickable link to config file
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine($"[dim]Configuration file:[/] [link]{configFilePath.EscapeMarkup()}[/]");
+    }
+
+    private static string MaskApiKey(string? apiKey)
+    {
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return "[dim]Not set[/]";
+
+        if (apiKey.Length <= 4)
+            return "••••";
+
+        return $"••••{apiKey[^4..]}";
+    }
+}
