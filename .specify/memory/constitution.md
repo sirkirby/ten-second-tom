@@ -1,21 +1,22 @@
 <!--
 Sync Impact Report:
-- Version change: 1.2.0 → 1.3.0
+- Version change: 1.3.0 → 1.4.0
 - Modified sections:
-  * Architecture & Design Standards (added Magic Strings & Constants subsection)
-  * Code Quality (enhanced with constants reference)
+  * Architecture & Design Standards (added Configuration Management subsection)
+  * Principle I - Modern .NET & Idiomatic C# (added Options Pattern reference)
+  * Code Quality (added Options Pattern reference)
 - Added sections:
-  * Magic Strings & Constants (mandatory constants for config/keys/shared definitions)
+  * Configuration Management (mandatory Options Pattern usage, standards, and examples)
 - Templates requiring updates:
   * ✅ plan-template.md (no changes needed - already references constitution)
   * ✅ tasks-template.md (no changes needed - structure already established)
   * ✅ spec-template.md (no changes needed - user story focused)
 - Agent instruction files updated:
-  * ✅ AGENTS.md (added magic strings prohibition and constants convention)
-  * ✅ CLAUDE.md (added magic strings prohibition and constants convention)
-  * ✅ .github/copilot-instructions.md (added magic strings prohibition and version bump)
-- Rationale: Magic strings create maintenance burden, risk typos, and reduce discoverability. Centralizing constants in Shared/Constants improves code quality and prevents configuration/key errors.
-- Follow-up TODOs: None
+  * ✅ CLAUDE.md (updated with comprehensive Options Pattern guidance)
+  * ✅ AGENTS.md (updated with Options Pattern section and examples)
+  * ✅ .github/copilot-instructions.md (updated with Options Pattern section and examples)
+- Rationale: The Options Pattern provides type-safe configuration with validation, IntelliSense support, testability, and eliminates magic strings. It is the recommended .NET approach for configuration management and aligns with modern C# best practices.
+- Follow-up TODOs: None - all updates completed
 -->
 
 # Ten Second Tom Constitution
@@ -32,8 +33,9 @@ Sync Impact Report:
 - Use modern async/await patterns where appropriate
 - Leverage .NET 9 performance improvements and features
 - Use Serilog as the logging framework (organizational standard)
+- Use the .NET Options Pattern for all configuration management (see Configuration Management section)
 
-**Rationale**: Modern C# provides powerful features that improve code quality, safety, and maintainability. Idiomatic code is easier for the open-source community to understand and contribute to. Serilog provides structured logging with excellent performance and is the organizational standard.
+**Rationale**: Modern C# provides powerful features that improve code quality, safety, and maintainability. Idiomatic code is easier for the open-source community to understand and contribute to. Serilog provides structured logging with excellent performance and is the organizational standard. The Options Pattern provides type-safe configuration with validation and IntelliSense support.
 
 ### II. CLI-First Interface
 
@@ -136,6 +138,119 @@ Sync Impact Report:
 - **Dependency Injection**: Leverage built-in .NET DI container
 - **Single Responsibility**: Each class/method has one clear purpose
 
+### Configuration Management
+
+**All configuration MUST use the .NET Options Pattern with strongly-typed options classes.**
+
+- **Prohibited**: Direct `IConfiguration` access with string keys (e.g., `configuration["SectionName:Key"]`)
+- **Required**: Strongly-typed options classes named `*Options` located in `src/Shared/Options/`
+- **Validation**: Options classes MUST have corresponding validators implementing `IValidateOptions<T>` (located in `src/Shared/Options/Validation/`)
+- **Registration**: Options MUST be registered in DI using `services.Configure<TOptions>(configuration.GetSection(SectionName))`
+- **Consumption**: Services MUST inject `IOptions<T>`, `IOptionsSnapshot<T>`, or `IOptionsMonitor<T>` (not `IConfiguration`)
+- **Documentation**: Options classes MUST have XML documentation including configuration section names, environment variable formats, and usage examples
+
+**Options Pattern Interfaces**:
+- `IOptions<T>`: Singleton - use for configuration that doesn't change during application lifetime
+- `IOptionsSnapshot<T>`: Scoped - use for configuration that may change between requests (reloads config per scope)
+- `IOptionsMonitor<T>`: Singleton with change notifications - use for hot-reload scenarios requiring immediate reaction to config changes
+
+**Naming and Organization**:
+- Options classes: `*Options.cs` (e.g., `StorageOptions`, `LlmOptions`, `AuthOptions`)
+- Validators: `*OptionsValidator.cs` (e.g., `StorageOptionsValidator`)
+- Location: `src/Shared/Options/` and `src/Shared/Options/Validation/`
+- Section names: Define as `public const string SectionName` within the options class
+
+**Examples**:
+
+```csharp
+// ❌ BAD - Stringly-typed configuration access
+public class MyService
+{
+    private readonly IConfiguration _configuration;
+
+    public MyService(IConfiguration configuration)
+    {
+        _configuration = configuration;
+    }
+
+    public void DoWork()
+    {
+        var apiKey = _configuration["MyApp:ApiKey"]; // Magic string, no type safety
+        var timeout = int.Parse(_configuration["MyApp:Timeout"]); // Runtime errors
+    }
+}
+
+// ✅ GOOD - Options Pattern with strongly-typed configuration
+namespace TenSecondTom.Shared.Options;
+
+/// <summary>
+/// Configuration options for MyService.
+/// Maps to the "TenSecondTom:MyService" configuration section.
+/// </summary>
+/// <remarks>
+/// Configuration example (appsettings.json):
+/// <code>
+/// {
+///   "TenSecondTom": {
+///     "MyService": {
+///       "ApiKey": "your-key-here",
+///       "Timeout": 30
+///     }
+///   }
+/// }
+/// </code>
+///
+/// Environment variables:
+/// - TenSecondTom__MyService__ApiKey
+/// - TenSecondTom__MyService__Timeout
+/// </remarks>
+public sealed class MyServiceOptions
+{
+    public const string SectionName = "TenSecondTom:MyService";
+
+    public required string ApiKey { get; init; }
+    public int Timeout { get; init; } = 30;
+}
+
+// Validator
+public sealed class MyServiceOptionsValidator : IValidateOptions<MyServiceOptions>
+{
+    public ValidateOptionsResult Validate(string? name, MyServiceOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(options.ApiKey))
+            return ValidateOptionsResult.Fail("ApiKey is required");
+
+        if (options.Timeout <= 0)
+            return ValidateOptionsResult.Fail("Timeout must be positive");
+
+        return ValidateOptionsResult.Success;
+    }
+}
+
+// Registration (in ServiceCollectionExtensions.cs)
+services.Configure<MyServiceOptions>(configuration.GetSection(MyServiceOptions.SectionName));
+services.AddSingleton<IValidateOptions<MyServiceOptions>, MyServiceOptionsValidator>();
+
+// Consumption
+public sealed class MyService
+{
+    private readonly MyServiceOptions _options;
+
+    public MyService(IOptions<MyServiceOptions> options)
+    {
+        _options = options.Value;
+    }
+
+    public void DoWork()
+    {
+        var apiKey = _options.ApiKey; // Type-safe, IntelliSense support
+        var timeout = _options.Timeout; // No parsing, validated on startup
+    }
+}
+```
+
+**Rationale**: The Options Pattern provides type safety, compile-time checking, IntelliSense support, validation on startup, testability (mock options easily), and eliminates magic strings. It is the recommended .NET approach for configuration management and aligns with modern C# best practices. This pattern prevents runtime configuration errors and makes configuration contracts explicit and discoverable.
+
 ### Project Structure Standards
 
 **The following directory structure is MANDATORY for all features:**
@@ -155,7 +270,10 @@ src/
 │   └── DependencyInjection.cs  # Infrastructure-level DI
 ├── Shared/                # Shared domain models, abstractions, utilities
 │   ├── Models/            # Common domain models
+│   ├── Options/           # Configuration options classes (*Options.cs)
+│   │   └── Validation/    # Options validators (*OptionsValidator.cs)
 │   ├── Abstractions/      # Interfaces, base classes
+│   ├── Constants/         # Centralized constants (ConfigurationKeys, CommandNames, etc.)
 │   └── Extensions/        # Extension methods
 └── Program.cs             # Entry point, host builder, DI composition
 
@@ -180,7 +298,8 @@ tests/
 4. **DI Registration**: Each feature MUST have its own `DependencyInjection.cs` with an extension method for service registration
 5. **No Cross-Feature Dependencies**: Features MUST NOT directly reference other features; use `Shared/` for common code
 6. **Infrastructure Separation**: Cross-cutting concerns (logging, config, auth) belong in `Infrastructure/`, not `Features/`
-7. **Test Mirroring**: Test structure MUST mirror source structure for discoverability
+7. **Configuration Organization**: All options classes belong in `Shared/Options/`, validators in `Shared/Options/Validation/`
+8. **Test Mirroring**: Test structure MUST mirror source structure for discoverability
 
 **Naming Conventions for Vertical Slices:**
 
@@ -188,6 +307,8 @@ tests/
 - Command classes: `[Verb][Noun]Command` (e.g., `CreateUserCommand`, `UpdateSettingsCommand`)
 - Query classes: `Get[Noun]Query` or `List[Noun]Query` (e.g., `GetUserQuery`, `ListItemsQuery`)
 - Handler classes: `[Command/Query]Handler` (e.g., `CreateUserCommandHandler`, `GetUserQueryHandler`)
+- Options classes: `[Feature]Options` (e.g., `StorageOptions`, `LlmOptions`, `AuthOptions`)
+- Validators: `[Options]Validator` (e.g., `StorageOptionsValidator`, `LlmOptionsValidator`)
 - DI method: `AddFeature[FeatureName]Services` (e.g., `AddFeatureAuthServices`)
 
 **This structure is the canonical reference for VSA implementation and MUST be followed for all new features.**
@@ -230,6 +351,8 @@ Console.WriteLine("Setup complete! Run 'tom today' to get started.");
 - Commands end with "Command", Queries end with "Query"
 - Handlers end with "Handler"
 - Test classes end with "Tests"
+- Options classes end with "Options"
+- Validators end with "Validator" or "OptionsValidator"
 - Constant classes end with descriptive suffix ("Constants", "Keys", "Names", "Providers")
 
 ### Error Handling
@@ -265,6 +388,7 @@ Console.WriteLine("Setup complete! Run 'tom today' to get started.");
 - Review and resolve all code analysis warnings
 - Maintain XML documentation comments for public APIs
 - Use constants from `Shared/Constants/` for all shared strings (config keys, command names, paths, etc.)
+- Use Options Pattern from `Shared/Options/` for all configuration (no direct `IConfiguration` access with strings)
 
 ## Development & Operations Standards
 
@@ -333,11 +457,27 @@ Console.WriteLine("Setup complete! Run 'tom today' to get started.");
 - Consult constitution before major architectural decisions
 - Educate new contributors on constitutional requirements
 
-**Version**: 1.3.0 | **Ratified**: 2025-10-01 | **Last Amended**: 2025-10-21
+**Version**: 1.4.0 | **Ratified**: 2025-10-01 | **Last Amended**: 2025-10-28
 
 ---
 
 ## Changelog
+
+### Version 1.4.0 (2025-10-28)
+
+- **MINOR**: Added Configuration Management subsection to Architecture & Design Standards
+- Mandated use of .NET Options Pattern for all configuration management
+- Prohibited direct `IConfiguration` access with string keys (stringly-typed configuration)
+- Required strongly-typed `*Options` classes in `Shared/Options/` directory
+- Required validators implementing `IValidateOptions<T>` in `Shared/Options/Validation/`
+- Documented Options Pattern interfaces: `IOptions<T>`, `IOptionsSnapshot<T>`, `IOptionsMonitor<T>`
+- Established naming conventions: `*Options.cs`, `*OptionsValidator.cs`
+- Added comprehensive examples showing anti-patterns and recommended patterns
+- Enhanced Principle I with Options Pattern reference
+- Enhanced Code Quality section with Options Pattern requirement
+- Enhanced Naming Conventions with Options and Validators
+- Enhanced Project Structure Standards with `Shared/Options/` directory
+- Purpose: Provide type-safe configuration with validation, IntelliSense support, testability, and eliminate magic strings in configuration access
 
 ### Version 1.3.0 (2025-10-21)
 

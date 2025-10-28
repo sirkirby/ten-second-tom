@@ -23,6 +23,10 @@ When suggesting code, apply these patterns:
   - Commands: `CreateUserCommand`, `UpdateSettingsCommand`
   - Queries: `GetUserQuery`, `ListItemsQuery`
   - Handlers: `CreateUserCommandHandler`, `GetUserQueryHandler`
+- **Options Pattern**: All configuration MUST use strongly-typed options classes
+  - Options: `StorageOptions`, `LlmOptions`, `AuthOptions` (in `Shared/Options/`)
+  - Validators: `StorageOptionsValidator`, `LlmOptionsValidator` (in `Shared/Options/Validation/`)
+  - Inject: `IOptions<T>`, `IOptionsSnapshot<T>`, or `IOptionsMonitor<T>` (NOT `IConfiguration`)
 - **Factory Pattern**: Use for complex object construction
 - **Dependency Injection**: Always use .NET's built-in DI container
 
@@ -75,6 +79,9 @@ src/
 │   └── DependencyInjection.cs
 ├── Shared/            # Shared domain models, abstractions, utilities
 │   ├── Models/
+│   ├── Options/           # Configuration options classes (*Options.cs)
+│   │   └── Validation/    # Options validators (*OptionsValidator.cs)
+│   ├── Constants/         # Centralized constants
 │   ├── Abstractions/
 │   └── Extensions/
 └── Program.cs         # Entry point
@@ -97,6 +104,60 @@ tests/
 - Naming conventions for vertical slices
 - Cross-feature dependency restrictions
 - Test structure mirroring
+
+## Configuration Management (REQUIRED)
+
+**All configuration MUST use the .NET Options Pattern. Direct `IConfiguration` access with string keys is PROHIBITED.**
+
+### Options Pattern Requirements
+
+1. **Create Options class** in `src/Shared/Options/`:
+   ```csharp
+   public sealed class MyServiceOptions
+   {
+       public const string SectionName = "TenSecondTom:MyService";
+       public required string ApiKey { get; init; }
+       public int Timeout { get; init; } = 30;
+   }
+   ```
+
+2. **Create Validator** in `src/Shared/Options/Validation/`:
+   ```csharp
+   public sealed class MyServiceOptionsValidator : IValidateOptions<MyServiceOptions>
+   {
+       public ValidateOptionsResult Validate(string? name, MyServiceOptions options)
+       {
+           if (string.IsNullOrWhiteSpace(options.ApiKey))
+               return ValidateOptionsResult.Fail("ApiKey is required");
+           return ValidateOptionsResult.Success;
+       }
+   }
+   ```
+
+3. **Register in DI** (ServiceCollectionExtensions.cs):
+   ```csharp
+   services.Configure<MyServiceOptions>(configuration.GetSection(MyServiceOptions.SectionName));
+   services.AddSingleton<IValidateOptions<MyServiceOptions>, MyServiceOptionsValidator>();
+   ```
+
+4. **Inject and use**:
+   ```csharp
+   public sealed class MyService(IOptions<MyServiceOptions> options)
+   {
+       private readonly MyServiceOptions _options = options.Value;
+
+       public void DoWork()
+       {
+           var apiKey = _options.ApiKey; // Type-safe!
+       }
+   }
+   ```
+
+### Options Interfaces
+
+- `IOptions<T>`: Singleton - use for static configuration (most CLI scenarios)
+- `IOptionsSnapshot<T>`: Scoped - use when config may change per scope
+- `IOptionsMonitor<T>`: Singleton with change notifications - use for hot-reload
 
 ## CLI Design Guidelines
 
@@ -191,6 +252,7 @@ tests/
 ❌ Don't ignore test coverage requirements
 ❌ Don't duplicate code instead of extracting reusable components
 ❌ Don't hardcode configuration or secrets
+❌ Don't use direct `IConfiguration` access with string keys (use Options Pattern)
 ❌ Don't swallow exceptions without logging
 ❌ Don't use outdated C# patterns (pre-C# 9)
 ❌ Don't create anemic domain models (models without behavior)
@@ -205,6 +267,48 @@ tests/
 - Include inline comments only for non-obvious "why" explanations, not "what"
 
 ## Examples
+
+### Options Pattern vs Direct Configuration
+
+```csharp
+// ❌ BAD - Direct IConfiguration access with string keys
+public class MyService
+{
+    private readonly IConfiguration _configuration;
+
+    public MyService(IConfiguration configuration)
+    {
+        _configuration = configuration;
+    }
+
+    public void DoWork()
+    {
+        var apiKey = _configuration["MyApp:ApiKey"]; // NO! Magic string, no type safety
+        var timeout = int.Parse(_configuration["MyApp:Timeout"]); // NO! Runtime errors
+    }
+}
+
+// ✅ GOOD - Options Pattern
+// Options class in Shared/Options/
+public sealed class MyServiceOptions
+{
+    public const string SectionName = "TenSecondTom:MyService";
+    public required string ApiKey { get; init; }
+    public int Timeout { get; init; } = 30;
+}
+
+// Service using options
+public sealed class MyService(IOptions<MyServiceOptions> options)
+{
+    private readonly MyServiceOptions _options = options.Value;
+
+    public void DoWork()
+    {
+        var apiKey = _options.ApiKey; // ✅ Type-safe, IntelliSense support
+        var timeout = _options.Timeout; // ✅ No parsing, validated on startup
+    }
+}
+```
 
 ### Constants vs Magic Strings
 
@@ -291,6 +395,6 @@ public sealed class CreateUserCommandHandlerTests
 
 ---
 
-**Constitution Version**: 1.3.0 | **Last Updated**: 2025-10-21
+**Constitution Version**: 1.4.0 | **Last Updated**: 2025-10-28
 
 For questions about architectural decisions or edge cases, consult `.specify/memory/constitution.md`.
