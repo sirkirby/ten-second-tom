@@ -4,11 +4,13 @@ using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using TenSecondTom.Features.Templates.Commands;
 using TenSecondTom.Features.Templates.Handlers;
 using TenSecondTom.Features.Templates.Services;
 using TenSecondTom.Infrastructure.Prompts;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.IntegrationTests.Integration.Features.Templates;
@@ -54,12 +56,13 @@ public sealed class TemplateMigrationIntegrationTests : IDisposable
         string rootDirectory = _testDirectory;
         string templatesDirectory = Path.Combine(rootDirectory, "templates");
 
-        var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c["TenSecondTom:MemoryDirectory"]).Returns(rootDirectory);
+        var storageOptions = new StorageOptions { MemoryDirectory = rootDirectory };
+        var mockOptions = new Mock<IOptions<StorageOptions>>();
+        mockOptions.Setup(o => o.Value).Returns(storageOptions);
 
         // Act
         await _migrationService.RunAutomaticMigrationAsync(
-            mockConfiguration.Object,
+            mockOptions.Object,
             CancellationToken.None);
 
         // Assert
@@ -88,12 +91,13 @@ public sealed class TemplateMigrationIntegrationTests : IDisposable
     {
         // Arrange
         string memoryDirectory = _testDirectory;
-        var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c["TenSecondTom:MemoryDirectory"]).Returns(memoryDirectory);
+        var storageOptions = new StorageOptions { MemoryDirectory = memoryDirectory };
+        var mockOptions = new Mock<IOptions<StorageOptions>>();
+        mockOptions.Setup(o => o.Value).Returns(storageOptions);
 
         // Act - First migration
         await _migrationService.RunAutomaticMigrationAsync(
-            mockConfiguration.Object,
+            mockOptions.Object,
             CancellationToken.None);
 
         // Get creation time of a template file
@@ -105,7 +109,7 @@ public sealed class TemplateMigrationIntegrationTests : IDisposable
 
         // Act - Second migration
         await _migrationService.RunAutomaticMigrationAsync(
-            mockConfiguration.Object,
+            mockOptions.Object,
             CancellationToken.None);
 
         // Assert - File should not have been touched
@@ -127,12 +131,13 @@ public sealed class TemplateMigrationIntegrationTests : IDisposable
             Path.Combine(templatesDirectory, "daily-summary.md"),
             customContent);
 
-        var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c["TenSecondTom:MemoryDirectory"]).Returns(rootDirectory);
+        var storageOptions = new StorageOptions { MemoryDirectory = rootDirectory };
+        var mockOptions = new Mock<IOptions<StorageOptions>>();
+        mockOptions.Setup(o => o.Value).Returns(storageOptions);
 
         // Act
         await _migrationService.RunAutomaticMigrationAsync(
-            mockConfiguration.Object,
+            mockOptions.Object,
             CancellationToken.None);
 
         // Assert

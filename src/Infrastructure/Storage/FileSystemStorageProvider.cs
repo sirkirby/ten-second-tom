@@ -465,15 +465,7 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
                     EntryNumber = Convert.ToInt32(frontmatter.GetValueOrDefault("entry-number") ?? 1, CultureInfo.InvariantCulture),
                     UserInput = userInput,
                     LlmResponse = llmResponse,
-                    Metadata = metadata,
-                    Summary = new DailySummary
-                    {
-                        KeyEvents = [],
-                        Themes = [],
-                        TodoItems = [],
-                        ImportantPeople = [],
-                        NotableTasks = []
-                    }
+                    Metadata = metadata
                 };
             }
             else // thisweek
@@ -486,17 +478,7 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
                     EntryNumber = Convert.ToInt32(frontmatter.GetValueOrDefault("entry-number") ?? 1, CultureInfo.InvariantCulture),
                     UserInput = userInput,
                     LlmResponse = llmResponse,
-                    Metadata = metadata,
-                    Summary = new WeeklySummary
-                    {
-                        TopAccomplishments = [],
-                        TopChallenges = [],
-                        DateRange = new DateRange
-                        {
-                            StartDate = DateTimeOffset.UtcNow.AddDays(-7),
-                            EndDate = DateTimeOffset.UtcNow
-                        }
-                    }
+                    Metadata = metadata
                 };
             }
         }

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Setup.Queries;
+using TenSecondTom.Shared.Constants;
 
 namespace TenSecondTom.Infrastructure.Auth.SshProviders;
 
@@ -69,19 +70,33 @@ public sealed class OnePasswordSshAgentDetector : ISshKeyDetector
                             var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                             foreach (var line in lines)
                             {
-                                if (line.StartsWith("ssh-ed25519"))
+                                // Accept all SSH key types: ssh-rsa, ssh-ed25519, ecdsa-sha2-*, ssh-dss
+                                if (line.StartsWith(SshConstants.KeyPrefixes.Ssh) || line.StartsWith(SshConstants.KeyPrefixes.Ecdsa))
                                 {
                                     var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                                     if (parts.Length >= 2)
                                     {
-                                        var comment = parts.Length > 2 ? parts[2] : "1password-key";
+                                        var keyType = parts[0];
+                                        var isEd25519 = keyType == SshConstants.KeyTypes.Ed25519;
+                                        var defaultComment = keyType switch
+                                        {
+                                            SshConstants.KeyTypes.Ed25519 => "1password-ed25519",
+                                            SshConstants.KeyTypes.Rsa => "1password-rsa",
+                                            SshConstants.KeyTypes.EcdsaNistP256 => "1password-ecdsa",
+                                            SshConstants.KeyTypes.EcdsaNistP384 => "1password-ecdsa",
+                                            SshConstants.KeyTypes.EcdsaNistP521 => "1password-ecdsa",
+                                            SshConstants.KeyTypes.Dsa => "1password-dsa",
+                                            _ => "1password-key"
+                                        };
+                                        var comment = parts.Length > 2 ? parts[2] : defaultComment;
+
                                         keys.Add(new SshKeyInfo
                                         {
-                                            DisplayName = $"[1Password] {comment}",
+                                            DisplayName = $"[1Password] {comment} ({keyType})",
                                             Source = SshKeySource.OnePasswordAgent,
                                             PublicKey = line,
                                             AgentName = "1Password",
-                                            IsEd25519 = true,
+                                            IsEd25519 = isEd25519,
                                             DetectedAt = DateTime.UtcNow,
                                             ValidationResult = ValidationResult.Valid
                                         });
@@ -90,7 +105,7 @@ public sealed class OnePasswordSshAgentDetector : ISshKeyDetector
                             }
                         }
 
-                        _logger.LogDebug("Detected {Count} ED25519 keys from 1Password SSH agent", keys.Count);
+                        _logger.LogDebug("Detected {Count} SSH keys from 1Password SSH agent", keys.Count);
                     }
                     finally
                     {

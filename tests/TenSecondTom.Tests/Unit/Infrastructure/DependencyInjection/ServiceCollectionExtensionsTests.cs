@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TenSecondTom.Features.Auth;
 using TenSecondTom.Features.Search;
 using TenSecondTom.Features.Setup;
@@ -32,11 +33,17 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     {
         _services = new ServiceCollection();
 
-        // Setup minimal required services
+        // Setup minimal required services with all required configuration options
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["TenSecondTom:MemoryDirectory"] = "./.test-memory"
+                ["TenSecondTom:MemoryDirectory"] = "./.test-memory",
+                ["TenSecondTom:Llm:Provider"] = "OpenAI",
+                ["TenSecondTom:Llm:ApiKey"] = "test-api-key",
+                ["TenSecondTom:Llm:Model"] = "gpt-4",
+                ["TenSecondTom:Llm:MaxInputTokens"] = "100000",
+                ["TenSecondTom:Ssh:KeySource"] = "FileSystem",
+                ["TenSecondTom:Ssh:KeyPath"] = "~/.ssh/id_ed25519"
             })
             .Build();
 
@@ -52,11 +59,14 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     /// <summary>
     /// Helper method to add all services (infrastructure + features) like Program.cs does.
     /// </summary>
-    private static void AddAllServices(ServiceCollection services)
+    private static void AddAllServices(ServiceCollection services, IConfiguration configuration)
     {
+        // Register strongly-typed Options with validation (Options Pattern)
+        services.AddTenSecondTomOptions(configuration);
+
         // Infrastructure (cross-cutting concerns)
         services.AddInfrastructureServices();
-        
+
         // Feature slices (vertical slice architecture)
         services.AddTodayFeature();
         services.AddThisWeekFeature();
@@ -71,7 +81,8 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_RegistersAllRequiredServices()
     {
         // Arrange & Act
-        AddAllServices(_services);
+        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        AddAllServices(_services, configuration);
         _serviceProvider = _services.BuildServiceProvider();
 
         // Assert - Infrastructure services (can be resolved without additional dependencies)
@@ -92,7 +103,8 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_RegistersStorageProviderAsSingleton()
     {
         // Arrange & Act
-        AddAllServices(_services);
+        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        AddAllServices(_services, configuration);
         _serviceProvider = _services.BuildServiceProvider();
 
         // Act
@@ -107,7 +119,8 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_RegistersHandlersAsTransient()
     {
         // Arrange & Act
-        AddAllServices(_services);
+        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        AddAllServices(_services, configuration);
         _serviceProvider = _services.BuildServiceProvider();
 
         // Act
@@ -133,7 +146,7 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddLogging();
-        AddAllServices(services);
+        AddAllServices(services, configuration);
 
         // Act
         using var serviceProvider = services.BuildServiceProvider();
@@ -155,7 +168,7 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddLogging();
-        AddAllServices(services);
+        AddAllServices(services, configuration);
 
         // Act
         using var serviceProvider = services.BuildServiceProvider();
@@ -170,7 +183,8 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_CanResolveAllDependencies()
     {
         // Arrange & Act
-        AddAllServices(_services);
+        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        AddAllServices(_services, configuration);
         _serviceProvider = _services.BuildServiceProvider();
 
         // Act & Assert - Core services should resolve without throwing
@@ -190,18 +204,28 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     [Fact]
     public void AddTenSecondTomServices_StorageProvider_RequiresConfiguration()
     {
-        // Arrange - Services without IConfiguration registered
+        // Arrange - Services with minimal auth config but missing required LLM options
+        var minimalConfiguration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                // Provide minimal Auth configuration to pass AuthOptions validation
+                ["TenSecondTom:Ssh:KeySource"] = "FileSystem",
+                ["TenSecondTom:Ssh:KeyPath"] = "~/.ssh/id_ed25519"
+                // LLM options are intentionally missing to test validation
+            })
+            .Build();
         var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(minimalConfiguration);
         services.AddLogging();
-        AddAllServices(services);
+        AddAllServices(services, minimalConfiguration);
 
         // Act
         using var serviceProvider = services.BuildServiceProvider();
-        var resolveStorageProvider = () => serviceProvider.GetRequiredService<IMemoryStorageProvider>();
+        var resolveHandler = () => serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
 
-        // Assert - Should throw because IConfiguration is missing
-        resolveStorageProvider.Should().Throw<InvalidOperationException>()
-            .WithMessage("*IConfiguration*");
+        // Assert - Should throw because required LlmOptions configuration is missing
+        resolveHandler.Should().Throw<OptionsValidationException>()
+            .WithMessage("*API key*");
     }
 
     [Fact]
@@ -218,7 +242,7 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
         // Note: NOT adding logging explicitly - AddHttpClient() should add it
-        AddAllServices(services);
+        AddAllServices(services, configuration);
 
         // Act
         using var serviceProvider = services.BuildServiceProvider();
@@ -236,7 +260,8 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_ReturnsSameServiceCollection()
     {
         // Act
-        AddAllServices(_services);
+        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        AddAllServices(_services, configuration);
         var result = _services;
 
         // Assert - Should return the same collection for chaining
@@ -247,7 +272,8 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_RegistersCorrectImplementationTypes()
     {
         // Arrange & Act
-        AddAllServices(_services);
+        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        AddAllServices(_services, configuration);
         _serviceProvider = _services.BuildServiceProvider();
 
         // Assert - Verify concrete types
@@ -268,7 +294,8 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_HandlersCanResolveTheirDependencies()
     {
         // Arrange & Act
-        AddAllServices(_services);
+        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        AddAllServices(_services, configuration);
         _serviceProvider = _services.BuildServiceProvider();
 
         // Act & Assert - Handlers should successfully resolve all their constructor dependencies
@@ -288,7 +315,8 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_AuthenticationService_UsesFactoryMethod()
     {
         // Arrange & Act
-        AddAllServices(_services);
+        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        AddAllServices(_services, configuration);
         _serviceProvider = _services.BuildServiceProvider();
 
         // Act
@@ -303,7 +331,8 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_AuthenticationService_RegisteredAsSingleton()
     {
         // Arrange & Act
-        AddAllServices(_services);
+        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        AddAllServices(_services, configuration);
         _serviceProvider = _services.BuildServiceProvider();
 
         // Act

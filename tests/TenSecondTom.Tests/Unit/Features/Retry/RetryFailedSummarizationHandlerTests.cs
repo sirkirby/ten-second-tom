@@ -313,14 +313,6 @@ public sealed class RetryFailedSummarizationHandlerTests
                     ["summarization-failed"] = "true",
                     ["original-error"] = "LLM API timeout"
                 }
-            },
-            Summary = new DailySummary
-            {
-                KeyEvents = [],
-                Themes = [],
-                TodoItems = [],
-                ImportantPeople = [],
-                NotableTasks = []
             }
         };
     }
@@ -342,14 +334,6 @@ public sealed class RetryFailedSummarizationHandlerTests
             {
                 LlmProvider = "OpenAI",
                 LlmModel = "gpt-4"
-            },
-            Summary = new DailySummary
-            {
-                KeyEvents = ["Event 1"],
-                Themes = ["Theme 1"],
-                TodoItems = [],
-                ImportantPeople = ["Person 1"],
-                NotableTasks = ["Task 1"]
             }
         };
     }

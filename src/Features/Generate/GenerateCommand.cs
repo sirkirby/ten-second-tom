@@ -1,6 +1,6 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Spectre.Console;
 using TenSecondTom.Features.Generate.Commands;
 using TenSecondTom.Features.Generate.Queries;
@@ -8,6 +8,7 @@ using TenSecondTom.Features.Templates.Queries;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Options;
 
 namespace TenSecondTom.Features.Generate;
 
@@ -187,24 +188,9 @@ public static class GenerateCommand
                 AnsiConsole.WriteLine();
             }
 
-            // Step 5: Load configuration for max input tokens
-            var configuration = serviceProvider.GetRequiredService<IConfiguration>();
-            var maxInputTokensConfig = configuration[ConfigurationKeys.LlmMaxInputTokensKey];
-            
-            // Get provider-specific default if not configured
-            var llmProvider = configuration[ConfigurationKeys.LlmProviderKey];
-            int defaultMaxTokens = llmProvider?.ToUpperInvariant() == "ANTHROPIC"
-                ? LlmConstants.DefaultMaxInputTokensAnthropic
-                : LlmConstants.DefaultMaxInputTokensOpenAI;
-
-            int maxInputTokens = defaultMaxTokens;
-
-            if (!string.IsNullOrWhiteSpace(maxInputTokensConfig) &&
-                int.TryParse(maxInputTokensConfig, out int parsedTokens) &&
-                parsedTokens > 0)
-            {
-                maxInputTokens = parsedTokens;
-            }
+            // Step 5: Get max input tokens from configuration
+            var llmOptions = serviceProvider.GetRequiredService<IOptions<LlmOptions>>().Value;
+            int maxInputTokens = llmOptions.MaxInputTokens;
 
             // Step 6: Generate output with LLM
             var generateHandler = serviceProvider.GetRequiredService<Handlers.GenerateOutputCommandHandler>();

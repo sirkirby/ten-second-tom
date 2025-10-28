@@ -1,8 +1,9 @@
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Shared.Options;
+using TenSecondTom.Features.Setup.Models;
 
 namespace TenSecondTom.Tests.Unit.Infrastructure.Auth;
 
@@ -24,83 +25,17 @@ public sealed class AuthenticationServiceFactoryTests
     }
 
     [Fact]
-    public void Create_WithSshAgentAvailableAndPublicKeyConfigured_ReturnsSshAgentService()
+    public async Task Create_WithSystemAgentAndValidKeyPath_ReturnsSshAgentService()
     {
         // Arrange
-        // Create a temporary socket file that File.Exists() can verify
         var socketPath = Path.Combine(Path.GetTempPath(), $"test-ssh-agent-{Guid.NewGuid()}.sock");
-        File.WriteAllText(socketPath, ""); // Create empty file to simulate socket
-        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", socketPath);
-        
-        // Create properly formatted Ed25519 public key in SSH wire format
-        var keyType = "ssh-ed25519"u8.ToArray();
-        var keyData = new byte[32];
-        Array.Fill(keyData, (byte)0x42);
+        var tempKeyFile = Path.Combine(Path.GetTempPath(), $"id_ed25519-{Guid.NewGuid()}.pub");
 
-        var publicKey = new byte[4 + keyType.Length + 4 + keyData.Length];
-        var offset = 0;
-
-        // Write type length (big-endian)
-        publicKey[offset++] = 0;
-        publicKey[offset++] = 0;
-        publicKey[offset++] = 0;
-        publicKey[offset++] = (byte)keyType.Length;
-
-        // Write type string
-        Array.Copy(keyType, 0, publicKey, offset, keyType.Length);
-        offset += keyType.Length;
-
-        // Write key length (big-endian)
-        publicKey[offset++] = 0;
-        publicKey[offset++] = 0;
-        publicKey[offset++] = 0;
-        publicKey[offset++] = (byte)keyData.Length;
-
-        // Write key data
-        Array.Copy(keyData, 0, publicKey, offset, keyData.Length);
-
-        var publicKeyBase64 = Convert.ToBase64String(publicKey);
-        
-        var configData = new Dictionary<string, string?>
-        {
-            ["TenSecondTom:Auth:PublicKey"] = publicKeyBase64,
-            ["TenSecondTom:Auth:SshAgentProvider"] = "System" // Use System provider to check SSH_AUTH_SOCK
-        };
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(configData)
-            .Build();
-
-        // Act
-        var result = AuthenticationServiceFactory.Create(
-            configuration,
-            _mockAgentClient.Object,
-            _mockSshAgentLogger.Object,
-            _mockSshKeyLogger.Object);
-
-        // Assert
-        result.Should().BeOfType<SshAgentAuthenticationService>();
-        
-        // Cleanup
-        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", null);
-        if (File.Exists(socketPath))
-        {
-            File.Delete(socketPath);
-        }
-    }
-
-    [Fact]
-    public void Create_WithSshAgentAvailableAndPublicKeyPathConfigured_ReturnsSshAgentService()
-    {
-        // Arrange
-        // Create a temporary socket file that File.Exists() can verify
-        var socketPath = Path.Combine(Path.GetTempPath(), $"test-ssh-agent-{Guid.NewGuid()}.sock");
-        File.WriteAllText(socketPath, ""); // Create empty file to simulate socket
-        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", socketPath);
-        
-        // Create a temporary SSH public key file
-        var tempFile = Path.GetTempFileName();
         try
         {
+            // Create a temporary socket file
+            File.WriteAllText(socketPath, "");
+
             // Create properly formatted Ed25519 public key in SSH wire format
             var keyType = "ssh-ed25519"u8.ToArray();
             var keyData = new byte[32];
@@ -129,22 +64,20 @@ public sealed class AuthenticationServiceFactoryTests
             Array.Copy(keyData, 0, publicKey, offset, keyData.Length);
 
             var publicKeyBase64 = Convert.ToBase64String(publicKey);
-            
-            // Write .pub file format: "ssh-ed25519 base64data comment"
-            File.WriteAllText(tempFile, $"ssh-ed25519 {publicKeyBase64} test@example.com");
-            
-            var configData = new Dictionary<string, string?>
+
+            // Write .pub file format
+            File.WriteAllText(tempKeyFile, $"ssh-ed25519 {publicKeyBase64} test@example.com");
+
+            var authOptions = new AuthOptions
             {
-                ["TenSecondTom:Auth:PublicKeyPath"] = tempFile,
-                ["TenSecondTom:Auth:SshAgentProvider"] = "System" // Use System provider to check SSH_AUTH_SOCK
+                KeySource = SshKeySource.SystemAgent,
+                KeyPath = tempKeyFile,
+                AgentSocketPath = socketPath
             };
-            var configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(configData)
-                .Build();
 
             // Act
-            var result = AuthenticationServiceFactory.Create(
-                configuration,
+            var result = await AuthenticationServiceFactory.CreateAsync(
+                authOptions,
                 _mockAgentClient.Object,
                 _mockSshAgentLogger.Object,
                 _mockSshKeyLogger.Object);
@@ -155,261 +88,526 @@ public sealed class AuthenticationServiceFactoryTests
         finally
         {
             // Cleanup
-            if (File.Exists(tempFile))
+            if (File.Exists(socketPath))
             {
-                File.Delete(tempFile);
+                File.Delete(socketPath);
+            }
+            if (File.Exists(tempKeyFile))
+            {
+                File.Delete(tempKeyFile);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Create_WithOnePasswordAgentAndValidKeyPath_ReturnsSshAgentService()
+    {
+        // Arrange
+        var socketPath = Path.Combine(Path.GetTempPath(), $"test-1password-agent-{Guid.NewGuid()}.sock");
+        var tempKeyFile = Path.Combine(Path.GetTempPath(), $"id_ed25519-{Guid.NewGuid()}.pub");
+
+        try
+        {
+            // Create a temporary socket file
+            File.WriteAllText(socketPath, "");
+
+            // Create properly formatted Ed25519 public key in SSH wire format
+            var keyType = "ssh-ed25519"u8.ToArray();
+            var keyData = new byte[32];
+            Array.Fill(keyData, (byte)0x42);
+
+            var publicKey = new byte[4 + keyType.Length + 4 + keyData.Length];
+            var offset = 0;
+
+            // Write type length (big-endian)
+            publicKey[offset++] = 0;
+            publicKey[offset++] = 0;
+            publicKey[offset++] = 0;
+            publicKey[offset++] = (byte)keyType.Length;
+
+            // Write type string
+            Array.Copy(keyType, 0, publicKey, offset, keyType.Length);
+            offset += keyType.Length;
+
+            // Write key length (big-endian)
+            publicKey[offset++] = 0;
+            publicKey[offset++] = 0;
+            publicKey[offset++] = 0;
+            publicKey[offset++] = (byte)keyData.Length;
+
+            // Write key data
+            Array.Copy(keyData, 0, publicKey, offset, keyData.Length);
+
+            var publicKeyBase64 = Convert.ToBase64String(publicKey);
+
+            // Write .pub file format
+            File.WriteAllText(tempKeyFile, $"ssh-ed25519 {publicKeyBase64} test@example.com");
+
+            var authOptions = new AuthOptions
+            {
+                KeySource = SshKeySource.OnePasswordAgent,
+                KeyPath = tempKeyFile,
+                AgentSocketPath = socketPath
+            };
+
+            // Act
+            var result = await AuthenticationServiceFactory.CreateAsync(
+                authOptions,
+                _mockAgentClient.Object,
+                _mockSshAgentLogger.Object,
+                _mockSshKeyLogger.Object);
+
+            // Assert
+            result.Should().BeOfType<SshAgentAuthenticationService>();
+        }
+        finally
+        {
+            // Cleanup
+            if (File.Exists(tempKeyFile))
+            {
+                File.Delete(tempKeyFile);
             }
             if (File.Exists(socketPath))
             {
                 File.Delete(socketPath);
             }
-            Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", null);
         }
     }
 
     [Fact]
-    public void Create_WithSshAgentAvailableButNoPublicKeyConfigured_ReturnsSshKeyService()
+    public async Task Create_WithAgentButNoKeyPath_UsesDefaultLocationIfAvailable()
     {
         // Arrange
-        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", "/tmp/ssh-agent.sock");
-        
-        var configData = new Dictionary<string, string?>();
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(configData)
-            .Build();
+        var socketPath = Path.Combine(Path.GetTempPath(), $"test-agent-{Guid.NewGuid()}.sock");
+        var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var defaultKeyExists = File.Exists(Path.Combine(homeDir, ".ssh", "id_ed25519.pub")) ||
+                               File.Exists(Path.Combine(homeDir, ".ssh", "id_rsa.pub")) ||
+                               File.Exists(Path.Combine(homeDir, ".ssh", "id_ecdsa.pub")) ||
+                               File.Exists(Path.Combine(homeDir, ".ssh", "id_dsa.pub"));
 
-        // Act
-        var result = AuthenticationServiceFactory.Create(
-            configuration,
-            _mockAgentClient.Object,
-            _mockSshAgentLogger.Object,
-            _mockSshKeyLogger.Object);
-
-        // Assert
-        result.Should().BeOfType<SshKeyAuthenticationService>();
-        
-        // Cleanup
-        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", null);
-    }
-
-    [Fact]
-    public void Create_WithoutSshAgent_ReturnsSshKeyService()
-    {
-        // Arrange
-        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", null);
-        
-        var configData = new Dictionary<string, string?>
+        try
         {
-            ["TenSecondTom:Auth:PublicKey"] = "AAAAC3NzaC1lZDI1NTE5AAAAIMockPublicKeyData"
-        };
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(configData)
-            .Build();
+            File.WriteAllText(socketPath, "");
 
-        // Act
-        var result = AuthenticationServiceFactory.Create(
-            configuration,
-            _mockAgentClient.Object,
-            _mockSshAgentLogger.Object,
-            _mockSshKeyLogger.Object);
+            var authOptions = new AuthOptions
+            {
+                KeySource = SshKeySource.SystemAgent,
+                AgentSocketPath = socketPath
+                // KeyPath is intentionally not set - should check default locations
+            };
 
-        // Assert
-        result.Should().BeOfType<SshKeyAuthenticationService>();
-    }
+            // Act
+            var result = await AuthenticationServiceFactory.CreateAsync(
+                authOptions,
+                _mockAgentClient.Object,
+                _mockSshAgentLogger.Object,
+                _mockSshKeyLogger.Object);
 
-    [Fact]
-    public void Create_WithEmptySshAuthSock_ReturnsSshKeyService()
-    {
-        // Arrange
-        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", "");
-        
-        var configData = new Dictionary<string, string?>
+            // Assert - behavior depends on whether default keys exist on the system
+            if (defaultKeyExists)
+            {
+                // Default key found - should use SSH agent authentication
+                result.Should().BeOfType<SshAgentAuthenticationService>(
+                    "because a default SSH key was found in ~/.ssh/");
+            }
+            else
+            {
+                // No default keys - should fall back to file-based authentication
+                result.Should().BeOfType<SshKeyAuthenticationService>(
+                    "because no default SSH keys exist in ~/.ssh/");
+            }
+        }
+        finally
         {
-            ["TenSecondTom:Auth:PublicKey"] = "AAAAC3NzaC1lZDI1NTE5AAAAIMockPublicKeyData"
-        };
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(configData)
-            .Build();
-
-        // Act
-        var result = AuthenticationServiceFactory.Create(
-            configuration,
-            _mockAgentClient.Object,
-            _mockSshAgentLogger.Object,
-            _mockSshKeyLogger.Object);
-
-        // Assert
-        result.Should().BeOfType<SshKeyAuthenticationService>();
-        
-        // Cleanup
-        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", null);
+            // Cleanup
+            if (File.Exists(socketPath))
+            {
+                File.Delete(socketPath);
+            }
+        }
     }
 
     [Fact]
-    public void Create_WithWhitespaceSshAuthSock_ReturnsSshKeyService()
+    public async Task Create_WithAgentButNoKeyPath_AndDefaultKeyExists_ReturnsSshAgentService()
     {
         // Arrange
-        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", "   ");
-        
-        var configData = new Dictionary<string, string?>
+        var socketPath = Path.Combine(Path.GetTempPath(), $"test-agent-{Guid.NewGuid()}.sock");
+        var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var sshDir = Path.Combine(homeDir, ".ssh");
+        var defaultKeyPath = Path.Combine(sshDir, "id_ed25519.pub");
+        var tempKeyCreated = false;
+
+        try
         {
-            ["TenSecondTom:Auth:PublicKey"] = "AAAAC3NzaC1lZDI1NTE5AAAAIMockPublicKeyData"
+            File.WriteAllText(socketPath, "");
+
+            // Only create default key if it doesn't already exist
+            // (we don't want to overwrite user's actual SSH key in tests!)
+            if (!File.Exists(defaultKeyPath))
+            {
+                // Ensure .ssh directory exists
+                Directory.CreateDirectory(sshDir);
+
+                // Create properly formatted Ed25519 public key in SSH wire format
+                var keyType = "ssh-ed25519"u8.ToArray();
+                var keyData = new byte[32];
+                Array.Fill(keyData, (byte)0x42);
+
+                var publicKey = new byte[4 + keyType.Length + 4 + keyData.Length];
+                var offset = 0;
+
+                // Write type length (big-endian)
+                publicKey[offset++] = 0;
+                publicKey[offset++] = 0;
+                publicKey[offset++] = 0;
+                publicKey[offset++] = (byte)keyType.Length;
+
+                // Write type string
+                Array.Copy(keyType, 0, publicKey, offset, keyType.Length);
+                offset += keyType.Length;
+
+                // Write key length (big-endian)
+                publicKey[offset++] = 0;
+                publicKey[offset++] = 0;
+                publicKey[offset++] = 0;
+                publicKey[offset++] = (byte)keyData.Length;
+
+                // Write key data
+                Array.Copy(keyData, 0, publicKey, offset, keyData.Length);
+
+                var publicKeyBase64 = Convert.ToBase64String(publicKey);
+
+                // Write .pub file format
+                File.WriteAllText(defaultKeyPath, $"ssh-ed25519 {publicKeyBase64} test@example.com");
+                tempKeyCreated = true;
+            }
+
+            var authOptions = new AuthOptions
+            {
+                KeySource = SshKeySource.OnePasswordAgent,
+                AgentSocketPath = socketPath
+                // KeyPath not set - should use default location
+            };
+
+            // Act
+            var result = await AuthenticationServiceFactory.CreateAsync(
+                authOptions,
+                _mockAgentClient.Object,
+                _mockSshAgentLogger.Object,
+                _mockSshKeyLogger.Object);
+
+            // Assert - should use agent with key from default location
+            result.Should().BeOfType<SshAgentAuthenticationService>();
+        }
+        finally
+        {
+            // Cleanup - only delete if we created it
+            if (tempKeyCreated && File.Exists(defaultKeyPath))
+            {
+                File.Delete(defaultKeyPath);
+            }
+            if (File.Exists(socketPath))
+            {
+                File.Delete(socketPath);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Create_WithFileSystemKeySource_ReturnsSshKeyService()
+    {
+        // Arrange
+        var authOptions = new AuthOptions
+        {
+            KeySource = SshKeySource.FileSystem,
+            KeyPath = "~/.ssh/id_ed25519"
         };
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(configData)
-            .Build();
 
         // Act
-        var result = AuthenticationServiceFactory.Create(
-            configuration,
+        var result = await AuthenticationServiceFactory.CreateAsync(
+            authOptions,
             _mockAgentClient.Object,
             _mockSshAgentLogger.Object,
             _mockSshKeyLogger.Object);
 
         // Assert
         result.Should().BeOfType<SshKeyAuthenticationService>();
-        
-        // Cleanup
-        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", null);
     }
 
     [Fact]
-    public void Create_WithNullConfiguration_ThrowsArgumentNullException()
+    public async Task Create_WithEmptyAgentSocketPath_ReturnsSshKeyService()
     {
         // Arrange
-        IConfiguration configuration = null!;
+        var authOptions = new AuthOptions
+        {
+            KeySource = SshKeySource.SystemAgent,
+            KeyPath = "~/.ssh/id_ed25519",
+            AgentSocketPath = ""
+        };
 
         // Act
-        var act = () => AuthenticationServiceFactory.Create(
-            configuration,
+        var result = await AuthenticationServiceFactory.CreateAsync(
+            authOptions,
             _mockAgentClient.Object,
             _mockSshAgentLogger.Object,
             _mockSshKeyLogger.Object);
 
         // Assert
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("configuration");
+        result.Should().BeOfType<SshKeyAuthenticationService>();
     }
 
     [Fact]
-    public void Create_WithNullAgentClient_ThrowsArgumentNullException()
+    public async Task Create_WithWhitespaceAgentSocketPath_ReturnsSshKeyService()
     {
         // Arrange
-        var configuration = new ConfigurationBuilder().Build();
+        var authOptions = new AuthOptions
+        {
+            KeySource = SshKeySource.SecretiveAgent,
+            KeyPath = "~/.ssh/id_ed25519",
+            AgentSocketPath = "   "
+        };
 
         // Act
-        var act = () => AuthenticationServiceFactory.Create(
-            configuration,
+        var result = await AuthenticationServiceFactory.CreateAsync(
+            authOptions,
+            _mockAgentClient.Object,
+            _mockSshAgentLogger.Object,
+            _mockSshKeyLogger.Object);
+
+        // Assert
+        result.Should().BeOfType<SshKeyAuthenticationService>();
+    }
+
+    [Fact]
+    public async Task Create_WithNullAuthOptions_ThrowsArgumentNullException()
+    {
+        // Arrange
+        AuthOptions authOptions = null!;
+
+        // Act
+        var act = async () => await AuthenticationServiceFactory.CreateAsync(
+            authOptions,
+            _mockAgentClient.Object,
+            _mockSshAgentLogger.Object,
+            _mockSshKeyLogger.Object);
+
+        // Assert
+        await act.Should().ThrowAsync<ArgumentNullException>()
+            .WithParameterName("authOptions");
+    }
+
+    [Fact]
+    public async Task Create_WithNullAgentClient_ThrowsArgumentNullException()
+    {
+        // Arrange
+        var authOptions = new AuthOptions
+        {
+            KeySource = SshKeySource.FileSystem,
+            KeyPath = "~/.ssh/id_ed25519"
+        };
+
+        // Act
+        var act = async () => await AuthenticationServiceFactory.CreateAsync(
+            authOptions,
             null!,
             _mockSshAgentLogger.Object,
             _mockSshKeyLogger.Object);
 
         // Assert
-        act.Should().Throw<ArgumentNullException>()
+        await act.Should().ThrowAsync<ArgumentNullException>()
             .WithParameterName("agentClient");
     }
 
     [Fact]
-    public void Create_WithFullSshPublicKeyLine_ReturnsSshAgentService()
+    public async Task Create_WithSecretiveAgentAndPubKeyFile_ReturnsSshAgentService()
     {
         // Arrange
-        // Create a temporary socket file that File.Exists() can verify
-        var socketPath = Path.Combine(Path.GetTempPath(), $"test-ssh-agent-{Guid.NewGuid()}.sock");
-        File.WriteAllText(socketPath, ""); // Create empty file to simulate socket
-        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", socketPath);
-        
-        // Create properly formatted Ed25519 public key in SSH wire format
-        var keyType = "ssh-ed25519"u8.ToArray();
-        var keyData = new byte[32];
-        Array.Fill(keyData, (byte)0x42);
+        var socketPath = Path.Combine(Path.GetTempPath(), $"test-secretive-agent-{Guid.NewGuid()}.sock");
+        var tempKeyFile = Path.Combine(Path.GetTempPath(), $"id_ed25519-{Guid.NewGuid()}.pub");
 
-        var publicKey = new byte[4 + keyType.Length + 4 + keyData.Length];
-        var offset = 0;
-
-        // Write type length (big-endian)
-        publicKey[offset++] = 0;
-        publicKey[offset++] = 0;
-        publicKey[offset++] = 0;
-        publicKey[offset++] = (byte)keyType.Length;
-
-        // Write type string
-        Array.Copy(keyType, 0, publicKey, offset, keyType.Length);
-        offset += keyType.Length;
-
-        // Write key length (big-endian)
-        publicKey[offset++] = 0;
-        publicKey[offset++] = 0;
-        publicKey[offset++] = 0;
-        publicKey[offset++] = (byte)keyData.Length;
-
-        // Write key data
-        Array.Copy(keyData, 0, publicKey, offset, keyData.Length);
-
-        var publicKeyBase64 = Convert.ToBase64String(publicKey);
-        
-        // Full SSH public key line format: "ssh-ed25519 base64data comment"
-        var fullKeyLine = $"ssh-ed25519 {publicKeyBase64} test@example.com";
-        
-        var configData = new Dictionary<string, string?>
+        try
         {
-            ["TenSecondTom:Auth:PublicKey"] = fullKeyLine,
-            ["TenSecondTom:Auth:SshAgentProvider"] = "System" // Use System provider to check SSH_AUTH_SOCK
-        };
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(configData)
-            .Build();
+            // Create a temporary socket file
+            File.WriteAllText(socketPath, "");
 
-        // Act
-        var result = AuthenticationServiceFactory.Create(
-            configuration,
-            _mockAgentClient.Object,
-            _mockSshAgentLogger.Object,
-            _mockSshKeyLogger.Object);
+            // Create properly formatted Ed25519 public key in SSH wire format
+            var keyType = "ssh-ed25519"u8.ToArray();
+            var keyData = new byte[32];
+            Array.Fill(keyData, (byte)0x42);
 
-        // Assert
-        result.Should().BeOfType<SshAgentAuthenticationService>();
-        
-        // Cleanup
-        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", null);
-        if (File.Exists(socketPath))
+            var publicKey = new byte[4 + keyType.Length + 4 + keyData.Length];
+            var offset = 0;
+
+            // Write type length (big-endian)
+            publicKey[offset++] = 0;
+            publicKey[offset++] = 0;
+            publicKey[offset++] = 0;
+            publicKey[offset++] = (byte)keyType.Length;
+
+            // Write type string
+            Array.Copy(keyType, 0, publicKey, offset, keyType.Length);
+            offset += keyType.Length;
+
+            // Write key length (big-endian)
+            publicKey[offset++] = 0;
+            publicKey[offset++] = 0;
+            publicKey[offset++] = 0;
+            publicKey[offset++] = (byte)keyData.Length;
+
+            // Write key data
+            Array.Copy(keyData, 0, publicKey, offset, keyData.Length);
+
+            var publicKeyBase64 = Convert.ToBase64String(publicKey);
+
+            // Write full SSH public key line format
+            File.WriteAllText(tempKeyFile, $"ssh-ed25519 {publicKeyBase64} test@example.com");
+
+            var authOptions = new AuthOptions
+            {
+                KeySource = SshKeySource.SecretiveAgent,
+                KeyPath = tempKeyFile,
+                AgentSocketPath = socketPath
+            };
+
+            // Act
+            var result = await AuthenticationServiceFactory.CreateAsync(
+                authOptions,
+                _mockAgentClient.Object,
+                _mockSshAgentLogger.Object,
+                _mockSshKeyLogger.Object);
+
+            // Assert
+            result.Should().BeOfType<SshAgentAuthenticationService>();
+        }
+        finally
         {
-            File.Delete(socketPath);
+            // Cleanup
+            if (File.Exists(socketPath))
+            {
+                File.Delete(socketPath);
+            }
+            if (File.Exists(tempKeyFile))
+            {
+                File.Delete(tempKeyFile);
+            }
         }
     }
 
     [Fact]
-    public void Create_WithNullSshAgentLogger_ThrowsArgumentNullException()
+    public async Task Create_WithNullSshAgentLogger_ThrowsArgumentNullException()
     {
         // Arrange
-        var configuration = new ConfigurationBuilder().Build();
+        var authOptions = new AuthOptions
+        {
+            KeySource = SshKeySource.FileSystem,
+            KeyPath = "~/.ssh/id_ed25519"
+        };
 
         // Act
-        var act = () => AuthenticationServiceFactory.Create(
-            configuration,
+        var act = async () => await AuthenticationServiceFactory.CreateAsync(
+            authOptions,
             _mockAgentClient.Object,
             null!,
             _mockSshKeyLogger.Object);
 
         // Assert
-        act.Should().Throw<ArgumentNullException>()
+        await act.Should().ThrowAsync<ArgumentNullException>()
             .WithParameterName("sshAgentLogger");
     }
 
     [Fact]
-    public void Create_WithNullSshKeyLogger_ThrowsArgumentNullException()
+    public async Task Create_WithNullSshKeyLogger_ThrowsArgumentNullException()
     {
         // Arrange
-        var configuration = new ConfigurationBuilder().Build();
+        var authOptions = new AuthOptions
+        {
+            KeySource = SshKeySource.ManualPath,
+            KeyPath = "~/.ssh/custom_key"
+        };
 
         // Act
-        var act = () => AuthenticationServiceFactory.Create(
-            configuration,
+        var act = async () => await AuthenticationServiceFactory.CreateAsync(
+            authOptions,
             _mockAgentClient.Object,
             _mockSshAgentLogger.Object,
             null!);
 
         // Assert
-        act.Should().Throw<ArgumentNullException>()
+        await act.Should().ThrowAsync<ArgumentNullException>()
             .WithParameterName("sshKeyLogger");
+    }
+
+    [Fact]
+    public async Task Create_WithManualPathKeySource_ReturnsSshKeyService()
+    {
+        // Arrange
+        var authOptions = new AuthOptions
+        {
+            KeySource = SshKeySource.ManualPath,
+            KeyPath = "/custom/path/to/id_ed25519"
+        };
+
+        // Act
+        var result = await AuthenticationServiceFactory.CreateAsync(
+            authOptions,
+            _mockAgentClient.Object,
+            _mockSshAgentLogger.Object,
+            _mockSshKeyLogger.Object);
+
+        // Assert
+        result.Should().BeOfType<SshKeyAuthenticationService>();
+    }
+
+    [Fact]
+    public async Task Create_WithAgentAndNonExistentKeyFile_FallsBackToDefaultLocations()
+    {
+        // Arrange
+        var socketPath = Path.Combine(Path.GetTempPath(), $"test-agent-{Guid.NewGuid()}.sock");
+        var nonExistentKeyPath = Path.Combine(Path.GetTempPath(), $"nonexistent-{Guid.NewGuid()}.pub");
+        var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var defaultKeyExists = File.Exists(Path.Combine(homeDir, ".ssh", "id_ed25519.pub")) ||
+                               File.Exists(Path.Combine(homeDir, ".ssh", "id_rsa.pub")) ||
+                               File.Exists(Path.Combine(homeDir, ".ssh", "id_ecdsa.pub")) ||
+                               File.Exists(Path.Combine(homeDir, ".ssh", "id_dsa.pub"));
+
+        try
+        {
+            File.WriteAllText(socketPath, "");
+
+            var authOptions = new AuthOptions
+            {
+                KeySource = SshKeySource.SystemAgent,
+                KeyPath = nonExistentKeyPath,
+                AgentSocketPath = socketPath
+            };
+
+            // Act
+            var result = await AuthenticationServiceFactory.CreateAsync(
+                authOptions,
+                _mockAgentClient.Object,
+                _mockSshAgentLogger.Object,
+                _mockSshKeyLogger.Object);
+
+            // Assert - when explicit KeyPath doesn't exist, falls back to default locations
+            if (defaultKeyExists)
+            {
+                // Default key found - should use SSH agent authentication
+                result.Should().BeOfType<SshAgentAuthenticationService>(
+                    "because the explicit KeyPath doesn't exist but a default SSH key was found in ~/.ssh/");
+            }
+            else
+            {
+                // No default keys - should fall back to file-based authentication
+                result.Should().BeOfType<SshKeyAuthenticationService>(
+                    "because neither the explicit KeyPath nor default SSH keys exist");
+            }
+        }
+        finally
+        {
+            if (File.Exists(socketPath))
+            {
+                File.Delete(socketPath);
+            }
+        }
     }
 }

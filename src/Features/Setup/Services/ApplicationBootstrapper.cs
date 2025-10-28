@@ -2,10 +2,12 @@ using System.IO.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TenSecondTom.Features.Setup.Commands;
 using TenSecondTom.Features.Setup.Handlers;
 using TenSecondTom.Features.Templates.Services;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Setup.Services;
@@ -48,21 +50,21 @@ public sealed class ApplicationBootstrapper
             return await HandleLegacyConfigurationAsync(configMigrationService, args, cancellationToken).ConfigureAwait(false);
         }
 
-        bool isConfigured = ConfigurationChecker.IsConfigured(_configuration, _logger);
+        var configChecker = _serviceProvider.GetRequiredService<ConfigurationChecker>();
+        bool isConfigured = configChecker.IsConfigured();
 
         // Run template migration for existing users (silent, automatic)
         if (isConfigured)
         {
             var templateMigrationService = _serviceProvider.GetRequiredService<TemplateMigrationService>();
-            await templateMigrationService.RunAutomaticMigrationAsync(_configuration, cancellationToken)
+            var storageOptions = _serviceProvider.GetRequiredService<IOptions<StorageOptions>>();
+            await templateMigrationService.RunAutomaticMigrationAsync(storageOptions, cancellationToken)
                 .ConfigureAwait(false);
 
             // Perform self-healing: check for missing templates directory and restore if needed
             var fileSystem = _serviceProvider.GetRequiredService<IFileSystem>();
-            bool healingPerformed = await ConfigurationChecker.PerformSelfHealingAsync(
-                _configuration,
+            bool healingPerformed = await configChecker.PerformSelfHealingAsync(
                 fileSystem,
-                _logger,
                 cancellationToken).ConfigureAwait(false);
 
             if (healingPerformed)
@@ -72,7 +74,7 @@ public sealed class ApplicationBootstrapper
         }
 
         // Validate model configuration if configured
-        if (isConfigured && !ConfigurationChecker.ValidateModel(_configuration, _logger))
+        if (isConfigured && !configChecker.ValidateModel())
         {
             return await HandleInvalidConfigurationAsync(args, cancellationToken).ConfigureAwait(false);
         }
@@ -163,7 +165,8 @@ public sealed class ApplicationBootstrapper
         string[] args,
         CancellationToken cancellationToken)
     {
-        string? errorMessage = ConfigurationChecker.GetModelValidationError(_configuration);
+        var configChecker = _serviceProvider.GetRequiredService<ConfigurationChecker>();
+        string? errorMessage = configChecker.GetModelValidationError();
         if (errorMessage != null)
         {
             await Console.Error.WriteLineAsync().ConfigureAwait(false);

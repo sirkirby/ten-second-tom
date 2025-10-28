@@ -1,12 +1,13 @@
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using TenSecondTom.Features.Generate.Models;
 using TenSecondTom.Features.Generate.Services;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Options;
 
 namespace TenSecondTom.Tests.Features.Generate.Services;
 
@@ -17,19 +18,19 @@ namespace TenSecondTom.Tests.Features.Generate.Services;
 public sealed class RecordingServiceTests
 {
     private readonly Mock<ILogger<RecordingService>> _mockLogger;
-    private readonly Mock<IConfiguration> _mockConfiguration;
+    private readonly Mock<IOptions<StorageOptions>> _mockStorageOptions;
     private readonly string _testMemoryDirectory;
 
     public RecordingServiceTests()
     {
         _mockLogger = new Mock<ILogger<RecordingService>>();
-        _mockConfiguration = new Mock<IConfiguration>();
+        _mockStorageOptions = new Mock<IOptions<StorageOptions>>();
         _testMemoryDirectory = "/test/memory";
 
-        // Setup configuration to return test memory directory
-        _mockConfiguration
-            .Setup(c => c[ConfigurationKeys.MemoryDirectoryKey])
-            .Returns(_testMemoryDirectory);
+        // Setup storage options to return test memory directory
+        _mockStorageOptions
+            .Setup(o => o.Value)
+            .Returns(new StorageOptions { MemoryDirectory = _testMemoryDirectory });
     }
 
     #region ListRecordingsAsync Tests
@@ -352,7 +353,7 @@ public sealed class RecordingServiceTests
     {
         return new RecordingService(
             fileSystem ?? new MockFileSystem(),
-            _mockConfiguration.Object,
+            _mockStorageOptions.Object,
             _mockLogger.Object);
     }
 

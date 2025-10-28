@@ -81,20 +81,17 @@ public class SshKeyDetectorFactory : ISshKeyDetectorFactory
             }
 
             var duration = DateTime.UtcNow - startTime;
-            
-            // Filter to only ED25519 keys
-            var ed25519Keys = allKeys.Where(k => k.IsEd25519).ToList();
 
             // Deduplicate keys by public key content (same key from multiple sources)
             // When duplicates exist, prefer more specific sources:
             // - 1Password/Secretive/dedicated agents are more specific than generic SystemAgent
             // - FileSystem is least specific (just a file on disk)
-            var deduplicatedKeys = ed25519Keys
+            var deduplicatedKeys = allKeys
                 .GroupBy(k => k.PublicKey) // Group by actual key content
                 .Select(g => g.OrderBy(k => GetDeduplicationPriority(k.Source)).First())
                 .ToList();
 
-            var duplicatesRemoved = ed25519Keys.Count - deduplicatedKeys.Count;
+            var duplicatesRemoved = allKeys.Count - deduplicatedKeys.Count;
             if (duplicatesRemoved > 0)
             {
                 _logger.LogInformation(
@@ -102,15 +99,25 @@ public class SshKeyDetectorFactory : ISshKeyDetectorFactory
                     duplicatesRemoved);
             }
 
+            // Sort keys to prefer ED25519 keys first (recommended), then other key types
+            // This ensures ED25519 keys are presented first to users during selection
+            var sortedKeys = deduplicatedKeys
+                .OrderByDescending(k => k.IsEd25519)  // ED25519 first
+                .ThenBy(k => GetDeduplicationPriority(k.Source))  // Then by source priority
+                .ToList();
+
+            var ed25519Count = sortedKeys.Count(k => k.IsEd25519);
+
             _logger.LogInformation(
-                "SSH key detection completed in {Duration}ms. Found {TotalKeys} keys ({Ed25519Keys} ED25519) from {Sources} sources",
+                "SSH key detection completed in {Duration}ms. Found {TotalKeys} keys ({Ed25519Keys} ED25519, {OtherKeys} other types) from {Sources} sources",
                 duration.TotalMilliseconds,
-                allKeys.Count,
-                deduplicatedKeys.Count,
+                sortedKeys.Count,
+                ed25519Count,
+                sortedKeys.Count - ed25519Count,
                 sourcesChecked.Count);
 
             return SshDetectionResult.Success(
-                deduplicatedKeys,
+                sortedKeys,
                 duration,
                 sourcesChecked);
         }

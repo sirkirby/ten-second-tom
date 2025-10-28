@@ -1,17 +1,18 @@
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
+using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Today.Commands;
 using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Cli;
-using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Tests.Unit.Features.Today;
@@ -28,7 +29,7 @@ public sealed class CreateDailyEntryHandlerTests
     private readonly Mock<ILlmProvider> _mockLlmProvider;
     private readonly Mock<IPromptTemplateLoader> _mockPromptLoader;
     private readonly Mock<IAuthenticationService> _mockAuthService;
-    private readonly Mock<IConfiguration> _mockConfiguration;
+    private readonly Mock<IOptions<LlmOptions>> _mockLlmOptions;
     private readonly Mock<ILogger<CreateDailyEntryHandler>> _mockLogger;
     private readonly TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler _listTemplatesHandler;
     private readonly Mock<ITemplateSelectionUI> _mockTemplateSelectionUI;
@@ -41,7 +42,7 @@ public sealed class CreateDailyEntryHandlerTests
         _mockLlmProvider = new Mock<ILlmProvider>();
         _mockPromptLoader = new Mock<IPromptTemplateLoader>();
         _mockAuthService = new Mock<IAuthenticationService>();
-        _mockConfiguration = new Mock<IConfiguration>();
+        _mockLlmOptions = new Mock<IOptions<LlmOptions>>();
         _mockLogger = new Mock<ILogger<CreateDailyEntryHandler>>();
         var mockListTemplatesLogger = new Mock<ILogger<TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler>>();
         _listTemplatesHandler = new TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler(
@@ -49,9 +50,14 @@ public sealed class CreateDailyEntryHandlerTests
             mockListTemplatesLogger.Object);
         _mockTemplateSelectionUI = new Mock<ITemplateSelectionUI>();
 
-        // Setup default configuration values
-        _mockConfiguration.Setup(c => c[ConfigurationKeys.LlmProviderKey]).Returns("OpenAI");
-        _mockConfiguration.Setup(c => c["Llm:Model"]).Returns("gpt-4o");
+        // Setup default LLM options
+        _mockLlmOptions.Setup(o => o.Value).Returns(new LlmOptions
+        {
+            Provider = LlmProvider.OpenAI,
+            ApiKey = "test-key",
+            Model = "gpt-4o",
+            MaxInputTokens = 100000
+        });
 
         // Setup default successful behaviors
         _mockLlmFactory.Setup(f => f.CreateProvider(It.IsAny<string>()))
@@ -95,7 +101,7 @@ public sealed class CreateDailyEntryHandlerTests
             _mockLlmFactory.Object,
             _mockPromptLoader.Object,
             _mockAuthService.Object,
-            _mockConfiguration.Object,
+            _mockLlmOptions.Object,
             _mockLogger.Object,
             _listTemplatesHandler,
             _mockTemplateSelectionUI.Object);
@@ -120,7 +126,7 @@ public sealed class CreateDailyEntryHandlerTests
         result.Value.EntryNumber.Should().Be(1);
         result.Value.EntryId.Should().StartWith("today-");
         result.Value.UserInput.Should().Contain("Had a productive meeting");
-        result.Value.Summary.Should().NotBeNull();
+        result.Value.LlmResponse.Should().NotBeNullOrEmpty();
 
         _mockStorage.Verify(s => s.SaveAsync(
             It.Is<DailyEntry>(e => e.Command == "today"),

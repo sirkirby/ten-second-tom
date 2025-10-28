@@ -1,13 +1,13 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TenSecondTom.Features.Generate.Commands;
 using TenSecondTom.Features.Generate.Models;
 using TenSecondTom.Features.Generate.Services;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
-using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Extensions;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Generate.Handlers;
@@ -23,7 +23,7 @@ public sealed class GenerateOutputCommandHandler
     private readonly IPromptTemplateLoader _templateLoader;
     private readonly ITranscriptProcessor _transcriptProcessor;
     private readonly ILlmProviderFactory _llmProviderFactory;
-    private readonly IConfiguration _configuration;
+    private readonly LlmOptions _llmOptions;
     private readonly IOutputStorageService _outputStorageService;
     private readonly ILogger<GenerateOutputCommandHandler> _logger;
 
@@ -32,7 +32,7 @@ public sealed class GenerateOutputCommandHandler
         IPromptTemplateLoader templateLoader,
         ITranscriptProcessor transcriptProcessor,
         ILlmProviderFactory llmProviderFactory,
-        IConfiguration configuration,
+        IOptions<LlmOptions> llmOptions,
         IOutputStorageService outputStorageService,
         ILogger<GenerateOutputCommandHandler> logger)
     {
@@ -40,7 +40,7 @@ public sealed class GenerateOutputCommandHandler
         _templateLoader = templateLoader ?? throw new ArgumentNullException(nameof(templateLoader));
         _transcriptProcessor = transcriptProcessor ?? throw new ArgumentNullException(nameof(transcriptProcessor));
         _llmProviderFactory = llmProviderFactory ?? throw new ArgumentNullException(nameof(llmProviderFactory));
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        _llmOptions = llmOptions?.Value ?? throw new ArgumentNullException(nameof(llmOptions));
         _outputStorageService = outputStorageService ?? throw new ArgumentNullException(nameof(outputStorageService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -55,13 +55,8 @@ public sealed class GenerateOutputCommandHandler
             request.RecordingBaseName,
             request.TemplateId);
 
-        // Get LLM provider from configuration
-        string? providerName = _configuration[ConfigurationKeys.LlmProviderKey];
-        if (string.IsNullOrWhiteSpace(providerName))
-        {
-            return Result<GeneratedOutput>.Failure(
-                "LLM provider not configured. Please run 'tom setup' to configure your LLM provider.");
-        }
+        // Get LLM provider from options
+        string providerName = _llmOptions.Provider.ToString();
 
         ILlmProvider llmProvider = _llmProviderFactory.CreateProvider(providerName);
 

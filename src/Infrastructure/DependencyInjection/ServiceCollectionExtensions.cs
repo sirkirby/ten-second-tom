@@ -3,6 +3,7 @@ using Anthropic.SDK;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using OpenAI;
 using OpenAI.Chat;
 using TenSecondTom.Infrastructure.Auth;
@@ -13,6 +14,8 @@ using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Options;
+using TenSecondTom.Shared.Options.Validation;
 using TenSecondTom.Shared.TextEditing.Services;
 
 namespace TenSecondTom.Infrastructure.DependencyInjection;
@@ -23,6 +26,49 @@ namespace TenSecondTom.Infrastructure.DependencyInjection;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
+    /// Registers strongly-typed Options classes and their validators using the .NET Options Pattern.
+    /// This replaces stringly-typed IConfiguration access with compile-time safe options.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">The application configuration.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddTenSecondTomOptions(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        // Register LlmOptions with validation
+        services.Configure<LlmOptions>(configuration.GetSection(LlmOptions.SectionName));
+        services.AddSingleton<IValidateOptions<LlmOptions>, LlmOptionsValidator>();
+
+        // Register AuthOptions with validation
+        services.Configure<AuthOptions>(configuration.GetSection(AuthOptions.SectionName));
+        services.AddSingleton<IValidateOptions<AuthOptions>, AuthOptionsValidator>();
+
+        // Register StorageOptions with custom binding (MemoryDirectory is at root, other properties in Storage section)
+        services.Configure<StorageOptions>(options =>
+        {
+            // MemoryDirectory is at root level: TenSecondTom:MemoryDirectory
+            options.MemoryDirectory = configuration[ConfigurationKeys.MemoryDirectoryKey]
+                ?? Path.Combine(".", DirectoryNames.ApplicationRoot);
+
+            // Other properties are in Storage section: TenSecondTom:Storage
+            var storageSection = configuration.GetSection(StorageOptions.SectionName);
+            storageSection.Bind(options);
+        });
+        services.AddSingleton<IValidateOptions<StorageOptions>, StorageOptionsValidator>();
+
+        // Register AppOptions (no validation needed - all have defaults)
+        services.Configure<AppOptions>(configuration.GetSection(AppOptions.SectionName));
+
+        // Register AudioConfiguration (existing - keep as-is)
+        services.AddOptions<Configuration.AudioConfiguration>()
+            .BindConfiguration(ConfigurationKeys.AudioSectionKey)
+            .ValidateOnStart();
+
+        return services;
+    }
+
+    /// <summary>
     /// Adds infrastructure services (cross-cutting concerns) to the service collection.
     /// Feature-specific services should be registered using their respective feature extension methods.
     /// </summary>
@@ -30,26 +76,24 @@ public static class ServiceCollectionExtensions
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddInfrastructureServices(this IServiceCollection services)
     {
-        // Bind configuration sections
-        services.AddOptions<Configuration.AudioConfiguration>()
-            .BindConfiguration(ConfigurationKeys.AudioSectionKey)
-            .ValidateOnStart();
+        // Options registration is now handled by AddTenSecondTomOptions()
+        // Keeping AudioConfiguration here for backward compatibility during migration
 
         // Add HttpClient support for API validators
         services.AddHttpClient();
 
         // Infrastructure services
         services.AddSingleton<IFileSystem, FileSystem>();
+        services.AddSingleton<ConfigurationChecker>();
 
         services.AddSingleton<IMemoryStorageProvider>(serviceProvider =>
         {
-            var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+            var storageOptions = serviceProvider.GetRequiredService<IOptions<StorageOptions>>();
             var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger<FileSystemStorageProvider>();
 
-            // Get memory directory using standard .NET configuration precedence
-            // env vars → user secrets → appsettings.json → default
-            string baseDirectory = configuration[ConfigurationKeys.MemoryDirectoryKey] ??
+            // Get memory directory from options (with fallback for safety)
+            string baseDirectory = storageOptions.Value.MemoryDirectory ??
                 Path.Combine(".", DirectoryNames.ApplicationRoot);
 
             return new FileSystemStorageProvider(baseDirectory, logger);
@@ -64,14 +108,14 @@ public static class ServiceCollectionExtensions
         // This provides resilient template loading with graceful degradation
         services.AddSingleton<IPromptTemplateLoader>(serviceProvider =>
         {
-            var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+            var storageOptions = serviceProvider.GetRequiredService<IOptions<StorageOptions>>();
             var yamlParser = serviceProvider.GetRequiredService<YamlFrontMatterParser>();
             var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
 
             // Templates are in the configured root directory under templates/ subdirectory
             // TenSecondTom:MemoryDirectory is the root (e.g., ~/ten-second-tom or ./.memory)
             // Structure: {root}/templates/, {root}/today/, {root}/thisweek/
-            string rootDirectory = configuration[ConfigurationKeys.MemoryDirectoryKey] ??
+            string rootDirectory = storageOptions.Value.MemoryDirectory ??
                 Path.Combine(".", DirectoryNames.ApplicationRoot);
             string templatesDirectory = Path.Combine(rootDirectory, DirectoryNames.Templates);
 
@@ -115,27 +159,28 @@ public static class ServiceCollectionExtensions
                 return new MockAuthenticationService(mockLogger);
             }
 
-            // Use factory to intelligently select authentication method
+            // Use factory with AuthOptions to intelligently select authentication method
+            var authOptions = serviceProvider.GetRequiredService<IOptions<AuthOptions>>().Value;
             var agentClient = serviceProvider.GetRequiredService<ISshAgentClient>();
             var sshAgentLogger = loggerFactory.CreateLogger<SshAgentAuthenticationService>();
             var sshKeyLogger = loggerFactory.CreateLogger<SshKeyAuthenticationService>();
-            
-            return AuthenticationServiceFactory.Create(
-                configuration,
+
+            // Note: Using GetAwaiter().GetResult() here is acceptable for DI registration
+            // since this only runs once during application startup
+            return AuthenticationServiceFactory.CreateAsync(
+                authOptions,
                 agentClient,
                 sshAgentLogger,
-                sshKeyLogger);
+                sshKeyLogger).GetAwaiter().GetResult();
         });
 
         // Register OpenAI ChatClient (lazy - only instantiated when OpenAI provider is actually used)
         services.AddTransient<ChatClient>(serviceProvider =>
         {
-            var configuration = serviceProvider.GetRequiredService<IConfiguration>();
-            
-            // Use standard .NET configuration hierarchy: appsettings → user secrets → environment variables
-            // Configuration system handles priority automatically (TenSecondTom__Llm__ApiKey env var)
-            string? apiKey = configuration[ConfigurationKeys.LlmApiKeyKey];
-            
+            var llmOptions = serviceProvider.GetRequiredService<IOptions<LlmOptions>>();
+
+            string? apiKey = llmOptions.Value.ApiKey;
+
             if (string.IsNullOrWhiteSpace(apiKey))
             {
                 throw new InvalidOperationException(
@@ -143,7 +188,7 @@ public static class ServiceCollectionExtensions
                     "or set TenSecondTom__Llm__ApiKey environment variable.");
             }
 
-            string model = configuration[ConfigurationKeys.LlmModelKey] ?? LlmConstants.OpenAIModels.GPTNano;
+            string model = llmOptions.Value.Model ?? LlmConstants.OpenAIModels.GPTNano;
             var openAIClient = new OpenAIClient(apiKey);
             return openAIClient.GetChatClient(model);
         });
@@ -151,12 +196,10 @@ public static class ServiceCollectionExtensions
         // Register Anthropic AnthropicClient (lazy - only instantiated when Anthropic provider is actually used)
         services.AddTransient<AnthropicClient>(serviceProvider =>
         {
-            var configuration = serviceProvider.GetRequiredService<IConfiguration>();
-            
-            // Use standard .NET configuration hierarchy: appsettings → user secrets → environment variables
-            // Configuration system handles priority automatically (TenSecondTom__Llm__ApiKey env var)
-            string? apiKey = configuration[ConfigurationKeys.LlmApiKeyKey];
-            
+            var llmOptions = serviceProvider.GetRequiredService<IOptions<LlmOptions>>();
+
+            string? apiKey = llmOptions.Value.ApiKey;
+
             if (string.IsNullOrWhiteSpace(apiKey))
             {
                 // Don't throw - allow app to run if only using OpenAI
@@ -170,35 +213,35 @@ public static class ServiceCollectionExtensions
         // LLM providers (now with dependencies)
         services.AddTransient<OpenAILlmProvider>(serviceProvider =>
         {
-            var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+            var llmOptions = serviceProvider.GetRequiredService<IOptions<LlmOptions>>();
             var chatClient = serviceProvider.GetRequiredService<ChatClient>();
             var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger<OpenAILlmProvider>();
-            
+
             // Get configured model or use default from ModelRegistry
-            string? configuredModel = configuration[ConfigurationKeys.LlmModelKey];
+            string? configuredModel = llmOptions.Value.Model;
             string model = !string.IsNullOrWhiteSpace(configuredModel)
                 ? configuredModel
                 : TenSecondTom.Features.Setup.Models.ModelRegistry.GetDefault(
                     TenSecondTom.Features.Setup.Models.LlmProvider.OpenAI).Id;
-            
+
             return new OpenAILlmProvider(chatClient, logger, model);
         });
 
         services.AddTransient<AnthropicLlmProvider>(serviceProvider =>
         {
-            var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+            var llmOptions = serviceProvider.GetRequiredService<IOptions<LlmOptions>>();
             var client = serviceProvider.GetRequiredService<AnthropicClient>();
             var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger<AnthropicLlmProvider>();
-            
+
             // Get configured model or use default from ModelRegistry
-            string? configuredModel = configuration[ConfigurationKeys.LlmModelKey];
+            string? configuredModel = llmOptions.Value.Model;
             string model = !string.IsNullOrWhiteSpace(configuredModel)
                 ? configuredModel
                 : TenSecondTom.Features.Setup.Models.ModelRegistry.GetDefault(
                     TenSecondTom.Features.Setup.Models.LlmProvider.Anthropic).Id;
-            
+
             return new AnthropicLlmProvider(client, logger, model);
         });
 
@@ -230,7 +273,7 @@ public static class ServiceCollectionExtensions
                 var streamLogger = logger.CreateLogger<StreamBasedTextEditor>();
                 #pragma warning disable CA1848 // Use LoggerMessage delegates for performance
                 var generalLogger = logger.CreateLogger("EditorSelection");
-                generalLogger.LogInformation(
+                generalLogger.LogDebug(
                     "Using StreamBasedTextEditor directly (IsInputRedirected={IsRedirected}, TERM={Term})",
                     Console.IsInputRedirected,
                     Environment.GetEnvironmentVariable("TERM") ?? "not set"
@@ -242,8 +285,8 @@ public static class ServiceCollectionExtensions
             // Use FallbackTextEditor wrapper - tries Terminal.Gui, falls back to StreamBased on failure
             #pragma warning disable CA1848 // Use LoggerMessage delegates for performance
             var selectionLogger = logger.CreateLogger("EditorSelection");
-            selectionLogger.LogInformation(
-                "Using FallbackTextEditor (will try Terminal.Gui, fallback to StreamBased if needed)"
+            selectionLogger.LogDebug(
+                "Text editor initialized with Terminal.Gui (StreamBased fallback available if needed)"
             );
             #pragma warning restore CA1848
             

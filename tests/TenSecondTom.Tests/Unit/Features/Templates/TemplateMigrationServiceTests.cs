@@ -1,12 +1,13 @@
 using TenSecondTom.Shared.Contracts;
 using System.IO.Abstractions;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using TenSecondTom.Features.Templates.Commands;
 using TenSecondTom.Features.Templates.Handlers;
 using TenSecondTom.Features.Templates.Services;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Tests.Unit.Features.Templates;
@@ -38,11 +39,12 @@ public sealed class TemplateMigrationServiceTests
     public async Task RunAutomaticMigration_WithNoMemoryDirectory_SkipsMigration()
     {
         // Arrange
-        var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c["TenSecondTom:MemoryDirectory"]).Returns((string?)null);
+        var storageOptions = new StorageOptions { MemoryDirectory = string.Empty };
+        var mockOptions = new Mock<IOptions<StorageOptions>>();
+        mockOptions.Setup(o => o.Value).Returns(storageOptions);
 
         // Act
-        await _service.RunAutomaticMigrationAsync(mockConfiguration.Object, CancellationToken.None);
+        await _service.RunAutomaticMigrationAsync(mockOptions.Object, CancellationToken.None);
 
         // Assert
         _mockTemplateHandler.Verify(h => h.Handle(
@@ -57,8 +59,9 @@ public sealed class TemplateMigrationServiceTests
         string rootDirectory = "/test/memory";
         string templatesDirectory = Path.Combine(rootDirectory, "templates");
 
-        var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c["TenSecondTom:MemoryDirectory"]).Returns(rootDirectory);
+        var storageOptions = new StorageOptions { MemoryDirectory = rootDirectory };
+        var mockOptions = new Mock<IOptions<StorageOptions>>();
+        mockOptions.Setup(o => o.Value).Returns(storageOptions);
 
         _mockFileSystem.Setup(fs => fs.Directory.Exists(templatesDirectory))
             .Returns(false);
@@ -78,7 +81,7 @@ public sealed class TemplateMigrationServiceTests
             }));
 
         // Act
-        await _service.RunAutomaticMigrationAsync(mockConfiguration.Object, CancellationToken.None);
+        await _service.RunAutomaticMigrationAsync(mockOptions.Object, CancellationToken.None);
 
         // Assert
         _mockTemplateHandler.Verify(h => h.Handle(
@@ -87,7 +90,7 @@ public sealed class TemplateMigrationServiceTests
     }
 
     [Fact]
-    public async Task RunAutomaticMigration_WithNullConfiguration_ThrowsArgumentNullException()
+    public async Task RunAutomaticMigration_WithNullStorageOptions_ThrowsArgumentNullException()
     {
         // Arrange & Act
         var act = async () => await _service.RunAutomaticMigrationAsync(null!, CancellationToken.None);
@@ -103,8 +106,9 @@ public sealed class TemplateMigrationServiceTests
         string rootDirectory = "/test/memory";
         string templatesDirectory = Path.Combine(rootDirectory, "templates");
 
-        var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c["TenSecondTom:MemoryDirectory"]).Returns(rootDirectory);
+        var storageOptions = new StorageOptions { MemoryDirectory = rootDirectory };
+        var mockOptions = new Mock<IOptions<StorageOptions>>();
+        mockOptions.Setup(o => o.Value).Returns(storageOptions);
 
         _mockFileSystem.Setup(fs => fs.Directory.Exists(templatesDirectory))
             .Returns(false);
@@ -118,7 +122,7 @@ public sealed class TemplateMigrationServiceTests
             .ThrowsAsync(new IOException("Disk full"));
 
         // Act
-        var act = async () => await _service.RunAutomaticMigrationAsync(mockConfiguration.Object, CancellationToken.None);
+        var act = async () => await _service.RunAutomaticMigrationAsync(mockOptions.Object, CancellationToken.None);
 
         // Assert
         await act.Should().NotThrowAsync("migration failures should be caught");

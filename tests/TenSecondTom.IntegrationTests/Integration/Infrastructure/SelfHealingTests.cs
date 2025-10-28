@@ -1,11 +1,13 @@
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
+using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Options;
 
 namespace TenSecondTom.IntegrationTests.Integration.Infrastructure;
 
@@ -15,26 +17,13 @@ namespace TenSecondTom.IntegrationTests.Integration.Infrastructure;
 /// </summary>
 public sealed class SelfHealingTests
 {
-    private readonly Mock<ILogger> _mockLogger;
+    private readonly Mock<ILogger<ConfigurationChecker>> _mockLogger;
     private readonly MockFileSystem _fileSystem;
-    private readonly IConfiguration _configuration;
 
     public SelfHealingTests()
     {
-        _mockLogger = new Mock<ILogger>();
+        _mockLogger = new Mock<ILogger<ConfigurationChecker>>();
         _fileSystem = new MockFileSystem();
-
-        // Create configuration with memory directory
-        var configData = new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.MemoryDirectoryKey] = "/.memory",
-            ["Llm:Provider"] = "OpenAI",
-            ["Llm:ApiKey"] = "test-key"
-        };
-
-        _configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(configData)
-            .Build();
     }
 
     [Fact]
@@ -45,11 +34,11 @@ public sealed class SelfHealingTests
         _fileSystem.AddDirectory("/.memory");
         // Templates directory does not exist (simulates deletion)
 
+        var checker = CreateConfigurationChecker("/.memory");
+
         // Act
-        bool healingPerformed = await ConfigurationChecker.PerformSelfHealingAsync(
-            _configuration,
+        bool healingPerformed = await checker.PerformSelfHealingAsync(
             _fileSystem,
-            _mockLogger.Object,
             CancellationToken.None);
 
         // Assert
@@ -102,11 +91,11 @@ public sealed class SelfHealingTests
         // Create empty templates directory
         _fileSystem.AddDirectory("/.memory/templates");
 
+        var checker = CreateConfigurationChecker("/.memory");
+
         // Act
-        bool healingPerformed = await ConfigurationChecker.PerformSelfHealingAsync(
-            _configuration,
+        bool healingPerformed = await checker.PerformSelfHealingAsync(
             _fileSystem,
-            _mockLogger.Object,
             CancellationToken.None);
 
         // Assert
@@ -147,11 +136,11 @@ public sealed class SelfHealingTests
         _fileSystem.AddFile("/.memory/templates/daily-summary.md", new MockFileData("# Daily Summary\n\nContent"));
         _fileSystem.AddFile("/.memory/templates/weekly-review.md", new MockFileData("# Weekly Review\n\nContent"));
 
+        var checker = CreateConfigurationChecker("/.memory");
+
         // Act
-        bool healingPerformed = await ConfigurationChecker.PerformSelfHealingAsync(
-            _configuration,
+        bool healingPerformed = await checker.PerformSelfHealingAsync(
             _fileSystem,
-            _mockLogger.Object,
             CancellationToken.None);
 
         // Assert
@@ -177,11 +166,11 @@ public sealed class SelfHealingTests
         _fileSystem.AddFile("/.memory/templates/custom-template.md", new MockFileData("# Custom Template\n\nUser content"));
         _fileSystem.AddFile("/.memory/templates/daily-summary.md", new MockFileData("# Modified Daily Summary\n\nCustom content"));
 
+        var checker = CreateConfigurationChecker("/.memory");
+
         // Act
-        bool healingPerformed = await ConfigurationChecker.PerformSelfHealingAsync(
-            _configuration,
+        bool healingPerformed = await checker.PerformSelfHealingAsync(
             _fileSystem,
-            _mockLogger.Object,
             CancellationToken.None);
 
         // Assert
@@ -209,14 +198,14 @@ public sealed class SelfHealingTests
         // Make the directory creation fail by making root read-only
         readOnlyFileSystem.File.SetAttributes("/.memory", FileAttributes.ReadOnly);
 
+        var checker = CreateConfigurationChecker("/.memory");
+
         // Note: MockFileSystem doesn't fully simulate permission errors,
         // so this test verifies the exception handling path exists
 
         // Act
-        bool healingPerformed = await ConfigurationChecker.PerformSelfHealingAsync(
-            _configuration,
+        bool healingPerformed = await checker.PerformSelfHealingAsync(
             readOnlyFileSystem,
-            _mockLogger.Object,
             CancellationToken.None);
 
         // Assert - Should handle gracefully and not throw
@@ -230,23 +219,19 @@ public sealed class SelfHealingTests
         // Arrange
         _fileSystem.AddDirectory("/.memory");
 
+        var checker = CreateConfigurationChecker("/.memory");
+
         // Act - Call self-healing multiple times
-        bool firstCall = await ConfigurationChecker.PerformSelfHealingAsync(
-            _configuration,
+        bool firstCall = await checker.PerformSelfHealingAsync(
             _fileSystem,
-            _mockLogger.Object,
             CancellationToken.None);
 
-        bool secondCall = await ConfigurationChecker.PerformSelfHealingAsync(
-            _configuration,
+        bool secondCall = await checker.PerformSelfHealingAsync(
             _fileSystem,
-            _mockLogger.Object,
             CancellationToken.None);
 
-        bool thirdCall = await ConfigurationChecker.PerformSelfHealingAsync(
-            _configuration,
+        bool thirdCall = await checker.PerformSelfHealingAsync(
             _fileSystem,
-            _mockLogger.Object,
             CancellationToken.None);
 
         // Assert
@@ -268,12 +253,12 @@ public sealed class SelfHealingTests
         var cts = new CancellationTokenSource();
         cts.Cancel();
 
+        var checker = CreateConfigurationChecker("/.memory");
+
         // Act & Assert
         await Assert.ThrowsAsync<OperationCanceledException>(
-            async () => await ConfigurationChecker.PerformSelfHealingAsync(
-                _configuration,
+            async () => await checker.PerformSelfHealingAsync(
                 _fileSystem,
-                _mockLogger.Object,
                 cts.Token));
     }
 
@@ -284,22 +269,13 @@ public sealed class SelfHealingTests
     public async Task PerformSelfHealingAsync_CustomMemoryDirectory_UsesConfiguredPath(string memoryDirectory)
     {
         // Arrange
-        var customConfig = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                [ConfigurationKeys.MemoryDirectoryKey] = memoryDirectory,
-                ["Llm:Provider"] = "OpenAI",
-                ["Llm:ApiKey"] = "test-key"
-            })
-            .Build();
-
         _fileSystem.AddDirectory(memoryDirectory);
 
+        var checker = CreateConfigurationChecker(memoryDirectory);
+
         // Act
-        bool healingPerformed = await ConfigurationChecker.PerformSelfHealingAsync(
-            customConfig,
+        bool healingPerformed = await checker.PerformSelfHealingAsync(
             _fileSystem,
-            _mockLogger.Object,
             CancellationToken.None);
 
         // Assert
@@ -316,11 +292,11 @@ public sealed class SelfHealingTests
         // Arrange
         // Neither memory nor templates directory exists
 
+        var checker = CreateConfigurationChecker("/.memory");
+
         // Act
-        bool healingPerformed = await ConfigurationChecker.PerformSelfHealingAsync(
-            _configuration,
+        bool healingPerformed = await checker.PerformSelfHealingAsync(
             _fileSystem,
-            _mockLogger.Object,
             CancellationToken.None);
 
         // Assert
@@ -336,11 +312,11 @@ public sealed class SelfHealingTests
         _fileSystem.AddDirectory("/.memory");
         // Templates directory missing
 
+        var checker = CreateConfigurationChecker("/.memory");
+
         // Act
-        await ConfigurationChecker.PerformSelfHealingAsync(
-            _configuration,
+        await checker.PerformSelfHealingAsync(
             _fileSystem,
-            _mockLogger.Object,
             CancellationToken.None);
 
         // Assert - Verify complete logging sequence
@@ -348,7 +324,7 @@ public sealed class SelfHealingTests
             x => x.Log(
                 LogLevel.Warning,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Performing self-healing")),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Performing self-healing") || v.ToString()!.Contains("Templates directory not found")),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once,
@@ -374,4 +350,39 @@ public sealed class SelfHealingTests
             Times.AtLeastOnce,
             "Should log template restoration");
     }
+
+    #region Helper Methods
+
+    /// <summary>
+    /// Creates a ConfigurationChecker with test configuration
+    /// </summary>
+    private ConfigurationChecker CreateConfigurationChecker(string memoryDirectory)
+    {
+        var llmOptions = Options.Create(new LlmOptions
+        {
+            Provider = LlmProvider.OpenAI,
+            ApiKey = "test-key",
+            Model = LlmConstants.OpenAIModels.GPTMini,
+            MaxInputTokens = 100000
+        });
+
+        var authOptions = Options.Create(new AuthOptions
+        {
+            KeyPath = "~/.ssh/id_ed25519",
+            KeySource = SshKeySource.FileSystem
+        });
+
+        var storageOptions = Options.Create(new StorageOptions
+        {
+            MemoryDirectory = memoryDirectory
+        });
+
+        return new ConfigurationChecker(
+            llmOptions,
+            authOptions,
+            storageOptions,
+            _mockLogger.Object);
+    }
+
+    #endregion
 }

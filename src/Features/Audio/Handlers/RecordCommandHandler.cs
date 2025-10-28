@@ -1,6 +1,6 @@
 using System.Text;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TenSecondTom.Features.Audio.Commands;
 using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Features.Audio.Services;
@@ -8,6 +8,7 @@ using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Audio.Handlers;
@@ -20,13 +21,15 @@ public sealed class RecordCommandHandler(
     RecordAudioCommandHandler recordHandler,
     TranscribeAudioCommandHandler transcribeHandler,
     IAudioPreprocessor audioPreprocessor,
-    IConfiguration configuration,
+    IOptions<StorageOptions> storageOptions,
+    IOptions<AudioConfiguration> audioOptions,
     ILogger<RecordCommandHandler> logger) : IRequestHandler<RecordCommand, Result<StoredRecording>>
 {
     private readonly RecordAudioCommandHandler _recordHandler = recordHandler ?? throw new ArgumentNullException(nameof(recordHandler));
     private readonly TranscribeAudioCommandHandler _transcribeHandler = transcribeHandler ?? throw new ArgumentNullException(nameof(transcribeHandler));
     private readonly IAudioPreprocessor _audioPreprocessor = audioPreprocessor ?? throw new ArgumentNullException(nameof(audioPreprocessor));
-    private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+    private readonly StorageOptions _storageOptions = (storageOptions ?? throw new ArgumentNullException(nameof(storageOptions))).Value;
+    private readonly AudioConfiguration _audioOptions = (audioOptions ?? throw new ArgumentNullException(nameof(audioOptions))).Value;
     private readonly ILogger<RecordCommandHandler> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <inheritdoc/>
@@ -38,13 +41,15 @@ public sealed class RecordCommandHandler(
         }
 
         // Create recording/ directory if it doesn't exist
-        // Use proper configuration precedence: .env → user secrets → appsettings.json
-        var memoryDir = _configuration.GetMemoryDirectory(expandHomeDirectory: true);
+        var memoryDir = _storageOptions.MemoryDirectory;
 
         if (string.IsNullOrWhiteSpace(memoryDir))
         {
             return Result<StoredRecording>.Failure("Memory directory is not configured");
         }
+
+        // Expand home directory if needed
+        memoryDir = memoryDir.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
         var recordingDir = Path.Combine(memoryDir, "recording");
         if (!Directory.Exists(recordingDir))
@@ -61,12 +66,8 @@ public sealed class RecordCommandHandler(
             }
         }
 
-        // Get audio configuration for timeout
-        var audioConfig = _configuration.GetSection(ConfigurationKeys.AudioSectionKey).Get<AudioConfiguration>()
-            ?? new AudioConfiguration();
-
         // Determine timeout: use command-specific value or fall back to config default
-        int? maxDurationSeconds = request.MaxDurationSeconds ?? audioConfig.Timeouts.RecordSeconds;
+        int? maxDurationSeconds = request.MaxDurationSeconds ?? _audioOptions.Timeouts.RecordSeconds;
 
         _logger.LogInformation("Starting record command with STT provider: {Provider}, Target directory: {RecordingDir}, Max duration: {MaxDuration}s",
             request.AudioConfig.SttProvider, recordingDir, maxDurationSeconds);

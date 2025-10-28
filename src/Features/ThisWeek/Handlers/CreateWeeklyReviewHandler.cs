@@ -1,5 +1,5 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TenSecondTom.Features.ThisWeek.Commands;
 using TenSecondTom.Features.Templates.Queries;
 using TenSecondTom.Infrastructure.Auth;
@@ -12,6 +12,7 @@ using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Extensions;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.ThisWeek.Handlers;
@@ -26,7 +27,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
     private readonly ILlmProviderFactory _llmFactory;
     private readonly IPromptTemplateLoader _promptLoader;
     private readonly IAuthenticationService _authService;
-    private readonly IConfiguration _configuration;
+    private readonly LlmOptions _llmOptions;
     private readonly ILogger<CreateWeeklyReviewHandler> _logger;
     private readonly TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler _listTemplatesHandler;
     private readonly ITemplateSelectionUI _templateSelectionUI;
@@ -38,7 +39,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
     /// <param name="llmFactory">The LLM provider factory.</param>
     /// <param name="promptLoader">The prompt template loader.</param>
     /// <param name="authService">The authentication service.</param>
-    /// <param name="configuration">The application configuration (includes user secrets + environment variable overrides).</param>
+    /// <param name="llmOptions">The LLM configuration options.</param>
     /// <param name="logger">The logger instance.</param>
     /// <param name="listTemplatesHandler">Handler for listing available templates.</param>
     /// <param name="templateSelectionUI">UI for interactive template selection.</param>
@@ -47,7 +48,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
         ILlmProviderFactory llmFactory,
         IPromptTemplateLoader promptLoader,
         IAuthenticationService authService,
-        IConfiguration configuration,
+        IOptions<LlmOptions> llmOptions,
         ILogger<CreateWeeklyReviewHandler> logger,
         TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler listTemplatesHandler,
         ITemplateSelectionUI templateSelectionUI)
@@ -56,7 +57,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
         _llmFactory = llmFactory;
         _promptLoader = promptLoader;
         _authService = authService;
-        _configuration = configuration;
+        _llmOptions = llmOptions.Value;
         _logger = logger;
         _listTemplatesHandler = listTemplatesHandler;
         _templateSelectionUI = templateSelectionUI;
@@ -170,7 +171,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
 
         string prompt = RenderPrompt(templateResult.Value, aggregatedContent, dateRange, entriesResult.Value.Count);
 
-        // 9. Determine LLM provider (use override, or load from config, or default to OpenAI)
+        // 9. Determine LLM provider (use override, or load from options)
         string provider;
         if (!string.IsNullOrWhiteSpace(request.LlmProviderOverride))
         {
@@ -178,19 +179,9 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
         }
         else
         {
-            // Read from IConfiguration which includes environment variable overrides
-            string? configuredProvider = _configuration[ConfigurationKeys.LlmProviderKey];
-            if (!string.IsNullOrWhiteSpace(configuredProvider))
-            {
-                provider = configuredProvider;
-                _logger.LogDebug("Using LLM provider from configuration: {Provider}", provider);
-            }
-            else
-            {
-                // Default to OpenAI if not configured
-                provider = LlmProviders.OpenAI;
-                _logger.LogDebug("No LLM provider configured, defaulting to OpenAI");
-            }
+            // Use strongly-typed LlmOptions from configuration
+            provider = _llmOptions.Provider.ToString();
+            _logger.LogDebug("Using LLM provider from configuration: {Provider}", provider);
         }
 
         ILlmProvider llmProvider;
@@ -236,30 +227,12 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
             return Result<WeeklyEntry>.Failure($"Failed to generate weekly review: {completionResult.Error}");
         }
 
-        // 10. Parse response and validate 3+3 structure
-        Result<WeeklySummary> summaryResult = ParseWeeklySummary(completionResult.Value.Content);
-        if (!summaryResult.IsSuccess)
-        {
-            return Result<WeeklyEntry>.Failure($"Failed to parse LLM response: {summaryResult.Error}");
-        }
-
-        // Validate exactly 3 accomplishments and 3 challenges
-        if (summaryResult.Value.TopAccomplishments.Count != 3)
-        {
-            return Result<WeeklyEntry>.Failure(
-                $"Weekly review must contain exactly 3 top accomplishments, but found {summaryResult.Value.TopAccomplishments.Count}");
-        }
-
-        if (summaryResult.Value.TopChallenges.Count != 3)
-        {
-            return Result<WeeklyEntry>.Failure(
-                $"Weekly review must contain exactly 3 top challenges, but found {summaryResult.Value.TopChallenges.Count}");
-        }
-
-        // 11. Strip markdown code block wrappers if present (defensive measure)
+        // 10. Strip markdown code block wrappers if present (defensive measure)
         string cleanedResponse = completionResult.Value.Content.StripMarkdownCodeBlock();
 
-        // 12. Create WeeklyEntry
+        // 11. Create WeeklyEntry
+        // Note: The prompt template defines the output structure.
+        // The LlmResponse field contains the complete, unaltered output.
         int entryNumber = await GetNextEntryNumber(dateRange, cancellationToken).ConfigureAwait(false);
 
         WeeklyEntry weeklyEntry = new()
@@ -276,8 +249,7 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
                 LlmModel = llmProvider.ModelName,
                 TokensUsed = completionResult.Value.TotalTokens,
                 ProcessingDuration = processingDuration
-            },
-            Summary = summaryResult.Value
+            }
         };
 
         // 13. Save to storage
@@ -436,92 +408,4 @@ public sealed class CreateWeeklyReviewHandler : IRequestHandler<CreateWeeklyRevi
         return count + 1;
     }
 
-    private static Result<WeeklySummary> ParseWeeklySummary(string llmResponse)
-    {
-        try
-        {
-            List<string> topAccomplishments = [];
-            List<string> topChallenges = [];
-            List<string> keyInsights = [];
-            List<string> goalsForNextWeek = [];
-
-            string[] lines = llmResponse.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-            string? currentSection = null;
-
-            foreach (string line in lines)
-            {
-                string trimmedLine = line.Trim();
-
-                if (trimmedLine.StartsWith("## Top 3 Accomplishments", StringComparison.OrdinalIgnoreCase))
-                {
-                    currentSection = "accomplishments";
-                }
-                else if (trimmedLine.StartsWith("## Top 3 Challenges", StringComparison.OrdinalIgnoreCase))
-                {
-                    currentSection = "challenges";
-                }
-                else if (trimmedLine.StartsWith("## Recurring Themes", StringComparison.OrdinalIgnoreCase) ||
-                         trimmedLine.StartsWith("## Key Insights", StringComparison.OrdinalIgnoreCase))
-                {
-                    currentSection = "insights";
-                }
-                else if (trimmedLine.StartsWith("## Interaction Patterns", StringComparison.OrdinalIgnoreCase))
-                {
-                    currentSection = "insights"; // Map to insights
-                }
-                else if (trimmedLine.StartsWith("## Next Week Suggestions", StringComparison.OrdinalIgnoreCase) ||
-                         trimmedLine.StartsWith("## Goals for Next Week", StringComparison.OrdinalIgnoreCase))
-                {
-                    currentSection = "goals";
-                }
-                else if (!trimmedLine.StartsWith('#') && !string.IsNullOrWhiteSpace(trimmedLine))
-                {
-                    // Parse list items
-                    string content = trimmedLine.TrimStart('-', '*', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '.', ' ');
-
-                    if (!string.IsNullOrWhiteSpace(content))
-                    {
-                        switch (currentSection)
-                        {
-                            case "accomplishments":
-                                topAccomplishments.Add(content);
-                                break;
-                            case "challenges":
-                                topChallenges.Add(content);
-                                break;
-                            case "insights":
-                                keyInsights.Add(content);
-                                break;
-                            case "goals":
-                                goalsForNextWeek.Add(content);
-                                break;
-                        }
-                    }
-                }
-            }
-
-            // Extract date range from context - for now use current week
-            DateTimeOffset now = DateTimeOffset.UtcNow;
-            DateRange dateRange = new()
-            {
-                StartDate = now.AddDays(-7),
-                EndDate = now
-            };
-
-            WeeklySummary summary = new()
-            {
-                TopAccomplishments = topAccomplishments,
-                TopChallenges = topChallenges,
-                DateRange = dateRange,
-                KeyInsights = keyInsights.Count > 0 ? keyInsights : null,
-                GoalsForNextWeek = goalsForNextWeek.Count > 0 ? goalsForNextWeek : null
-            };
-
-            return Result<WeeklySummary>.Success(summary);
-        }
-        catch (Exception ex)
-        {
-            return Result<WeeklySummary>.Failure($"Failed to parse weekly summary: {ex.Message}");
-        }
-    }
 }

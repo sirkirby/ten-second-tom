@@ -1,12 +1,13 @@
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using TenSecondTom.Features.Generate.Models;
 using TenSecondTom.Features.Generate.Services;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Options;
 
 namespace TenSecondTom.Tests.Features.Generate.Services;
 
@@ -17,18 +18,18 @@ namespace TenSecondTom.Tests.Features.Generate.Services;
 public sealed class OutputStorageServiceTests
 {
     private readonly Mock<ILogger<OutputStorageService>> _mockLogger;
-    private readonly Mock<IConfiguration> _mockConfiguration;
+    private readonly Mock<IOptions<StorageOptions>> _mockStorageOptions;
     private readonly string _testMemoryDirectory;
 
     public OutputStorageServiceTests()
     {
         _mockLogger = new Mock<ILogger<OutputStorageService>>();
-        _mockConfiguration = new Mock<IConfiguration>();
+        _mockStorageOptions = new Mock<IOptions<StorageOptions>>();
         _testMemoryDirectory = "/test/memory";
 
-        _mockConfiguration
-            .Setup(c => c[ConfigurationKeys.MemoryDirectoryKey])
-            .Returns(_testMemoryDirectory);
+        _mockStorageOptions
+            .Setup(o => o.Value)
+            .Returns(new StorageOptions { MemoryDirectory = _testMemoryDirectory });
     }
 
     #region BuildOutputFilePath Tests
@@ -278,7 +279,7 @@ public sealed class OutputStorageServiceTests
     {
         return new OutputStorageService(
             fileSystem,
-            _mockConfiguration.Object,
+            _mockStorageOptions.Object,
             _mockLogger.Object);
     }
 

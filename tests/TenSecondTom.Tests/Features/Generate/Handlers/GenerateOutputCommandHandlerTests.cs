@@ -1,15 +1,16 @@
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using TenSecondTom.Features.Generate.Commands;
 using TenSecondTom.Features.Generate.Handlers;
 using TenSecondTom.Features.Generate.Models;
 using TenSecondTom.Features.Generate.Services;
+using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
-using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Tests.Features.Generate.Handlers;
@@ -26,7 +27,7 @@ public sealed class GenerateOutputCommandHandlerTests
     private readonly Mock<ITranscriptProcessor> _mockTranscriptProcessor;
     private readonly Mock<ILlmProvider> _mockLlmProvider;
     private readonly Mock<ILlmProviderFactory> _mockLlmProviderFactory;
-    private readonly Mock<IConfiguration> _mockConfiguration;
+    private readonly Mock<IOptions<LlmOptions>> _mockLlmOptions;
     private readonly Mock<IOutputStorageService> _mockOutputStorageService;
     private readonly Mock<ILogger<GenerateOutputCommandHandler>> _mockLogger;
 
@@ -37,7 +38,7 @@ public sealed class GenerateOutputCommandHandlerTests
         _mockTranscriptProcessor = new Mock<ITranscriptProcessor>();
         _mockLlmProvider = new Mock<ILlmProvider>();
         _mockLlmProviderFactory = new Mock<ILlmProviderFactory>();
-        _mockConfiguration = new Mock<IConfiguration>();
+        _mockLlmOptions = new Mock<IOptions<LlmOptions>>();
         _mockOutputStorageService = new Mock<IOutputStorageService>();
         _mockLogger = new Mock<ILogger<GenerateOutputCommandHandler>>();
 
@@ -45,8 +46,15 @@ public sealed class GenerateOutputCommandHandlerTests
         _mockLlmProvider.Setup(p => p.ProviderName).Returns("TestProvider");
         _mockLlmProvider.Setup(p => p.ModelName).Returns("test-model");
 
-        // Setup configuration to return a valid provider name
-        _mockConfiguration.Setup(c => c[ConfigurationKeys.LlmProviderKey]).Returns("OpenAI");
+        // Setup LLM options with default values
+        var llmOptions = new LlmOptions
+        {
+            Provider = LlmProvider.OpenAI,
+            ApiKey = "test-api-key",
+            Model = "test-model",
+            MaxInputTokens = 100000
+        };
+        _mockLlmOptions.Setup(o => o.Value).Returns(llmOptions);
 
         // Setup factory to return the mock provider
         _mockLlmProviderFactory
@@ -422,7 +430,7 @@ public sealed class GenerateOutputCommandHandlerTests
             _mockTemplateLoader.Object,
             _mockTranscriptProcessor.Object,
             _mockLlmProviderFactory.Object,
-            _mockConfiguration.Object,
+            _mockLlmOptions.Object,
             _mockOutputStorageService.Object,
             _mockLogger.Object);
     }

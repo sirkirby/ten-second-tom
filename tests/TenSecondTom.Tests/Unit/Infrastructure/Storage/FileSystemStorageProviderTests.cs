@@ -51,14 +51,6 @@ public sealed class FileSystemStorageProviderTests : IDisposable
                 LlmModel = "gpt-4",
                 TokensUsed = 150,
                 ProcessingDuration = TimeSpan.FromSeconds(2.5)
-            },
-            Summary = new DailySummary
-            {
-                KeyEvents = ["Event 1", "Event 2"],
-                Themes = ["Theme 1"],
-                TodoItems = [],
-                ImportantPeople = ["Person 1"],
-                NotableTasks = ["Task 1"]
             }
         };
 
@@ -352,18 +344,6 @@ public sealed class FileSystemStorageProviderTests : IDisposable
             {
                 LlmProvider = "Anthropic",
                 LlmModel = "claude-3-sonnet-20240229"
-            },
-            Summary = new WeeklySummary
-            {
-                TopAccomplishments = ["Accomplishment 1", "Accomplishment 2", "Accomplishment 3"],
-                TopChallenges = ["Challenge 1", "Challenge 2", "Challenge 3"],
-                DateRange = new DateRange
-                {
-                    StartDate = new DateTimeOffset(new DateTime(2025, 9, 29), TimeSpan.Zero),
-                    EndDate = new DateTimeOffset(new DateTime(2025, 10, 5), TimeSpan.Zero)
-                },
-                KeyInsights = ["Insight 1"],
-                GoalsForNextWeek = ["Goal 1"]
             }
         };
 
@@ -474,14 +454,6 @@ public sealed class FileSystemStorageProviderTests : IDisposable
             {
                 LlmProvider = "OpenAI",
                 LlmModel = "gpt-4"
-            },
-            Summary = new DailySummary
-            {
-                KeyEvents = ["Event 1"],
-                Themes = ["Theme 1"],
-                TodoItems = [],
-                ImportantPeople = ["Person 1"],
-                NotableTasks = ["Task 1"]
             }
         };
     }

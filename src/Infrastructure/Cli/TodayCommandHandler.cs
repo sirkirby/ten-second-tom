@@ -1,6 +1,6 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Spectre.Console;
 using TenSecondTom.Features.Audio;
 using TenSecondTom.Features.Audio.Commands;
@@ -13,6 +13,7 @@ using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.OutputFormatters;
 using TenSecondTom.Shared.Results;
 using TenSecondTom.Shared.TextEditing.Services;
@@ -59,7 +60,7 @@ public static class TodayCommandHandler
         var handler = serviceProvider.GetRequiredService<TodayHandlers.CreateDailyEntryHandler>();
         var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
         var textEditor = serviceProvider.GetRequiredService<IInteractiveTextEditor>();
-        var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+        var audioConfig = serviceProvider.GetRequiredService<IOptions<AudioConfiguration>>().Value;
         var logger = serviceProvider.GetRequiredService<ILogger<TodayHandlers.CreateVoiceNoteEntryHandler>>();
 
         // Show warning if using mock authentication (only in non-JSON mode)
@@ -85,8 +86,6 @@ public static class TodayCommandHandler
         if (useVoice)
         {
             // Validate audio configuration before proceeding with voice input
-            var audioConfig = configuration.GetSection(ConfigurationKeys.AudioSectionKey).Get<AudioConfiguration>()
-                ?? new AudioConfiguration();
             var audioValidator = serviceProvider.GetRequiredService<IAudioConfigurationValidator>();
             var audioConfigResult = AudioConfigurationHelper.EnsureAudioConfigured(
                 audioValidator,
@@ -257,14 +256,9 @@ public static class TodayCommandHandler
                     entryId = entry.EntryId,
                     timestamp = entry.Timestamp,
                     provider = entry.Metadata.LlmProvider,
-                    summary = new
-                    {
-                        keyEvents = entry.Summary.KeyEvents,
-                        themes = entry.Summary.Themes,
-                        todoItems = entry.Summary.TodoItems.Select(t => new { description = t.Description, isCompleted = t.IsCompleted }),
-                        importantPeople = entry.Summary.ImportantPeople,
-                        notableTasks = entry.Summary.NotableTasks
-                    }
+                    model = entry.Metadata.LlmModel,
+                    tokensUsed = entry.Metadata.TokensUsed,
+                    response = entry.LlmResponse
                 };
             }
 
@@ -279,43 +273,37 @@ public static class TodayCommandHandler
             AnsiConsole.MarkupLine("[bold green]✓ Daily entry created successfully![/]");
             AnsiConsole.WriteLine();
 
+            // Show truncated preview of the LLM response
+            string[] responseLines = entry.LlmResponse.Split('\n');
+            bool isTruncated = responseLines.Length > 10;
+            string preview = isTruncated
+                ? string.Join('\n', responseLines.Take(10))
+                : entry.LlmResponse;
+
             var panel = new Panel(new Markup($"""
                 [bold]Entry ID:[/] {entry.EntryId}
                 [bold]Timestamp:[/] {entry.Timestamp:yyyy-MM-dd HH:mm:ss}
                 [bold]Provider:[/] {entry.Metadata.LlmProvider}
+                [bold]Tokens:[/] {entry.Metadata.TokensUsed}
 
-                [bold cyan]Summary:[/]
-                [dim]{entry.LlmResponse.Split('\n').Take(5).Aggregate((a, b) => a + "\n" + b)}...[/]
+                [bold cyan]Response:[/]
+                {Markup.Escape(preview)}
                 """))
             {
-                Header = new PanelHeader("📋 Daily Entry Summary"),
+                Header = new PanelHeader("📋 Daily Entry"),
                 Border = BoxBorder.Rounded,
                 BorderStyle = new Style(foreground: Color.Cyan1)
             };
 
             AnsiConsole.Write(panel);
 
-            // Show key events if any
-            if (entry.Summary.KeyEvents.Count > 0)
+            // Show clickable file path
+            if (isTruncated)
             {
+                var storageOptions = serviceProvider.GetRequiredService<IOptions<StorageOptions>>();
+                string fullPath = Path.Combine(storageOptions.Value.MemoryDirectory, entry.FilePath);
                 AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine("[bold]Key Events:[/]");
-                foreach (string keyEvent in entry.Summary.KeyEvents)
-                {
-                    AnsiConsole.MarkupLine($"  • {Markup.Escape(keyEvent)}");
-                }
-            }
-
-            // Show todo items if any
-            if (entry.Summary.TodoItems.Count > 0)
-            {
-                AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine("[bold]Todo Items:[/]");
-                foreach (TodoItem todo in entry.Summary.TodoItems)
-                {
-                    string status = todo.IsCompleted ? "✓" : "○";
-                    AnsiConsole.MarkupLine($"  {status} {Markup.Escape(todo.Description)}");
-                }
+                AnsiConsole.MarkupLine($"[dim]Full entry:[/] [link]{fullPath.EscapeMarkup()}[/]");
             }
         }
     }
@@ -337,17 +325,18 @@ public static class TodayCommandHandler
         var transcribeHandler = serviceProvider.GetRequiredService<IRequestHandler<TranscribeAudioCommand, Result<TranscriptionResult>>>();
         var audioPreprocessor = serviceProvider.GetRequiredService<IAudioPreprocessor>();
         var voiceNoteHandler = serviceProvider.GetRequiredService<IRequestHandler<CreateVoiceNoteEntryCommand, Result<VoiceNoteEntry>>>();
-        var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+        var storageOptions = serviceProvider.GetRequiredService<IOptions<StorageOptions>>().Value;
+        var audioConfig = serviceProvider.GetRequiredService<IOptions<AudioConfiguration>>().Value;
         var logger = serviceProvider.GetRequiredService<ILogger<TodayHandlers.CreateVoiceNoteEntryHandler>>();
 
-        // Get audio configuration
-        var audioConfig = configuration.GetSection("TenSecondTom:Audio").Get<AudioConfiguration>()
-            ?? new AudioConfiguration();
+        // Get memory directory from configuration
+        var memoryDirectory = storageOptions.MemoryDirectory;
 
-        // Get memory directory from configuration with proper precedence
-        // PRIMARY: Storage:MemoryDirectory (from .env, user secrets, environment vars)
-        // FALLBACK: TenSecondTom:MemoryDirectory (from appsettings.json)
-        var memoryDirectory = configuration.GetMemoryDirectory(expandHomeDirectory: true);
+        // Expand home directory if needed
+        if (!string.IsNullOrWhiteSpace(memoryDirectory))
+        {
+            memoryDirectory = memoryDirectory.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        }
         if (string.IsNullOrWhiteSpace(memoryDirectory))
         {
             var error = "Memory directory not configured. Run 'tom setup' to configure.";
@@ -648,14 +637,9 @@ public static class TodayCommandHandler
                     sttEngine = entry.SttEngine.ToString(),
                     sttModel = entry.SttModel,
                     provider = entry.Metadata.LlmProvider,
-                    summary = new
-                    {
-                        keyEvents = entry.Summary.KeyEvents,
-                        themes = entry.Summary.Themes,
-                        todoItems = entry.Summary.TodoItems.Select(t => new { description = t.Description, isCompleted = t.IsCompleted }),
-                        importantPeople = entry.Summary.ImportantPeople,
-                        notableTasks = entry.Summary.NotableTasks
-                    }
+                    model = entry.Metadata.LlmModel,
+                    tokensUsed = entry.Metadata.TokensUsed,
+                    response = entry.LlmResponse
                 };
 
                 Console.WriteLine(JsonOutputFormatter.FormatSuccess(CommandNames.Today, jsonData, DateTimeOffset.UtcNow));
@@ -666,44 +650,37 @@ public static class TodayCommandHandler
                 AnsiConsole.MarkupLine("[bold green]✓ Voice note entry created successfully![/]");
                 AnsiConsole.WriteLine();
 
+                // Show truncated preview of the LLM response
+                string[] responseLines = entry.LlmResponse.Split('\n');
+                bool isTruncated = responseLines.Length > 10;
+                string preview = isTruncated
+                    ? string.Join('\n', responseLines.Take(10))
+                    : entry.LlmResponse;
+
                 var panel = new Panel(new Markup($"""
                     [bold]Entry ID:[/] {entry.EntryId}
                     [bold]Timestamp:[/] {entry.Timestamp:yyyy-MM-dd HH:mm:ss}
                     [bold]Provider:[/] {entry.Metadata.LlmProvider}
                     [bold]Audio:[/] {entry.AudioDuration.TotalSeconds:F1}s ({entry.SttEngine})
+                    [bold]Tokens:[/] {entry.Metadata.TokensUsed}
 
-                    [bold cyan]Summary:[/]
-                    [dim]{entry.LlmResponse.Split('\n').Take(5).Aggregate((a, b) => a + "\n" + b)}...[/]
+                    [bold cyan]Response:[/]
+                    {Markup.Escape(preview)}
                     """))
                 {
-                    Header = new PanelHeader("🎤 Voice Note Summary"),
+                    Header = new PanelHeader("🎤 Voice Note Entry"),
                     Border = BoxBorder.Rounded,
                     BorderStyle = new Style(foreground: Color.Cyan1)
                 };
 
                 AnsiConsole.Write(panel);
 
-                // Show key events if any
-                if (entry.Summary.KeyEvents.Count > 0)
+                // Show clickable file path
+                if (isTruncated)
                 {
+                    string fullPath = Path.Combine(storageOptions.MemoryDirectory, entry.FilePath);
                     AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine("[bold]Key Events:[/]");
-                    foreach (string keyEvent in entry.Summary.KeyEvents)
-                    {
-                        AnsiConsole.MarkupLine($"  • {Markup.Escape(keyEvent)}");
-                    }
-                }
-
-                // Show todo items if any
-                if (entry.Summary.TodoItems.Count > 0)
-                {
-                    AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine("[bold]Todo Items:[/]");
-                    foreach (TodoItem todo in entry.Summary.TodoItems)
-                    {
-                        string status = todo.IsCompleted ? "✓" : "○";
-                        AnsiConsole.MarkupLine($"  {status} {Markup.Escape(todo.Description)}");
-                    }
+                    AnsiConsole.MarkupLine($"[dim]Full entry:[/] [link]{fullPath.EscapeMarkup()}[/]");
                 }
 
                 if (audioConfig.KeepFiles)

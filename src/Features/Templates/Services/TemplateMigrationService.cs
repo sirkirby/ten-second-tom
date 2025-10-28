@@ -1,10 +1,11 @@
 using System.IO.Abstractions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TenSecondTom.Features.Templates.Commands;
 using TenSecondTom.Features.Templates.Handlers;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Contracts;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Templates.Services;
@@ -34,21 +35,21 @@ public sealed class TemplateMigrationService
 
     /// <summary>
     /// Runs automatic template migration for existing users if configured.
-    /// Extracts memory directory from configuration and performs silent migration.
+    /// Extracts memory directory from storage options and performs silent migration.
     /// Non-critical operation - failures are logged but don't stop application execution.
     /// </summary>
-    /// <param name="configuration">Application configuration</param>
+    /// <param name="storageOptions">Storage configuration options</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Task representing the asynchronous operation</returns>
     public async Task RunAutomaticMigrationAsync(
-        IConfiguration configuration,
+        IOptions<StorageOptions> storageOptions,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(storageOptions);
 
-        // Get memory directory using standard .NET configuration
-        // TenSecondTom:MemoryDirectory is the root containing templates/, today/, thisweek/, etc.
-            string? rootDirectory = configuration[ConfigurationKeys.MemoryDirectoryKey];
+        // Get memory directory from storage options
+        // MemoryDirectory is the root containing templates/, today/, thisweek/, etc.
+        string rootDirectory = storageOptions.Value.MemoryDirectory;
         _logger.LogDebug("Root directory from configuration: {RootDirectory}", rootDirectory);
 
         if (string.IsNullOrWhiteSpace(rootDirectory))

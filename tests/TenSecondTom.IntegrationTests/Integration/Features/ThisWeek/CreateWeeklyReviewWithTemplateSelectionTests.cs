@@ -489,7 +489,6 @@ Some insights here
                 EntryNumber = 1,
                 UserInput = "Sample input",
                 LlmResponse = "Sample response",
-                Summary = new DailySummary(),
                 Metadata = new MemoryEntryMetadata
                 {
                     LlmProvider = "openai",

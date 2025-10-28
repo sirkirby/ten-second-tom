@@ -1,5 +1,5 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TenSecondTom.Features.Today.Commands;
 using TenSecondTom.Features.Templates.Queries;
 using TenSecondTom.Infrastructure.Auth;
@@ -12,6 +12,7 @@ using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Extensions;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Today.Handlers;
@@ -27,7 +28,7 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
     private readonly ILlmProviderFactory _llmFactory;
     private readonly IPromptTemplateLoader _promptLoader;
     private readonly IAuthenticationService _authService;
-    private readonly IConfiguration _configuration;
+    private readonly LlmOptions _llmOptions;
     private readonly ILogger<CreateDailyEntryHandler> _logger;
     private readonly TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler _listTemplatesHandler;
     private readonly ITemplateSelectionUI _templateSelectionUI;
@@ -39,7 +40,7 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
     /// <param name="llmFactory">The LLM provider factory.</param>
     /// <param name="promptLoader">The prompt template loader.</param>
     /// <param name="authService">The authentication service.</param>
-    /// <param name="configuration">The application configuration (includes user secrets + environment variable overrides).</param>
+    /// <param name="llmOptions">The LLM configuration options.</param>
     /// <param name="logger">The logger instance.</param>
     /// <param name="listTemplatesHandler">Handler for listing available templates.</param>
     /// <param name="templateSelectionUI">UI for interactive template selection.</param>
@@ -48,7 +49,7 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
         ILlmProviderFactory llmFactory,
         IPromptTemplateLoader promptLoader,
         IAuthenticationService authService,
-        IConfiguration configuration,
+        IOptions<LlmOptions> llmOptions,
         ILogger<CreateDailyEntryHandler> logger,
         TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler listTemplatesHandler,
         ITemplateSelectionUI templateSelectionUI)
@@ -57,7 +58,7 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
         _llmFactory = llmFactory;
         _promptLoader = promptLoader;
         _authService = authService;
-        _configuration = configuration;
+        _llmOptions = llmOptions.Value;
         _logger = logger;
         _listTemplatesHandler = listTemplatesHandler;
         _templateSelectionUI = templateSelectionUI;
@@ -185,7 +186,7 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
 
         string prompt = RenderPrompt(templateResult.Value, userInput);
 
-        // 7. Determine LLM provider (use override, or load from config, or default to OpenAI)
+        // 7. Determine LLM provider (use override, or load from options)
         string provider;
         if (!string.IsNullOrWhiteSpace(request.LlmProviderOverride))
         {
@@ -193,19 +194,9 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
         }
         else
         {
-            // Read from IConfiguration which includes environment variable overrides
-            string? configuredProvider = _configuration[ConfigurationKeys.LlmProviderKey];
-            if (!string.IsNullOrWhiteSpace(configuredProvider))
-            {
-                provider = configuredProvider;
-                _logger.LogDebug("Using LLM provider from configuration: {Provider}", provider);
-            }
-            else
-            {
-                // Default to OpenAI if not configured
-                provider = LlmProviders.OpenAI;
-                _logger.LogDebug("No LLM provider configured, defaulting to OpenAI");
-            }
+            // Use strongly-typed configuration from LlmOptions
+            provider = _llmOptions.Provider.ToString();
+            _logger.LogDebug("Using LLM provider from configuration: {Provider}", provider);
         }
 
         ILlmProvider llmProvider;
@@ -240,10 +231,9 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
         // 8. Strip markdown code block wrappers if present (defensive measure)
         string cleanedResponse = llmResult.Value.Content.StripMarkdownCodeBlock();
 
-        // 9. Parse LLM response into DailySummary
-        DailySummary summary = ParseDailySummary(cleanedResponse);
-
-        // 10. Create DailyEntry
+        // 9. Create DailyEntry
+        // Note: The prompt template defines the output structure.
+        // The LlmResponse field contains the complete, unaltered output.
         var entry = new DailyEntry
         {
             EntryId = $"{CommandNames.Today}-{today:MM-dd-yyyy}-{entryNumber}",
@@ -256,8 +246,7 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
                 llmProvider.ProviderName, 
                 llmProvider.ModelName, 
                 llmResult.Value.TotalTokens,
-                processingDuration),
-            Summary = summary
+                processingDuration)
         };
 
         // 11. Save to storage
@@ -333,8 +322,7 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
                         ["Status"] = "Partial",
                         ["Reason"] = "LLM provider failed"
                     }
-                },
-                Summary = new DailySummary() // Empty summary
+                }
             };
 
             await _storage.SaveAsync(partialEntry, cancellationToken).ConfigureAwait(false);
@@ -358,104 +346,6 @@ public sealed class CreateDailyEntryHandler : IRequestHandler<CreateDailyEntryCo
         _logger.LogError(ex, "Failed to save partial entry for date {Date}", date);
     }
 
-    private static DailySummary ParseDailySummary(string llmResponse)
-    {
-        // Simple parsing logic - extract sections from markdown-style response
-        var keyEvents = new List<string>();
-        var themes = new List<string>();
-        var todoItems = new List<TodoItem>();
-        var importantPeople = new List<string>();
-        var notableTasks = new List<string>();
-
-        string[] lines = llmResponse.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        string? currentSection = null;
-
-        foreach (string line in lines)
-        {
-            string trimmed = line.Trim();
-
-            // Detect section headers
-            if (trimmed.StartsWith("##", StringComparison.OrdinalIgnoreCase) || trimmed.StartsWith("**", StringComparison.OrdinalIgnoreCase))
-            {
-                string header = trimmed.Replace("#", string.Empty, StringComparison.Ordinal)
-                    .Replace("*", string.Empty, StringComparison.Ordinal)
-                    .Trim()
-                    .ToUpperInvariant();
-
-                if (header.Contains("KEY EVENT", StringComparison.OrdinalIgnoreCase) || header.Contains("EVENTS", StringComparison.OrdinalIgnoreCase))
-                {
-                    currentSection = "events";
-                }
-                else if (header.Contains("THEME", StringComparison.OrdinalIgnoreCase) || header.Contains("PATTERN", StringComparison.OrdinalIgnoreCase))
-                {
-                    currentSection = "themes";
-                }
-                else if (header.Contains("TODO", StringComparison.OrdinalIgnoreCase) || header.Contains("TO-DO", StringComparison.OrdinalIgnoreCase) || header.Contains("TASK", StringComparison.OrdinalIgnoreCase))
-                {
-                    currentSection = "todos";
-                }
-                else if (header.Contains("PEOPLE", StringComparison.OrdinalIgnoreCase) || header.Contains("PERSON", StringComparison.OrdinalIgnoreCase))
-                {
-                    currentSection = "people";
-                }
-                else if (header.Contains("NOTABLE", StringComparison.OrdinalIgnoreCase) || header.Contains("FOLLOW", StringComparison.OrdinalIgnoreCase))
-                {
-                    currentSection = "notable";
-                }
-
-                continue;
-            }
-
-            // Extract bullet points or numbered items
-            if (trimmed.StartsWith('-') || 
-                trimmed.StartsWith('*') || 
-                char.IsDigit(trimmed.FirstOrDefault()))
-            {
-                string content = trimmed.TrimStart('-', '*', ' ', '\t');
-                if (content.Length > 0 && char.IsDigit(content[0]))
-                {
-                    int dotIndex = content.IndexOf('.', StringComparison.Ordinal);
-                    if (dotIndex > 0)
-                    {
-                        content = content[(dotIndex + 1)..].Trim();
-                    }
-                }
-
-                if (string.IsNullOrWhiteSpace(content))
-                {
-                    continue;
-                }
-
-                switch (currentSection)
-                {
-                    case "events":
-                        keyEvents.Add(content);
-                        break;
-                    case "themes":
-                        themes.Add(content);
-                        break;
-                    case "todos":
-                        todoItems.Add(new TodoItem { Description = content, IsCompleted = false });
-                        break;
-                    case "people":
-                        importantPeople.Add(content);
-                        break;
-                    case "notable":
-                        notableTasks.Add(content);
-                        break;
-                }
-            }
-        }
-
-        return new DailySummary
-        {
-            KeyEvents = keyEvents,
-            Themes = themes,
-            TodoItems = todoItems,
-            ImportantPeople = importantPeople,
-            NotableTasks = notableTasks
-        };
-    }
 
     private static MemoryEntryMetadata CreateMetadata(string provider, string model, int tokensUsed, TimeSpan processingDuration)
     {

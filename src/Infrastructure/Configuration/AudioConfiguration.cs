@@ -148,15 +148,15 @@ public sealed class RecordingTimeoutsConfiguration
 {
     /// <summary>
     /// Gets or sets the maximum duration (seconds) for 'today --voice' before prompting to continue.
-    /// Default: 180 (3 minutes).
+    /// Default: 300 (5 minutes).
     /// </summary>
-    public int TodaySeconds { get; init; } = 180;
+    public int TodaySeconds { get; init; } = 300;
 
     /// <summary>
     /// Gets or sets the maximum duration (seconds) for open-ended 'record' command before prompting.
-    /// Default: 900 (15 minutes).
+    /// Default: 1800 (30 minutes).
     /// </summary>
-    public int RecordSeconds { get; init; } = 900;
+    public int RecordSeconds { get; init; } = 1800;
 }
 
 /// <summary>
