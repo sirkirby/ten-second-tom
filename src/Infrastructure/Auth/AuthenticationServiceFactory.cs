@@ -1,6 +1,9 @@
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using TenSecondTom.Shared.Options;
+using TenSecondTom.Features.Setup.Models;
 
 namespace TenSecondTom.Infrastructure.Auth;
 
@@ -11,110 +14,141 @@ namespace TenSecondTom.Infrastructure.Auth;
 public static class AuthenticationServiceFactory
 {
     /// <summary>
-    /// Creates an authentication service based on available authentication methods.
+    /// Creates an authentication service based on authentication configuration.
     /// </summary>
-    /// <param name="configuration">Application configuration.</param>
+    /// <param name="authOptions">Authentication configuration options.</param>
     /// <param name="agentClient">SSH agent client instance.</param>
     /// <param name="sshAgentLogger">Logger for SSH agent authentication service.</param>
     /// <param name="sshKeyLogger">Logger for SSH key authentication service.</param>
-    /// <returns>An authentication service instance.</returns>
+    /// <returns>A task that resolves to an authentication service instance.</returns>
     /// <remarks>
-    /// Selection strategy:
+    /// Selection strategy based on KeySource:
+    /// <list type="bullet">
+    /// <item>SystemAgent, OnePasswordAgent, SecretiveAgent: Use SSH agent authentication</item>
+    /// <item>FileSystem, ManualPath: Use file-based authentication</item>
+    /// </list>
+    ///
+    /// For agent authentication, the public key is loaded from:
     /// <list type="number">
-    /// <item>SSH agent authentication if agent is available and public key is configured</item>
-    /// <item>File-based authentication as fallback</item>
+    /// <item>Explicit KeyPath if configured</item>
+    /// <item>Default SSH locations (~/.ssh/id_ed25519.pub, ~/.ssh/id_rsa.pub, etc.) if KeyPath not provided</item>
+    /// <item>SSH agent identity list if no files are found</item>
     /// </list>
     /// </remarks>
-    public static IAuthenticationService Create(
-        IConfiguration configuration,
+    public static async Task<IAuthenticationService> CreateAsync(
+        AuthOptions authOptions,
         ISshAgentClient agentClient,
         ILogger<SshAgentAuthenticationService> sshAgentLogger,
         ILogger<SshKeyAuthenticationService> sshKeyLogger)
     {
-        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(authOptions);
         ArgumentNullException.ThrowIfNull(agentClient);
         ArgumentNullException.ThrowIfNull(sshAgentLogger);
         ArgumentNullException.ThrowIfNull(sshKeyLogger);
 
-        // Get configured SSH agent provider (defaults to Auto)
-        var providerConfig = configuration["TenSecondTom:Auth:SshAgentProvider"];
-        var provider = string.IsNullOrWhiteSpace(providerConfig)
-            ? SshAgentProvider.Auto
-            : Enum.Parse<SshAgentProvider>(providerConfig, ignoreCase: true);
+        // Determine authentication method based on KeySource
+        var useAgentAuth = authOptions.KeySource is SshKeySource.SystemAgent
+            or SshKeySource.OnePasswordAgent
+            or SshKeySource.SecretiveAgent;
 
-        // Check if SSH agent is available via provider resolution
-        var agentSocketPath = SshAgentProviderResolver.GetSocketPath(provider);
-        
-        if (!string.IsNullOrEmpty(agentSocketPath))
+        if (useAgentAuth && !string.IsNullOrWhiteSpace(authOptions.AgentSocketPath))
         {
-            // Check if public key is configured
-            var publicKeyBase64 = configuration["TenSecondTom:Auth:PublicKey"];
-            var publicKeyPath = configuration["TenSecondTom:Auth:PublicKeyPath"];
+            // Try to load public key for agent authentication
+            // Agent needs the public key to identify which key in the agent to use for signing
+            byte[]? publicKey = null;
+            string? loadedFrom = null;
 
-            if (!string.IsNullOrWhiteSpace(publicKeyBase64))
+            // First, try explicit KeyPath if configured
+            if (!string.IsNullOrWhiteSpace(authOptions.KeyPath))
             {
-                // Parse public key from configuration
-                // Can be either:
-                // 1. Full SSH public key line: "ssh-ed25519 AAAAC3Nza... comment"
-                // 2. Just the base64 data: "AAAAC3Nza..."
+                var result = TryLoadPublicKeyFromPath(authOptions.KeyPath, sshAgentLogger);
+                if (result.publicKey != null)
+                {
+                    publicKey = result.publicKey;
+                    loadedFrom = result.path;
+                }
+            }
+
+            // If no explicit KeyPath or loading failed, try common default locations
+            if (publicKey == null)
+            {
+                var defaultLocations = GetDefaultSshKeyLocations();
+                foreach (var location in defaultLocations)
+                {
+                    var result = TryLoadPublicKeyFromPath(location, sshAgentLogger);
+                    if (result.publicKey != null)
+                    {
+                        publicKey = result.publicKey;
+                        loadedFrom = result.path;
+                        sshAgentLogger.LogInformation(
+                            "Loaded public key from default location: {Path}",
+                            loadedFrom);
+                        break;
+                    }
+                }
+            }
+
+            // If still no public key, try querying the agent directly
+            if (publicKey == null)
+            {
+                sshAgentLogger.LogInformation("No public key files found, querying SSH agent for available identities");
+
                 try
                 {
-                    byte[] publicKey;
-                    
-                    // Check if it's a full SSH public key line (starts with algorithm type)
-                    if (publicKeyBase64.StartsWith("ssh-", StringComparison.OrdinalIgnoreCase) ||
-                        publicKeyBase64.StartsWith("ecdsa-", StringComparison.OrdinalIgnoreCase))
+                    // Connect to agent first
+                    var provider = authOptions.KeySource switch
                     {
-                        // Parse as full SSH public key line
-                        var parts = publicKeyBase64.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                        
-                        if (parts.Length < 2)
+                        SshKeySource.OnePasswordAgent => SshAgentProvider.OnePassword,
+                        SshKeySource.SecretiveAgent => SshAgentProvider.Secretive,
+                        SshKeySource.SystemAgent => SshAgentProvider.System,
+                        _ => SshAgentProvider.Auto
+                    };
+
+                    var connected = await agentClient.ConnectAsync(provider).ConfigureAwait(false);
+                    if (!connected)
+                    {
+                        sshAgentLogger.LogWarning("Failed to connect to SSH agent");
+                    }
+                    else
+                    {
+                        // List available identities
+                        var identities = await agentClient.ListIdentitiesAsync().ConfigureAwait(false);
+
+                        if (identities.Count > 0)
                         {
-                            throw new FormatException("Invalid SSH public key format. Expected: 'algorithm base64data [comment]'");
+                            // Use the first available identity
+                            publicKey = identities[0];
+                            loadedFrom = $"SSH agent ({authOptions.KeySource})";
+                            sshAgentLogger.LogInformation(
+                                "Retrieved public key from SSH agent ({Count} identities available)",
+                                identities.Count);
                         }
+                        else
+                        {
+                            sshAgentLogger.LogWarning("SSH agent has no identities loaded");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    sshAgentLogger.LogWarning(ex, "Failed to query SSH agent for identities");
+                }
+            }
 
-                        var keyDataBase64 = parts[1];
-                        publicKey = Convert.FromBase64String(keyDataBase64);
-                    }
-                    else
-                    {
-                        // Assume it's just the base64 data
-                        publicKey = Convert.FromBase64String(publicKeyBase64);
-                    }
-                    
-                    return new SshAgentAuthenticationService(agentClient, publicKey, sshAgentLogger);
-                }
-                catch (FormatException ex)
-                {
-                    sshAgentLogger.LogWarning(ex, 
-                        "Invalid public key format in TenSecondTom:Auth:PublicKey configuration, falling back to file-based authentication");
-                }
-            }
-            else if (!string.IsNullOrWhiteSpace(publicKeyPath))
+            // If we successfully loaded a public key, create agent authentication service
+            if (publicKey != null)
             {
-                // Load public key from file
-                try
-                {
-                    var expandedPath = ExpandPath(publicKeyPath);
-                    if (File.Exists(expandedPath))
-                    {
-                        var publicKey = LoadPublicKeyFromFile(expandedPath);
-                        return new SshAgentAuthenticationService(agentClient, publicKey, sshAgentLogger);
-                    }
-                    else
-                    {
-                        sshAgentLogger.LogWarning(
-                            "Public key file not found at {Path}, falling back to file-based authentication",
-                            expandedPath);
-                    }
-                }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-                {
-                    sshAgentLogger.LogWarning(ex,
-                        "Failed to load public key from {Path}, falling back to file-based authentication",
-                        publicKeyPath);
-                }
+                sshAgentLogger.LogDebug("Creating SSH agent authentication service with public key from {Source}", loadedFrom);
+                return new SshAgentAuthenticationService(agentClient, publicKey, sshAgentLogger);
             }
+
+            // No public key found - log warning and fall back
+            sshAgentLogger.LogWarning(
+                "SSH agent authentication requested but no public key found. " +
+                "Checked: KeyPath ({KeyPath}), default locations ({Defaults}), and SSH agent. " +
+                "Falling back to file-based authentication",
+                authOptions.KeyPath ?? "(not configured)",
+                string.Join(", ", GetDefaultSshKeyLocations()));
         }
 
         // Fallback to file-based authentication
@@ -159,5 +193,56 @@ public static class AuthenticationServiceFactory
         var publicKey = Convert.FromBase64String(keyDataBase64);
 
         return publicKey;
+    }
+
+    /// <summary>
+    /// Gets common default SSH public key locations to try when KeyPath is not configured.
+    /// </summary>
+    /// <returns>Array of default SSH public key paths (with ~ notation).</returns>
+    private static string[] GetDefaultSshKeyLocations()
+    {
+        return
+        [
+            "~/.ssh/id_ed25519.pub",  // Modern default (Ed25519)
+            "~/.ssh/id_rsa.pub",      // Common legacy default (RSA)
+            "~/.ssh/id_ecdsa.pub",    // ECDSA keys
+            "~/.ssh/id_dsa.pub"       // Very old DSA keys (deprecated)
+        ];
+    }
+
+    /// <summary>
+    /// Attempts to load a public key from the specified path.
+    /// </summary>
+    /// <param name="path">Path to the SSH key (with or without .pub extension).</param>
+    /// <param name="logger">Logger for diagnostic messages.</param>
+    /// <returns>A tuple containing the loaded public key bytes and the actual path used, or (null, null) if loading failed.</returns>
+    private static (byte[]? publicKey, string? path) TryLoadPublicKeyFromPath(
+        string path,
+        ILogger<SshAgentAuthenticationService> logger)
+    {
+        try
+        {
+            var expandedPath = ExpandPath(path);
+
+            // Check if this is a public key file (.pub extension)
+            var publicKeyPath = expandedPath.EndsWith(".pub", StringComparison.OrdinalIgnoreCase)
+                ? expandedPath
+                : expandedPath + ".pub";
+
+            if (!File.Exists(publicKeyPath))
+            {
+                logger.LogDebug("Public key file not found at {Path}", publicKeyPath);
+                return (null, null);
+            }
+
+            var publicKey = LoadPublicKeyFromFile(publicKeyPath);
+            logger.LogDebug("Successfully loaded public key from {Path}", publicKeyPath);
+            return (publicKey, publicKeyPath);
+        }
+        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is FormatException)
+        {
+            logger.LogDebug(ex, "Failed to load public key from {Path}", path);
+            return (null, null);
+        }
     }
 }

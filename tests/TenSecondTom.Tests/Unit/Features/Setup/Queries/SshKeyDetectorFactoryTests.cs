@@ -176,7 +176,7 @@ public sealed class SshKeyDetectorFactoryTests
     }
 
     [Fact]
-    public async Task DetectKeysAsync_FiltersNonEd25519Keys()
+    public async Task DetectKeysAsync_ReturnsAllKeyTypes_WithEd25519First()
     {
         // Arrange
         var ed25519Key = new SshKeyInfo
@@ -199,12 +199,12 @@ public sealed class SshKeyDetectorFactoryTests
 
         _mockSystemDetector
             .Setup(d => d.DetectKeysAsync(It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new[] { ed25519Key, rsaKey });
+            .ReturnsAsync(new[] { rsaKey, ed25519Key }); // RSA returned first
 
         var factory = new SshKeyDetectorFactory(
             new[] { _mockSystemDetector.Object },
             _mockLogger.Object);
-        
+
         var timeout = TimeSpan.FromSeconds(10);
         using var cts = new CancellationTokenSource();
 
@@ -212,9 +212,12 @@ public sealed class SshKeyDetectorFactoryTests
         var result = await factory.DetectKeysAsync(timeout, cts.Token);
 
         // Assert
-        result.DetectedKeys.Should().HaveCount(1);
+        result.DetectedKeys.Should().HaveCount(2);
         result.DetectedKeys.Should().Contain(ed25519Key);
-        result.DetectedKeys.Should().NotContain(rsaKey);
+        result.DetectedKeys.Should().Contain(rsaKey);
+        // ED25519 key should be first (preferred)
+        result.DetectedKeys[0].Should().Be(ed25519Key);
+        result.DetectedKeys[1].Should().Be(rsaKey);
     }
 
     #endregion

@@ -93,7 +93,10 @@ internal static class Program
             services.AddSingleton<IConfiguration>(configuration);
             services.AddSingleton(loggerFactory);
             services.AddLogging(); // Add logging services to enable ILogger<T> resolution
-            
+
+            // Register strongly-typed Options with validation (Options Pattern)
+            services.AddTenSecondTomOptions(configuration);
+
             // Infrastructure (cross-cutting concerns)
             services.AddInfrastructureServices();
             

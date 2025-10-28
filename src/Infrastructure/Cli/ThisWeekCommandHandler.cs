@@ -1,9 +1,12 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Spectre.Console;
 using TenSecondTom.Features.ThisWeek.Commands;
 using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.OutputFormatters;
 using TenSecondTom.Shared.Results;
 
@@ -18,6 +21,7 @@ public static class ThisWeekCommandHandler
     /// <summary>
     /// Executes the thisweek command to create a weekly review.
     /// </summary>
+    /// <param name="serviceProvider">Service provider for dependency injection.</param>
     /// <param name="handler">The command handler.</param>
     /// <param name="authService">The authentication service.</param>
     /// <param name="fromDate">Optional start date for custom range.</param>
@@ -26,6 +30,7 @@ public static class ThisWeekCommandHandler
     /// <param name="jsonOutput">Whether to output results in JSON format.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     public static async Task ExecuteAsync(
+        IServiceProvider serviceProvider,
         CreateWeeklyReviewHandler handler,
         IAuthenticationService authService,
         DateTimeOffset? fromDate,
@@ -114,7 +119,7 @@ public static class ThisWeekCommandHandler
             }).ConfigureAwait(false);
 
         // Display results
-        if (entry?.Summary == null)
+        if (entry == null)
         {
             return;
         }
@@ -123,74 +128,42 @@ public static class ThisWeekCommandHandler
         AnsiConsole.MarkupLine("[bold green]✓ Weekly review created successfully![/]");
         AnsiConsole.WriteLine();
 
-        // Display summary panel
+        // Show truncated preview of the LLM response
+        string[] responseLines = entry.LlmResponse.Split('\n');
+        bool isTruncated = responseLines.Length > 15;
+        string preview = isTruncated
+            ? string.Join('\n', responseLines.Take(15))
+            : entry.LlmResponse;
+
+        // Display summary panel with LLM response
         var panel = new Panel(new Markup($"""
             [bold]Entry ID:[/] {entry.EntryId}
             [bold]Timestamp:[/] {entry.Timestamp:yyyy-MM-dd HH:mm:ss}
             [bold]Provider:[/] {entry.Metadata.LlmProvider}
-            [bold]Date Range:[/] {entry.Summary.DateRange.StartDate:yyyy-MM-dd} to {entry.Summary.DateRange.EndDate:yyyy-MM-dd}
+            [bold]Tokens:[/] {entry.Metadata.TokensUsed}
+
+            [bold cyan]Response:[/]
+            {Markup.Escape(preview)}
             """))
         {
-            Header = new PanelHeader("📊 Weekly Review Summary"),
+            Header = new PanelHeader("📊 Weekly Review"),
             Border = BoxBorder.Rounded,
             BorderStyle = new Style(foreground: Color.Magenta1)
         };
 
         AnsiConsole.Write(panel);
 
-        // Display Top 3 Accomplishments
-        if (entry.Summary.TopAccomplishments.Count > 0)
-        {
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[bold green]🏆 Top 3 Accomplishments:[/]");
-            for (int i = 0; i < entry.Summary.TopAccomplishments.Count; i++)
-            {
-                AnsiConsole.MarkupLine($"  [green]{i + 1}.[/] {Markup.Escape(entry.Summary.TopAccomplishments[i])}");
-            }
-        }
-
-        // Display Top 3 Challenges
-        if (entry.Summary.TopChallenges.Count > 0)
-        {
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[bold yellow]⚠️  Top 3 Challenges:[/]");
-            for (int i = 0; i < entry.Summary.TopChallenges.Count; i++)
-            {
-                AnsiConsole.MarkupLine($"  [yellow]{i + 1}.[/] {Markup.Escape(entry.Summary.TopChallenges[i])}");
-            }
-        }
-
-        // Display Key Insights
-        if (entry.Summary.KeyInsights != null && entry.Summary.KeyInsights.Count > 0)
-        {
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[bold cyan]💡 Key Insights:[/]");
-            
-            foreach (string insight in entry.Summary.KeyInsights)
-            {
-                if (!string.IsNullOrWhiteSpace(insight))
-                {
-                    AnsiConsole.MarkupLine($"  • {Markup.Escape(insight)}");
-                }
-            }
-        }
-
-        // Display Goals for Next Week
-        if (entry.Summary.GoalsForNextWeek != null && entry.Summary.GoalsForNextWeek.Count > 0)
-        {
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[bold blue]🎯 Goals for Next Week:[/]");
-            
-            foreach (string goal in entry.Summary.GoalsForNextWeek)
-            {
-                if (!string.IsNullOrWhiteSpace(goal))
-                {
-                    AnsiConsole.MarkupLine($"  • {Markup.Escape(goal)}");
-                }
-            }
-        }
-
+        // Show clickable file path
         AnsiConsole.WriteLine();
-    AnsiConsole.MarkupLine($"[dim]Entry saved to: .memory/{CommandNames.ThisWeek}/[/]");
+        if (isTruncated)
+        {
+            var storageOptions = serviceProvider.GetRequiredService<IOptions<StorageOptions>>();
+            string fullPath = Path.Combine(storageOptions.Value.MemoryDirectory, entry.FilePath);
+            AnsiConsole.MarkupLine($"[dim]Full entry:[/] [link]{fullPath.EscapeMarkup()}[/]");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine($"[dim]Entry saved to: .memory/{CommandNames.ThisWeek}/[/]");
+        }
     }
 }

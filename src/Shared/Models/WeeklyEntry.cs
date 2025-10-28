@@ -1,53 +1,20 @@
 namespace TenSecondTom.Shared.Models;
 
 /// <summary>
-/// Represents a weekly memory entry with structured summary.
-/// Inherits from MemoryEntry and adds weekly-specific summary fields.
+/// Represents a weekly memory entry.
 /// </summary>
+/// <remarks>
+/// A weekly entry is a thin wrapper around MemoryEntry that provides type distinction.
+/// The prompt template defines the output structure, and the LlmResponse field contains
+/// the complete output from the LLM. No additional parsing or structure is imposed.
+/// </remarks>
 public record WeeklyEntry : MemoryEntry
 {
-    /// <summary>
-    /// Gets the structured summary of the weekly entry.
-    /// </summary>
-    public required WeeklySummary Summary { get; init; }
+    // No additional properties - this is a type marker for weekly entries
 }
 
 /// <summary>
-/// Structured summary extracted from weekly reflection.
-/// </summary>
-public record WeeklySummary
-{
-    /// <summary>
-    /// Gets the top 3 accomplishments from the week.
-    /// Must contain exactly 3 items.
-    /// </summary>
-    public required IReadOnlyList<string> TopAccomplishments { get; init; }
-
-    /// <summary>
-    /// Gets the top 3 challenges from the week.
-    /// Must contain exactly 3 items.
-    /// </summary>
-    public required IReadOnlyList<string> TopChallenges { get; init; }
-
-    /// <summary>
-    /// Gets the date range for the weekly review.
-    /// Duration must be between 3-10 days.
-    /// </summary>
-    public required DateRange DateRange { get; init; }
-
-    /// <summary>
-    /// Gets optional key insights or learnings from the week.
-    /// </summary>
-    public IReadOnlyList<string>? KeyInsights { get; init; }
-
-    /// <summary>
-    /// Gets optional goals or priorities for the next week.
-    /// </summary>
-    public IReadOnlyList<string>? GoalsForNextWeek { get; init; }
-}
-
-/// <summary>
-/// Represents a date range with validation.
+/// Represents a date range used for weekly reviews.
 /// </summary>
 public record DateRange
 {

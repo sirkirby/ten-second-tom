@@ -1,11 +1,11 @@
 using System.Globalization;
 using System.IO.Abstractions;
 using System.Text.RegularExpressions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TenSecondTom.Features.Generate.Models;
-using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Generate.Services;
@@ -29,14 +29,15 @@ public sealed partial class RecordingService : IRecordingService
 
     public RecordingService(
         IFileSystem fileSystem,
-        IConfiguration configuration,
+        IOptions<StorageOptions> storageOptions,
         ILogger<RecordingService> logger)
     {
         _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        // Use ConfigurationHelpers to get memory directory with proper tilde expansion
-        var memoryDirectory = configuration.GetMemoryDirectory(expandHomeDirectory: true);
+        // Get memory directory and expand home directory if needed
+        var memoryDirectory = (storageOptions ?? throw new ArgumentNullException(nameof(storageOptions))).Value.MemoryDirectory
+            .Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
         _recordingDirectory = Path.Combine(memoryDirectory, DirectoryNames.Recording);
     }

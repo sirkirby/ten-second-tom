@@ -1,10 +1,12 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TenSecondTom.Features.Setup.Commands;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Setup.Validation;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Setup.Handlers;
@@ -21,6 +23,10 @@ public sealed class ConfigCommandHandler
     private readonly IEnumerable<IApiKeyValidator> _apiKeyValidators;
     private readonly IAppSettingsStorageService _appSettingsStorage;
     private readonly ILogger<ConfigCommandHandler> _logger;
+    private readonly LlmOptions _llmOptions;
+    private readonly AuthOptions _authOptions;
+    private readonly StorageOptions _storageOptions;
+    private readonly AudioConfiguration _audioOptions;
 
     public ConfigCommandHandler(
         IConfigurationStorageService storageService,
@@ -28,6 +34,10 @@ public sealed class ConfigCommandHandler
         ISetupWizardUI setupWizard,
         IEnumerable<IApiKeyValidator> apiKeyValidators,
         IAppSettingsStorageService appSettingsStorage,
+        IOptions<LlmOptions> llmOptions,
+        IOptions<AuthOptions> authOptions,
+        IOptions<StorageOptions> storageOptions,
+        IOptions<AudioConfiguration> audioOptions,
         ILogger<ConfigCommandHandler> logger)
     {
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
@@ -36,6 +46,12 @@ public sealed class ConfigCommandHandler
         _apiKeyValidators = apiKeyValidators ?? throw new ArgumentNullException(nameof(apiKeyValidators));
         _appSettingsStorage = appSettingsStorage ?? throw new ArgumentNullException(nameof(appSettingsStorage));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        // Extract option values - null-forgiving operator is safe because Options pattern provides defaults
+        _llmOptions = (llmOptions ?? throw new ArgumentNullException(nameof(llmOptions))).Value;
+        _authOptions = (authOptions ?? throw new ArgumentNullException(nameof(authOptions))).Value;
+        _storageOptions = (storageOptions ?? throw new ArgumentNullException(nameof(storageOptions))).Value;
+        _audioOptions = (audioOptions ?? throw new ArgumentNullException(nameof(audioOptions))).Value;
     }
 
     public async Task<Result<ConfigurationSettings>> Handle(
@@ -79,6 +95,7 @@ public sealed class ConfigCommandHandler
 
         // Apply environment variable overrides from IConfiguration
         // This shows the effective configuration that will be used at runtime
+        // We check IConfiguration to detect if env vars are overriding user secrets
         string? envSshKeyPath = _configuration[ConfigurationKeys.SshKeyPathKey];
         string? envSshKeySource = _configuration[ConfigurationKeys.SshKeySourceKey];
         string? envSshAgentSocketPath = _configuration[ConfigurationKeys.SshAgentSocketPathKey];
@@ -90,8 +107,8 @@ public sealed class ConfigCommandHandler
         string? envLogLevel = _configuration["TenSecondTom:Optional:LogLevel"];
         string? envRetentionDays = _configuration["TenSecondTom:Optional:RetentionDays"];
         string? envEnableTelemetry = _configuration["TenSecondTom:Optional:EnableTelemetry"];
-        
-        // Audio configuration from environment
+
+        // Audio configuration from environment (check for overrides)
         string? envSttProvider = _configuration["TenSecondTom:Audio:SttProvider"];
         string? envSttApiKey = _configuration["TenSecondTom:Audio:SttApiKey"];
         string? envSttFallbackEnabled = _configuration["TenSecondTom:Audio:SttFallbackEnabled"];
@@ -126,26 +143,26 @@ public sealed class ConfigCommandHandler
                                 !string.IsNullOrWhiteSpace(envSilenceThreshold) ||
                                 !string.IsNullOrWhiteSpace(envMinSilenceDuration);
 
-        // Load audio configuration from IConfiguration (includes appsettings.json and env vars)
+        // Load audio configuration from typed options (includes appsettings.json and env vars)
         var audioConfig = new AudioConfigurationDisplay
         {
-            SttProvider = _configuration["TenSecondTom:Audio:SttProvider"] ?? SttProviders.WhisperCpp,
-            SttApiKey = _configuration["TenSecondTom:Audio:SttApiKey"],
-            SttFallbackEnabled = bool.TryParse(_configuration["TenSecondTom:Audio:SttFallbackEnabled"], out var fallback) ? fallback : false,
-            SttFallbackProvider = _configuration["TenSecondTom:Audio:SttFallbackProvider"],
-            SttFallbackApiKey = _configuration["TenSecondTom:Audio:SttFallbackApiKey"],
-            KeepFiles = bool.TryParse(_configuration["TenSecondTom:Audio:KeepFiles"], out var keepFiles) ? keepFiles : true,
+            SttProvider = _audioOptions.SttProvider,
+            SttApiKey = _audioOptions.SttApiKey,
+            SttFallbackEnabled = _audioOptions.SttFallbackEnabled,
+            SttFallbackProvider = _audioOptions.SttFallbackProvider,
+            SttFallbackApiKey = _audioOptions.SttFallbackApiKey,
+            KeepFiles = _audioOptions.KeepFiles,
             Recorder = new RecorderConfigurationDisplay
             {
-                InputVolume = double.TryParse(_configuration[ConfigurationKeys.AudioRecorderInputVolumeKey], out var inputVolume) ? inputVolume : 1.0,
-                EnableNoiseReduction = bool.TryParse(_configuration[ConfigurationKeys.AudioRecorderEnableNoiseReductionKey], out var noiseReduction) ? noiseReduction : true,
-                EnableFrequencyFilters = bool.TryParse(_configuration[ConfigurationKeys.AudioRecorderEnableFrequencyFiltersKey], out var freqFilters) ? freqFilters : true
+                InputVolume = _audioOptions.Recorder.InputVolume,
+                EnableNoiseReduction = _audioOptions.Recorder.EnableNoiseReduction,
+                EnableFrequencyFilters = _audioOptions.Recorder.EnableFrequencyFilters
             },
             Preprocessing = new PreprocessingConfigurationDisplay
             {
-                RemoveSilence = bool.TryParse(_configuration[ConfigurationKeys.AudioPreprocessingRemoveSilenceKey], out var removeSilence) ? removeSilence : true,
-                SilenceThresholdDb = int.TryParse(_configuration[ConfigurationKeys.AudioPreprocessingSilenceThresholdDbKey], out var silenceThreshold) ? silenceThreshold : -50,
-                MinimumSilenceDurationMs = int.TryParse(_configuration[ConfigurationKeys.AudioPreprocessingMinimumSilenceDurationMsKey], out var minSilenceDuration) ? minSilenceDuration : 500
+                RemoveSilence = _audioOptions.Preprocessing.RemoveSilence,
+                SilenceThresholdDb = _audioOptions.Preprocessing.SilenceThresholdDb,
+                MinimumSilenceDurationMs = _audioOptions.Preprocessing.MinimumSilenceDurationMs
             }
         };
 

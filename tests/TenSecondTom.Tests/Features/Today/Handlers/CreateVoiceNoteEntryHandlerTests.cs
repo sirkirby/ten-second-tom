@@ -1,8 +1,9 @@
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using TenSecondTom.Features.Audio.Models;
+using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Templates.Handlers;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Cli;
@@ -13,6 +14,7 @@ using TenSecondTom.Shared.Models;
 using TenSecondTom.Features.Today.Commands;
 using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Features.Today.Models;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Tests.Features.Today.Handlers;
@@ -27,7 +29,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
     private readonly Mock<ILlmProviderFactory> _mockLlmFactory;
     private readonly Mock<IPromptTemplateLoader> _mockPromptLoader;
     private readonly Mock<IAuthenticationService> _mockAuthService;
-    private readonly Mock<IConfiguration> _mockConfiguration;
+    private readonly Mock<IOptions<LlmOptions>> _mockLlmOptions;
     private readonly Mock<ILogger<CreateVoiceNoteEntryHandler>> _mockLogger;
     private readonly Mock<ITemplateSelectionUI> _mockTemplateSelectionUI;
     private readonly Mock<ILlmProvider> _mockLlmProvider;
@@ -38,10 +40,19 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         _mockLlmFactory = new Mock<ILlmProviderFactory>();
         _mockPromptLoader = new Mock<IPromptTemplateLoader>();
         _mockAuthService = new Mock<IAuthenticationService>();
-        _mockConfiguration = new Mock<IConfiguration>();
+        _mockLlmOptions = new Mock<IOptions<LlmOptions>>();
         _mockLogger = new Mock<ILogger<CreateVoiceNoteEntryHandler>>();
         _mockTemplateSelectionUI = new Mock<ITemplateSelectionUI>();
         _mockLlmProvider = new Mock<ILlmProvider>();
+
+        // Setup default LLM options
+        _mockLlmOptions.Setup(o => o.Value).Returns(new LlmOptions
+        {
+            Provider = LlmProvider.OpenAI,
+            ApiKey = "test-key",
+            Model = "gpt-4",
+            MaxInputTokens = 100000
+        });
     }
 
     [Fact]
@@ -93,7 +104,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         result.Value.TranscriptText.Should().Be(transcription.TranscriptText);
         result.Value.SttEngine.Should().Be(SttEngine.Local);
         result.Value.SttModel.Should().Be("ggml-base.en");
-        result.Value.Summary.Should().NotBeNull();
+        result.Value.LlmResponse.Should().NotBeNullOrEmpty();
         
         // Verify LLM was called
         _mockLlmProvider.Verify(x => x.GenerateCompletionAsync(
@@ -202,8 +213,8 @@ public sealed class CreateVoiceNoteEntryHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Summary.Should().NotBeNull();
-        result.Value.Summary!.KeyEvents.Should().NotBeEmpty();
+        result.Value.LlmResponse.Should().NotBeNullOrEmpty();
+        // Parsing removed - LlmResponse is the source of truth;
         result.Value.Metadata.LlmProvider.Should().Be("TestProvider");
         
         // Verify LLM was invoked (prompt template would be rendered with the transcript)
@@ -486,14 +497,6 @@ public sealed class CreateVoiceNoteEntryHandlerTests
             .Setup(x => x.IsAuthenticatedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        // Setup configuration mocks
-        _mockConfiguration
-            .Setup(x => x["TenSecondTom:MemoryDirectory"])
-            .Returns("/test/memory");
-        _mockConfiguration
-            .Setup(x => x["TenSecondTom:MemoryDirectory"])
-            .Returns("/test/memory");
-
         // Setup template loader mock
         var mockTemplate = new PromptTemplate
         {
@@ -569,7 +572,7 @@ Successfully implemented voice note feature with TDD approach.";
             _mockLlmFactory.Object,
             _mockPromptLoader.Object,
             _mockAuthService.Object,
-            _mockConfiguration.Object,
+            _mockLlmOptions.Object,
             _mockLogger.Object,
             listTemplatesHandler,
             _mockTemplateSelectionUI.Object);

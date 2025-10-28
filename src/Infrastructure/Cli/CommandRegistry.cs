@@ -14,6 +14,7 @@ using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.OutputFormatters;
 using AuthLoginHandler = TenSecondTom.Features.Auth.Handlers.LoginCommandHandler;
 using AuthLogoutHandler = TenSecondTom.Features.Auth.Handlers.LogoutCommandHandler;
@@ -291,7 +292,7 @@ public static class CommandRegistry
 
             var handler = serviceProvider.GetRequiredService<CreateWeeklyReviewHandler>();
             var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
-            await ThisWeekCommandHandler.ExecuteAsync(handler, authService, fromDate, toDate, provider, jsonOutput).ConfigureAwait(false);
+            await ThisWeekCommandHandler.ExecuteAsync(serviceProvider, handler, authService, fromDate, toDate, provider, jsonOutput).ConfigureAwait(false);
         });
 
         return thisWeekCommand;
@@ -406,23 +407,23 @@ public static class CommandRegistry
                 return;
             }
 
-            var configuration = serviceProvider.GetService<IConfiguration>();
-            if (configuration is null)
+            var storageOptions = serviceProvider.GetService<IOptions<StorageOptions>>();
+            if (storageOptions is null)
             {
                 if (jsonOutput)
                 {
                     Console.WriteLine(JsonOutputFormatter.FormatFailure("search",
-                        "Configuration service not registered - cannot resolve file paths.",
+                        "Storage options not registered - cannot resolve file paths.",
                         DateTimeOffset.UtcNow));
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine("[red]Configuration unavailable:[/] service not registered.");
+                    AnsiConsole.MarkupLine("[red]Storage options unavailable:[/] service not registered.");
                 }
                 return;
             }
 
-            SearchCommandHandler.ExecuteAsync(handler, authService, configuration, query, fromDate, toDate, jsonOutput)
+            SearchCommandHandler.ExecuteAsync(handler, authService, storageOptions.Value, query, fromDate, toDate, jsonOutput)
                 .GetAwaiter().GetResult();
             Environment.ExitCode = 0; // success
         });

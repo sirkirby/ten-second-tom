@@ -1,9 +1,8 @@
-using Microsoft.Extensions.Configuration;
 using Spectre.Console;
 using TenSecondTom.Features.Search.Handlers;
 using TenSecondTom.Features.Search.Queries;
 using TenSecondTom.Infrastructure.Auth;
-using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.OutputFormatters;
 using TenSecondTom.Shared.Constants;
 
@@ -20,7 +19,7 @@ public static class SearchCommandHandler
     /// </summary>
     /// <param name="handler">The search query handler.</param>
     /// <param name="authService">The authentication service.</param>
-    /// <param name="configuration">Application configuration for accessing memory directory.</param>
+    /// <param name="storageOptions">Storage options for accessing memory directory.</param>
     /// <param name="query">The search query text.</param>
     /// <param name="fromDate">Optional start date filter.</param>
     /// <param name="toDate">Optional end date filter.</param>
@@ -29,7 +28,7 @@ public static class SearchCommandHandler
     public static async Task ExecuteAsync(
         SearchMemoriesQueryHandler handler,
         IAuthenticationService authService,
-        IConfiguration configuration,
+        StorageOptions storageOptions,
         string query,
         DateTime? fromDate = null,
         DateTime? toDate = null,
@@ -129,7 +128,8 @@ public static class SearchCommandHandler
                 AnsiConsole.MarkupLine($"[green]Found {result.Value.Count} result(s)[/]\n");
 
                 // Get memory directory for absolute path display
-                string memoryDirectory = configuration.GetMemoryDirectory(expandHomeDirectory: true);
+                string memoryDirectory = storageOptions.MemoryDirectory
+                    .Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
                 // Sort by date (newest first) and display each result
                 var sortedResults = result.Value.OrderByDescending(e => e.Timestamp).ToList();

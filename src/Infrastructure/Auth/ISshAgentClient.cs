@@ -28,6 +28,20 @@ public interface ISshAgentClient : IDisposable
     Task<bool> ConnectAsync(SshAgentProvider provider = SshAgentProvider.Auto, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Lists all identities (public keys) available in the SSH agent.
+    /// </summary>
+    /// <param name="cancellationToken">A token to cancel the list operation.</param>
+    /// <returns>
+    /// A list of public keys in SSH wire format, or an empty list if no keys are available.
+    /// </returns>
+    /// <remarks>
+    /// This method sends an SSH_AGENTC_REQUEST_IDENTITIES (message type 11) to the agent and
+    /// waits for an SSH_AGENT_IDENTITIES_ANSWER (message type 12).
+    /// Each returned key includes the public key blob that can be used with SignDataAsync.
+    /// </remarks>
+    Task<IReadOnlyList<byte[]>> ListIdentitiesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Requests the SSH agent to sign the provided data using the specified public key.
     /// </summary>
     /// <param name="publicKey">The public key blob in SSH wire format.</param>

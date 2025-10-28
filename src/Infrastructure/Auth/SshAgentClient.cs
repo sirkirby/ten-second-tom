@@ -141,6 +141,120 @@ public sealed class SshAgentClient : ISshAgentClient
     }
 
     /// <summary>
+    /// Lists all identities (public keys) available in the SSH agent.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>A list of public keys in SSH wire format, or an empty list if no keys are available.</returns>
+    public async Task<IReadOnlyList<byte[]>> ListIdentitiesAsync(CancellationToken cancellationToken = default)
+    {
+        if (_socket == null || !IsConnected)
+        {
+            _logger.LogError("Not connected to SSH agent");
+            return Array.Empty<byte[]>();
+        }
+
+        try
+        {
+            // Build SSH_AGENTC_REQUEST_IDENTITIES message
+            var messageSize = 1; // Just the message type
+            var buffer = new byte[4 + messageSize];
+
+            var span = buffer.AsSpan();
+            BinaryPrimitives.WriteUInt32BigEndian(span, (uint)messageSize);
+            buffer[4] = SSH_AGENTC_REQUEST_IDENTITIES;
+
+            // Send request
+            await _socket.SendAsync(buffer, SocketFlags.None, cancellationToken).ConfigureAwait(false);
+
+            // Read response
+            var response = await ReadAgentResponseAsync(cancellationToken).ConfigureAwait(false);
+
+            if (response == null || response.Length == 0)
+            {
+                _logger.LogWarning("Empty response from SSH agent identity request");
+                return Array.Empty<byte[]>();
+            }
+
+            var messageType = response[0];
+            if (messageType == SSH_AGENT_FAILURE)
+            {
+                _logger.LogDebug("SSH agent returned no identities");
+                return Array.Empty<byte[]>();
+            }
+
+            if (messageType != SSH_AGENT_IDENTITIES_ANSWER)
+            {
+                _logger.LogWarning("Unexpected response type from identity request: {Type}", messageType);
+                return Array.Empty<byte[]>();
+            }
+
+            // Parse the identities from the response
+            // Format: 1 byte type + 4 bytes count + [4 bytes key length + key blob + 4 bytes comment length + comment]...
+            if (response.Length < 5)
+            {
+                _logger.LogWarning("Response too short to contain identity count");
+                return Array.Empty<byte[]>();
+            }
+
+            var offset = 1; // Skip message type
+            var count = BinaryPrimitives.ReadUInt32BigEndian(response.AsSpan(offset));
+            offset += 4;
+
+            var identities = new List<byte[]>((int)count);
+
+            for (var i = 0; i < count; i++)
+            {
+                // Read key blob length
+                if (offset + 4 > response.Length)
+                {
+                    _logger.LogWarning("Truncated response while reading key blob length for identity {Index}", i);
+                    break;
+                }
+
+                var keyBlobLength = BinaryPrimitives.ReadUInt32BigEndian(response.AsSpan(offset));
+                offset += 4;
+
+                // Read key blob
+                if (offset + keyBlobLength > response.Length)
+                {
+                    _logger.LogWarning("Truncated response while reading key blob for identity {Index}", i);
+                    break;
+                }
+
+                var keyBlob = response.AsSpan(offset, (int)keyBlobLength).ToArray();
+                identities.Add(keyBlob);
+                offset += (int)keyBlobLength;
+
+                // Skip comment (4 bytes length + comment data)
+                if (offset + 4 > response.Length)
+                {
+                    _logger.LogWarning("Truncated response while reading comment length for identity {Index}", i);
+                    break;
+                }
+
+                var commentLength = BinaryPrimitives.ReadUInt32BigEndian(response.AsSpan(offset));
+                offset += 4;
+
+                if (offset + commentLength > response.Length)
+                {
+                    _logger.LogWarning("Truncated response while skipping comment for identity {Index}", i);
+                    break;
+                }
+
+                offset += (int)commentLength;
+            }
+
+            _logger.LogInformation("Retrieved {Count} identities from SSH agent", identities.Count);
+            return identities;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to list identities from SSH agent");
+            return Array.Empty<byte[]>();
+        }
+    }
+
+    /// <summary>
     /// Requests the SSH agent to sign data with the specified public key.
     /// </summary>
     /// <param name="publicKey">The SSH public key blob to use for signing.</param>

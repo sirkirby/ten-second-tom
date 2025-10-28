@@ -223,14 +223,6 @@ public sealed class SearchMemoriesQueryHandlerTests
                 LlmProvider = "OpenAI",
                 LlmModel = "gpt-4",
                 TokensUsed = 100
-            },
-            Summary = new DailySummary
-            {
-                KeyEvents = new List<string> { "Event 1" },
-                Themes = new List<string> { "Theme 1" },
-                TodoItems = new List<TodoItem>(),
-                ImportantPeople = new List<string> { "Person 1" },
-                NotableTasks = new List<string> { "Task 1" }
             }
         };
     }

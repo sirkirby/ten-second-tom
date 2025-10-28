@@ -1,12 +1,13 @@
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Setup.Queries;
+using TenSecondTom.Shared.Constants;
 
 namespace TenSecondTom.Infrastructure.Auth.SshProviders;
 
 /// <summary>
 /// Detects SSH keys from the file system (~/.ssh directory)
-/// Scans for *.pub files and validates ED25519 format
+/// Scans for *.pub files and validates SSH key formats
 /// </summary>
 public sealed class FileSystemSshKeyDetector : ISshKeyDetector
 {
@@ -51,30 +52,45 @@ public sealed class FileSystemSshKeyDetector : ISshKeyDetector
                         try
                         {
                             var content = File.ReadAllText(pubKeyFile);
-                            
-                            // Check if it's an ED25519 key
-                            if (content.StartsWith("ssh-ed25519"))
+
+                            // Accept all SSH key types: ssh-rsa, ssh-ed25519, ecdsa-sha2-*, ssh-dss
+                            if (content.StartsWith(SshConstants.KeyPrefixes.Ssh) || content.StartsWith(SshConstants.KeyPrefixes.Ecdsa))
                             {
                                 var parts = content.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                                var fileName = Path.GetFileNameWithoutExtension(pubKeyFile);
-                                var comment = parts.Length > 2 ? parts[2] : fileName;
-
-                                keys.Add(new SshKeyInfo
+                                if (parts.Length >= 2)
                                 {
-                                    DisplayName = $"[File] ~/.ssh/{Path.GetFileName(pubKeyFile)}",
-                                    Source = SshKeySource.FileSystem,
-                                    PublicKey = content.TrimEnd(),
-                                    FilePath = pubKeyFile,
-                                    IsEd25519 = true,
-                                    DetectedAt = DateTime.UtcNow,
-                                    ValidationResult = ValidationResult.Valid
-                                });
+                                    var keyType = parts[0];
+                                    var isEd25519 = keyType == SshConstants.KeyTypes.Ed25519;
+                                    var fileName = Path.GetFileNameWithoutExtension(pubKeyFile);
+                                    var defaultComment = keyType switch
+                                    {
+                                        SshConstants.KeyTypes.Ed25519 => fileName,
+                                        SshConstants.KeyTypes.Rsa => fileName,
+                                        SshConstants.KeyTypes.EcdsaNistP256 => fileName,
+                                        SshConstants.KeyTypes.EcdsaNistP384 => fileName,
+                                        SshConstants.KeyTypes.EcdsaNistP521 => fileName,
+                                        SshConstants.KeyTypes.Dsa => fileName,
+                                        _ => fileName
+                                    };
+                                    var comment = parts.Length > 2 ? parts[2] : defaultComment;
 
-                                _logger.LogDebug("Found ED25519 key: {FileName}", Path.GetFileName(pubKeyFile));
+                                    keys.Add(new SshKeyInfo
+                                    {
+                                        DisplayName = $"[File] ~/.ssh/{Path.GetFileName(pubKeyFile)} ({keyType})",
+                                        Source = SshKeySource.FileSystem,
+                                        PublicKey = content.TrimEnd(),
+                                        FilePath = pubKeyFile,
+                                        IsEd25519 = isEd25519,
+                                        DetectedAt = DateTime.UtcNow,
+                                        ValidationResult = ValidationResult.Valid
+                                    });
+
+                                    _logger.LogDebug("Found {KeyType} key: {FileName}", keyType, Path.GetFileName(pubKeyFile));
+                                }
                             }
                             else
                             {
-                                _logger.LogDebug("Skipping non-ED25519 key: {FileName}", Path.GetFileName(pubKeyFile));
+                                _logger.LogDebug("Skipping unrecognized key format: {FileName}", Path.GetFileName(pubKeyFile));
                             }
                         }
                         catch (Exception ex)
@@ -83,7 +99,7 @@ public sealed class FileSystemSshKeyDetector : ISshKeyDetector
                         }
                     }
 
-                    _logger.LogDebug("Detected {Count} ED25519 keys from file system", keys.Count);
+                    _logger.LogDebug("Detected {Count} SSH keys from file system", keys.Count);
                 }
                 catch (Exception ex)
                 {

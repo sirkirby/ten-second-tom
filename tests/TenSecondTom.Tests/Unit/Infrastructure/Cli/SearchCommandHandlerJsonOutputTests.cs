@@ -1,14 +1,13 @@
 using System.Text.Json;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using TenSecondTom.Features.Search.Handlers;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Storage;
-using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Options;
 using Xunit;
 
 namespace TenSecondTom.Tests.Unit.Infrastructure.Cli;
@@ -36,18 +35,15 @@ public sealed class SearchCommandHandlerJsonOutputTests : IDisposable
         // Arrange
         var mockStorageProvider = new Mock<IMemoryStorageProvider>();
         var mockAuthService = new Mock<IAuthenticationService>();
-        var mockConfiguration = new Mock<IConfiguration>();
         var mockLogger = new Mock<ILogger<SearchMemoriesQueryHandler>>();
-        
-        mockConfiguration
-            .Setup(x => x[ConfigurationKeys.MemoryDirectoryKey])
-            .Returns("/Users/test/.memory");
-        
+
+        var storageOptions = new StorageOptions { MemoryDirectory = "/Users/test/.memory" };
+
         var handler = new SearchMemoriesQueryHandler(
             mockStorageProvider.Object,
             mockAuthService.Object,
             mockLogger.Object);
-        
+
         mockAuthService
             .Setup(x => x.IsAuthenticatedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
@@ -56,7 +52,7 @@ public sealed class SearchCommandHandlerJsonOutputTests : IDisposable
         await SearchCommandHandler.ExecuteAsync(
             handler,
             mockAuthService.Object,
-            mockConfiguration.Object,
+            storageOptions,
             "test query",
             jsonOutput: true,
             cancellationToken: CancellationToken.None);
@@ -85,18 +81,15 @@ public sealed class SearchCommandHandlerJsonOutputTests : IDisposable
         // Arrange
         var mockStorageProvider = new Mock<IMemoryStorageProvider>();
         var mockAuthService = new Mock<IAuthenticationService>();
-        var mockConfiguration = new Mock<IConfiguration>();
         var mockLogger = new Mock<ILogger<SearchMemoriesQueryHandler>>();
-        
-        mockConfiguration
-            .Setup(x => x[ConfigurationKeys.MemoryDirectoryKey])
-            .Returns("/Users/test/.memory");
-        
+
+        var storageOptions = new StorageOptions { MemoryDirectory = "/Users/test/.memory" };
+
         var handler = new SearchMemoriesQueryHandler(
             mockStorageProvider.Object,
             mockAuthService.Object,
             mockLogger.Object);
-        
+
         mockAuthService
             .Setup(x => x.IsAuthenticatedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
@@ -128,7 +121,7 @@ public sealed class SearchCommandHandlerJsonOutputTests : IDisposable
         await SearchCommandHandler.ExecuteAsync(
             handler,
             mockAuthService.Object,
-            mockConfiguration.Object,
+            storageOptions,
             "test query",
             jsonOutput: true,
             cancellationToken: CancellationToken.None);

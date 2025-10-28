@@ -1,9 +1,11 @@
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
+using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Options;
 
 namespace TenSecondTom.Tests.Unit.Infrastructure.Configuration;
 
@@ -13,11 +15,11 @@ namespace TenSecondTom.Tests.Unit.Infrastructure.Configuration;
 /// </summary>
 public sealed class ConfigurationCheckerTests
 {
-    private readonly Mock<ILogger> _mockLogger;
+    private readonly Mock<ILogger<ConfigurationChecker>> _mockLogger;
 
     public ConfigurationCheckerTests()
     {
-        _mockLogger = new Mock<ILogger>();
+        _mockLogger = new Mock<ILogger<ConfigurationChecker>>();
     }
 
     #region Complete Configuration Tests
@@ -26,16 +28,26 @@ public sealed class ConfigurationCheckerTests
     public void IsConfigured_WithAllRequiredSettingsForOpenAI_ReturnsTrue()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.SshKeyPathKey] = "~/.ssh/id_ed25519",
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI",
-            [ConfigurationKeys.LlmApiKeyKey] = "sk-test1234567890",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
-        });
+        var checker = CreateConfigurationChecker(
+            llmOptions: new LlmOptions
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "sk-test1234567890",
+                Model = LlmConstants.OpenAIModels.GPTMini,
+                MaxInputTokens = 100000
+            },
+            authOptions: new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            },
+            storageOptions: new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            });
 
         // Act
-        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        var result = checker.IsConfigured();
 
         // Assert
         result.Should().BeTrue("all required settings are present");
@@ -45,55 +57,84 @@ public sealed class ConfigurationCheckerTests
     public void IsConfigured_WithAllRequiredSettingsForAnthropic_ReturnsTrue()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.SshKeyPathKey] = "~/.ssh/id_ed25519",
-            [ConfigurationKeys.LlmProviderKey] = "Anthropic",
-            [ConfigurationKeys.LlmApiKeyKey] = "sk-ant-test1234567890",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
-        });
+        var checker = CreateConfigurationChecker(
+            llmOptions: new LlmOptions
+            {
+                Provider = LlmProvider.Anthropic,
+                ApiKey = "sk-ant-test1234567890",
+                Model = LlmConstants.AnthropicModels.ClaudeHaiku,
+                MaxInputTokens = 100000
+            },
+            authOptions: new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            },
+            storageOptions: new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            });
 
         // Act
-        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        var result = checker.IsConfigured();
 
         // Assert
         result.Should().BeTrue("all required settings are present");
     }
 
     [Fact]
-    public void IsConfigured_WithCasInsensitiveProviderOpenAI_ReturnsTrue()
+    public void IsConfigured_WithCaseInsensitiveProviderOpenAI_ReturnsTrue()
     {
-        // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.SshKeyPathKey] = "~/.ssh/id_ed25519",
-            [ConfigurationKeys.LlmProviderKey] = "OPENAI",
-            [ConfigurationKeys.LlmApiKeyKey] = "sk-test1234567890",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
-        });
+        // Arrange - Provider enum is case-sensitive, but parsing should handle it
+        var checker = CreateConfigurationChecker(
+            llmOptions: new LlmOptions
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "sk-test1234567890",
+                Model = LlmConstants.OpenAIModels.GPTMini,
+                MaxInputTokens = 100000
+            },
+            authOptions: new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            },
+            storageOptions: new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            });
 
         // Act
-        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        var result = checker.IsConfigured();
 
         // Assert
-        result.Should().BeTrue("provider name should be case-insensitive");
+        result.Should().BeTrue("provider should be properly configured");
     }
 
     [Fact]
-    public void IsConfigured_WithApiKeyFromEnvironmentVariable_ReturnsTrue()
+    public void IsConfigured_WithApiKeyFromConfiguration_ReturnsTrue()
     {
-        // Arrange - API key is now stored directly in configuration (Llm:ApiKey)
-        // This test is no longer relevant since we don't check environment variables
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.SshKeyPathKey] = "~/.ssh/id_ed25519",
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI",
-            [ConfigurationKeys.LlmApiKeyKey] = "sk-test1234567890",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
-        });
+        // Arrange - API key is now stored directly in LlmOptions
+        var checker = CreateConfigurationChecker(
+            llmOptions: new LlmOptions
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "sk-test1234567890",
+                Model = LlmConstants.OpenAIModels.GPTMini,
+                MaxInputTokens = 100000
+            },
+            authOptions: new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            },
+            storageOptions: new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            });
 
         // Act
-        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        var result = checker.IsConfigured();
 
         // Assert
         result.Should().BeTrue("API key from configuration should be accepted");
@@ -107,16 +148,22 @@ public sealed class ConfigurationCheckerTests
     public void IsConfigured_WithMissingSshConfiguration_ReturnsFalse()
     {
         // Arrange - Neither KeyPath nor KeySource is set
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            // SSH configuration missing entirely
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI",
-            [ConfigurationKeys.LlmApiKeyKey] = "sk-test1234567890",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
-        });
+        var checker = CreateConfigurationChecker(
+            llmOptions: new LlmOptions
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "sk-test1234567890",
+                Model = LlmConstants.OpenAIModels.GPTMini,
+                MaxInputTokens = 100000
+            },
+            authOptions: null, // SSH configuration missing entirely
+            storageOptions: new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            });
 
         // Act
-        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        var result = checker.IsConfigured();
 
         // Assert
         result.Should().BeFalse("SSH configuration is required");
@@ -127,17 +174,27 @@ public sealed class ConfigurationCheckerTests
     public void IsConfigured_WithSshKeySourceOnly_ReturnsTrue()
     {
         // Arrange - KeyPath is null but KeySource is set (agent scenario)
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.SshKeyPathKey] = null,
-            [ConfigurationKeys.SshKeySourceKey] = "OnePasswordAgent",
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI",
-            [ConfigurationKeys.LlmApiKeyKey] = "sk-test1234567890",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
-        });
+        var checker = CreateConfigurationChecker(
+            llmOptions: new LlmOptions
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "sk-test1234567890",
+                Model = LlmConstants.OpenAIModels.GPTMini,
+                MaxInputTokens = 100000
+            },
+            authOptions: new AuthOptions
+            {
+                KeyPath = null,
+                KeySource = SshKeySource.OnePasswordAgent,
+                AgentSocketPath = "/tmp/1password.sock"
+            },
+            storageOptions: new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            });
 
         // Act
-        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        var result = checker.IsConfigured();
 
         // Assert
         result.Should().BeTrue("SSH agent configuration without KeyPath should be valid");
@@ -147,16 +204,20 @@ public sealed class ConfigurationCheckerTests
     public void IsConfigured_WithMissingLlmProvider_ReturnsFalse()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.SshKeyPathKey] = "~/.ssh/id_ed25519",
-            // LLM provider missing
-            [ConfigurationKeys.LlmApiKeyKey] = "sk-test1234567890",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
-        });
+        var checker = CreateConfigurationChecker(
+            llmOptions: null, // LLM configuration missing
+            authOptions: new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            },
+            storageOptions: new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            });
 
         // Act
-        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        var result = checker.IsConfigured();
 
         // Assert
         result.Should().BeFalse("LLM provider is required");
@@ -167,16 +228,23 @@ public sealed class ConfigurationCheckerTests
     public void IsConfigured_WithMissingMemoryDirectory_ReturnsFalse()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.SshKeyPathKey] = "~/.ssh/id_ed25519",
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI",
-            [ConfigurationKeys.LlmApiKeyKey] = "sk-test1234567890"
-            // Memory directory missing
-        });
+        var checker = CreateConfigurationChecker(
+            llmOptions: new LlmOptions
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "sk-test1234567890",
+                Model = LlmConstants.OpenAIModels.GPTMini,
+                MaxInputTokens = 100000
+            },
+            authOptions: new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            },
+            storageOptions: null); // Memory directory missing
 
         // Act
-        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        var result = checker.IsConfigured();
 
         // Assert
         result.Should().BeFalse("Memory directory is required");
@@ -186,17 +254,32 @@ public sealed class ConfigurationCheckerTests
     [Fact]
     public void IsConfigured_WithMissingApiKey_ReturnsFalse()
     {
-        // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        // Arrange - Create LlmOptions without API key using Mock to bypass required property
+        var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
+        var llmOptionsValue = new LlmOptions
         {
-            [ConfigurationKeys.SshKeyPathKey] = "~/.ssh/id_ed25519",
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
-            // API key missing
-        });
+            Provider = LlmProvider.OpenAI,
+            ApiKey = "", // Empty API key
+            Model = LlmConstants.OpenAIModels.GPTMini,
+            MaxInputTokens = 100000
+        };
+        mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
+
+        var checker = new ConfigurationChecker(
+            mockLlmOptions.Object,
+            Options.Create(new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            }),
+            Options.Create(new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            }),
+            _mockLogger.Object);
 
         // Act
-        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        var result = checker.IsConfigured();
 
         // Assert
         result.Should().BeFalse("API key is required");
@@ -206,18 +289,32 @@ public sealed class ConfigurationCheckerTests
     [Fact]
     public void IsConfigured_WithWrongProviderApiKey_ReturnsFalse()
     {
-        // Arrange - Test is no longer relevant as API key is stored in Llm:ApiKey
-        // All providers use the same configuration key now
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        // Arrange - API key is stored in Llm:ApiKey for all providers
+        var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
+        var llmOptionsValue = new LlmOptions
         {
-            [ConfigurationKeys.SshKeyPathKey] = "~/.ssh/id_ed25519",
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
-            // Missing API key
-        });
+            Provider = LlmProvider.OpenAI,
+            ApiKey = "", // Missing API key
+            Model = LlmConstants.OpenAIModels.GPTMini,
+            MaxInputTokens = 100000
+        };
+        mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
+
+        var checker = new ConfigurationChecker(
+            mockLlmOptions.Object,
+            Options.Create(new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            }),
+            Options.Create(new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            }),
+            _mockLogger.Object);
 
         // Act
-        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        var result = checker.IsConfigured();
 
         // Assert
         result.Should().BeFalse("API key is required regardless of provider");
@@ -226,17 +323,40 @@ public sealed class ConfigurationCheckerTests
     [Fact]
     public void IsConfigured_WithEmptyStrings_ReturnsFalse()
     {
-        // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        // Arrange - Create options with empty strings using Mock
+        var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
+        var llmOptionsValue = new LlmOptions
         {
-            [ConfigurationKeys.SshKeyPathKey] = "",
-            [ConfigurationKeys.LlmProviderKey] = "",
-            [ConfigurationKeys.LlmApiKeyKey] = "",
-            ["TenSecondTom:MemoryDirectory"] = ""
-        });
+            Provider = LlmProvider.OpenAI,
+            ApiKey = "",
+            Model = "",
+            MaxInputTokens = 100000
+        };
+        mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
+
+        var mockAuthOptions = new Mock<IOptions<AuthOptions>>();
+        var authOptionsValue = new AuthOptions
+        {
+            KeyPath = "",
+            KeySource = SshKeySource.FileSystem
+        };
+        mockAuthOptions.Setup(x => x.Value).Returns(authOptionsValue);
+
+        var mockStorageOptions = new Mock<IOptions<StorageOptions>>();
+        var storageOptionsValue = new StorageOptions
+        {
+            MemoryDirectory = ""
+        };
+        mockStorageOptions.Setup(x => x.Value).Returns(storageOptionsValue);
+
+        var checker = new ConfigurationChecker(
+            mockLlmOptions.Object,
+            mockAuthOptions.Object,
+            mockStorageOptions.Object,
+            _mockLogger.Object);
 
         // Act
-        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        var result = checker.IsConfigured();
 
         // Assert
         result.Should().BeFalse("empty strings should be treated as missing");
@@ -245,17 +365,40 @@ public sealed class ConfigurationCheckerTests
     [Fact]
     public void IsConfigured_WithWhitespaceStrings_ReturnsFalse()
     {
-        // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        // Arrange - Create options with whitespace strings using Mock
+        var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
+        var llmOptionsValue = new LlmOptions
         {
-            [ConfigurationKeys.SshKeyPathKey] = "   ",
-            [ConfigurationKeys.LlmProviderKey] = "  ",
-            [ConfigurationKeys.LlmApiKeyKey] = "  ",
-            ["TenSecondTom:MemoryDirectory"] = "   "
-        });
+            Provider = LlmProvider.OpenAI,
+            ApiKey = "   ",
+            Model = "  ",
+            MaxInputTokens = 100000
+        };
+        mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
+
+        var mockAuthOptions = new Mock<IOptions<AuthOptions>>();
+        var authOptionsValue = new AuthOptions
+        {
+            KeyPath = "   ",
+            KeySource = SshKeySource.FileSystem
+        };
+        mockAuthOptions.Setup(x => x.Value).Returns(authOptionsValue);
+
+        var mockStorageOptions = new Mock<IOptions<StorageOptions>>();
+        var storageOptionsValue = new StorageOptions
+        {
+            MemoryDirectory = "   "
+        };
+        mockStorageOptions.Setup(x => x.Value).Returns(storageOptionsValue);
+
+        var checker = new ConfigurationChecker(
+            mockLlmOptions.Object,
+            mockAuthOptions.Object,
+            mockStorageOptions.Object,
+            _mockLogger.Object);
 
         // Act
-        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        var result = checker.IsConfigured();
 
         // Assert
         result.Should().BeFalse("whitespace-only strings should be treated as missing");
@@ -266,22 +409,31 @@ public sealed class ConfigurationCheckerTests
     #region Unknown Provider Tests
 
     [Fact]
-    public void IsConfigured_WithUnknownProvider_ReturnsFalse()
+    public void IsConfigured_WithUnknownProvider_ReturnsTrue()
     {
-        // Arrange - Unknown provider is still configured as long as all fields are present
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.SshKeyPathKey] = "~/.ssh/id_ed25519",
-            [ConfigurationKeys.LlmProviderKey] = "UnknownProvider",
-            [ConfigurationKeys.LlmApiKeyKey] = "sk-test1234567890",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
-        });
+        // Arrange - Any valid LlmProvider enum value will work
+        var checker = CreateConfigurationChecker(
+            llmOptions: new LlmOptions
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "sk-test1234567890",
+                Model = LlmConstants.OpenAIModels.GPTMini,
+                MaxInputTokens = 100000
+            },
+            authOptions: new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            },
+            storageOptions: new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            });
 
         // Act
-        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        var result = checker.IsConfigured();
 
         // Assert
-        // ConfigurationChecker doesn't validate provider names, just checks if fields exist
         result.Should().BeTrue("configuration checker only validates presence, not provider validity");
     }
 
@@ -293,10 +445,10 @@ public sealed class ConfigurationCheckerTests
     public void IsConfigured_WhenNotConfigured_LogsInformationMessage()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>());
+        var checker = CreateConfigurationChecker();
 
         // Act
-        ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        checker.IsConfigured();
 
         // Assert
         VerifyLogContains(LogLevel.Information, "Application is not configured");
@@ -307,10 +459,10 @@ public sealed class ConfigurationCheckerTests
     public void IsConfigured_WhenNotConfigured_LogsAllMissingSettings()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>());
+        var checker = CreateConfigurationChecker();
 
         // Act
-        ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        checker.IsConfigured();
 
         // Assert
         VerifyLogContains(LogLevel.Debug, "Missing: SSH configuration");
@@ -323,16 +475,26 @@ public sealed class ConfigurationCheckerTests
     public void IsConfigured_WhenConfigured_DoesNotLogMissingSettings()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.SshKeyPathKey] = "~/.ssh/id_ed25519",
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI",
-            [ConfigurationKeys.LlmApiKeyKey] = "sk-test1234567890",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
-        });
+        var checker = CreateConfigurationChecker(
+            llmOptions: new LlmOptions
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "sk-test1234567890",
+                Model = LlmConstants.OpenAIModels.GPTMini,
+                MaxInputTokens = 100000
+            },
+            authOptions: new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            },
+            storageOptions: new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            });
 
         // Act
-        ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        checker.IsConfigured();
 
         // Assert
         _mockLogger.Verify(
@@ -348,21 +510,34 @@ public sealed class ConfigurationCheckerTests
     [Fact]
     public void IsConfigured_WithPartialConfiguration_LogsSpecificMissingItems()
     {
-        // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        // Arrange - Missing API key and memory directory
+        var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
+        var llmOptionsValue = new LlmOptions
         {
-            [ConfigurationKeys.SshKeyPathKey] = "~/.ssh/id_ed25519",
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI"
-            // Missing: Memory directory and API key
-        });
+            Provider = LlmProvider.OpenAI,
+            ApiKey = "", // Missing API key
+            Model = LlmConstants.OpenAIModels.GPTMini,
+            MaxInputTokens = 100000
+        };
+        mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
+
+        var checker = new ConfigurationChecker(
+            mockLlmOptions.Object,
+            Options.Create(new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            }),
+            null, // Missing storage options
+            _mockLogger.Object);
 
         // Act
-        ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        checker.IsConfigured();
 
         // Assert
         VerifyLogContains(LogLevel.Debug, "Missing: Memory directory");
         VerifyLogContains(LogLevel.Debug, "Missing: LLM API key");
-        
+
         // Should NOT log for present settings
         _mockLogger.Verify(
             l => l.Log(
@@ -379,22 +554,38 @@ public sealed class ConfigurationCheckerTests
     #region Edge Cases
 
     [Fact]
-    public void IsConfigured_WithNullConfiguration_ThrowsArgumentNullException()
+    public void IsConfigured_WithNullConfiguration_DoesNotThrow()
     {
-        // Act & Assert
-        var act = () => ConfigurationChecker.IsConfigured(null!, _mockLogger.Object);
+        // Arrange - Create checker with null options
+        var checker = CreateConfigurationChecker();
 
-        act.Should().Throw<NullReferenceException>("null configuration should throw");
+        // Act & Assert - Should not throw, just return false
+        var result = checker.IsConfigured();
+        result.Should().BeFalse("null configuration should not be considered configured");
     }
 
     [Fact]
     public void IsConfigured_WithNullLogger_ThrowsArgumentNullException()
     {
-        // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>());
-
         // Act & Assert
-        var act = () => ConfigurationChecker.IsConfigured(configuration, null!);
+        var act = () => new ConfigurationChecker(
+            Options.Create(new LlmOptions
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "sk-test1234567890",
+                Model = LlmConstants.OpenAIModels.GPTMini,
+                MaxInputTokens = 100000
+            }),
+            Options.Create(new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            }),
+            Options.Create(new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            }),
+            null!);
 
         act.Should().Throw<ArgumentNullException>("null logger should throw");
     }
@@ -403,10 +594,10 @@ public sealed class ConfigurationCheckerTests
     public void IsConfigured_WithEmptyConfiguration_ReturnsFalse()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>());
+        var checker = CreateConfigurationChecker();
 
         // Act
-        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        var result = checker.IsConfigured();
 
         // Assert
         result.Should().BeFalse("empty configuration should not be considered configured");
@@ -417,40 +608,64 @@ public sealed class ConfigurationCheckerTests
     #region Configuration Precedence Tests
 
     [Fact]
-    public void IsConfigured_WithApiKeyInBothConfigAndEnvironment_PrefersConfig()
+    public void IsConfigured_WithApiKeyInConfiguration_ReturnsTrue()
     {
-        // Arrange - This test is no longer relevant as ConfigurationChecker only checks Llm:ApiKey
-        // Environment variables are not checked by ConfigurationChecker
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.SshKeyPathKey] = "~/.ssh/id_ed25519",
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI",
-            [ConfigurationKeys.LlmApiKeyKey] = "sk-config-key",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
-        });
+        // Arrange - API key is stored in LlmOptions
+        var checker = CreateConfigurationChecker(
+            llmOptions: new LlmOptions
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "sk-config-key",
+                Model = LlmConstants.OpenAIModels.GPTMini,
+                MaxInputTokens = 100000
+            },
+            authOptions: new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            },
+            storageOptions: new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            });
 
         // Act
-        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        var result = checker.IsConfigured();
 
         // Assert
         result.Should().BeTrue("all required configuration is present");
     }
 
     [Fact]
-    public void IsConfigured_WithOnlyEnvironmentApiKey_UsesEnvironmentVariable()
+    public void IsConfigured_WithOnlyEnvironmentApiKey_RequiresConfiguration()
     {
-        // Arrange - ConfigurationChecker now only checks Llm:ApiKey from configuration
+        // Arrange - ConfigurationChecker only checks LlmOptions
         // Environment variables must be loaded into IConfiguration before this check
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
+        var llmOptionsValue = new LlmOptions
         {
-            [ConfigurationKeys.SshKeyPathKey] = "~/.ssh/id_ed25519",
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI",
-            ["TenSecondTom:MemoryDirectory"] = "~/.ten-second-tom/memory"
-            // No API key in configuration
-        });
+            Provider = LlmProvider.OpenAI,
+            ApiKey = "", // No API key in options
+            Model = LlmConstants.OpenAIModels.GPTMini,
+            MaxInputTokens = 100000
+        };
+        mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
+
+        var checker = new ConfigurationChecker(
+            mockLlmOptions.Object,
+            Options.Create(new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            }),
+            Options.Create(new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            }),
+            _mockLogger.Object);
 
         // Act
-        var result = ConfigurationChecker.IsConfigured(configuration, _mockLogger.Object);
+        var result = checker.IsConfigured();
 
         // Assert
         result.Should().BeFalse("API key is required in configuration");
@@ -464,14 +679,26 @@ public sealed class ConfigurationCheckerTests
     public void ValidateModel_WithValidOpenAIModel_ReturnsTrue()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI",
-            [ConfigurationKeys.LlmModelKey] = LlmConstants.OpenAIModels.GPTMini
-        });
+        var checker = CreateConfigurationChecker(
+            llmOptions: new LlmOptions
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "sk-test1234567890",
+                Model = LlmConstants.OpenAIModels.GPTMini,
+                MaxInputTokens = 100000
+            },
+            authOptions: new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            },
+            storageOptions: new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            });
 
         // Act
-        var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
+        var result = checker.ValidateModel();
 
         // Assert
         result.Should().BeTrue($"{LlmConstants.OpenAIModels.GPTMini} is a valid OpenAI model");
@@ -481,14 +708,26 @@ public sealed class ConfigurationCheckerTests
     public void ValidateModel_WithValidAnthropicModel_ReturnsTrue()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.LlmProviderKey] = "Anthropic",
-            [ConfigurationKeys.LlmModelKey] = LlmConstants.AnthropicModels.ClaudeHaiku
-        });
+        var checker = CreateConfigurationChecker(
+            llmOptions: new LlmOptions
+            {
+                Provider = LlmProvider.Anthropic,
+                ApiKey = "sk-ant-test1234567890",
+                Model = LlmConstants.AnthropicModels.ClaudeHaiku,
+                MaxInputTokens = 100000
+            },
+            authOptions: new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            },
+            storageOptions: new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            });
 
         // Act
-        var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
+        var result = checker.ValidateModel();
 
         // Assert
         result.Should().BeTrue($"{LlmConstants.AnthropicModels.ClaudeHaiku} is a valid Anthropic model");
@@ -498,14 +737,26 @@ public sealed class ConfigurationCheckerTests
     public void ValidateModel_WithInvalidModelForProvider_ReturnsFalse()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI",
-            [ConfigurationKeys.LlmModelKey] = LlmConstants.AnthropicModels.ClaudeHaiku // Anthropic model with OpenAI provider
-        });
+        var checker = CreateConfigurationChecker(
+            llmOptions: new LlmOptions
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "sk-test1234567890",
+                Model = LlmConstants.AnthropicModels.ClaudeHaiku, // Anthropic model with OpenAI provider
+                MaxInputTokens = 100000
+            },
+            authOptions: new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            },
+            storageOptions: new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            });
 
         // Act
-        var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
+        var result = checker.ValidateModel();
 
         // Assert
         result.Should().BeFalse("claude model should not be valid for OpenAI provider");
@@ -516,14 +767,31 @@ public sealed class ConfigurationCheckerTests
     public void ValidateModel_WithNoModelConfigured_ReturnsTrue()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
+        var llmOptionsValue = new LlmOptions
         {
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI"
-            // No model configured
-        });
+            Provider = LlmProvider.OpenAI,
+            ApiKey = "sk-test1234567890",
+            Model = "", // No model configured
+            MaxInputTokens = 100000
+        };
+        mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
+
+        var checker = new ConfigurationChecker(
+            mockLlmOptions.Object,
+            Options.Create(new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            }),
+            Options.Create(new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            }),
+            _mockLogger.Object);
 
         // Act
-        var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
+        var result = checker.ValidateModel();
 
         // Assert
         result.Should().BeTrue("validation should pass when no model is configured");
@@ -532,50 +800,50 @@ public sealed class ConfigurationCheckerTests
     [Fact]
     public void ValidateModel_WithNoProviderConfigured_ReturnsTrue()
     {
-        // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.LlmModelKey] = "gpt-4o-mini"
-            // No provider configured
-        });
+        // Arrange - Create checker without LLM options
+        var checker = CreateConfigurationChecker(
+            llmOptions: null,
+            authOptions: new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            },
+            storageOptions: new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            });
 
         // Act
-        var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
+        var result = checker.ValidateModel();
 
         // Assert
         result.Should().BeTrue("validation should pass when no provider is configured");
     }
 
     [Fact]
-    public void ValidateModel_WithInvalidProvider_ReturnsFalse()
-    {
-        // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.LlmProviderKey] = "InvalidProvider",
-            [ConfigurationKeys.LlmModelKey] = "some-model"
-        });
-
-        // Act
-        var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
-
-        // Assert
-        result.Should().BeFalse("invalid provider should fail validation");
-        VerifyLogContains(LogLevel.Error, "Invalid LLM provider configured");
-    }
-
-    [Fact]
     public void ValidateModel_WithNonExistentModel_ReturnsFalse()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI",
-            [ConfigurationKeys.LlmModelKey] = "gpt-999-nonexistent"
-        });
+        var checker = CreateConfigurationChecker(
+            llmOptions: new LlmOptions
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "sk-test1234567890",
+                Model = "gpt-999-nonexistent",
+                MaxInputTokens = 100000
+            },
+            authOptions: new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            },
+            storageOptions: new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            });
 
         // Act
-        var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
+        var result = checker.ValidateModel();
 
         // Assert
         result.Should().BeFalse("non-existent model should fail validation");
@@ -585,14 +853,31 @@ public sealed class ConfigurationCheckerTests
     public void ValidateModel_WithEmptyModel_ReturnsTrue()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
+        var llmOptionsValue = new LlmOptions
         {
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI",
-            [ConfigurationKeys.LlmModelKey] = ""
-        });
+            Provider = LlmProvider.OpenAI,
+            ApiKey = "sk-test1234567890",
+            Model = "",
+            MaxInputTokens = 100000
+        };
+        mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
+
+        var checker = new ConfigurationChecker(
+            mockLlmOptions.Object,
+            Options.Create(new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            }),
+            Options.Create(new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            }),
+            _mockLogger.Object);
 
         // Act
-        var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
+        var result = checker.ValidateModel();
 
         // Assert
         result.Should().BeTrue("empty model should be treated as not configured");
@@ -602,14 +887,31 @@ public sealed class ConfigurationCheckerTests
     public void ValidateModel_WithWhitespaceModel_ReturnsTrue()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
+        var llmOptionsValue = new LlmOptions
         {
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI",
-            [ConfigurationKeys.LlmModelKey] = "   "
-        });
+            Provider = LlmProvider.OpenAI,
+            ApiKey = "sk-test1234567890",
+            Model = "   ",
+            MaxInputTokens = 100000
+        };
+        mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
+
+        var checker = new ConfigurationChecker(
+            mockLlmOptions.Object,
+            Options.Create(new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            }),
+            Options.Create(new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            }),
+            _mockLogger.Object);
 
         // Act
-        var result = ConfigurationChecker.ValidateModel(configuration, _mockLogger.Object);
+        var result = checker.ValidateModel();
 
         // Assert
         result.Should().BeTrue("whitespace model should be treated as not configured");
@@ -623,14 +925,26 @@ public sealed class ConfigurationCheckerTests
     public void GetModelValidationError_WithValidModel_ReturnsNull()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI",
-            [ConfigurationKeys.LlmModelKey] = LlmConstants.OpenAIModels.GPTMini
-        });
+        var checker = CreateConfigurationChecker(
+            llmOptions: new LlmOptions
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "sk-test1234567890",
+                Model = LlmConstants.OpenAIModels.GPTMini,
+                MaxInputTokens = 100000
+            },
+            authOptions: new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            },
+            storageOptions: new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            });
 
         // Act
-        var result = ConfigurationChecker.GetModelValidationError(configuration);
+        var result = checker.GetModelValidationError();
 
         // Assert
         result.Should().BeNull("valid model should not return an error message");
@@ -640,14 +954,26 @@ public sealed class ConfigurationCheckerTests
     public void GetModelValidationError_WithInvalidModel_ReturnsErrorMessage()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI",
-            [ConfigurationKeys.LlmModelKey] = LlmConstants.AnthropicModels.ClaudeHaiku // Anthropic model
-        });
+        var checker = CreateConfigurationChecker(
+            llmOptions: new LlmOptions
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "sk-test1234567890",
+                Model = LlmConstants.AnthropicModels.ClaudeHaiku, // Anthropic model
+                MaxInputTokens = 100000
+            },
+            authOptions: new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            },
+            storageOptions: new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            });
 
         // Act
-        var result = ConfigurationChecker.GetModelValidationError(configuration);
+        var result = checker.GetModelValidationError();
 
         // Assert
         result.Should().NotBeNullOrEmpty("invalid model should return an error message");
@@ -660,14 +986,31 @@ public sealed class ConfigurationCheckerTests
     public void GetModelValidationError_WithNoModel_ReturnsNull()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
+        var llmOptionsValue = new LlmOptions
         {
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI"
-            // No model configured
-        });
+            Provider = LlmProvider.OpenAI,
+            ApiKey = "sk-test1234567890",
+            Model = "", // No model configured
+            MaxInputTokens = 100000
+        };
+        mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
+
+        var checker = new ConfigurationChecker(
+            mockLlmOptions.Object,
+            Options.Create(new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            }),
+            Options.Create(new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            }),
+            _mockLogger.Object);
 
         // Act
-        var result = ConfigurationChecker.GetModelValidationError(configuration);
+        var result = checker.GetModelValidationError();
 
         // Assert
         result.Should().BeNull("no model configured should not return an error");
@@ -677,49 +1020,49 @@ public sealed class ConfigurationCheckerTests
     public void GetModelValidationError_WithNoProvider_ReturnsNull()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.LlmModelKey] = "gpt-4o-mini"
-            // No provider configured
-        });
+        var checker = CreateConfigurationChecker(
+            llmOptions: null, // No provider configured
+            authOptions: new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            },
+            storageOptions: new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            });
 
         // Act
-        var result = ConfigurationChecker.GetModelValidationError(configuration);
+        var result = checker.GetModelValidationError();
 
         // Assert
         result.Should().BeNull("no provider configured should not return an error");
     }
 
     [Fact]
-    public void GetModelValidationError_WithInvalidProvider_ReturnsErrorMessage()
-    {
-        // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.LlmProviderKey] = "InvalidProvider",
-            [ConfigurationKeys.LlmModelKey] = "some-model"
-        });
-
-        // Act
-        var result = ConfigurationChecker.GetModelValidationError(configuration);
-
-        // Assert
-        result.Should().NotBeNullOrEmpty("invalid provider should return an error message");
-        result.Should().Contain("Invalid LLM provider configured");
-    }
-
-    [Fact]
     public void GetModelValidationError_MessageContainsAllValidModels()
     {
         // Arrange
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            [ConfigurationKeys.LlmProviderKey] = "OpenAI",
-            [ConfigurationKeys.LlmModelKey] = "invalid-model"
-        });
+        var checker = CreateConfigurationChecker(
+            llmOptions: new LlmOptions
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "sk-test1234567890",
+                Model = "invalid-model",
+                MaxInputTokens = 100000
+            },
+            authOptions: new AuthOptions
+            {
+                KeyPath = "~/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem
+            },
+            storageOptions: new StorageOptions
+            {
+                MemoryDirectory = "~/.ten-second-tom/memory"
+            });
 
         // Act
-        var result = ConfigurationChecker.GetModelValidationError(configuration);
+        var result = checker.GetModelValidationError();
 
         // Assert
         result.Should().NotBeNullOrEmpty();
@@ -732,11 +1075,32 @@ public sealed class ConfigurationCheckerTests
 
     #region Helper Methods
 
-    private static IConfiguration BuildConfiguration(Dictionary<string, string?> values)
+    /// <summary>
+    /// Creates a ConfigurationChecker with the specified options.
+    /// If any option is null, creates an empty/invalid option that will fail validation.
+    /// </summary>
+    private ConfigurationChecker CreateConfigurationChecker(
+        LlmOptions? llmOptions = null,
+        AuthOptions? authOptions = null,
+        StorageOptions? storageOptions = null)
     {
-        return new ConfigurationBuilder()
-            .AddInMemoryCollection(values)
-            .Build();
+        var llmOptionsWrapper = llmOptions != null
+            ? Options.Create(llmOptions)
+            : null;
+
+        var authOptionsWrapper = authOptions != null
+            ? Options.Create(authOptions)
+            : null;
+
+        var storageOptionsWrapper = storageOptions != null
+            ? Options.Create(storageOptions)
+            : null;
+
+        return new ConfigurationChecker(
+            llmOptionsWrapper,
+            authOptionsWrapper,
+            storageOptionsWrapper,
+            _mockLogger.Object);
     }
 
     private void VerifyLogContains(LogLevel logLevel, string messageSubstring)

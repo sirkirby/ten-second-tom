@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Renci.SshNet;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Setup.Queries;
+using TenSecondTom.Shared.Constants;
 
 namespace TenSecondTom.Infrastructure.Auth.SshProviders;
 
@@ -66,19 +67,33 @@ public sealed class SystemSshAgentDetector : ISshKeyDetector
                         var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                         foreach (var line in lines)
                         {
-                            if (line.StartsWith("ssh-ed25519"))
+                            // Accept all SSH key types: ssh-rsa, ssh-ed25519, ecdsa-sha2-*, ssh-dss
+                            if (line.StartsWith(SshConstants.KeyPrefixes.Ssh) || line.StartsWith(SshConstants.KeyPrefixes.Ecdsa))
                             {
                                 var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                                 if (parts.Length >= 2)
                                 {
-                                    var comment = parts.Length > 2 ? parts[2] : "id_ed25519";
+                                    var keyType = parts[0];
+                                    var isEd25519 = keyType == SshConstants.KeyTypes.Ed25519;
+                                    var defaultComment = keyType switch
+                                    {
+                                        SshConstants.KeyTypes.Ed25519 => "id_ed25519",
+                                        SshConstants.KeyTypes.Rsa => "id_rsa",
+                                        SshConstants.KeyTypes.EcdsaNistP256 => "id_ecdsa",
+                                        SshConstants.KeyTypes.EcdsaNistP384 => "id_ecdsa",
+                                        SshConstants.KeyTypes.EcdsaNistP521 => "id_ecdsa",
+                                        SshConstants.KeyTypes.Dsa => "id_dsa",
+                                        _ => "id_unknown"
+                                    };
+                                    var comment = parts.Length > 2 ? parts[2] : defaultComment;
+
                                     keys.Add(new SshKeyInfo
                                     {
-                                        DisplayName = $"[System Agent] {comment}",
+                                        DisplayName = $"[System Agent] {comment} ({keyType})",
                                         Source = SshKeySource.SystemAgent,
                                         PublicKey = line,
                                         AgentName = "ssh-agent",
-                                        IsEd25519 = true,
+                                        IsEd25519 = isEd25519,
                                         DetectedAt = DateTime.UtcNow,
                                         ValidationResult = ValidationResult.Valid
                                     });
@@ -87,7 +102,7 @@ public sealed class SystemSshAgentDetector : ISshKeyDetector
                         }
                     }
 
-                    _logger.LogDebug("Detected {Count} ED25519 keys from system SSH agent", keys.Count);
+                    _logger.LogDebug("Detected {Count} SSH keys from system SSH agent", keys.Count);
                 }
                 catch (Exception ex)
                 {

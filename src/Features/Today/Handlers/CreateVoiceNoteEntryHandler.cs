@@ -1,5 +1,5 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TenSecondTom.Features.Templates.Queries;
 using TenSecondTom.Features.Today.Commands;
 using TenSecondTom.Features.Today.Models;
@@ -12,6 +12,7 @@ using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Contracts;
 using TenSecondTom.Shared.Extensions;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Today.Handlers;
@@ -26,7 +27,7 @@ public sealed class CreateVoiceNoteEntryHandler : IRequestHandler<CreateVoiceNot
     private readonly ILlmProviderFactory _llmFactory;
     private readonly IPromptTemplateLoader _promptLoader;
     private readonly IAuthenticationService _authService;
-    private readonly IConfiguration _configuration;
+    private readonly LlmOptions _llmOptions;
     private readonly ILogger<CreateVoiceNoteEntryHandler> _logger;
     private readonly TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler _listTemplatesHandler;
     private readonly ITemplateSelectionUI _templateSelectionUI;
@@ -39,7 +40,7 @@ public sealed class CreateVoiceNoteEntryHandler : IRequestHandler<CreateVoiceNot
         ILlmProviderFactory llmFactory,
         IPromptTemplateLoader promptLoader,
         IAuthenticationService authService,
-        IConfiguration configuration,
+        IOptions<LlmOptions> llmOptions,
         ILogger<CreateVoiceNoteEntryHandler> logger,
         TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler listTemplatesHandler,
         ITemplateSelectionUI templateSelectionUI)
@@ -48,7 +49,7 @@ public sealed class CreateVoiceNoteEntryHandler : IRequestHandler<CreateVoiceNot
         _llmFactory = llmFactory ?? throw new ArgumentNullException(nameof(llmFactory));
         _promptLoader = promptLoader ?? throw new ArgumentNullException(nameof(promptLoader));
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        _llmOptions = (llmOptions ?? throw new ArgumentNullException(nameof(llmOptions))).Value;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _listTemplatesHandler = listTemplatesHandler ?? throw new ArgumentNullException(nameof(listTemplatesHandler));
         _templateSelectionUI = templateSelectionUI ?? throw new ArgumentNullException(nameof(templateSelectionUI));
@@ -181,7 +182,7 @@ public sealed class CreateVoiceNoteEntryHandler : IRequestHandler<CreateVoiceNot
 
         string prompt = RenderPrompt(templateResult.Value, userInput);
 
-        // 7. Determine LLM provider
+        // 7. Determine LLM provider (use override, or load from options)
         string provider;
         if (!string.IsNullOrWhiteSpace(request.LlmProviderOverride))
         {
@@ -189,17 +190,9 @@ public sealed class CreateVoiceNoteEntryHandler : IRequestHandler<CreateVoiceNot
         }
         else
         {
-            string? configuredProvider = _configuration[ConfigurationKeys.LlmProviderKey];
-            if (!string.IsNullOrWhiteSpace(configuredProvider))
-            {
-                provider = configuredProvider;
-                _logger.LogDebug("Using LLM provider from configuration: {Provider}", provider);
-            }
-            else
-            {
-                provider = LlmProviders.OpenAI;
-                _logger.LogDebug("No LLM provider configured, defaulting to OpenAI");
-            }
+            // Use strongly-typed configuration from LlmOptions
+            provider = _llmOptions.Provider.ToString();
+            _logger.LogDebug("Using LLM provider from configuration: {Provider}", provider);
         }
 
         ILlmProvider llmProvider;
@@ -232,10 +225,9 @@ public sealed class CreateVoiceNoteEntryHandler : IRequestHandler<CreateVoiceNot
         // 9. Strip markdown code block wrappers if present (defensive measure)
         string cleanedResponse = llmResult.Value.Content.StripMarkdownCodeBlock();
 
-        // 10. Parse LLM response into DailySummary
-        DailySummary summary = ParseDailySummary(cleanedResponse);
-
-        // 11. Create VoiceNoteEntry with voice-specific metadata
+        // 10. Create VoiceNoteEntry with voice-specific metadata
+        // Note: The prompt template defines the output structure.
+        // The LlmResponse field contains the complete, unaltered output.
         var entry = new VoiceNoteEntry
         {
             // Voice-specific properties
@@ -267,10 +259,7 @@ public sealed class CreateVoiceNoteEntryHandler : IRequestHandler<CreateVoiceNot
                     ["stt-model"] = request.Transcription.SttModel ?? "unknown",
                     ["word-count"] = request.Transcription.WordCount.ToString()
                 }
-            },
-
-            // DailyEntry properties
-            Summary = summary
+            }
         };
 
         // 12. Save to storage
@@ -298,93 +287,4 @@ public sealed class CreateVoiceNoteEntryHandler : IRequestHandler<CreateVoiceNot
             .Replace("{{USER_INPUT}}", userInput, StringComparison.Ordinal);
     }
 
-    /// <summary>
-    /// Parses LLM response into DailySummary.
-    /// Extracts structured information from markdown-formatted response.
-    /// </summary>
-    private DailySummary ParseDailySummary(string llmResponse)
-    {
-        var summary = new DailySummary
-        {
-            KeyEvents = new List<string>(),
-            Themes = new List<string>(),
-            TodoItems = new List<TodoItem>(),
-            ImportantPeople = new List<string>(),
-            NotableTasks = new List<string>()
-        };
-
-        try
-        {
-            var lines = llmResponse.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-            string? currentSection = null;
-
-            foreach (string line in lines)
-            {
-                string trimmedLine = line.Trim();
-
-                // Detect section headers
-                if (trimmedLine.Contains("Key Events", StringComparison.OrdinalIgnoreCase))
-                {
-                    currentSection = "events";
-                    continue;
-                }
-                if (trimmedLine.Contains("Themes", StringComparison.OrdinalIgnoreCase))
-                {
-                    currentSection = "themes";
-                    continue;
-                }
-                if (trimmedLine.Contains("Todo", StringComparison.OrdinalIgnoreCase) ||
-                    trimmedLine.Contains("Action Items", StringComparison.OrdinalIgnoreCase))
-                {
-                    currentSection = "todos";
-                    continue;
-                }
-                if (trimmedLine.Contains("People", StringComparison.OrdinalIgnoreCase))
-                {
-                    currentSection = "people";
-                    continue;
-                }
-                if (trimmedLine.Contains("Tasks", StringComparison.OrdinalIgnoreCase))
-                {
-                    currentSection = "tasks";
-                    continue;
-                }
-
-                // Parse list items
-                if (trimmedLine.StartsWith("- ") || trimmedLine.StartsWith("* ") || trimmedLine.StartsWith("• "))
-                {
-                    string itemText = trimmedLine[2..].Trim();
-                    if (string.IsNullOrWhiteSpace(itemText)) continue;
-
-                    switch (currentSection)
-                    {
-                        case "events":
-                            ((List<string>)summary.KeyEvents).Add(itemText);
-                            break;
-                        case "themes":
-                            ((List<string>)summary.Themes).Add(itemText);
-                            break;
-                        case "todos":
-                            bool isCompleted = itemText.StartsWith("[x]", StringComparison.OrdinalIgnoreCase) ||
-                                             itemText.StartsWith("[X]", StringComparison.OrdinalIgnoreCase);
-                            string todoText = itemText.StartsWith('[') ? itemText[3..].Trim() : itemText;
-                            ((List<TodoItem>)summary.TodoItems).Add(new TodoItem { Description = todoText, IsCompleted = isCompleted });
-                            break;
-                        case "people":
-                            ((List<string>)summary.ImportantPeople).Add(itemText);
-                            break;
-                        case "tasks":
-                            ((List<string>)summary.NotableTasks).Add(itemText);
-                            break;
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to parse LLM response into structured summary, returning empty summary");
-        }
-
-        return summary;
-    }
 }

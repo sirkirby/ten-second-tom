@@ -1,7 +1,8 @@
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
+using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.ThisWeek.Commands;
 using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Infrastructure.Auth;
@@ -12,6 +13,7 @@ using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Tests.Unit.Features.ThisWeek;
@@ -27,7 +29,7 @@ public sealed class CreateWeeklyReviewHandlerTests
     private readonly Mock<ILlmProvider> _mockLlmProvider;
     private readonly Mock<IPromptTemplateLoader> _mockPromptLoader;
     private readonly Mock<IAuthenticationService> _mockAuthService;
-    private readonly Mock<IConfiguration> _mockConfiguration;
+    private readonly Mock<IOptions<LlmOptions>> _mockLlmOptions;
     private readonly Mock<ILogger<CreateWeeklyReviewHandler>> _mockLogger;
     private readonly TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler _listTemplatesHandler;
     private readonly Mock<ITemplateSelectionUI> _mockTemplateSelectionUI;
@@ -40,7 +42,7 @@ public sealed class CreateWeeklyReviewHandlerTests
         _mockLlmProvider = new Mock<ILlmProvider>();
         _mockPromptLoader = new Mock<IPromptTemplateLoader>();
         _mockAuthService = new Mock<IAuthenticationService>();
-        _mockConfiguration = new Mock<IConfiguration>();
+        _mockLlmOptions = new Mock<IOptions<LlmOptions>>();
         _mockLogger = new Mock<ILogger<CreateWeeklyReviewHandler>>();
         var mockListTemplatesLogger = new Mock<ILogger<TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler>>();
         _listTemplatesHandler = new TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler(
@@ -48,9 +50,15 @@ public sealed class CreateWeeklyReviewHandlerTests
             mockListTemplatesLogger.Object);
         _mockTemplateSelectionUI = new Mock<ITemplateSelectionUI>();
 
-        // Setup default configuration values
-        _mockConfiguration.Setup(c => c[ConfigurationKeys.LlmProviderKey]).Returns("OpenAI");
-        _mockConfiguration.Setup(c => c["Llm:Model"]).Returns("gpt-4o");
+        // Setup default LLM options
+        var llmOptions = new LlmOptions
+        {
+            Provider = LlmProvider.OpenAI,
+            ApiKey = "test-api-key",
+            Model = "gpt-4o",
+            MaxInputTokens = 100000
+        };
+        _mockLlmOptions.Setup(o => o.Value).Returns(llmOptions);
 
         // Setup default successful behaviors
         _mockLlmFactory.Setup(f => f.CreateProvider(It.IsAny<string>()))
@@ -102,7 +110,7 @@ Noticed pattern of afternoon productivity dips.
             _mockLlmFactory.Object,
             _mockPromptLoader.Object,
             _mockAuthService.Object,
-            _mockConfiguration.Object,
+            _mockLlmOptions.Object,
             _mockLogger.Object,
             _listTemplatesHandler,
             _mockTemplateSelectionUI.Object);
@@ -132,9 +140,8 @@ Noticed pattern of afternoon productivity dips.
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeNull();
         result.Value.Command.Should().Be("thisweek");
-        result.Value.Summary.Should().NotBeNull();
-        result.Value.Summary.TopAccomplishments.Should().HaveCount(3);
-        result.Value.Summary.TopChallenges.Should().HaveCount(3);
+        result.Value.LlmResponse.Should().Contain("Accomplishments");
+        result.Value.LlmResponse.Should().Contain("Challenges");
     }
 
     [Fact]
@@ -303,7 +310,7 @@ Noticed pattern of afternoon productivity dips.
     }
 
     [Fact]
-    public async Task Handle_EnsuresExactly3Accomplishments()
+    public async Task Handle_ParsesAccomplishmentsFromLlmResponse()
     {
         // Arrange
         var dailyEntries = CreateSampleDailyEntries(7);
@@ -324,11 +331,12 @@ Noticed pattern of afternoon productivity dips.
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Summary.TopAccomplishments.Should().HaveCount(3);
+        result.Value.LlmResponse.Should().Contain("Accomplishments", 
+            "the default template should include accomplishments section");
     }
 
     [Fact]
-    public async Task Handle_EnsuresExactly3Challenges()
+    public async Task Handle_ParsesChallengesFromLlmResponse()
     {
         // Arrange
         var dailyEntries = CreateSampleDailyEntries(7);
@@ -349,7 +357,8 @@ Noticed pattern of afternoon productivity dips.
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Summary.TopChallenges.Should().HaveCount(3);
+        result.Value.LlmResponse.Should().Contain("Challenges",
+            "the default template should include challenges section");
     }
 
     [Fact]
@@ -375,7 +384,7 @@ Noticed pattern of afternoon productivity dips.
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeNull();
-        result.Value.Summary.Should().NotBeNull();
+        result.Value.LlmResponse.Should().NotBeNullOrWhiteSpace();
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1859:Use concrete types when possible for improved performance", Justification = "Test helper method readability")]
@@ -393,22 +402,13 @@ Noticed pattern of afternoon productivity dips.
                 Timestamp = baseDate.AddDays(i),
                 EntryNumber = i + 1,
                 UserInput = $"Sample daily input {i + 1}",
-                LlmResponse = $"Sample LLM response {i + 1}",
-                Summary = new DailySummary
-                {
-                    KeyEvents = new List<string> { $"Event {i + 1}", $"Event {i + 2}" },
-                    Themes = new List<string> { $"Theme {i + 1}" },
-                    TodoItems = new List<TodoItem>
-                    {
-                        new() { Description = $"Todo {i + 1}", IsCompleted = false }
-                    },
-                    ImportantPeople = new List<string> { $"Person {i + 1}" },
-                    NotableTasks = new List<string> { $"Task {i + 1}" }
-                },
+                LlmResponse = $"## Key Events\n- Event {i + 1}\n- Event {i + 2}\n\n## Themes\n- Theme {i + 1}\n\n## To-Do Items\n- [ ] Todo {i + 1}",
                 Metadata = new MemoryEntryMetadata
                 {
                     LlmProvider = "openai",
-                    LlmModel = "gpt-4"
+                    LlmModel = "gpt-4",
+                    TokensUsed = 100,
+                    ProcessingDuration = TimeSpan.FromSeconds(1.0)
                 }
             });
         }
