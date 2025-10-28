@@ -19,13 +19,15 @@
     <NoWarn>$(NoWarn);CA1515;CA1716</NoWarn>
   </PropertyGroup>
 
-  <!-- Preserve assemblies that are loaded via reflection (e.g., Serilog sinks) -->
+  <!-- Preserve assemblies that are loaded via reflection (e.g., Serilog sinks, MediatR handlers) -->
   <ItemGroup>
     <TrimmerRootAssembly Include="Serilog.Sinks.Console" />
     <TrimmerRootAssembly Include="Serilog.Sinks.File" />
     <TrimmerRootAssembly Include="Serilog.Enrichers.Environment" />
     <TrimmerRootAssembly Include="Serilog.Settings.Configuration" />
     <TrimmerRootAssembly Include="Anthropic.SDK" />
+    <TrimmerRootAssembly Include="MediatR" />
+    <TrimmerRootAssembly Include="FluentValidation" />
   </ItemGroup>
 
   <ItemGroup>
