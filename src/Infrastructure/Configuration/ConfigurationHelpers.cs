@@ -30,7 +30,7 @@ public static class ConfigurationHelpers
         bool expandHomeDirectory = true)
     {
         // Get TenSecondTom:MemoryDirectory with .NET's built-in precedence
-        var memoryDir = configuration[ConfigurationKeys.MemoryDirectoryKey] ??
+        var memoryDir = configuration[ConfigurationKeys.RootDirectoryKey] ??
                         Path.Combine(".", DirectoryNames.ApplicationRoot);
 
         if (expandHomeDirectory && memoryDir.Contains('~'))
@@ -95,7 +95,7 @@ public static class ConfigurationHelpers
     /// <returns>Absolute path to user configuration file (e.g., ~/ten-second-tom/config/config.json)</returns>
     public static string GetUserConfigPath(IConfiguration configuration)
     {
-        var memoryDir = configuration[ConfigurationKeys.MemoryDirectoryKey];
+        var memoryDir = configuration[ConfigurationKeys.RootDirectoryKey];
 
         if (string.IsNullOrWhiteSpace(memoryDir))
         {

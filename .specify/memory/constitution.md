@@ -1,22 +1,24 @@
 <!--
 Sync Impact Report:
-- Version change: 1.3.0 → 1.4.0
+- Version change: 1.3.0 → 1.7.0
+- Consolidated amendments: 1.4.0 (Options Pattern), 1.5.0 (MediatR), 1.6.0 (Pipeline Behaviors), 1.7.0 (Co-location Pattern)
 - Modified sections:
-  * Architecture & Design Standards (added Configuration Management subsection)
-  * Principle I - Modern .NET & Idiomatic C# (added Options Pattern reference)
+  * Architecture & Design Standards (added Configuration Management, updated Project Structure Standards)
+  * Principle I - Modern .NET & Idiomatic C# (added Options Pattern and MediatR references)
   * Code Quality (added Options Pattern reference)
-- Added sections:
-  * Configuration Management (mandatory Options Pattern usage, standards, and examples)
+- Added foundational standards:
+  * Configuration Management (Options Pattern mandatory)
+  * Co-location Pattern for VSA (foundational structure)
+  * MediatR pipeline behaviors for cross-cutting concerns
 - Templates requiring updates:
   * ✅ plan-template.md (no changes needed - already references constitution)
   * ✅ tasks-template.md (no changes needed - structure already established)
   * ✅ spec-template.md (no changes needed - user story focused)
 - Agent instruction files updated:
-  * ✅ CLAUDE.md (updated with comprehensive Options Pattern guidance)
-  * ✅ AGENTS.md (updated with Options Pattern section and examples)
-  * ✅ .github/copilot-instructions.md (updated with Options Pattern section and examples)
-- Rationale: The Options Pattern provides type-safe configuration with validation, IntelliSense support, testability, and eliminates magic strings. It is the recommended .NET approach for configuration management and aligns with modern C# best practices.
-- Follow-up TODOs: None - all updates completed
+  * ✅ CLAUDE.md (updated with Options Pattern, MediatR, and Co-location guidance)
+  * ✅ AGENTS.md (updated with all foundational patterns)
+  * ✅ .github/copilot-instructions.md (updated with all foundational patterns)
+- Rationale: These amendments establish foundational patterns for configuration management, CQRS implementation, and code organization that improve maintainability, type safety, and developer experience.
 -->
 
 # Ten Second Tom Constitution
@@ -251,23 +253,23 @@ public sealed class MyService
 
 **Rationale**: The Options Pattern provides type safety, compile-time checking, IntelliSense support, validation on startup, testability (mock options easily), and eliminates magic strings. It is the recommended .NET approach for configuration management and aligns with modern C# best practices. This pattern prevents runtime configuration errors and makes configuration contracts explicit and discoverable.
 
-### Project Structure Standards
+### Project Structure Standards (v1.7.0 - Co-location Pattern)
 
-**The following directory structure is MANDATORY for all features:**
+**The following directory structure with Co-location Pattern is MANDATORY for all features:**
 
 ```
 src/
 ├── Features/              # Vertical slices (self-contained feature modules)
 │   └── [FeatureName]/
-│       ├── Commands/      # Command classes (mutations, writes)
-│       ├── Queries/       # Query classes (reads) [if needed]
-│       ├── Handlers/      # Command/Query handlers (business logic)
-│       ├── Validation/    # FluentValidation validators [if needed]
+│       ├── [UseCase].cs   # Co-located Command/Query, Validator, Handler (one file per use case)
+│       ├── Migrations/    # Feature bootstrap migrations [if needed]
+│       ├── Services/      # Feature-specific domain services [if needed]
 │       └── DependencyInjection.cs  # Feature-specific DI registration
-├── Infrastructure/        # Cross-cutting concerns (DI, config, logging)
+├── Infrastructure/        # Cross-cutting concerns (DI, config, logging, behaviors)
+│   ├── Behaviors/         # MediatR pipeline behaviors
 │   ├── Configuration/     # App configuration setup
 │   ├── Logging/           # Serilog configuration
-│   └── DependencyInjection.cs  # Infrastructure-level DI
+│   └── DependencyInjection/
 ├── Shared/                # Shared domain models, abstractions, utilities
 │   ├── Models/            # Common domain models
 │   ├── Options/           # Configuration options classes (*Options.cs)
@@ -281,35 +283,99 @@ tests/
 ├── TenSecondTom.Tests/         # Unit tests (fast, isolated)
 │   └── Features/
 │       └── [FeatureName]/
-│           ├── Commands/       # Command tests
-│           ├── Queries/        # Query tests
-│           └── Handlers/       # Handler tests
+│           └── [UseCase]Tests.cs  # Tests mirror use case structure
 └── TenSecondTom.IntegrationTests/  # Integration tests
     ├── Features/
     │   └── [FeatureName]/      # Feature integration tests
     └── Cli/                    # CLI command tests
 ```
 
+**Co-location Pattern (REQUIRED):**
+
+All code for a single use case MUST be co-located in a single file as nested classes within a static container class:
+
+```csharp
+namespace TenSecondTom.Features.[FeatureName];
+
+/// <summary>
+/// [Brief description of what this use case does]
+/// </summary>
+public static class [UseCase]
+{
+    /// <summary>
+    /// Command/Query representing the request
+    /// </summary>
+    public sealed record Command(...parameters...)
+        : IRequest<Result<TResponse>>;
+
+    /// <summary>
+    /// Validator for the command (auto-discovered by FluentValidation)
+    /// </summary>
+    public sealed class Validator : AbstractValidator<Command>
+    {
+        public Validator()
+        {
+            // Validation rules
+        }
+    }
+
+    /// <summary>
+    /// Handler executing the business logic (auto-discovered by MediatR)
+    /// </summary>
+    public sealed class Handler(
+        IDependency1 dep1,
+        IDependency2 dep2,
+        ILogger<Handler> logger)
+        : IRequestHandler<Command, Result<TResponse>>
+    {
+        public async Task<Result<TResponse>> Handle(
+            Command request,
+            CancellationToken cancellationToken)
+        {
+            // Business logic here
+            // Input is already validated by ValidationPipelineBehavior
+            // Execution is already logged by RequestLoggingPipelineBehavior
+        }
+    }
+}
+```
+
+**Benefits of Co-location:**
+- ✅ Single source of truth - everything for one use case in one place
+- ✅ Reduced navigation - no jumping between Commands/, Queries/, Handlers/ folders
+- ✅ Easier to understand - see command, validation, and logic together
+- ✅ Industry pattern - used by ConciergeWorkflowServices, FastEndpoints, Jimmy Bogard
+- ✅ Zero boilerplate - assembly scanning auto-discovers nested classes
+
 **Feature Organization Rules:**
 
 1. **Self-Contained Slices**: Each feature in `src/Features/[FeatureName]` MUST contain all code specific to that feature
-2. **Commands vs Queries**: Separate commands (write/mutate) from queries (read-only) in dedicated folders
-3. **Handler Collocation**: Handlers MUST be in the same feature folder as their commands/queries
-4. **DI Registration**: Each feature MUST have its own `DependencyInjection.cs` with an extension method for service registration
+2. **One Use Case Per File**: Each `[UseCase].cs` file contains exactly one static class with nested Command/Query, Validator (optional), and Handler
+3. **Assembly Scanning**: MediatR and FluentValidation automatically discover nested handlers and validators - no manual registration required
+4. **DI Registration**: Each feature MUST have its own `DependencyInjection.cs` with an extension method for service registration (feature-specific services only)
 5. **No Cross-Feature Dependencies**: Features MUST NOT directly reference other features; use `Shared/` for common code
-6. **Infrastructure Separation**: Cross-cutting concerns (logging, config, auth) belong in `Infrastructure/`, not `Features/`
+6. **Infrastructure Separation**: Cross-cutting concerns (logging, config, auth, pipeline behaviors) belong in `Infrastructure/`, not `Features/`
 7. **Configuration Organization**: All options classes belong in `Shared/Options/`, validators in `Shared/Options/Validation/`
-8. **Test Mirroring**: Test structure MUST mirror source structure for discoverability
+8. **Test Mirroring**: Test structure MUST mirror source structure - one `[UseCase]Tests.cs` file per use case
 
-**Naming Conventions for Vertical Slices:**
+**Naming Conventions (Co-location Pattern):**
 
-- Feature folders: PascalCase singular (e.g., `Auth`, `Setup`, `Search`)
-- Command classes: `[Verb][Noun]Command` (e.g., `CreateUserCommand`, `UpdateSettingsCommand`)
-- Query classes: `Get[Noun]Query` or `List[Noun]Query` (e.g., `GetUserQuery`, `ListItemsQuery`)
-- Handler classes: `[Command/Query]Handler` (e.g., `CreateUserCommandHandler`, `GetUserQueryHandler`)
+- Feature folders: PascalCase singular (e.g., `Auth`, `Today`, `Generate`)
+- Use case files: `[Verb][Noun].cs` (e.g., `CreateUser.cs`, `ListTemplates.cs`, `GenerateOutput.cs`)
+- Static container: `public static class [UseCase]` (matches file name without .cs)
+- Nested Command: `public sealed record Command(...) : IRequest<Result<T>>`
+- Nested Query: `public sealed record Query(...) : IRequest<Result<T>>`
+- Nested Validator: `public sealed class Validator : AbstractValidator<Command>` (optional)
+- Nested Handler: `public sealed class Handler(...) : IRequestHandler<Command, Result<T>>`
+- Test files: `[UseCase]Tests.cs` (e.g., `CreateUserTests.cs`, `ListTemplatesTests.cs`)
 - Options classes: `[Feature]Options` (e.g., `StorageOptions`, `LlmOptions`, `AuthOptions`)
 - Validators: `[Options]Validator` (e.g., `StorageOptionsValidator`, `LlmOptionsValidator`)
-- DI method: `AddFeature[FeatureName]Services` (e.g., `AddFeatureAuthServices`)
+- DI method: `Add[FeatureName]Feature` (e.g., `AddAuthFeature`, `AddTemplatesFeature`)
+
+**Example Use Cases:**
+- `CreateDailyEntry.cs` - Contains `CreateDailyEntry.Command`, `.Validator`, `.Handler`
+- `ListTemplates.cs` - Contains `ListTemplates.Query`, `.Handler` (validator optional)
+- `GenerateOutput.cs` - Contains `GenerateOutput.Command`, `.Handler`
 
 **This structure is the canonical reference for VSA implementation and MUST be followed for all new features.**
 
@@ -457,27 +523,39 @@ Console.WriteLine("Setup complete! Run 'tom today' to get started.");
 - Consult constitution before major architectural decisions
 - Educate new contributors on constitutional requirements
 
-**Version**: 1.4.0 | **Ratified**: 2025-10-01 | **Last Amended**: 2025-10-28
+**Version**: 1.7.0 | **Ratified**: 2025-10-01 | **Last Amended**: 2025-10-28
 
 ---
 
 ## Changelog
 
+### Version 1.7.0 (2025-10-28)
+
+- **MINOR**: Established Co-location Pattern as foundational standard for Vertical Slice Architecture
+- Mandated single-file organization per use case (Command/Query, Validator, Handler as nested classes)
+- Established naming conventions: `[Verb][Noun].cs` files with `Command`, `Query`, `Validator`, `Handler` nested classes
+- Documented assembly scanning for automatic discovery (MediatR handlers, FluentValidation validators)
+- Rationale: Single source of truth per use case, reduced navigation, improved maintainability
+
+### Version 1.6.0 (2025-10-28)
+
+- **MINOR**: Established MediatR pipeline behaviors as foundational pattern for cross-cutting concerns
+- Mandated Infrastructure/Behaviors/ for ValidationPipelineBehavior and RequestLoggingPipelineBehavior
+- Rationale: Centralize validation and logging, reduce handler boilerplate
+
+### Version 1.5.0 (2025-10-28)
+
+- **MINOR**: Established assembly scanning as foundational pattern for MediatR and FluentValidation
+- Eliminated requirement for manual handler registration
+- Rationale: Reduce boilerplate, improve developer experience
+
 ### Version 1.4.0 (2025-10-28)
 
-- **MINOR**: Added Configuration Management subsection to Architecture & Design Standards
-- Mandated use of .NET Options Pattern for all configuration management
-- Prohibited direct `IConfiguration` access with string keys (stringly-typed configuration)
-- Required strongly-typed `*Options` classes in `Shared/Options/` directory
-- Required validators implementing `IValidateOptions<T>` in `Shared/Options/Validation/`
+- **MINOR**: Established Options Pattern as mandatory standard for configuration management
+- Prohibited direct `IConfiguration` access with string keys
+- Mandated strongly-typed `*Options` classes in `Shared/Options/` with `IValidateOptions<T>` validators
 - Documented Options Pattern interfaces: `IOptions<T>`, `IOptionsSnapshot<T>`, `IOptionsMonitor<T>`
-- Established naming conventions: `*Options.cs`, `*OptionsValidator.cs`
-- Added comprehensive examples showing anti-patterns and recommended patterns
-- Enhanced Principle I with Options Pattern reference
-- Enhanced Code Quality section with Options Pattern requirement
-- Enhanced Naming Conventions with Options and Validators
-- Enhanced Project Structure Standards with `Shared/Options/` directory
-- Purpose: Provide type-safe configuration with validation, IntelliSense support, testability, and eliminate magic strings in configuration access
+- Rationale: Type-safe configuration with validation, IntelliSense support, testability
 
 ### Version 1.3.0 (2025-10-21)
 

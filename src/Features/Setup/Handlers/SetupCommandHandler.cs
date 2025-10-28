@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Setup.Commands;
 using TenSecondTom.Features.Setup.Models;
-using TenSecondTom.Features.Setup.Queries;
+using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Results;
@@ -124,7 +124,7 @@ public sealed class SetupCommandHandler
             // Step 4: Memory Directory Configuration
             _wizardUI.ShowStepHeader(4, 8, "Memory Storage Location");
             var memoryDirectory = await _wizardUI.PromptForMemoryDirectoryAsync(
-                command.ExistingConfiguration?.Storage.MemoryDirectory,
+                command.ExistingConfiguration?.RootDirectory,
                 cancellationToken);
 
             if (string.IsNullOrWhiteSpace(memoryDirectory))
@@ -151,13 +151,14 @@ public sealed class SetupCommandHandler
             
             var newConfiguration = new ConfigurationSettings
             {
+                RootDirectory = memoryDirectory,
                 Ssh = new SshConfiguration
                 {
                     KeyPath = selectedSshKey?.FilePath,
                     KeySource = selectedSshKey?.Source,
                     KeyDisplayName = selectedSshKey?.DisplayName,
-                    AgentSocketPath = selectedSshKey?.Source != SshKeySource.FileSystem 
-                        ? GetAgentSocketPath(selectedSshKey?.Source) 
+                    AgentSocketPath = selectedSshKey?.Source != SshKeySource.FileSystem
+                        ? GetAgentSocketPath(selectedSshKey?.Source)
                         : null
                 },
                 Llm = new LlmConfiguration
@@ -171,7 +172,6 @@ public sealed class SetupCommandHandler
                 },
                 Storage = new StorageConfiguration
                 {
-                    MemoryDirectory = memoryDirectory,
                     CreateIfMissing = true
                 },
                 Optional = new OptionalConfiguration

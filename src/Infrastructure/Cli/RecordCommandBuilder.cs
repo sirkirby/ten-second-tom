@@ -2,7 +2,7 @@ using System.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
-using TenSecondTom.Features.Audio.Commands;
+using TenSecondTom.Features.Audio;
 using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Configuration;
@@ -113,7 +113,7 @@ internal static class RecordCommandBuilder
             }
 
             // Get handler
-            var handler = serviceProvider.GetService<TenSecondTom.Features.Audio.Handlers.RecordCommandHandler>();
+            var handler = serviceProvider.GetService<Record.Handler>();
             if (handler is null)
             {
                 CommandOutputFormatter.WriteError(
@@ -129,7 +129,7 @@ internal static class RecordCommandBuilder
             }
 
             // Execute command with configured timeout
-            var command = new RecordCommand
+            var command = new Record.Command
             {
                 AudioConfig = ConvertSttSelectionToConfig(sttSelection, audioConfig),
                 MaxDurationSeconds = audioConfig.Timeouts.RecordSeconds  // Use configured timeout

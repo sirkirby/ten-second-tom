@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
-using TenSecondTom.Features.Templates.Models;
+using TenSecondTom.Infrastructure.Prompts;
 
 namespace TenSecondTom.Infrastructure.Cli;
 
@@ -22,7 +22,7 @@ public sealed class TemplateSelectionUI : ITemplateSelectionUI
 
     /// <inheritdoc/>
     public async Task<string?> SelectTemplateAsync(
-        IReadOnlyList<TemplateListItem> templates,
+        IReadOnlyList<TemplateInfo> templates,
         string commandContext,
         CancellationToken cancellationToken = default)
     {
@@ -69,7 +69,7 @@ public sealed class TemplateSelectionUI : ITemplateSelectionUI
 
         try
         {
-            var prompt = new SelectionPrompt<TemplateListItem>()
+            var prompt = new SelectionPrompt<TemplateInfo>()
                 .Title($"Select a template for [green]{EscapeMarkup(commandContext)}[/]:")
                 .PageSize(10)
                 .MoreChoicesText("[grey](Move up and down to reveal more templates)[/]")
@@ -118,7 +118,7 @@ public sealed class TemplateSelectionUI : ITemplateSelectionUI
     /// A formatted string with Spectre.Console markup showing the template's
     /// title in yellow, description in grey, and a default badge if applicable.
     /// </returns>
-    private static string FormatTemplateOption(TemplateListItem template)
+    private static string FormatTemplateOption(TemplateInfo template)
     {
         var title = EscapeMarkup(template.Title);
         var description = EscapeMarkup(template.Description);

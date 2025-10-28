@@ -1,37 +1,36 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using TenSecondTom.Features.Retry.Commands;
-using TenSecondTom.Features.Retry.Handlers;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Storage;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Features.Retry;
 
 namespace TenSecondTom.Tests.Unit.Features.Retry;
 
 /// <summary>
-/// Unit tests for RetryFailedSummarizationHandler.
+/// Unit tests for RetryFailedSummarization.Handler.
 /// Tests the retry mechanism for entries where LLM summarization failed.
 /// </summary>
 public sealed class RetryFailedSummarizationHandlerTests
 {
     private readonly Mock<IMemoryStorageProvider> _mockStorage;
     private readonly Mock<ILlmProvider> _mockLlmProvider;
-    private readonly Mock<ILogger<RetryFailedSummarizationHandler>> _mockLogger;
+    private readonly Mock<ILogger<RetryFailedSummarization.Handler>> _mockLogger;
 
     public RetryFailedSummarizationHandlerTests()
     {
         _mockStorage = new Mock<IMemoryStorageProvider>();
         _mockLlmProvider = new Mock<ILlmProvider>();
-        _mockLogger = new Mock<ILogger<RetryFailedSummarizationHandler>>();
+        _mockLogger = new Mock<ILogger<RetryFailedSummarization.Handler>>();
     }
 
     [Fact]
     public async Task Handle_WithNoEntryId_RetriesAllFailedEntries()
     {
         // Arrange
-        var handler = new RetryFailedSummarizationHandler(
+        var handler = new RetryFailedSummarization.Handler(
             _mockStorage.Object,
             _mockLlmProvider.Object,
             _mockLogger.Object);
@@ -63,10 +62,10 @@ public sealed class RetryFailedSummarizationHandlerTests
             .Setup(s => s.SaveAsync(It.IsAny<MemoryEntry>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((MemoryEntry e, CancellationToken _) => Result<MemoryEntry>.Success(e));
 
-        var command = new RetryFailedSummarizationCommand();
+        var command = new RetryFailedSummarization.Command();
 
         // Act
-        Result<RetryResult> result = await handler.Handle(command, CancellationToken.None);
+        Result<RetryFailedSummarization.Result> result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -79,7 +78,7 @@ public sealed class RetryFailedSummarizationHandlerTests
     public async Task Handle_WithSpecificEntryId_RetriesOnlyThatEntry()
     {
         // Arrange
-        var handler = new RetryFailedSummarizationHandler(
+        var handler = new RetryFailedSummarization.Handler(
             _mockStorage.Object,
             _mockLlmProvider.Object,
             _mockLogger.Object);
@@ -107,13 +106,13 @@ public sealed class RetryFailedSummarizationHandlerTests
             .Setup(s => s.SaveAsync(It.IsAny<MemoryEntry>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((MemoryEntry e, CancellationToken _) => Result<MemoryEntry>.Success(e));
 
-        var command = new RetryFailedSummarizationCommand
+        var command = new RetryFailedSummarization.Command
         {
             EntryId = "today-10-02-2025-1"
         };
 
         // Act
-        Result<RetryResult> result = await handler.Handle(command, CancellationToken.None);
+        Result<RetryFailedSummarization.Result> result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -125,7 +124,7 @@ public sealed class RetryFailedSummarizationHandlerTests
     public async Task Handle_WhenEntryNotFound_ReturnsError()
     {
         // Arrange
-        var handler = new RetryFailedSummarizationHandler(
+        var handler = new RetryFailedSummarization.Handler(
             _mockStorage.Object,
             _mockLlmProvider.Object,
             _mockLogger.Object);
@@ -134,13 +133,13 @@ public sealed class RetryFailedSummarizationHandlerTests
             .Setup(s => s.GetEntryByIdAsync("nonexistent-id", It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<MemoryEntry?>.Success(null));
 
-        var command = new RetryFailedSummarizationCommand
+        var command = new RetryFailedSummarization.Command
         {
             EntryId = "nonexistent-id"
         };
 
         // Act
-        Result<RetryResult> result = await handler.Handle(command, CancellationToken.None);
+        Result<RetryFailedSummarization.Result> result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeFalse();
@@ -151,7 +150,7 @@ public sealed class RetryFailedSummarizationHandlerTests
     public async Task Handle_WhenEntryNotFailed_SkipsEntry()
     {
         // Arrange
-        var handler = new RetryFailedSummarizationHandler(
+        var handler = new RetryFailedSummarization.Handler(
             _mockStorage.Object,
             _mockLlmProvider.Object,
             _mockLogger.Object);
@@ -162,13 +161,13 @@ public sealed class RetryFailedSummarizationHandlerTests
             .Setup(s => s.GetEntryByIdAsync("today-10-02-2025-1", It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<MemoryEntry?>.Success(successfulEntry));
 
-        var command = new RetryFailedSummarizationCommand
+        var command = new RetryFailedSummarization.Command
         {
             EntryId = "today-10-02-2025-1"
         };
 
         // Act
-        Result<RetryResult> result = await handler.Handle(command, CancellationToken.None);
+        Result<RetryFailedSummarization.Result> result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeFalse();
@@ -179,7 +178,7 @@ public sealed class RetryFailedSummarizationHandlerTests
     public async Task Handle_WhenLlmRetryFails_RecordsFailure()
     {
         // Arrange
-        var handler = new RetryFailedSummarizationHandler(
+        var handler = new RetryFailedSummarization.Handler(
             _mockStorage.Object,
             _mockLlmProvider.Object,
             _mockLogger.Object);
@@ -198,13 +197,13 @@ public sealed class RetryFailedSummarizationHandlerTests
                 It.IsAny<double?>()))
             .ReturnsAsync(Result<LlmResponse>.Failure("LLM API error"));
 
-        var command = new RetryFailedSummarizationCommand
+        var command = new RetryFailedSummarization.Command
         {
             EntryId = "today-10-02-2025-1"
         };
 
         // Act
-        Result<RetryResult> result = await handler.Handle(command, CancellationToken.None);
+        Result<RetryFailedSummarization.Result> result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -218,7 +217,7 @@ public sealed class RetryFailedSummarizationHandlerTests
     public async Task Handle_OnSuccess_RemovesFailedFlag()
     {
         // Arrange
-        var handler = new RetryFailedSummarizationHandler(
+        var handler = new RetryFailedSummarization.Handler(
             _mockStorage.Object,
             _mockLlmProvider.Object,
             _mockLogger.Object);
@@ -248,13 +247,13 @@ public sealed class RetryFailedSummarizationHandlerTests
             .Callback<MemoryEntry, CancellationToken>((e, _) => savedEntry = e)
             .ReturnsAsync((MemoryEntry e, CancellationToken _) => Result<MemoryEntry>.Success(e));
 
-        var command = new RetryFailedSummarizationCommand
+        var command = new RetryFailedSummarization.Command
         {
             EntryId = "today-10-02-2025-1"
         };
 
         // Act
-        Result<RetryResult> result = await handler.Handle(command, CancellationToken.None);
+        Result<RetryFailedSummarization.Result> result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -266,7 +265,7 @@ public sealed class RetryFailedSummarizationHandlerTests
     public async Task Handle_WithNoFailedEntries_ReturnsZeroAttempts()
     {
         // Arrange
-        var handler = new RetryFailedSummarizationHandler(
+        var handler = new RetryFailedSummarization.Handler(
             _mockStorage.Object,
             _mockLlmProvider.Object,
             _mockLogger.Object);
@@ -279,10 +278,10 @@ public sealed class RetryFailedSummarizationHandlerTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyList<MemoryEntry>>.Success(Array.Empty<MemoryEntry>()));
 
-        var command = new RetryFailedSummarizationCommand();
+        var command = new RetryFailedSummarization.Command();
 
         // Act
-        Result<RetryResult> result = await handler.Handle(command, CancellationToken.None);
+        Result<RetryFailedSummarization.Result> result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();

@@ -1,28 +1,27 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using TenSecondTom.Features.Audio.Commands;
-using TenSecondTom.Features.Audio.Handlers;
+using TenSecondTom.Features.Audio;
 using TenSecondTom.Features.Audio.Models;
-using TenSecondTom.Shared.Models;
 using TenSecondTom.Features.Audio.Services;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Tests.Features.Audio.Handlers;
 
 /// <summary>
-/// Tests for <see cref="RecordAudioCommandHandler"/>.
+/// Tests for <see cref="RecordAudio.Handler"/>.
 /// Validates audio recording orchestration and AudioRecording creation.
 /// </summary>
 public sealed class RecordAudioCommandHandlerTests
 {
     private readonly Mock<IAudioRecorder> _mockRecorder;
-    private readonly Mock<ILogger<RecordAudioCommandHandler>> _mockLogger;
+    private readonly Mock<ILogger<RecordAudio.Handler>> _mockLogger;
 
     public RecordAudioCommandHandlerTests()
     {
         _mockRecorder = new Mock<IAudioRecorder>();
-        _mockLogger = new Mock<ILogger<RecordAudioCommandHandler>>();
+        _mockLogger = new Mock<ILogger<RecordAudio.Handler>>();
     }
 
     [Fact]
@@ -30,7 +29,7 @@ public sealed class RecordAudioCommandHandlerTests
     {
         // Arrange
         var outputPath = "/path/to/recording.wav";
-        var command = new RecordAudioCommand
+        var command = new RecordAudio.Command
         {
             OutputPath = outputPath
         };
@@ -69,7 +68,7 @@ public sealed class RecordAudioCommandHandlerTests
     {
         // Arrange
         var outputPath = "/path/to/recording.wav";
-        var command = new RecordAudioCommand { OutputPath = outputPath };
+        var command = new RecordAudio.Command { OutputPath = outputPath };
 
         var recording = new AudioRecording
         {
@@ -104,7 +103,7 @@ public sealed class RecordAudioCommandHandlerTests
     public async Task Handle_WhenRecordingFails_ReturnsFailure()
     {
         // Arrange
-        var command = new RecordAudioCommand { OutputPath = "/path/to/recording.wav" };
+        var command = new RecordAudio.Command { OutputPath = "/path/to/recording.wav" };
 
         _mockRecorder
             .Setup(r => r.RecordAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
@@ -125,7 +124,7 @@ public sealed class RecordAudioCommandHandlerTests
     {
         // Arrange
         var outputPath = "/path/to/recording.wav";
-        var command = new RecordAudioCommand { OutputPath = outputPath };
+        var command = new RecordAudio.Command { OutputPath = outputPath };
 
         var recording = new AudioRecording
         {
@@ -161,7 +160,7 @@ public sealed class RecordAudioCommandHandlerTests
     {
         // Arrange
         var outputPath = "/path/to/recording.wav";
-        var command = new RecordAudioCommand { OutputPath = outputPath };
+        var command = new RecordAudio.Command { OutputPath = outputPath };
 
         var recording = new AudioRecording
         {
@@ -196,7 +195,7 @@ public sealed class RecordAudioCommandHandlerTests
     public async Task Handle_RespectsCancellationToken()
     {
         // Arrange
-        var command = new RecordAudioCommand { OutputPath = "/path/to/recording.wav" };
+        var command = new RecordAudio.Command { OutputPath = "/path/to/recording.wav" };
         var cts = new CancellationTokenSource();
         cts.Cancel();
 
@@ -217,7 +216,7 @@ public sealed class RecordAudioCommandHandlerTests
     public async Task Handle_WithNullOutputPath_ThrowsException()
     {
         // Arrange
-        var command = new RecordAudioCommand { OutputPath = null! };
+        var command = new RecordAudio.Command { OutputPath = null! };
         var handler = CreateHandler();
 
         // Act
@@ -232,7 +231,7 @@ public sealed class RecordAudioCommandHandlerTests
     public async Task Handle_WithEmptyOutputPath_ThrowsException()
     {
         // Arrange
-        var command = new RecordAudioCommand { OutputPath = string.Empty };
+        var command = new RecordAudio.Command { OutputPath = string.Empty };
         var handler = CreateHandler();
 
         // Act
@@ -248,7 +247,7 @@ public sealed class RecordAudioCommandHandlerTests
     {
         // Arrange
         var outputPath = "/path/to/recording.wav";
-        var command = new RecordAudioCommand { OutputPath = outputPath };
+        var command = new RecordAudio.Command { OutputPath = outputPath };
 
         var recording = new AudioRecording
         {
@@ -278,8 +277,8 @@ public sealed class RecordAudioCommandHandlerTests
             "Recording should meet whisper.cpp requirements");
     }
 
-    private RecordAudioCommandHandler CreateHandler()
+    private RecordAudio.Handler CreateHandler()
     {
-        return new RecordAudioCommandHandler(_mockRecorder.Object, _mockLogger.Object);
+        return new RecordAudio.Handler(_mockRecorder.Object, _mockLogger.Object);
     }
 }

@@ -1,12 +1,12 @@
 using FluentAssertions;
-using TenSecondTom.Features.Setup.Commands;
 using TenSecondTom.Features.Setup.Models;
+using TenSecondTom.Features.Setup.Commands;
 
 namespace TenSecondTom.Tests.Unit.Features.Setup.Commands;
 
 /// <summary>
-/// Contract tests for ConfigCommand
-/// Tests the command structure, validation, and all scenarios from ConfigCommand.contract.md
+/// Contract tests for Config.Command
+/// Tests the command structure, validation, and all scenarios from Config.Command.contract.md
 /// </summary>
 public sealed class ConfigCommandTests
 {

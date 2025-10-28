@@ -7,6 +7,7 @@ using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.IntegrationTests.TestHelpers;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Features.Setup;
 
 namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
 
@@ -52,6 +53,7 @@ public sealed class EnvironmentVariableConfigTests : UserSecretsTestFixture
 
         var configurationWithModel = new ConfigurationSettings
         {
+            RootDirectory = _testDirectory.BasePath,
             Ssh = new SshConfiguration { KeyPath = "/home/user/.ssh/id_ed25519" },
             Llm = new LlmConfiguration
             {
@@ -59,7 +61,7 @@ public sealed class EnvironmentVariableConfigTests : UserSecretsTestFixture
                 ApiKey = "sk-test-key",
                 Model = "gpt-4o-mini" // appsettings.json model
             },
-            Storage = new StorageConfiguration { MemoryDirectory = _testDirectory.BasePath }
+            Storage = new StorageConfiguration()
         };
 
         var saveResult = await storageService.SaveAsync(configurationWithModel, CancellationToken.None);

@@ -1,9 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using TenSecondTom.Features.ThisWeek.Commands;
-using TenSecondTom.Features.ThisWeek.Handlers;
-using TenSecondTom.Shared.Contracts;
-using TenSecondTom.Shared.Models;
-using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.ThisWeek;
 
@@ -17,12 +12,15 @@ public static class ThisWeekFeatureExtensions
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// MediatR assembly scanning automatically discovers and registers IRequestHandler interfaces.
+    /// Concrete handlers are registered here for direct dependency injection when needed.
+    /// </remarks>
     public static IServiceCollection AddThisWeekFeature(this IServiceCollection services)
     {
-        // Register command handler (dual registration: concrete + interface)
-        services.AddTransient<CreateWeeklyReviewHandler>();
-        services.AddTransient<IRequestHandler<CreateWeeklyReviewCommand, Result<WeeklyEntry>>>(
-            sp => sp.GetRequiredService<CreateWeeklyReviewHandler>());
+        // Register concrete handler for direct resolution
+        // IRequestHandler interface is auto-registered by MediatR assembly scanning
+        services.AddTransient<CreateWeeklyReview.Handler>();
 
         return services;
     }

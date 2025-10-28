@@ -4,13 +4,13 @@ using Moq;
 using TenSecondTom.Features.Setup.Commands;
 using TenSecondTom.Features.Setup.Handlers;
 using TenSecondTom.Features.Setup.Models;
-using TenSecondTom.Features.Setup.Queries;
+using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Results;
 using Xunit;
 
-namespace TenSecondTom.Tests.Unit.Features.Setup.Handlers;
+namespace SetupCommandHandlers;
 
 /// <summary>
 /// Unit tests for <see cref="SetupCommandHandler"/>
@@ -115,7 +115,7 @@ public sealed class SetupCommandHandlerTests
         result.Value.Should().NotBeNull();
         result.Value.Llm.Provider.Should().Be(LlmProvider.OpenAI);
         result.Value.Llm.ApiKey.Should().Be("sk-test123456789012345678901234567890123456789012");
-        result.Value.Storage.MemoryDirectory.Should().NotBeNullOrWhiteSpace();
+        result.Value.RootDirectory.Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -209,7 +209,7 @@ public sealed class SetupCommandHandlerTests
         savedConfig.Should().NotBeNull();
         savedConfig!.Llm.Provider.Should().Be(LlmProvider.OpenAI);
         savedConfig.Llm.ApiKey.Should().NotBeNullOrWhiteSpace();
-        savedConfig.Storage.MemoryDirectory.Should().NotBeNullOrWhiteSpace();
+        savedConfig.RootDirectory.Should().NotBeNullOrWhiteSpace();
         savedConfig.Optional.LogLevel.Should().Be(Microsoft.Extensions.Logging.LogLevel.Information);
         savedConfig.Optional.RetentionDays.Should().Be(30);
     }
@@ -460,9 +460,9 @@ public sealed class SetupCommandHandlerTests
                 ApiKey = "sk-test123456789012345678901234567890123456789012",
                 Model = null
             },
+            RootDirectory = "/Users/test/.memory/ten-second-tom",
             Storage = new StorageConfiguration
             {
-                MemoryDirectory = "/Users/test/.memory/ten-second-tom",
                 CreateIfMissing = true
             },
             Optional = new OptionalConfiguration
@@ -555,8 +555,8 @@ public sealed class SetupCommandHandlerTests
 
         // Assert
         savedConfig.Should().NotBeNull();
-        savedConfig!.Storage.MemoryDirectory.Should().Contain(DirectoryNames.ApplicationRoot);
-        savedConfig.Storage.MemoryDirectory.Should().NotContain(".memory", "root directory should not have .memory subdirectory");
+        savedConfig!.RootDirectory.Should().Contain(DirectoryNames.ApplicationRoot);
+        savedConfig.RootDirectory.Should().NotContain(".memory", "root directory should not have .memory subdirectory");
     }
 
     [Fact]
@@ -631,7 +631,7 @@ public sealed class SetupCommandHandlerTests
         savedConfig!.Optional.EnableTelemetry.Should().BeFalse();
     }
 
-    // NOTE: This test is commented out because SetupCommandHandler no longer uses IConfiguration directly.
+    // NOTE: This test is commented out because Setup.Handler no longer uses IConfiguration directly.
     // Environment variable configuration is now handled at the Program.cs level and tested in integration tests.
     // See SetupWithTemplatesIntegrationTests for end-to-end environment variable testing.
 
@@ -665,7 +665,7 @@ public sealed class SetupCommandHandlerTests
     //     // Assert
     //     capturedDefault.Should().Be(envMemoryDir, "environment variable should be passed as default");
     //     savedConfig.Should().NotBeNull();
-    //     savedConfig!.Storage.MemoryDirectory.Should().Be(envMemoryDir);
+    //     savedConfig!.RootDirectory.Should().Be(envMemoryDir);
     //
     //     // Verify debug logging
     //     _mockLogger.Verify(
@@ -937,7 +937,6 @@ public sealed class SetupCommandHandlerTests
             .ReturnsAsync(Result<string>.Success("/Users/test/.microsoft/usersecrets/secrets.json"));
     }
 
-
     private static ConfigurationSettings CreateValidConfiguration()
     {
         return new ConfigurationSettings
@@ -954,9 +953,9 @@ public sealed class SetupCommandHandlerTests
                 ApiKey = "sk-test123456789012345678901234567890123456789012",
                 Model = null
             },
+            RootDirectory = "/Users/test/.memory/ten-second-tom",
             Storage = new StorageConfiguration
             {
-                MemoryDirectory = "/Users/test/.memory/ten-second-tom",
                 CreateIfMissing = true
             },
             Optional = new OptionalConfiguration

@@ -3,8 +3,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using TenSecondTom.Features.Setup.Models;
-using TenSecondTom.Features.Today.Commands;
-using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Llm;
@@ -14,11 +12,12 @@ using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Features.Today;
 
 namespace TenSecondTom.Tests.Unit.Features.Today;
 
 /// <summary>
-/// Unit tests for CreateDailyEntryHandler per contract specification.
+/// Unit tests for CreateDailyEntry.Handler per contract specification.
 /// Tests cover command validation, LLM provider interaction, storage operations,
 /// authentication, and error handling scenarios.
 /// </summary>
@@ -30,10 +29,10 @@ public sealed class CreateDailyEntryHandlerTests
     private readonly Mock<IPromptTemplateLoader> _mockPromptLoader;
     private readonly Mock<IAuthenticationService> _mockAuthService;
     private readonly Mock<IOptions<LlmOptions>> _mockLlmOptions;
-    private readonly Mock<ILogger<CreateDailyEntryHandler>> _mockLogger;
-    private readonly TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler _listTemplatesHandler;
+    private readonly Mock<ILogger<CreateDailyEntry.Handler>> _mockLogger;
+    private readonly Mock<ITemplateProvider> _mockTemplateProvider;
     private readonly Mock<ITemplateSelectionUI> _mockTemplateSelectionUI;
-    private readonly CreateDailyEntryHandler _handler;
+    private readonly CreateDailyEntry.Handler _handler;
 
     public CreateDailyEntryHandlerTests()
     {
@@ -43,11 +42,8 @@ public sealed class CreateDailyEntryHandlerTests
         _mockPromptLoader = new Mock<IPromptTemplateLoader>();
         _mockAuthService = new Mock<IAuthenticationService>();
         _mockLlmOptions = new Mock<IOptions<LlmOptions>>();
-        _mockLogger = new Mock<ILogger<CreateDailyEntryHandler>>();
-        var mockListTemplatesLogger = new Mock<ILogger<TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler>>();
-        _listTemplatesHandler = new TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler(
-            _mockPromptLoader.Object,
-            mockListTemplatesLogger.Object);
+        _mockLogger = new Mock<ILogger<CreateDailyEntry.Handler>>();
+        _mockTemplateProvider = new Mock<ITemplateProvider>();
         _mockTemplateSelectionUI = new Mock<ITemplateSelectionUI>();
 
         // Setup default LLM options
@@ -96,14 +92,14 @@ public sealed class CreateDailyEntryHandlerTests
         _mockStorage.Setup(s => s.SaveAsync(It.IsAny<DailyEntry>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((DailyEntry entry, CancellationToken _) => Result<MemoryEntry>.Success(entry));
 
-        _handler = new CreateDailyEntryHandler(
+        _handler = new CreateDailyEntry.Handler(
             _mockStorage.Object,
             _mockLlmFactory.Object,
             _mockPromptLoader.Object,
             _mockAuthService.Object,
             _mockLlmOptions.Object,
             _mockLogger.Object,
-            _listTemplatesHandler,
+            _mockTemplateProvider.Object,
             _mockTemplateSelectionUI.Object);
     }
 
@@ -111,7 +107,7 @@ public sealed class CreateDailyEntryHandlerTests
     public async Task Handle_WithValidCommand_CreatesDailyEntry()
     {
         // Arrange
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Had a productive meeting today.\nPlanning to finish the design doc tomorrow.\nFeeling energized and focused."
         };
@@ -137,7 +133,7 @@ public sealed class CreateDailyEntryHandlerTests
     public async Task Handle_WithEmptyContent_ReturnsValidationError()
     {
         // Arrange
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = string.Empty
         };
@@ -158,7 +154,7 @@ public sealed class CreateDailyEntryHandlerTests
     public async Task Handle_WithWhitespaceOnlyContent_ReturnsValidationError()
     {
         // Arrange
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "   \t\n   "
         };
@@ -180,7 +176,7 @@ public sealed class CreateDailyEntryHandlerTests
     {
         // Arrange
         var multiLineContent = "First line of my day\nSecond line with details\n\nThird line after blank";
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = multiLineContent
         };
@@ -202,7 +198,7 @@ public sealed class CreateDailyEntryHandlerTests
     public async Task Handle_WhenLlmProviderFails_SavesUserInputAndReturnsError()
     {
         // Arrange
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Had a productive meeting today.\nPlanning to finish the design doc tomorrow.\nFeeling energized and focused."
         };
@@ -234,7 +230,7 @@ public sealed class CreateDailyEntryHandlerTests
     public async Task Handle_WhenStorageFails_ReturnsStorageError()
     {
         // Arrange
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Had a productive meeting today.\nPlanning to finish the design doc tomorrow.\nFeeling energized and focused."
         };
@@ -255,7 +251,7 @@ public sealed class CreateDailyEntryHandlerTests
     public async Task Handle_WithOpenAIProvider_UsesOpenAI()
     {
         // Arrange
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Had a productive meeting today.\nPlanning to finish the design doc tomorrow.\nFeeling energized and focused.",
             LlmProviderOverride = "OpenAI"
@@ -279,7 +275,7 @@ public sealed class CreateDailyEntryHandlerTests
     public async Task Handle_WithAnthropicProvider_UsesAnthropic()
     {
         // Arrange
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Had a productive meeting today.\nPlanning to finish the design doc tomorrow.\nFeeling energized and focused.",
             LlmProviderOverride = "Anthropic"
@@ -303,7 +299,7 @@ public sealed class CreateDailyEntryHandlerTests
     public async Task Handle_WithInvalidProvider_ReturnsValidationError()
     {
         // Arrange
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Had a productive meeting today.\nPlanning to finish the design doc tomorrow.\nFeeling energized and focused.",
             LlmProviderOverride = "InvalidProvider"
@@ -326,12 +322,12 @@ public sealed class CreateDailyEntryHandlerTests
     public async Task Handle_MultipleCallsSameDay_IncrementsEntryNumber()
     {
         // Arrange
-        var command1 = new CreateDailyEntryCommand
+        var command1 = new CreateDailyEntry.Command
         {
             Content = "Morning meeting notes and reflections."
         };
 
-        var command2 = new CreateDailyEntryCommand
+        var command2 = new CreateDailyEntry.Command
         {
             Content = "Afternoon coding session recap."
         };
@@ -368,7 +364,7 @@ public sealed class CreateDailyEntryHandlerTests
     {
         // Arrange
         var customTemplateId = "custom-daily-template";
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Daily content for custom template",
             TemplateName = customTemplateId
@@ -397,7 +393,7 @@ public sealed class CreateDailyEntryHandlerTests
     {
         // Arrange
         var invalidTemplateId = "non-existent-template";
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Daily content with invalid template",
             TemplateName = invalidTemplateId
@@ -444,7 +440,7 @@ public sealed class CreateDailyEntryHandlerTests
     public async Task Handle_WithUseDefaultTemplate_SkipsTemplateSelection()
     {
         // Arrange
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Daily content for default template",
             UseDefaultTemplate = true
@@ -468,7 +464,7 @@ public sealed class CreateDailyEntryHandlerTests
 
         // Verify template selection UI was never shown
         _mockTemplateSelectionUI.Verify(
-            ui => ui.SelectTemplateAsync(It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            ui => ui.SelectTemplateAsync(It.IsAny<IReadOnlyList<TenSecondTom.Infrastructure.Prompts.TemplateInfo>>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 }

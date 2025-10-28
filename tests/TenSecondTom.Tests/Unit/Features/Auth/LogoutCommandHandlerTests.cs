@@ -1,35 +1,34 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using TenSecondTom.Features.Auth.Commands;
-using TenSecondTom.Features.Auth.Handlers;
+using TenSecondTom.Features.Auth;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Tests.Unit.Features.Auth;
 
 /// <summary>
-/// Unit tests for <see cref="LogoutCommandHandler"/>.
+/// Unit tests for <see cref="Logout.Handler"/>.
 /// Tests the logout command handler's ability to invalidate user sessions.
 /// </summary>
 public sealed class LogoutCommandHandlerTests
 {
     private readonly Mock<IAuthenticationService> _mockAuthService;
-    private readonly Mock<ILogger<LogoutCommandHandler>> _mockLogger;
-    private readonly LogoutCommandHandler _handler;
+    private readonly Mock<ILogger<Logout.Handler>> _mockLogger;
+    private readonly Logout.Handler _handler;
 
     public LogoutCommandHandlerTests()
     {
         _mockAuthService = new Mock<IAuthenticationService>();
-        _mockLogger = new Mock<ILogger<LogoutCommandHandler>>();
-        _handler = new LogoutCommandHandler(_mockAuthService.Object, _mockLogger.Object);
+        _mockLogger = new Mock<ILogger<Logout.Handler>>();
+        _handler = new Logout.Handler(_mockAuthService.Object, _mockLogger.Object);
     }
 
     [Fact]
     public async Task Handle_WithActiveSession_LogsOutSuccessfully()
     {
         // Arrange
-        var command = new LogoutCommand();
+        var command = new Logout.Command();
         _mockAuthService
             .Setup(x => x.LogoutAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<bool>.Success(true));
@@ -47,7 +46,7 @@ public sealed class LogoutCommandHandlerTests
     public async Task Handle_WithNoActiveSession_ReturnsError()
     {
         // Arrange
-        var command = new LogoutCommand();
+        var command = new Logout.Command();
         _mockAuthService
             .Setup(x => x.LogoutAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<bool>.Failure("No active session to logout."));
@@ -65,7 +64,7 @@ public sealed class LogoutCommandHandlerTests
     public async Task Handle_WhenAuthServiceFails_ReturnsError()
     {
         // Arrange
-        var command = new LogoutCommand();
+        var command = new Logout.Command();
         _mockAuthService
             .Setup(x => x.LogoutAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<bool>.Failure("Session file could not be deleted."));
@@ -82,7 +81,7 @@ public sealed class LogoutCommandHandlerTests
     public async Task Handle_PropagatesCancellationToken()
     {
         // Arrange
-        var command = new LogoutCommand();
+        var command = new Logout.Command();
         using var cancellationTokenSource = new CancellationTokenSource();
         _mockAuthService
             .Setup(x => x.LogoutAsync(It.IsAny<CancellationToken>()))
@@ -101,7 +100,7 @@ public sealed class LogoutCommandHandlerTests
     public async Task Handle_LogsLogoutAttempt()
     {
         // Arrange
-        var command = new LogoutCommand();
+        var command = new Logout.Command();
         _mockAuthService
             .Setup(x => x.LogoutAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<bool>.Success(true));
@@ -124,7 +123,7 @@ public sealed class LogoutCommandHandlerTests
     public async Task Handle_LogsSuccessfulLogout()
     {
         // Arrange
-        var command = new LogoutCommand();
+        var command = new Logout.Command();
         _mockAuthService
             .Setup(x => x.LogoutAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<bool>.Success(true));
@@ -147,7 +146,7 @@ public sealed class LogoutCommandHandlerTests
     public async Task Handle_LogsFailedLogout()
     {
         // Arrange
-        var command = new LogoutCommand();
+        var command = new Logout.Command();
         var errorMessage = "No active session to logout.";
         _mockAuthService
             .Setup(x => x.LogoutAsync(It.IsAny<CancellationToken>()))

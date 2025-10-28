@@ -18,11 +18,15 @@ Ten Second Tom is a modern CLI application built with C# and .NET 9, designed fo
 
 When suggesting code, apply these patterns:
 
-- **Vertical Slice Architecture (VSA)**: Organize features as self-contained vertical slices
+- **Vertical Slice Architecture (VSA) with Co-location Pattern**: Organize features as self-contained vertical slices with all related code co-located in a single file per use case
+  - Use case files: `CreateUser.cs`, `ListItems.cs`, `GenerateOutput.cs`
+  - Static class container: `public static class [UseCase]` with nested Command/Query, Validator, Handler
+  - Example: `CreateUser.cs` contains `CreateUser.Command`, `CreateUser.Validator`, `CreateUser.Handler`
 - **CQRS**: Separate commands (mutations) from queries (reads)
-  - Commands: `CreateUserCommand`, `UpdateSettingsCommand`
-  - Queries: `GetUserQuery`, `ListItemsQuery`
-  - Handlers: `CreateUserCommandHandler`, `GetUserQueryHandler`
+  - Nested Command: `public sealed record Command(...) : IRequest<Result<T>>`
+  - Nested Query: `public sealed record Query(...) : IRequest<Result<T>>`
+  - Nested Handler: `public sealed class Handler(...) : IRequestHandler<Command, Result<T>>`
+  - Assembly scanning auto-discovers all nested handlers and validators
 - **Options Pattern**: All configuration MUST use strongly-typed options classes
   - Options: `StorageOptions`, `LlmOptions`, `AuthOptions` (in `Shared/Options/`)
   - Validators: `StorageOptionsValidator`, `LlmOptionsValidator` (in `Shared/Options/Validation/`)
@@ -48,11 +52,13 @@ When suggesting code, apply these patterns:
 - **DRY Principle**: Never duplicate logic; extract to reusable methods/classes
 - **No Compiler Warnings**: Code must compile without warnings
 - **XML Documentation**: Add XML comments to all public APIs
-- **Naming Conventions**:
-  - Commands: `*Command`
-  - Queries: `*Query`
-  - Handlers: `*Handler`
-  - Tests: `*Tests`
+- **Naming Conventions** (Co-location Pattern since v1.7.0):
+  - Use case files: `[Verb][Noun].cs` (e.g., `CreateUser.cs`, `ListTemplates.cs`)
+  - Nested Command: `public sealed record Command(...) : IRequest<Result<T>>`
+  - Nested Query: `public sealed record Query(...) : IRequest<Result<T>>`
+  - Nested Validator: `public sealed class Validator : AbstractValidator<Command>`
+  - Nested Handler: `public sealed class Handler(...) : IRequestHandler<Command, Result<T>>`
+  - Test files: `[UseCase]Tests.cs` (e.g., `CreateUserTests.cs`, `ListTemplatesTests.cs`)
   - Interfaces: `I*`
 - **Error Handling**:
   - Use exceptions only for exceptional cases
@@ -62,21 +68,23 @@ When suggesting code, apply these patterns:
 
 ## Project Structure
 
-**NOTE**: The canonical project structure is defined in `.specify/memory/constitution.md` (Project Structure Standards section). The structure below is a summary for quick reference.
+**NOTE**: The canonical project structure is defined in `.specify/memory/constitution.md` (Project Structure Standards v1.7.0). The structure below is a summary for quick reference.
+
+**Co-location Pattern** (since v1.7.0): All code for a single use case co-located in one file.
 
 ```text
 src/
 ├── Features/          # Vertical slices (self-contained feature modules)
 │   └── [FeatureName]/
-│       ├── Commands/      # Command classes (mutations, writes)
-│       ├── Queries/       # Query classes (reads) [if needed]
-│       ├── Handlers/      # Command/Query handlers (business logic)
-│       ├── Validation/    # FluentValidation validators [if needed]
+│       ├── [UseCase].cs   # Co-located Command/Query, Validator, Handler
+│       ├── Migrations/    # Feature bootstrap migrations [if needed]
+│       ├── Services/      # Feature-specific domain services [if needed]
 │       └── DependencyInjection.cs  # Feature-specific DI registration
-├── Infrastructure/    # Cross-cutting concerns (DI, config, logging)
+├── Infrastructure/    # Cross-cutting concerns (DI, config, logging, behaviors)
+│   ├── Behaviors/         # MediatR pipeline behaviors
 │   ├── Configuration/
 │   ├── Logging/
-│   └── DependencyInjection.cs
+│   └── DependencyInjection/
 ├── Shared/            # Shared domain models, abstractions, utilities
 │   ├── Models/
 │   ├── Options/           # Configuration options classes (*Options.cs)
@@ -90,20 +98,47 @@ tests/
 ├── TenSecondTom.Tests/         # Unit tests (fast, isolated)
 │   └── Features/
 │       └── [FeatureName]/
-│           ├── Commands/
-│           ├── Queries/
-│           └── Handlers/
+│           └── [UseCase]Tests.cs  # Tests mirror use case files
 └── TenSecondTom.IntegrationTests/  # Integration tests
     ├── Features/
     │   └── [FeatureName]/
     └── Cli/
 ```
 
-**See `.specify/memory/constitution.md` for detailed rules on:**
-- Feature organization requirements
+**Co-location Pattern Structure** (one file per use case):
+
+```csharp
+namespace TenSecondTom.Features.[FeatureName];
+
+/// <summary>
+/// [Brief description of what this use case does]
+/// </summary>
+public static class [UseCase]
+{
+    public sealed record Command(...) : IRequest<Result<T>>;
+
+    public sealed class Validator : AbstractValidator<Command>
+    {
+        public Validator() { /* validation rules */ }
+    }
+
+    public sealed class Handler(...) : IRequestHandler<Command, Result<T>>
+    {
+        public async Task<Result<T>> Handle(Command request, CancellationToken ct)
+        {
+            // Business logic (input is pre-validated, execution is pre-logged)
+        }
+    }
+}
+```
+
+**See `.specify/memory/constitution.md` v1.7.0 for detailed rules on:**
+- Co-location pattern requirements
+- Feature organization rules
 - Naming conventions for vertical slices
 - Cross-feature dependency restrictions
 - Test structure mirroring
+- Assembly scanning for auto-discovery
 
 ## Configuration Management (REQUIRED)
 
@@ -395,6 +430,6 @@ public sealed class CreateUserCommandHandlerTests
 
 ---
 
-**Constitution Version**: 1.4.0 | **Last Updated**: 2025-10-28
+**Constitution Version**: 1.7.0 | **Last Updated**: 2025-10-28
 
 For questions about architectural decisions or edge cases, consult `.specify/memory/constitution.md`.

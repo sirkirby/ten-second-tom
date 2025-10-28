@@ -3,10 +3,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using TenSecondTom.Features.Templates.Handlers;
-using TenSecondTom.Features.Templates.Queries;
-using TenSecondTom.Features.Today.Commands;
-using TenSecondTom.Features.Today.Handlers;
+using TenSecondTom.Features.Templates;
+using static TenSecondTom.Features.Templates.ListTemplates;
+using TenSecondTom.Features.Today;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Llm;
@@ -87,15 +86,15 @@ version: 1.0
         // Setup template selection to choose the custom template
         _mockTemplateSelectionUI
             .Setup(ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TemplateInfo>>(),
                 "today",
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync("my-custom-daily");
 
         // Create handler with the real filesystem loader
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
 
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Implemented custom templates feature\nAdd comprehensive tests\nAccomplished"
         };
@@ -109,7 +108,7 @@ version: 1.0
         // Verify custom template was presented for selection
         _mockTemplateSelectionUI.Verify(
             ui => ui.SelectTemplateAsync(
-                It.Is<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(
+                It.Is<IReadOnlyList<TemplateInfo>>(
                     templates => templates.Any(t => t.TemplateId == "my-custom-daily")),
                 "today",
                 It.IsAny<CancellationToken>()),
@@ -140,8 +139,8 @@ Weekly reflection content here.
             Path.Combine(_templatesDirectory, "custom-weekly.md"),
             customTemplateContent);
 
-        var queryHandler = _serviceProvider.GetRequiredService<ListTemplatesQueryHandler>();
-        var query = new ListTemplatesQuery(FilterByType: TemplateType.Weekly);
+        var queryHandler = _serviceProvider.GetRequiredService<ListTemplates.Handler>();
+        var query = new ListTemplates.Query(FilterByType: TemplateType.Weekly);
 
         // Act
         var result = await queryHandler.Handle(query, CancellationToken.None);
@@ -192,13 +191,13 @@ A brief daily check-in.
         // Setup selection to return one of them
         _mockTemplateSelectionUI
             .Setup(ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TemplateInfo>>(),
                 "today",
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync("morning-reflection");
 
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
-        var command = new CreateDailyEntryCommand
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
+        var command = new CreateDailyEntry.Command
         {
             Content = "Created templates\nTest them\nGood"
         };
@@ -212,7 +211,7 @@ A brief daily check-in.
         // Verify all three custom templates were offered in selection
         _mockTemplateSelectionUI.Verify(
             ui => ui.SelectTemplateAsync(
-                It.Is<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(
+                It.Is<IReadOnlyList<TemplateInfo>>(
                     templates => templates.Count(t => !t.IsDefault) >= 3),
                 "today",
                 It.IsAny<CancellationToken>()),
@@ -255,13 +254,13 @@ invalid: {unclosed
 
         _mockTemplateSelectionUI
             .Setup(ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TemplateInfo>>(),
                 "today",
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync("valid-custom");
 
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
-        var command = new CreateDailyEntryCommand
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
+        var command = new CreateDailyEntry.Command
         {
             Content = "Worked on templates\nTest validation\nGood"
         };
@@ -275,7 +274,7 @@ invalid: {unclosed
         // Verify invalid template was skipped, valid template was included
         _mockTemplateSelectionUI.Verify(
             ui => ui.SelectTemplateAsync(
-                It.Is<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(
+                It.Is<IReadOnlyList<TemplateInfo>>(
                     templates => templates.Any(t => t.TemplateId == "valid-custom") &&
                                 !templates.Any(t => t.TemplateId == "invalid-custom")),
                 "today",
@@ -317,7 +316,7 @@ title: Another Template
 
         _mockTemplateSelectionUI
             .Setup(ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TemplateInfo>>(),
                 "today",
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync("marker-template");
@@ -339,8 +338,8 @@ title: Another Template
                 OutputTokens = 20
             }));
 
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
-        var command = new CreateDailyEntryCommand
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
+        var command = new CreateDailyEntry.Command
         {
             Content = "Test input\nTest plans\nGood"
         };
@@ -413,10 +412,13 @@ title: Another Template
 
         services.AddSingleton<IPromptTemplateLoader>(templateLoader);
         services.AddSingleton(_mockTemplateSelectionUI.Object);
-        services.AddSingleton<ListTemplatesQueryHandler>();
+
+        // Add TemplateProvider and ListTemplates.Handler (both needed for different tests)
+        services.AddSingleton<ITemplateProvider, TemplateProvider>();
+        services.AddSingleton<ListTemplates.Handler>();
 
         // Add handlers
-        services.AddSingleton<CreateDailyEntryHandler>();
+        services.AddSingleton<CreateDailyEntry.Handler>();
 
         return services.BuildServiceProvider();
     }

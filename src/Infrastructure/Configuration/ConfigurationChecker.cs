@@ -2,8 +2,7 @@ using System.IO.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TenSecondTom.Features.Setup.Models;
-using TenSecondTom.Features.Templates.Commands;
-using TenSecondTom.Features.Templates.Handlers;
+using static TenSecondTom.Features.Templates.InstallDefaultTemplates;
 using TenSecondTom.Shared.Options;
 
 namespace TenSecondTom.Infrastructure.Configuration;
@@ -286,11 +285,11 @@ public sealed class ConfigurationChecker
         {
             // Create a temporary logger for the handler that logs through the main logger
             using var loggerFactory = LoggerFactory.Create(builder => { });
-            var handlerLogger = loggerFactory.CreateLogger<InstallDefaultTemplatesHandler>();
+            var handlerLogger = loggerFactory.CreateLogger<Handler>();
 
-            var handler = new InstallDefaultTemplatesHandler(fileSystem, handlerLogger);
+            var handler = new Handler(fileSystem, handlerLogger);
 
-            var command = new InstallDefaultTemplatesCommand
+            var command = new Command
             {
                 TargetDirectory = templatesDirectory,
                 OverwriteExisting = false // Don't overwrite any existing customizations

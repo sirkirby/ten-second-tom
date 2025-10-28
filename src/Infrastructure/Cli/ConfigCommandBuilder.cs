@@ -1,8 +1,9 @@
 using System.CommandLine;
+using TenSecondTom.Features.Setup.Handlers;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
 using TenSecondTom.Features.Setup.Commands;
-using TenSecondTom.Features.Setup.Handlers;
+using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Infrastructure.Configuration;
 
@@ -289,6 +290,11 @@ internal static class ConfigCommandBuilder
             .AddColumn("[yellow]Setting[/]")
             .AddColumn("[yellow]Value[/]");
 
+        // Application Directory Configuration
+        table.AddRow("[yellow]Application Directory[/]", "");
+        table.AddRow("  Root Directory", config.RootDirectory?.EscapeMarkup() ?? "[dim]Not set[/]");
+        table.AddRow("", ""); // Spacer
+
         // SSH Configuration
         table.AddRow("[yellow]SSH Configuration[/]", "");
         table.AddRow("  Key Path", config.Ssh.KeyPath?.EscapeMarkup() ?? "[dim]Not set[/]");
@@ -326,7 +332,6 @@ internal static class ConfigCommandBuilder
 
         // Storage Configuration
         table.AddRow("[yellow]Storage Configuration[/]", "");
-        table.AddRow("  Memory Directory", config.Storage.MemoryDirectory?.EscapeMarkup() ?? "[dim]Not set[/]");
         table.AddRow("  Create If Missing", config.Storage.CreateIfMissing ? "Yes" : "No");
 
         // Optional Configuration

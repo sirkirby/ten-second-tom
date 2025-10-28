@@ -13,6 +13,10 @@ public static class GenerateFeatureExtensions
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// MediatR assembly scanning automatically discovers and registers IRequestHandler interfaces.
+    /// Concrete handlers are registered here for direct dependency injection when needed.
+    /// </remarks>
     public static IServiceCollection AddGenerateFeature(this IServiceCollection services)
     {
         // Register domain services
@@ -20,18 +24,11 @@ public static class GenerateFeatureExtensions
         services.AddTransient<Services.ITranscriptProcessor, Services.TranscriptProcessor>();
         services.AddTransient<Services.IOutputStorageService, Services.OutputStorageService>();
 
-        // Register command/query handlers
-        services.AddTransient<Handlers.GenerateOutputCommandHandler>();
-        services.AddTransient<Shared.Contracts.IRequestHandler<Commands.GenerateOutputCommand, Shared.Results.Result<Models.GeneratedOutput>>>(
-            sp => sp.GetRequiredService<Handlers.GenerateOutputCommandHandler>());
-
-        services.AddTransient<Handlers.ListRecordingsQueryHandler>();
-        services.AddTransient<Shared.Contracts.IRequestHandler<Queries.ListRecordingsQuery, Shared.Results.Result<System.Collections.Generic.IReadOnlyList<Models.RecordingListItem>>>>(
-            sp => sp.GetRequiredService<Handlers.ListRecordingsQueryHandler>());
-
-        services.AddTransient<Handlers.GetRecordingTranscriptQueryHandler>();
-        services.AddTransient<Shared.Contracts.IRequestHandler<Queries.GetRecordingTranscriptQuery, Shared.Results.Result<string>>>(
-            sp => sp.GetRequiredService<Handlers.GetRecordingTranscriptQueryHandler>());
+        // Register concrete handlers for direct resolution
+        // IRequestHandler interfaces are auto-registered by MediatR assembly scanning
+        services.AddTransient<GenerateOutput.Handler>();
+        services.AddTransient<ListRecordings.Handler>();
+        services.AddTransient<GetRecordingTranscript.Handler>();
 
         return services;
     }

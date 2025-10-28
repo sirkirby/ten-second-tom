@@ -3,8 +3,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using TenSecondTom.Features.ThisWeek.Commands;
-using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Configuration;
@@ -15,11 +13,12 @@ using TenSecondTom.IntegrationTests.TestHelpers;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Features.ThisWeek;
 
 namespace TenSecondTom.IntegrationTests.Integration.Features.ThisWeek;
 
 /// <summary>
-/// Integration tests for CreateWeeklyReviewCommand with template selection (T033).
+/// Integration tests for CreateWeeklyReview.Command with template selection (T033).
 /// Tests end-to-end flow including template selection step for weekly reviews.
 /// Tests cover:
 /// - Template selection is invoked before LLM call
@@ -48,17 +47,17 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
     public async Task Handle_WithMultipleTemplates_InvokesTemplateSelection()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateWeeklyReviewHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateWeeklyReview.Handler>();
 
         SetupMultipleWeeklyTemplates();
         _mockTemplateSelectionUI
             .Setup(ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TenSecondTom.Infrastructure.Prompts.TemplateInfo>>(),
                 "thisweek",
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync("custom-weekly");
 
-        var command = new CreateWeeklyReviewCommand();
+        var command = new CreateWeeklyReview.Command();
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -69,7 +68,7 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
         // Verify template selection UI was invoked
         _mockTemplateSelectionUI.Verify(
             ui => ui.SelectTemplateAsync(
-                It.Is<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(
+                It.Is<IReadOnlyList<TenSecondTom.Infrastructure.Prompts.TemplateInfo>>(
                     templates => templates.Count >= 2),
                 "thisweek",
                 It.IsAny<CancellationToken>()),
@@ -81,11 +80,11 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
     public async Task Handle_WithSingleTemplate_AutoSelectsWithoutUI()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateWeeklyReviewHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateWeeklyReview.Handler>();
 
         SetupSingleWeeklyTemplate();
 
-        var command = new CreateWeeklyReviewCommand();
+        var command = new CreateWeeklyReview.Command();
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -96,7 +95,7 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
         // Verify template selection UI was NOT invoked (auto-selection)
         _mockTemplateSelectionUI.Verify(
             ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TenSecondTom.Infrastructure.Prompts.TemplateInfo>>(),
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()),
             Times.Never,
@@ -107,17 +106,17 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
     public async Task Handle_FiltersOnlyWeeklyTemplates_DoesNotShowDailyTemplates()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateWeeklyReviewHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateWeeklyReview.Handler>();
 
         SetupMixedDailyAndWeeklyTemplates();
         _mockTemplateSelectionUI
             .Setup(ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TenSecondTom.Infrastructure.Prompts.TemplateInfo>>(),
                 "thisweek",
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync("weekly-review");
 
-        var command = new CreateWeeklyReviewCommand();
+        var command = new CreateWeeklyReview.Command();
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -128,7 +127,7 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
         // Verify only weekly templates were passed to UI
         _mockTemplateSelectionUI.Verify(
             ui => ui.SelectTemplateAsync(
-                It.Is<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(
+                It.Is<IReadOnlyList<TenSecondTom.Infrastructure.Prompts.TemplateInfo>>(
                     templates => templates.All(t => t.TemplateType == TemplateType.Weekly)),
                 "thisweek",
                 It.IsAny<CancellationToken>()),
@@ -140,14 +139,14 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
     public async Task Handle_UsesSelectedTemplate_ForPromptGeneration()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateWeeklyReviewHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateWeeklyReview.Handler>();
 
         var selectedTemplateContent = "# Custom Weekly Review\nWeek input: {{WEEK_INPUT}}";
         SetupMultipleWeeklyTemplates();
 
         _mockTemplateSelectionUI
             .Setup(ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TenSecondTom.Infrastructure.Prompts.TemplateInfo>>(),
                 "thisweek",
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync("custom-weekly");
@@ -163,7 +162,7 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
                 Source = TemplateSource.FileSystem
             }));
 
-        var command = new CreateWeeklyReviewCommand();
+        var command = new CreateWeeklyReview.Command();
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -182,17 +181,17 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
     public async Task Handle_WhenTemplateSelectionCancelled_ReturnsFailure()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateWeeklyReviewHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateWeeklyReview.Handler>();
 
         SetupMultipleWeeklyTemplates();
         _mockTemplateSelectionUI
             .Setup(ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TenSecondTom.Infrastructure.Prompts.TemplateInfo>>(),
                 "thisweek",
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new OperationCanceledException("User cancelled template selection"));
 
-        var command = new CreateWeeklyReviewCommand();
+        var command = new CreateWeeklyReview.Command();
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -206,11 +205,11 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
     public async Task Handle_WhenNoTemplatesAvailable_FallsBackToEmbedded()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateWeeklyReviewHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateWeeklyReview.Handler>();
 
         SetupNoTemplates();
 
-        var command = new CreateWeeklyReviewCommand();
+        var command = new CreateWeeklyReview.Command();
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -221,7 +220,7 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
         // Template selection UI should not be invoked
         _mockTemplateSelectionUI.Verify(
             ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TenSecondTom.Infrastructure.Prompts.TemplateInfo>>(),
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()),
             Times.Never,
@@ -232,14 +231,14 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
     public async Task Handle_TemplateSelectionFlow_OccursBeforeLLMCall()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateWeeklyReviewHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateWeeklyReview.Handler>();
         var callSequence = new List<string>();
 
         SetupMultipleWeeklyTemplates();
 
         _mockTemplateSelectionUI
             .Setup(ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TenSecondTom.Infrastructure.Prompts.TemplateInfo>>(),
                 "thisweek",
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(() =>
@@ -279,7 +278,7 @@ Some insights here
                 OutputTokens = 200
             }));
 
-        var command = new CreateWeeklyReviewCommand();
+        var command = new CreateWeeklyReview.Command();
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -295,17 +294,17 @@ Some insights here
     public async Task Handle_WithMultipleWeeklyTemplates_ShowsCorrectCommandContext()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateWeeklyReviewHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateWeeklyReview.Handler>();
 
         SetupMultipleWeeklyTemplates();
         _mockTemplateSelectionUI
             .Setup(ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TenSecondTom.Infrastructure.Prompts.TemplateInfo>>(),
                 "thisweek",
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync("weekly-review");
 
-        var command = new CreateWeeklyReviewCommand();
+        var command = new CreateWeeklyReview.Command();
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -316,7 +315,7 @@ Some insights here
         // Verify correct command context was passed
         _mockTemplateSelectionUI.Verify(
             ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TenSecondTom.Infrastructure.Prompts.TemplateInfo>>(),
                 "thisweek",
                 It.IsAny<CancellationToken>()),
             Times.Once,
@@ -546,10 +545,12 @@ Some insights here
         // Add template infrastructure
         services.AddSingleton(_mockTemplateLoader.Object);
         services.AddSingleton(_mockTemplateSelectionUI.Object);
-        services.AddSingleton<TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler>();
+
+        // Add TemplateProvider (required by CreateWeeklyReview.Handler)
+        services.AddSingleton<ITemplateProvider, TemplateProvider>();
 
         // Add handler
-        services.AddSingleton<CreateWeeklyReviewHandler>();
+        services.AddSingleton<CreateWeeklyReview.Handler>();
 
         return services.BuildServiceProvider();
     }

@@ -3,14 +3,13 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
 using TenSecondTom.Features.Audio;
-using TenSecondTom.Features.Audio.Commands;
 using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Features.Audio.Services;
-using TenSecondTom.Features.Today.Commands;
+using TenSecondTom.Features.Today;
 using TenSecondTom.Features.Today.Models;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Configuration;
-using TenSecondTom.Shared.Contracts;
+using MediatR;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Options;
@@ -18,8 +17,6 @@ using TenSecondTom.Shared.OutputFormatters;
 using TenSecondTom.Shared.Results;
 using TenSecondTom.Shared.TextEditing.Services;
 using TenSecondTom.Shared.TextEditing.Models;
-using AudioHandlers = TenSecondTom.Features.Audio.Handlers;
-using TodayHandlers = TenSecondTom.Features.Today.Handlers;
 
 namespace TenSecondTom.Infrastructure.Cli;
 
@@ -57,11 +54,11 @@ public static class TodayCommandHandler
         ArgumentNullException.ThrowIfNull(serviceProvider);
 
         // Resolve required services
-        var handler = serviceProvider.GetRequiredService<TodayHandlers.CreateDailyEntryHandler>();
+        var handler = serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
         var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
         var textEditor = serviceProvider.GetRequiredService<IInteractiveTextEditor>();
         var audioConfig = serviceProvider.GetRequiredService<IOptions<AudioConfiguration>>().Value;
-        var logger = serviceProvider.GetRequiredService<ILogger<TodayHandlers.CreateVoiceNoteEntryHandler>>();
+        var logger = serviceProvider.GetRequiredService<ILogger<CreateVoiceNoteEntry.Handler>>();
 
         // Show warning if using mock authentication (only in non-JSON mode)
         if (!jsonOutput && authService is MockAuthenticationService)
@@ -203,7 +200,7 @@ public static class TodayCommandHandler
         }
 
         // Create command
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = content,
             TemplateName = templateName,
@@ -321,13 +318,13 @@ public static class TodayCommandHandler
         bool jsonOutput)
     {
         // Resolve required services
-        var recordHandler = serviceProvider.GetRequiredService<IRequestHandler<RecordAudioCommand, Result<AudioRecording>>>();
-        var transcribeHandler = serviceProvider.GetRequiredService<IRequestHandler<TranscribeAudioCommand, Result<TranscriptionResult>>>();
+        var recordHandler = serviceProvider.GetRequiredService<RecordAudio.Handler>();
+        var transcribeHandler = serviceProvider.GetRequiredService<TranscribeAudio.Handler>();
         var audioPreprocessor = serviceProvider.GetRequiredService<IAudioPreprocessor>();
-        var voiceNoteHandler = serviceProvider.GetRequiredService<IRequestHandler<CreateVoiceNoteEntryCommand, Result<VoiceNoteEntry>>>();
+        var voiceNoteHandler = serviceProvider.GetRequiredService<IRequestHandler<CreateVoiceNoteEntry.Command, Result<VoiceNoteEntry>>>();
         var storageOptions = serviceProvider.GetRequiredService<IOptions<StorageOptions>>().Value;
         var audioConfig = serviceProvider.GetRequiredService<IOptions<AudioConfiguration>>().Value;
-        var logger = serviceProvider.GetRequiredService<ILogger<TodayHandlers.CreateVoiceNoteEntryHandler>>();
+        var logger = serviceProvider.GetRequiredService<ILogger<CreateVoiceNoteEntry.Handler>>();
 
         // Get memory directory from configuration
         var memoryDirectory = storageOptions.MemoryDirectory;
@@ -367,8 +364,8 @@ public static class TodayCommandHandler
                 logger.LogInformation("Recording audio to {AudioFile}", audioFilePath);
             }
 
-            var recordCommand = new RecordAudioCommand 
-            { 
+            var recordCommand = new RecordAudio.Command
+            {
                 OutputPath = audioFilePath,
                 MaxDurationSeconds = audioConfig.Timeouts.TodaySeconds  // Use TodaySeconds for voice notes
             };
@@ -455,7 +452,7 @@ public static class TodayCommandHandler
                     transcribeConfig.SttProvider, transcribeConfig.SttFallbackEnabled);
             }
 
-            var transcribeCommand = new TranscribeAudioCommand
+            var transcribeCommand = new TranscribeAudio.Command
             {
                 AudioFilePath = audioFilePath,
                 AudioConfig = transcribeConfig
@@ -504,7 +501,7 @@ public static class TodayCommandHandler
             }
 
             // Step 3: Create voice note entry with AI processing
-            var voiceNoteCommand = new CreateVoiceNoteEntryCommand
+            var voiceNoteCommand = new CreateVoiceNoteEntry.Command
             {
                 TranscriptText = transcription.TranscriptText,
                 Recording = recording,

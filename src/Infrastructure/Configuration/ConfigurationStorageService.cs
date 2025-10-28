@@ -257,16 +257,14 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
     /// </summary>
     private static JsonElement SerializeToJsonElement(ConfigurationSettings settings)
     {
-        var audioDefaults = new AudioConfiguration();
-        
         // Build the JSON structure with all required sections
         var tenSecondTomSection = new
         {
-            MemoryDirectory = settings.Storage.MemoryDirectory,
+            RootDirectory = settings.RootDirectory,
             Ssh = settings.Ssh,
             Llm = settings.Llm,
             Optional = settings.Optional,
-            Audio = audioDefaults,
+            Audio = settings.Audio,
             Auth = new
             {
                 SshAgentProvider = SshConstants.DefaultAgentProvider,
@@ -313,16 +311,26 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
             ? JsonSerializer.Deserialize<OptionalConfiguration>(optionalElement.GetRawText(), JsonOptions) ?? new OptionalConfiguration()
             : new OptionalConfiguration();
 
-        // Extract MemoryDirectory (can be at root or in Storage section for backwards compatibility)
-        string? memoryDirectory = null;
-        if (tenSecondTomSection.TryGetProperty("MemoryDirectory", out var memoryDirElement))
+        var audioConfig = tenSecondTomSection.TryGetProperty("Audio", out var audioElement)
+            ? JsonSerializer.Deserialize<AudioConfigurationDisplay>(audioElement.GetRawText(), JsonOptions) ?? new AudioConfigurationDisplay()
+            : new AudioConfigurationDisplay();
+
+        // Extract RootDirectory (supports legacy MemoryDirectory key for migration)
+        string? rootDirectory = null;
+        if (tenSecondTomSection.TryGetProperty("RootDirectory", out var rootDirElement))
         {
-            memoryDirectory = memoryDirElement.GetString();
+            rootDirectory = rootDirElement.GetString();
         }
-        else if (tenSecondTomSection.TryGetProperty("Storage", out var storageElement) 
+        else if (tenSecondTomSection.TryGetProperty("MemoryDirectory", out var memoryDirElement))
+        {
+            // Legacy support: migrate old MemoryDirectory key to RootDirectory
+            rootDirectory = memoryDirElement.GetString();
+        }
+        else if (tenSecondTomSection.TryGetProperty("Storage", out var storageElement)
                  && storageElement.TryGetProperty("MemoryDirectory", out var storageMemDirElement))
         {
-            memoryDirectory = storageMemDirElement.GetString();
+            // Legacy support: even older nested structure
+            rootDirectory = storageMemDirElement.GetString();
         }
 
         // Extract metadata
@@ -352,14 +360,13 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
 
         return new ConfigurationSettings
         {
+            RootDirectory = rootDirectory
+                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), DirectoryNames.ApplicationRoot),
             Ssh = sshConfig,
             Llm = llmConfig,
-            Storage = new StorageConfiguration
-            {
-                MemoryDirectory = memoryDirectory 
-                    ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), DirectoryNames.ApplicationRoot)
-            },
+            Storage = new StorageConfiguration(),
             Optional = optionalConfig,
+            Audio = audioConfig,
             CreatedAt = createdAt,
             LastModifiedAt = lastModifiedAt,
             ConfigurationVersion = version
@@ -370,18 +377,16 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
     {
         return new ConfigurationSettings
         {
+            RootDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                DirectoryNames.ApplicationRoot),
             Ssh = new SshConfiguration(),
             Llm = new LlmConfiguration
             {
                 Provider = LlmProvider.OpenAI,
                 MaxInputTokens = LlmConstants.DefaultMaxInputTokensOpenAI
             },
-            Storage = new StorageConfiguration
-            {
-                MemoryDirectory = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    DirectoryNames.ApplicationRoot)
-            },
+            Storage = new StorageConfiguration(),
             Optional = new OptionalConfiguration(),
             CreatedAt = DateTime.UtcNow,
             ConfigurationVersion = "1.0"

@@ -2,6 +2,7 @@ using FluentAssertions;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Infrastructure.Configuration;
 using Xunit;
+using TenSecondTom.Features.Setup;
 
 namespace TenSecondTom.Tests.Unit.Features.Setup.Models;
 

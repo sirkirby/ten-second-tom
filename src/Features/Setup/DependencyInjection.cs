@@ -1,8 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using TenSecondTom.Features.Setup.Handlers;
-using TenSecondTom.Features.Setup.Queries;
 using TenSecondTom.Features.Setup.Services;
-using TenSecondTom.Features.Setup.Validation;
 using TenSecondTom.Infrastructure.Auth.SshProviders;
 using TenSecondTom.Infrastructure.Configuration;
 

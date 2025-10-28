@@ -1,12 +1,12 @@
 using FluentAssertions;
-using TenSecondTom.Features.Setup.Commands;
 using TenSecondTom.Features.Setup.Models;
+using TenSecondTom.Features.Setup.Commands;
 
 namespace TenSecondTom.Tests.Unit.Features.Setup.Commands;
 
 /// <summary>
-/// Contract tests for SetupCommand
-/// Tests the command structure, validation, and all scenarios from SetupCommand.contract.md
+/// Contract tests for Setup.Command
+/// Tests the command structure, validation, and all scenarios from Setup.Command.contract.md
 /// </summary>
 public sealed class SetupCommandTests
 {
@@ -273,9 +273,9 @@ public sealed class SetupCommandTests
                 ApiKey = "sk-test1234567890abcdef",
                 Model = "gpt-4"
             },
+            RootDirectory = "~/.ten-second-tom/memory",
             Storage = new StorageConfiguration
             {
-                MemoryDirectory = "~/.ten-second-tom/memory",
                 CreateIfMissing = true
             },
             Optional = new OptionalConfiguration

@@ -4,6 +4,7 @@ using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Features.Audio.Services;
 using Xunit.Abstractions;
+using TenSecondTom.Features.Audio;
 
 namespace TenSecondTom.IntegrationTests.Features.Audio;
 

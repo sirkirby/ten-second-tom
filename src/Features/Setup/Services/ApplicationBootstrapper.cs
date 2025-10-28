@@ -1,11 +1,13 @@
 using System.IO.Abstractions;
+using TenSecondTom.Features.Setup.Handlers;
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TenSecondTom.Features.Setup.Commands;
-using TenSecondTom.Features.Setup.Handlers;
-using TenSecondTom.Features.Templates.Services;
+using TenSecondTom.Features.Setup.Services;
+using TenSecondTom.Infrastructure.Bootstrapping;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
@@ -53,13 +55,10 @@ public sealed class ApplicationBootstrapper
         var configChecker = _serviceProvider.GetRequiredService<ConfigurationChecker>();
         bool isConfigured = configChecker.IsConfigured();
 
-        // Run template migration for existing users (silent, automatic)
+        // Run feature migrations for existing users (discovered via assembly scanning)
         if (isConfigured)
         {
-            var templateMigrationService = _serviceProvider.GetRequiredService<TemplateMigrationService>();
-            var storageOptions = _serviceProvider.GetRequiredService<IOptions<StorageOptions>>();
-            await templateMigrationService.RunAutomaticMigrationAsync(storageOptions, cancellationToken)
-                .ConfigureAwait(false);
+            await RunFeatureMigrationsAsync(cancellationToken).ConfigureAwait(false);
 
             // Perform self-healing: check for missing templates directory and restore if needed
             var fileSystem = _serviceProvider.GetRequiredService<IFileSystem>();
@@ -305,6 +304,70 @@ public sealed class ApplicationBootstrapper
         // Cancelled
         Console.WriteLine();
         return false;
+    }
+
+    /// <summary>
+    /// Discovers and executes feature migrations via assembly scanning.
+    /// Migrations are run in priority order (lower priority numbers first).
+    /// </summary>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    private async Task RunFeatureMigrationsAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogDebug("Scanning for feature migrations...");
+
+        // Discover all IFeatureMigration implementations via assembly scanning
+        var migrations = Assembly.GetExecutingAssembly()
+            .GetTypes()
+            .Where(t => typeof(IFeatureMigration).IsAssignableFrom(t)
+                     && t.IsClass
+                     && !t.IsAbstract)
+            .Select(t => (IFeatureMigration)Activator.CreateInstance(t)!)
+            .OrderBy(m => m.Priority)
+            .ThenBy(m => m.FeatureName)
+            .ToList();
+
+        if (migrations.Count == 0)
+        {
+            _logger.LogDebug("No feature migrations discovered");
+            return;
+        }
+
+        _logger.LogInformation("Discovered {Count} feature migration(s)", migrations.Count);
+
+        foreach (var migration in migrations)
+        {
+            try
+            {
+                _logger.LogDebug(
+                    "Running {FeatureName} migration (priority: {Priority})",
+                    migration.FeatureName,
+                    migration.Priority);
+
+                bool executed = await migration.MigrateAsync(_serviceProvider, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (executed)
+                {
+                    _logger.LogInformation(
+                        "{FeatureName} migration completed successfully",
+                        migration.FeatureName);
+                }
+                else
+                {
+                    _logger.LogDebug(
+                        "{FeatureName} migration skipped (not needed)",
+                        migration.FeatureName);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-critical: log but don't fail bootstrap
+                _logger.LogWarning(
+                    ex,
+                    "{FeatureName} migration failed, continuing",
+                    migration.FeatureName);
+            }
+        }
     }
 }
 

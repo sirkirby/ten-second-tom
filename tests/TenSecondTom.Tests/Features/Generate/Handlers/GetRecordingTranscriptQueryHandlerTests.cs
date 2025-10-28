@@ -1,26 +1,25 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using TenSecondTom.Features.Generate.Handlers;
-using TenSecondTom.Features.Generate.Queries;
 using TenSecondTom.Features.Generate.Services;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Features.Generate;
 
 namespace TenSecondTom.Tests.Features.Generate.Handlers;
 
 /// <summary>
-/// Tests for <see cref="GetRecordingTranscriptQueryHandler"/> implementation.
+/// Tests for <see cref="GetRecordingTranscript.Handler"/> implementation.
 /// Validates query handling for loading transcript content.
 /// </summary>
 public sealed class GetRecordingTranscriptQueryHandlerTests
 {
     private readonly Mock<IRecordingService> _mockRecordingService;
-    private readonly Mock<ILogger<GetRecordingTranscriptQueryHandler>> _mockLogger;
+    private readonly Mock<ILogger<GetRecordingTranscript.Handler>> _mockLogger;
 
     public GetRecordingTranscriptQueryHandlerTests()
     {
         _mockRecordingService = new Mock<IRecordingService>();
-        _mockLogger = new Mock<ILogger<GetRecordingTranscriptQueryHandler>>();
+        _mockLogger = new Mock<ILogger<GetRecordingTranscript.Handler>>();
     }
 
     [Fact]
@@ -35,7 +34,7 @@ public sealed class GetRecordingTranscriptQueryHandlerTests
             .ReturnsAsync(Result<string>.Success(expectedContent));
 
         var handler = CreateHandler();
-        var query = new GetRecordingTranscriptQuery
+        var query = new GetRecordingTranscript.Query
         {
             TranscriptFilePath = transcriptPath
         };
@@ -59,7 +58,7 @@ public sealed class GetRecordingTranscriptQueryHandlerTests
             .ReturnsAsync(Result<string>.Failure("Transcript file not found"));
 
         var handler = CreateHandler();
-        var query = new GetRecordingTranscriptQuery
+        var query = new GetRecordingTranscript.Query
         {
             TranscriptFilePath = transcriptPath
         };
@@ -77,7 +76,7 @@ public sealed class GetRecordingTranscriptQueryHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var query = new GetRecordingTranscriptQuery
+        var query = new GetRecordingTranscript.Query
         {
             TranscriptFilePath = string.Empty
         };
@@ -95,7 +94,7 @@ public sealed class GetRecordingTranscriptQueryHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var query = new GetRecordingTranscriptQuery
+        var query = new GetRecordingTranscript.Query
         {
             TranscriptFilePath = null!
         };
@@ -119,7 +118,7 @@ public sealed class GetRecordingTranscriptQueryHandlerTests
             .ReturnsAsync(Result<string>.Success("content"));
 
         var handler = CreateHandler();
-        var query = new GetRecordingTranscriptQuery
+        var query = new GetRecordingTranscript.Query
         {
             TranscriptFilePath = transcriptPath,
             CancellationToken = cts.Token
@@ -146,7 +145,7 @@ public sealed class GetRecordingTranscriptQueryHandlerTests
             .ReturnsAsync(Result<string>.Failure("Unable to read file"));
 
         var handler = CreateHandler();
-        var query = new GetRecordingTranscriptQuery
+        var query = new GetRecordingTranscript.Query
         {
             TranscriptFilePath = transcriptPath
         };
@@ -161,9 +160,9 @@ public sealed class GetRecordingTranscriptQueryHandlerTests
 
     #region Helper Methods
 
-    private GetRecordingTranscriptQueryHandler CreateHandler()
+    private GetRecordingTranscript.Handler CreateHandler()
     {
-        return new GetRecordingTranscriptQueryHandler(
+        return new GetRecordingTranscript.Handler(
             _mockRecordingService.Object,
             _mockLogger.Object);
     }

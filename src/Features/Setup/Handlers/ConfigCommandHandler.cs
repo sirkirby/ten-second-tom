@@ -1,9 +1,8 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TenSecondTom.Features.Setup.Commands;
 using TenSecondTom.Features.Setup.Models;
-using TenSecondTom.Features.Setup.Validation;
+using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Options;
@@ -18,40 +17,26 @@ namespace TenSecondTom.Features.Setup.Handlers;
 public sealed class ConfigCommandHandler
 {
     private readonly IConfigurationStorageService _storageService;
-    private readonly IConfiguration _configuration;
+    private readonly IOptionsMonitor<ConfigurationSettings> _configMonitor;
     private readonly ISetupWizardUI _setupWizard;
     private readonly IEnumerable<IApiKeyValidator> _apiKeyValidators;
     private readonly IAppSettingsStorageService _appSettingsStorage;
     private readonly ILogger<ConfigCommandHandler> _logger;
-    private readonly LlmOptions _llmOptions;
-    private readonly AuthOptions _authOptions;
-    private readonly StorageOptions _storageOptions;
-    private readonly AudioConfiguration _audioOptions;
 
     public ConfigCommandHandler(
         IConfigurationStorageService storageService,
-        IConfiguration configuration,
+        IOptionsMonitor<ConfigurationSettings> configMonitor,
         ISetupWizardUI setupWizard,
         IEnumerable<IApiKeyValidator> apiKeyValidators,
         IAppSettingsStorageService appSettingsStorage,
-        IOptions<LlmOptions> llmOptions,
-        IOptions<AuthOptions> authOptions,
-        IOptions<StorageOptions> storageOptions,
-        IOptions<AudioConfiguration> audioOptions,
         ILogger<ConfigCommandHandler> logger)
     {
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        _configMonitor = configMonitor ?? throw new ArgumentNullException(nameof(configMonitor));
         _setupWizard = setupWizard ?? throw new ArgumentNullException(nameof(setupWizard));
         _apiKeyValidators = apiKeyValidators ?? throw new ArgumentNullException(nameof(apiKeyValidators));
         _appSettingsStorage = appSettingsStorage ?? throw new ArgumentNullException(nameof(appSettingsStorage));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
-        // Extract option values - null-forgiving operator is safe because Options pattern provides defaults
-        _llmOptions = (llmOptions ?? throw new ArgumentNullException(nameof(llmOptions))).Value;
-        _authOptions = (authOptions ?? throw new ArgumentNullException(nameof(authOptions))).Value;
-        _storageOptions = (storageOptions ?? throw new ArgumentNullException(nameof(storageOptions))).Value;
-        _audioOptions = (audioOptions ?? throw new ArgumentNullException(nameof(audioOptions))).Value;
     }
 
     public async Task<Result<ConfigurationSettings>> Handle(
@@ -79,150 +64,19 @@ public sealed class ConfigCommandHandler
         }
     }
 
-    private async Task<Result<ConfigurationSettings>> HandleShowAsync(
+    private Task<Result<ConfigurationSettings>> HandleShowAsync(
         ConfigCommand command,
         CancellationToken cancellationToken)
     {
-        // Load base configuration from user secrets
-        var loadResult = await _storageService.LoadAsync(cancellationToken);
-        
-        if (!loadResult.IsSuccess)
-        {
-            return Result<ConfigurationSettings>.Failure("No configuration found. Run 'tom setup' first to configure Ten Second Tom.");
-        }
+        // Use IOptionsMonitor.CurrentValue to get the latest effective configuration
+        // This includes values from all sources (appsettings.json, config.json, env vars, command line)
+        // merged in the correct precedence order
+        var config = _configMonitor.CurrentValue;
 
-        var config = loadResult.Value!;
-
-        // Apply environment variable overrides from IConfiguration
-        // This shows the effective configuration that will be used at runtime
-        // We check IConfiguration to detect if env vars are overriding user secrets
-        string? envSshKeyPath = _configuration[ConfigurationKeys.SshKeyPathKey];
-        string? envSshKeySource = _configuration[ConfigurationKeys.SshKeySourceKey];
-        string? envSshAgentSocketPath = _configuration[ConfigurationKeys.SshAgentSocketPathKey];
-        string? envProvider = _configuration[ConfigurationKeys.LlmProviderKey];
-        string? envApiKey = _configuration[ConfigurationKeys.LlmApiKeyKey];
-        string? envModel = _configuration[ConfigurationKeys.LlmModelKey];
-        string? envMemoryDir = _configuration[ConfigurationKeys.MemoryDirectoryKey];
-        string? envCreateIfMissing = _configuration["TenSecondTom:CreateIfMissing"];
-        string? envLogLevel = _configuration["TenSecondTom:Optional:LogLevel"];
-        string? envRetentionDays = _configuration["TenSecondTom:Optional:RetentionDays"];
-        string? envEnableTelemetry = _configuration["TenSecondTom:Optional:EnableTelemetry"];
-
-        // Audio configuration from environment (check for overrides)
-        string? envSttProvider = _configuration["TenSecondTom:Audio:SttProvider"];
-        string? envSttApiKey = _configuration["TenSecondTom:Audio:SttApiKey"];
-        string? envSttFallbackEnabled = _configuration["TenSecondTom:Audio:SttFallbackEnabled"];
-        string? envKeepFiles = _configuration["TenSecondTom:Audio:KeepFiles"];
-        string? envInputVolume = _configuration[ConfigurationKeys.AudioRecorderInputVolumeKey];
-        string? envNoiseReduction = _configuration[ConfigurationKeys.AudioRecorderEnableNoiseReductionKey];
-        string? envFreqFilters = _configuration[ConfigurationKeys.AudioRecorderEnableFrequencyFiltersKey];
-        string? envRemoveSilence = _configuration[ConfigurationKeys.AudioPreprocessingRemoveSilenceKey];
-        string? envSilenceThreshold = _configuration[ConfigurationKeys.AudioPreprocessingSilenceThresholdDbKey];
-        string? envMinSilenceDuration = _configuration[ConfigurationKeys.AudioPreprocessingMinimumSilenceDurationMsKey];
-
-        // If environment variables are set, they override user secrets
-        bool hasSshOverrides = !string.IsNullOrWhiteSpace(envSshKeyPath) ||
-                              !string.IsNullOrWhiteSpace(envSshKeySource) ||
-                              !string.IsNullOrWhiteSpace(envSshAgentSocketPath);
-        bool hasLlmOverrides = !string.IsNullOrWhiteSpace(envProvider) ||
-                              !string.IsNullOrWhiteSpace(envApiKey) ||
-                              !string.IsNullOrWhiteSpace(envModel);
-        bool hasStorageOverrides = !string.IsNullOrWhiteSpace(envMemoryDir) ||
-                                   !string.IsNullOrWhiteSpace(envCreateIfMissing);
-        bool hasOptionalOverrides = !string.IsNullOrWhiteSpace(envLogLevel) ||
-                                    !string.IsNullOrWhiteSpace(envRetentionDays) ||
-                                    !string.IsNullOrWhiteSpace(envEnableTelemetry);
-        bool hasAudioOverrides = !string.IsNullOrWhiteSpace(envSttProvider) ||
-                                !string.IsNullOrWhiteSpace(envSttApiKey) ||
-                                !string.IsNullOrWhiteSpace(envSttFallbackEnabled) ||
-                                !string.IsNullOrWhiteSpace(envKeepFiles) ||
-                                !string.IsNullOrWhiteSpace(envInputVolume) ||
-                                !string.IsNullOrWhiteSpace(envNoiseReduction) ||
-                                !string.IsNullOrWhiteSpace(envFreqFilters) ||
-                                !string.IsNullOrWhiteSpace(envRemoveSilence) ||
-                                !string.IsNullOrWhiteSpace(envSilenceThreshold) ||
-                                !string.IsNullOrWhiteSpace(envMinSilenceDuration);
-
-        // Load audio configuration from typed options (includes appsettings.json and env vars)
-        var audioConfig = new AudioConfigurationDisplay
-        {
-            SttProvider = _audioOptions.SttProvider,
-            SttApiKey = _audioOptions.SttApiKey,
-            SttFallbackEnabled = _audioOptions.SttFallbackEnabled,
-            SttFallbackProvider = _audioOptions.SttFallbackProvider,
-            SttFallbackApiKey = _audioOptions.SttFallbackApiKey,
-            KeepFiles = _audioOptions.KeepFiles,
-            Recorder = new RecorderConfigurationDisplay
-            {
-                InputVolume = _audioOptions.Recorder.InputVolume,
-                EnableNoiseReduction = _audioOptions.Recorder.EnableNoiseReduction,
-                EnableFrequencyFilters = _audioOptions.Recorder.EnableFrequencyFilters
-            },
-            Preprocessing = new PreprocessingConfigurationDisplay
-            {
-                RemoveSilence = _audioOptions.Preprocessing.RemoveSilence,
-                SilenceThresholdDb = _audioOptions.Preprocessing.SilenceThresholdDb,
-                MinimumSilenceDurationMs = _audioOptions.Preprocessing.MinimumSilenceDurationMs
-            }
-        };
-
-        if (hasSshOverrides || hasLlmOverrides || hasStorageOverrides || hasOptionalOverrides || hasAudioOverrides)
-        {
-            config = config with
-            {
-                Ssh = config.Ssh with
-                {
-                    KeyPath = envSshKeyPath ?? config.Ssh.KeyPath,
-                    KeySource = Enum.TryParse<SshKeySource>(envSshKeySource, true, out var keySource)
-                        ? keySource
-                        : config.Ssh.KeySource,
-                    AgentSocketPath = envSshAgentSocketPath ?? config.Ssh.AgentSocketPath
-                },
-                Llm = config.Llm with
-                {
-                    Provider = Enum.TryParse<LlmProvider>(envProvider, true, out var provider)
-                        ? provider
-                        : config.Llm.Provider,
-                    ApiKey = envApiKey ?? config.Llm.ApiKey,
-                    Model = envModel ?? config.Llm.Model
-                },
-                Storage = config.Storage with
-                {
-                    MemoryDirectory = envMemoryDir ?? config.Storage.MemoryDirectory,
-                    CreateIfMissing = bool.TryParse(envCreateIfMissing, out var createIfMissing)
-                        ? createIfMissing
-                        : config.Storage.CreateIfMissing
-                },
-                Optional = config.Optional with
-                {
-                    LogLevel = Enum.TryParse<Microsoft.Extensions.Logging.LogLevel>(envLogLevel, true, out var logLevel)
-                        ? logLevel
-                        : config.Optional.LogLevel,
-                    RetentionDays = int.TryParse(envRetentionDays, out var retentionDays)
-                        ? retentionDays
-                        : config.Optional.RetentionDays,
-                    EnableTelemetry = bool.TryParse(envEnableTelemetry, out var enableTelemetry)
-                        ? enableTelemetry
-                        : config.Optional.EnableTelemetry
-                },
-                Audio = audioConfig
-            };
-
-            _logger.LogDebug("Configuration overrides applied from environment variables");
-        }
-        else
-        {
-            // No overrides, but still need to populate audio config
-            config = config with
-            {
-                Audio = audioConfig
-            };
-        }
-
-        _logger.LogInformation("Displaying current configuration (ShowSecrets: {ShowSecrets})", 
+        _logger.LogInformation("Displaying current configuration (ShowSecrets: {ShowSecrets})",
             command.ShowSecrets);
 
-        return Result<ConfigurationSettings>.Success(config);
+        return Task.FromResult(Result<ConfigurationSettings>.Success(config));
     }
 
     private async Task<Result<ConfigurationSettings>> HandleSetAsync(
@@ -368,10 +222,10 @@ public sealed class ConfigCommandHandler
         try
         {
             var fullPath = Path.GetFullPath(value);
-            
+
             var newConfig = currentConfig with
             {
-                Storage = currentConfig.Storage with { MemoryDirectory = fullPath }
+                RootDirectory = fullPath
             };
 
             return Result<ConfigurationSettings>.Success(newConfig);
@@ -873,23 +727,19 @@ public sealed class ConfigCommandHandler
         return Task.FromResult(Result<ConfigurationSettings>.Failure("Reset configuration is not yet implemented. To reconfigure, run 'tom setup' to walk through all settings again."));
     }
 
-    private async Task<Result<ConfigurationSettings>> HandleValidateAsync(CancellationToken cancellationToken)
+    private Task<Result<ConfigurationSettings>> HandleValidateAsync(CancellationToken cancellationToken)
     {
-        var loadResult = await _storageService.LoadAsync(cancellationToken);
-        
-        if (!loadResult.IsSuccess)
-        {
-            return Result<ConfigurationSettings>.Failure("No configuration found. Run 'tom setup' first to create a configuration.");
-        }
-
-        var config = loadResult.Value!;
+        // Get the effective runtime configuration (includes env var overrides)
+        // We validate what the app will actually use, not just what's in config.json
+        var config = _configMonitor.CurrentValue;
 
         if (!config.IsValid())
         {
-            return Result<ConfigurationSettings>.Failure("Configuration validation failed: Required fields are missing or invalid. Run 'tom setup' to reconfigure.");
+            return Task.FromResult(Result<ConfigurationSettings>.Failure(
+                "Configuration validation failed: Required fields are missing or invalid. Run 'tom setup' to reconfigure."));
         }
 
         _logger.LogInformation("Configuration validation passed");
-        return Result<ConfigurationSettings>.Success(config);
+        return Task.FromResult(Result<ConfigurationSettings>.Success(config));
     }
 }

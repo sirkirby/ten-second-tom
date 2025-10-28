@@ -1,9 +1,9 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using TenSecondTom.Features.Templates.Handlers;
+using TenSecondTom.Features.Templates;
 using TenSecondTom.Features.Templates.Models;
-using TenSecondTom.Features.Templates.Queries;
+using static TenSecondTom.Features.Templates.ListTemplates;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
@@ -11,7 +11,7 @@ using TenSecondTom.Shared.Results;
 namespace TenSecondTom.Tests.Unit.Features.Templates;
 
 /// <summary>
-/// Unit tests for ListTemplatesQueryHandler (T030).
+/// Unit tests for ListTemplates.Handler (T030).
 /// Tests querying and filtering templates for selection UI.
 /// Tests cover:
 /// - Filtering by template type (daily vs weekly)
@@ -22,16 +22,16 @@ namespace TenSecondTom.Tests.Unit.Features.Templates;
 public sealed class ListTemplatesQueryHandlerTests
 {
     private readonly Mock<IPromptTemplateLoader> _mockTemplateLoader;
-    private readonly Mock<ILogger<ListTemplatesQueryHandler>> _mockLogger;
-    private readonly ListTemplatesQueryHandler _handler;
+    private readonly Mock<ILogger<ListTemplates.Handler>> _mockLogger;
+    private readonly ListTemplates.Handler _handler;
 
     public ListTemplatesQueryHandlerTests()
     {
         _mockTemplateLoader = new Mock<IPromptTemplateLoader>();
-        _mockLogger = new Mock<ILogger<ListTemplatesQueryHandler>>();
+        _mockLogger = new Mock<ILogger<ListTemplates.Handler>>();
 
-        // This will fail until ListTemplatesQueryHandler is implemented
-        _handler = new ListTemplatesQueryHandler(
+        // This will fail until ListTemplates.Handler is implemented
+        _handler = new ListTemplates.Handler(
             _mockTemplateLoader.Object,
             _mockLogger.Object);
     }
@@ -51,7 +51,7 @@ public sealed class ListTemplatesQueryHandlerTests
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(templates));
 
-        var query = new ListTemplatesQuery(FilterByType: TemplateType.Daily);
+        var query = new ListTemplates.Query(FilterByType: TemplateType.Daily);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
@@ -77,7 +77,7 @@ public sealed class ListTemplatesQueryHandlerTests
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(templates));
 
-        var query = new ListTemplatesQuery(FilterByType: TemplateType.Weekly);
+        var query = new ListTemplates.Query(FilterByType: TemplateType.Weekly);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
@@ -103,7 +103,7 @@ public sealed class ListTemplatesQueryHandlerTests
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(templates));
 
-        var query = new ListTemplatesQuery(FilterByType: TemplateType.Daily);
+        var query = new ListTemplates.Query(FilterByType: TemplateType.Daily);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
@@ -130,7 +130,7 @@ public sealed class ListTemplatesQueryHandlerTests
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(templates));
 
-        var query = new ListTemplatesQuery(FilterByType: TemplateType.Daily);
+        var query = new ListTemplates.Query(FilterByType: TemplateType.Daily);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
@@ -159,7 +159,7 @@ public sealed class ListTemplatesQueryHandlerTests
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(templates));
 
-        var query = new ListTemplatesQuery(FilterByType: TemplateType.Daily);
+        var query = new ListTemplates.Query(FilterByType: TemplateType.Daily);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
@@ -199,7 +199,7 @@ public sealed class ListTemplatesQueryHandlerTests
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(templates));
 
-        var query = new ListTemplatesQuery(FilterByType: TemplateType.Daily);
+        var query = new ListTemplates.Query(FilterByType: TemplateType.Daily);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
@@ -219,7 +219,7 @@ public sealed class ListTemplatesQueryHandlerTests
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(new List<PromptTemplate>()));
 
-        var query = new ListTemplatesQuery(FilterByType: TemplateType.Daily);
+        var query = new ListTemplates.Query(FilterByType: TemplateType.Daily);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
@@ -238,7 +238,7 @@ public sealed class ListTemplatesQueryHandlerTests
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Failure("Failed to load templates from disk"));
 
-        var query = new ListTemplatesQuery(FilterByType: TemplateType.Daily);
+        var query = new ListTemplates.Query(FilterByType: TemplateType.Daily);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
@@ -268,7 +268,7 @@ public sealed class ListTemplatesQueryHandlerTests
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(templates));
 
-        var query = new ListTemplatesQuery(FilterByType: TemplateType.Daily);
+        var query = new ListTemplates.Query(FilterByType: TemplateType.Daily);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
@@ -295,7 +295,7 @@ public sealed class ListTemplatesQueryHandlerTests
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(templates));
 
-        var query = new ListTemplatesQuery(FilterByType: TemplateType.Daily);
+        var query = new ListTemplates.Query(FilterByType: TemplateType.Daily);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
@@ -322,7 +322,7 @@ public sealed class ListTemplatesQueryHandlerTests
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(new List<PromptTemplate> { template }));
 
-        var query = new ListTemplatesQuery(FilterByType: TemplateType.Daily);
+        var query = new ListTemplates.Query(FilterByType: TemplateType.Daily);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
@@ -353,7 +353,7 @@ public sealed class ListTemplatesQueryHandlerTests
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(templates));
 
-        var query = new ListTemplatesQuery(FilterByType: TemplateType.Daily);
+        var query = new ListTemplates.Query(FilterByType: TemplateType.Daily);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
@@ -381,7 +381,7 @@ public sealed class ListTemplatesQueryHandlerTests
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(templates));
 
-        var query = new ListTemplatesQuery(FilterByType: TemplateType.Daily);
+        var query = new ListTemplates.Query(FilterByType: TemplateType.Daily);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
@@ -419,7 +419,7 @@ public sealed class ListTemplatesQueryHandlerTests
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(templates));
 
-        var query = new ListTemplatesQuery(FilterByType: TemplateType.Daily);
+        var query = new ListTemplates.Query(FilterByType: TemplateType.Daily);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
@@ -452,7 +452,7 @@ public sealed class ListTemplatesQueryHandlerTests
             .Setup(l => l.LoadAllTemplatesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PromptTemplate>>.Success(templates));
 
-        var query = new ListTemplatesQuery(FilterByType: TemplateType.Daily);
+        var query = new ListTemplates.Query(FilterByType: TemplateType.Daily);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);

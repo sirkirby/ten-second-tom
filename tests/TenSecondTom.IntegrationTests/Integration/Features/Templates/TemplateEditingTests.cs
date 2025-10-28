@@ -1,9 +1,10 @@
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using TenSecondTom.Features.Templates.Queries;
+using static TenSecondTom.Features.Templates.ListTemplates;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Features.Templates;
 
 namespace TenSecondTom.IntegrationTests.Integration.Features.Templates;
 

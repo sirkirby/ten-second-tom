@@ -1,14 +1,16 @@
 using FluentAssertions;
+using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using TenSecondTom.Features.Setup.Commands;
 using TenSecondTom.Features.Setup.Handlers;
 using TenSecondTom.Features.Setup.Models;
-using TenSecondTom.Features.Setup.Queries;
+using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.IntegrationTests.TestHelpers;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Features.Setup;
 
 namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
 
@@ -151,7 +153,7 @@ public sealed class FirstTimeSetupTests : IDisposable
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Storage.MemoryDirectory.Should().NotBeNullOrEmpty();
+        result.Value.RootDirectory.Should().NotBeNullOrEmpty();
         // Note: Directory creation might be deferred until first use
     }
 
@@ -220,9 +222,10 @@ public sealed class FirstTimeSetupTests : IDisposable
             {
                 var config = new ConfigurationSettings
                 {
+                    RootDirectory = _testDirectory.BasePath,
                     Ssh = new SshConfiguration { KeyPath = "/home/user/.ssh/id_ed25519" },
                     Llm = new LlmConfiguration { Provider = LlmProvider.OpenAI, ApiKey = "sk-test-key" },
-                    Storage = new StorageConfiguration { MemoryDirectory = _testDirectory.BasePath },
+                    Storage = new StorageConfiguration(),
                     Optional = new OptionalConfiguration { RetentionDays = 30 }
                 };
                 return Result<ConfigurationSettings>.Success(config);
@@ -326,10 +329,10 @@ public sealed class FirstTimeSetupTests : IDisposable
 
         // Template handler registration (required by SetupCommandHandler)
         services.AddTransient<
-            TenSecondTom.Shared.Contracts.IRequestHandler<
-                TenSecondTom.Features.Templates.Commands.InstallDefaultTemplatesCommand,
-                TenSecondTom.Shared.Results.Result<TenSecondTom.Features.Templates.Commands.InstallDefaultTemplatesResult>>,
-            TenSecondTom.Features.Templates.Handlers.InstallDefaultTemplatesHandler>();
+            IRequestHandler<
+                TenSecondTom.Features.Templates.InstallDefaultTemplates.Command,
+                Result<TenSecondTom.Features.Templates.InstallDefaultTemplates.CommandResult>>,
+            TenSecondTom.Features.Templates.InstallDefaultTemplates.Handler>();
 
         // Add handler
         services.AddSingleton<SetupCommandHandler>();

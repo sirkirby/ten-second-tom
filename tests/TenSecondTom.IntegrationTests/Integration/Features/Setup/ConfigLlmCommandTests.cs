@@ -6,10 +6,11 @@ using Moq;
 using TenSecondTom.Features.Setup.Commands;
 using TenSecondTom.Features.Setup.Handlers;
 using TenSecondTom.Features.Setup.Models;
-using TenSecondTom.Features.Setup.Validation;
+using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.IntegrationTests.TestHelpers;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Features.Setup;
 
 namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
 
@@ -347,9 +348,9 @@ public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
                 ApiKey = "sk-test1234567890abcdef",
                 Model = "gpt-4"
             },
+            RootDirectory = "~/.ten-second-tom/memory",
             Storage = new StorageConfiguration
             {
-                MemoryDirectory = "~/.ten-second-tom/memory",
                 CreateIfMissing = true
             },
             Optional = new OptionalConfiguration

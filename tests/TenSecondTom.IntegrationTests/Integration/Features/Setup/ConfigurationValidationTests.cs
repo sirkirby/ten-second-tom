@@ -2,14 +2,16 @@ using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using TenSecondTom.Features.Setup.Commands;
 using TenSecondTom.Features.Setup.Handlers;
 using TenSecondTom.Features.Setup.Models;
-using TenSecondTom.Features.Setup.Validation;
+using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.IntegrationTests.TestHelpers;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Features.Setup;
 
 namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
 
@@ -38,18 +40,18 @@ public sealed class ConfigurationValidationTests : IDisposable
         
         var completeConfig = new ConfigurationSettings
         {
+            RootDirectory = _testDirectory.BasePath,
             Ssh = new SshConfiguration { KeyPath = "/home/user/.ssh/id_ed25519" },
             Llm = new LlmConfiguration { Provider = LlmProvider.OpenAI, ApiKey = "sk-valid-key" },
-            Storage = new StorageConfiguration { MemoryDirectory = _testDirectory.BasePath },
+            Storage = new StorageConfiguration(),
             Optional = new OptionalConfiguration { RetentionDays = 30, LogLevel = LogLevel.Information },
             CreatedAt = DateTime.UtcNow
         };
 
-        // Setup storage to return this config
-        var storageService = _serviceProvider.GetRequiredService<IConfigurationStorageService>();
-        var mockStorage = Mock.Get(storageService);
-        mockStorage.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<ConfigurationSettings>.Success(completeConfig));
+        // Setup IOptionsMonitor to return this config
+        var optionsMonitor = _serviceProvider.GetRequiredService<IOptionsMonitor<ConfigurationSettings>>();
+        var mockMonitor = Mock.Get(optionsMonitor);
+        mockMonitor.Setup(c => c.CurrentValue).Returns(completeConfig);
 
         var command = new ConfigCommand
         {
@@ -70,20 +72,21 @@ public sealed class ConfigurationValidationTests : IDisposable
     {
         // Arrange
         var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
-        
+
         var incompleteConfig = new ConfigurationSettings
         {
+            RootDirectory = _testDirectory.BasePath,
             Ssh = new SshConfiguration { KeyPath = null }, // Missing SSH key
             Llm = new LlmConfiguration { Provider = LlmProvider.OpenAI, ApiKey = "sk-valid-key" },
-            Storage = new StorageConfiguration { MemoryDirectory = _testDirectory.BasePath },
+            Storage = new StorageConfiguration(),
             Optional = new OptionalConfiguration { RetentionDays = 30 },
             CreatedAt = DateTime.UtcNow
         };
 
-        var storageService = _serviceProvider.GetRequiredService<IConfigurationStorageService>();
-        var mockStorage = Mock.Get(storageService);
-        mockStorage.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<ConfigurationSettings>.Success(incompleteConfig));
+        // Setup IOptionsMonitor to return this config
+        var optionsMonitor = _serviceProvider.GetRequiredService<IOptionsMonitor<ConfigurationSettings>>();
+        var mockMonitor = Mock.Get(optionsMonitor);
+        mockMonitor.Setup(c => c.CurrentValue).Returns(incompleteConfig);
 
         var command = new ConfigCommand
         {
@@ -103,20 +106,21 @@ public sealed class ConfigurationValidationTests : IDisposable
     {
         // Arrange
         var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
-        
+
         var incompleteConfig = new ConfigurationSettings
         {
+            RootDirectory = _testDirectory.BasePath,
             Ssh = new SshConfiguration { KeyPath = "/home/user/.ssh/id_ed25519" },
             Llm = new LlmConfiguration { Provider = LlmProvider.OpenAI, ApiKey = null }, // Missing API key
-            Storage = new StorageConfiguration { MemoryDirectory = _testDirectory.BasePath },
+            Storage = new StorageConfiguration(),
             Optional = new OptionalConfiguration { RetentionDays = 30 },
             CreatedAt = DateTime.UtcNow
         };
 
-        var storageService = _serviceProvider.GetRequiredService<IConfigurationStorageService>();
-        var mockStorage = Mock.Get(storageService);
-        mockStorage.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<ConfigurationSettings>.Success(incompleteConfig));
+        // Setup IOptionsMonitor to return this config
+        var optionsMonitor = _serviceProvider.GetRequiredService<IOptionsMonitor<ConfigurationSettings>>();
+        var mockMonitor = Mock.Get(optionsMonitor);
+        mockMonitor.Setup(c => c.CurrentValue).Returns(incompleteConfig);
 
         var command = new ConfigCommand
         {
@@ -135,20 +139,21 @@ public sealed class ConfigurationValidationTests : IDisposable
     {
         // Arrange
         var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
-        
+
         var incompleteConfig = new ConfigurationSettings
         {
+            RootDirectory = "", // Missing directory
             Ssh = new SshConfiguration { KeyPath = "/home/user/.ssh/id_ed25519" },
             Llm = new LlmConfiguration { Provider = LlmProvider.OpenAI, ApiKey = "sk-valid-key" },
-            Storage = new StorageConfiguration { MemoryDirectory = "" }, // Missing directory
+            Storage = new StorageConfiguration(),
             Optional = new OptionalConfiguration { RetentionDays = 30 },
             CreatedAt = DateTime.UtcNow
         };
 
-        var storageService = _serviceProvider.GetRequiredService<IConfigurationStorageService>();
-        var mockStorage = Mock.Get(storageService);
-        mockStorage.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<ConfigurationSettings>.Success(incompleteConfig));
+        // Setup IOptionsMonitor to return this config
+        var optionsMonitor = _serviceProvider.GetRequiredService<IOptionsMonitor<ConfigurationSettings>>();
+        var mockMonitor = Mock.Get(optionsMonitor);
+        mockMonitor.Setup(c => c.CurrentValue).Returns(incompleteConfig);
 
         var command = new ConfigCommand
         {
@@ -167,20 +172,21 @@ public sealed class ConfigurationValidationTests : IDisposable
     {
         // Arrange
         var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
-        
+
         var incompleteConfig = new ConfigurationSettings
         {
+            RootDirectory = _testDirectory.BasePath,
             Ssh = new SshConfiguration { KeyPath = "/home/user/.ssh/id_ed25519" },
             Llm = new LlmConfiguration { Provider = LlmProvider.OpenAI, ApiKey = "sk-valid-key" },
-            Storage = new StorageConfiguration { MemoryDirectory = _testDirectory.BasePath },
-            Optional = new OptionalConfiguration { RetentionDays = -1 }, // Invalid retention
+            Storage = new StorageConfiguration(),
+            Optional = new OptionalConfiguration { RetentionDays = -5 }, // Invalid retention (only -1 is valid for unlimited)
             CreatedAt = DateTime.UtcNow
         };
 
-        var storageService = _serviceProvider.GetRequiredService<IConfigurationStorageService>();
-        var mockStorage = Mock.Get(storageService);
-        mockStorage.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<ConfigurationSettings>.Success(incompleteConfig));
+        // Setup IOptionsMonitor to return this config
+        var optionsMonitor = _serviceProvider.GetRequiredService<IOptionsMonitor<ConfigurationSettings>>();
+        var mockMonitor = Mock.Get(optionsMonitor);
+        mockMonitor.Setup(c => c.CurrentValue).Returns(incompleteConfig);
 
         var command = new ConfigCommand
         {
@@ -191,7 +197,42 @@ public sealed class ConfigurationValidationTests : IDisposable
         var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        result.IsFailure.Should().BeTrue("validation should fail for negative retention days");
+        result.IsFailure.Should().BeTrue("validation should fail for negative retention days other than -1");
+    }
+
+    [Fact]
+    public async Task ConfigValidation_WithUnlimitedRetentionDays_ReturnsValid()
+    {
+        // Arrange - Test that -1 (unlimited) is valid
+        var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
+
+        var configWithUnlimited = new ConfigurationSettings
+        {
+            RootDirectory = _testDirectory.BasePath,
+            Ssh = new SshConfiguration { KeyPath = "/home/user/.ssh/id_ed25519" },
+            Llm = new LlmConfiguration { Provider = LlmProvider.OpenAI, ApiKey = "sk-valid-key" },
+            Storage = new StorageConfiguration(),
+            Optional = new OptionalConfiguration { RetentionDays = -1 }, // -1 means unlimited
+            CreatedAt = DateTime.UtcNow
+        };
+
+        // Setup IOptionsMonitor to return this config
+        var optionsMonitor = _serviceProvider.GetRequiredService<IOptionsMonitor<ConfigurationSettings>>();
+        var mockMonitor = Mock.Get(optionsMonitor);
+        mockMonitor.Setup(c => c.CurrentValue).Returns(configWithUnlimited);
+
+        var command = new ConfigCommand
+        {
+            Action = ConfigAction.Validate
+        };
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue("validation should pass for -1 (unlimited) retention days");
+        result.Value.Should().NotBeNull();
+        result.Value.IsValid().Should().BeTrue();
     }
 
     [Fact]
@@ -199,11 +240,22 @@ public sealed class ConfigurationValidationTests : IDisposable
     {
         // Arrange
         var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
-        
-        var storageService = _serviceProvider.GetRequiredService<IConfigurationStorageService>();
-        var mockStorage = Mock.Get(storageService);
-        mockStorage.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<ConfigurationSettings>.Failure("No configuration found"));
+
+        // Create an empty/default config (simulates missing configuration)
+        var emptyConfig = new ConfigurationSettings
+        {
+            RootDirectory = string.Empty,
+            Ssh = new SshConfiguration { KeyPath = null },
+            Llm = new LlmConfiguration { Provider = LlmProvider.OpenAI, ApiKey = null },
+            Storage = new StorageConfiguration(),
+            Optional = new OptionalConfiguration { RetentionDays = 30 },
+            CreatedAt = DateTime.UtcNow
+        };
+
+        // Setup IOptionsSnapshot to return empty config
+        var optionsMonitor = _serviceProvider.GetRequiredService<IOptionsMonitor<ConfigurationSettings>>();
+        var mockMonitor = Mock.Get(optionsMonitor);
+        mockMonitor.Setup(c => c.CurrentValue).Returns(emptyConfig);
 
         var command = new ConfigCommand
         {
@@ -215,8 +267,7 @@ public sealed class ConfigurationValidationTests : IDisposable
 
         // Assert
         result.IsFailure.Should().BeTrue("validation should fail when no configuration exists");
-        result.Error.Should().Contain("No configuration found", "error should indicate configuration not found");
-        result.Error.Should().Contain("tom setup", "error should provide actionable guidance");
+        result.Error.Should().Contain("setup", "error should provide actionable guidance");
     }
 
     [Fact]
@@ -224,11 +275,22 @@ public sealed class ConfigurationValidationTests : IDisposable
     {
         // Arrange
         var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
-        
-        var storageService = _serviceProvider.GetRequiredService<IConfigurationStorageService>();
-        var mockStorage = Mock.Get(storageService);
-        mockStorage.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<ConfigurationSettings>.Failure("No configuration found"));
+
+        // Create an empty/default config (simulates missing configuration)
+        var emptyConfig = new ConfigurationSettings
+        {
+            RootDirectory = string.Empty,
+            Ssh = new SshConfiguration { KeyPath = null },
+            Llm = new LlmConfiguration { Provider = LlmProvider.OpenAI, ApiKey = null },
+            Storage = new StorageConfiguration(),
+            Optional = new OptionalConfiguration { RetentionDays = 30 },
+            CreatedAt = DateTime.UtcNow
+        };
+
+        // Setup IOptionsSnapshot to return empty config
+        var optionsMonitor = _serviceProvider.GetRequiredService<IOptionsMonitor<ConfigurationSettings>>();
+        var mockMonitor = Mock.Get(optionsMonitor);
+        mockMonitor.Setup(c => c.CurrentValue).Returns(emptyConfig);
 
         var command = new ConfigCommand
         {
@@ -241,8 +303,8 @@ public sealed class ConfigurationValidationTests : IDisposable
         // Assert
         result.IsFailure.Should().BeTrue();
         result.Error.Should().NotBeNullOrEmpty("error message should be provided");
-        (result.Error!.Contains("Config.", StringComparison.OrdinalIgnoreCase) || 
-         result.Error.Contains("configuration", StringComparison.OrdinalIgnoreCase) || 
+        (result.Error!.Contains("Config.", StringComparison.OrdinalIgnoreCase) ||
+         result.Error.Contains("configuration", StringComparison.OrdinalIgnoreCase) ||
          result.Error.Contains("setup", StringComparison.OrdinalIgnoreCase))
             .Should().BeTrue("error should be descriptive");
     }
@@ -265,6 +327,10 @@ public sealed class ConfigurationValidationTests : IDisposable
         // Add IConfiguration with empty configuration (no overrides)
         var configBuilder = new ConfigurationBuilder();
         services.AddSingleton<IConfiguration>(configBuilder.Build());
+
+        // Mock IOptionsMonitor<ConfigurationSettings> (used by HandleShowAsync)
+        var mockOptionsMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
+        services.AddSingleton(mockOptionsMonitor.Object);
 
         // Mock ISetupWizardUI (required by ConfigCommandHandler)
         var mockWizard = new Mock<ISetupWizardUI>();

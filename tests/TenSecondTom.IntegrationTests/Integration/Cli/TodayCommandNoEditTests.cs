@@ -3,10 +3,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using TenSecondTom.Features.Today.Commands;
-using TenSecondTom.Features.Today.Handlers;
-using TenSecondTom.Features.Templates.Handlers;
+using TenSecondTom.Features.Templates;
 using TenSecondTom.Features.Templates.Models;
+using TenSecondTom.Features.Today; // Add for CreateDailyEntry co-located use case
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Llm;
@@ -56,10 +55,10 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
     public async Task Handle_WithNoEditAndDefaultTemplate_CreatesEntryQuickly()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
         SetupSingleDailyTemplate(); // Setup default template
 
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Productive day! Finished the feature and reviewed two PRs.",
             UseDefaultTemplate = true // Simulates --use-default-template flag
@@ -76,7 +75,7 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
         // Verify template selection UI was NOT invoked (bypassed with default template)
         _mockTemplateSelectionUI.Verify(
             ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TemplateInfo>>(),
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()),
             Times.Never,
@@ -97,10 +96,10 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
     public async Task Handle_WithNoEditAndNamedTemplate_UsesCorrectTemplate()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
         SetupMultipleDailyTemplates();
 
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Team standup at 9am. Sprint planning in the afternoon.",
             TemplateName = "daily-standup" // Simulates --template "daily-standup"
@@ -121,7 +120,7 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
         // Verify template selection UI was NOT invoked
         _mockTemplateSelectionUI.Verify(
             ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TemplateInfo>>(),
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()),
             Times.Never,
@@ -132,7 +131,7 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
     public async Task Handle_WithNoEditAndMissingTemplate_FallsBackToDefault()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
         SetupMultipleDailyTemplates();
 
         // Setup template loader to fail for nonexistent template, then succeed for default
@@ -140,7 +139,7 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
             .Setup(l => l.LoadTemplateAsync("nonexistent-template", It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<PromptTemplate>.Failure("Template not found"));
 
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "My daily notes",
             TemplateName = "nonexistent-template" // Invalid template
@@ -169,9 +168,9 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
     public async Task Handle_WithEmptyContent_ReturnsValidationError()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
 
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "", // Empty content
             UseDefaultTemplate = true
@@ -199,9 +198,9 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
     public async Task Handle_WithWhitespaceOnlyContent_ReturnsValidationError()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
 
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "   \n\n  \t  ", // Whitespace only
             UseDefaultTemplate = true
@@ -219,12 +218,12 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
     public async Task Handle_WithMultiLineNotes_PreservesLineBreaks()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
         SetupSingleDailyTemplate();
 
         var multiLineContent = "Morning:\n- Team standup\n- Code review\n\nAfternoon:\n- Feature implementation\n- Unit tests";
 
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = multiLineContent,
             UseDefaultTemplate = true
@@ -244,10 +243,10 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
     public async Task Handle_WithTemplateAndUseDefaultFlag_PrefersTemplateFlag()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
         SetupMultipleDailyTemplates();
 
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Daily notes",
             TemplateName = "daily-standup", // Specific template
@@ -276,13 +275,13 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
     public async Task Handle_WithLongContent_ProcessesSuccessfully()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
         SetupSingleDailyTemplate();
 
         var longContent = string.Join("\n", Enumerable.Range(1, 50)
             .Select(i => $"Point {i}: This is a detailed note about what happened during the day."));
 
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = longContent,
             UseDefaultTemplate = true
@@ -301,12 +300,12 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
     public async Task Handle_WithSpecialCharacters_PreservesContent()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
         SetupSingleDailyTemplate();
 
         var specialContent = "Today's work: \"Fixed bug #123\"\n- Improved performance by 50%\n- Cost: $500\n- Email: test@example.com";
 
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = specialContent,
             UseDefaultTemplate = true
@@ -327,10 +326,10 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
     public async Task Handle_QuickEntryPerformance_CompletesWithoutTemplateSelection()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
         SetupSingleDailyTemplate();
 
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Quick daily update",
             UseDefaultTemplate = true
@@ -349,7 +348,7 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
         // Verify no interactive UI calls that would slow down execution
         _mockTemplateSelectionUI.Verify(
             ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TemplateInfo>>(),
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()),
             Times.Never,
@@ -363,10 +362,10 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
     public async Task Handle_WithNoTemplateFlags_UsesDefaultBehavior()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
         SetupSingleDailyTemplate(); // Only one template available
 
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Daily notes without template flags",
             // No TemplateName, no UseDefaultTemplate
@@ -381,7 +380,7 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
         // With single template, it should auto-select without prompting
         _mockTemplateSelectionUI.Verify(
             ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TemplateInfo>>(),
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()),
             Times.Never,
@@ -495,10 +494,12 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
         // Add template infrastructure
         services.AddSingleton(_mockTemplateLoader.Object);
         services.AddSingleton(_mockTemplateSelectionUI.Object);
-        services.AddSingleton<ListTemplatesQueryHandler>();
+
+        // Add TemplateProvider (required by CreateDailyEntry.Handler)
+        services.AddSingleton<ITemplateProvider, TemplateProvider>();
 
         // Add handler under test
-        services.AddSingleton<CreateDailyEntryHandler>();
+        services.AddSingleton<CreateDailyEntry.Handler>();
 
         return services.BuildServiceProvider();
     }

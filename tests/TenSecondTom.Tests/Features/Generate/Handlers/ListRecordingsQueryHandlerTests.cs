@@ -1,27 +1,26 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using TenSecondTom.Features.Generate.Handlers;
 using TenSecondTom.Features.Generate.Models;
-using TenSecondTom.Features.Generate.Queries;
 using TenSecondTom.Features.Generate.Services;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Features.Generate;
 
 namespace TenSecondTom.Tests.Features.Generate.Handlers;
 
 /// <summary>
-/// Tests for <see cref="ListRecordingsQueryHandler"/> implementation.
+/// Tests for <see cref="ListRecordings.Handler"/> implementation.
 /// Validates query handling for listing available recordings.
 /// </summary>
 public sealed class ListRecordingsQueryHandlerTests
 {
     private readonly Mock<IRecordingService> _mockRecordingService;
-    private readonly Mock<ILogger<ListRecordingsQueryHandler>> _mockLogger;
+    private readonly Mock<ILogger<ListRecordings.Handler>> _mockLogger;
 
     public ListRecordingsQueryHandlerTests()
     {
         _mockRecordingService = new Mock<IRecordingService>();
-        _mockLogger = new Mock<ILogger<ListRecordingsQueryHandler>>();
+        _mockLogger = new Mock<ILogger<ListRecordings.Handler>>();
     }
 
     [Fact]
@@ -33,7 +32,7 @@ public sealed class ListRecordingsQueryHandlerTests
             .ReturnsAsync(Result<IReadOnlyList<RecordingListItem>>.Failure("No recordings found"));
 
         var handler = CreateHandler();
-        var query = new ListRecordingsQuery();
+        var query = new ListRecordings.Query();
 
         // Act
         var result = await handler.Handle(query, CancellationToken.None);
@@ -58,7 +57,7 @@ public sealed class ListRecordingsQueryHandlerTests
             .ReturnsAsync(Result<IReadOnlyList<RecordingListItem>>.Success(recordings));
 
         var handler = CreateHandler();
-        var query = new ListRecordingsQuery();
+        var query = new ListRecordings.Query();
 
         // Act
         var result = await handler.Handle(query, CancellationToken.None);
@@ -85,7 +84,7 @@ public sealed class ListRecordingsQueryHandlerTests
             .ReturnsAsync(Result<IReadOnlyList<RecordingListItem>>.Success(recordings));
 
         var handler = CreateHandler();
-        var query = new ListRecordingsQuery();
+        var query = new ListRecordings.Query();
 
         // Act
         var result = await handler.Handle(query, CancellationToken.None);
@@ -108,7 +107,7 @@ public sealed class ListRecordingsQueryHandlerTests
             .ReturnsAsync(Result<IReadOnlyList<RecordingListItem>>.Success(recordings));
 
         var handler = CreateHandler();
-        var query = new ListRecordingsQuery { CancellationToken = cts.Token };
+        var query = new ListRecordings.Query { CancellationToken = cts.Token };
 
         // Act
         var result = await handler.Handle(query, cts.Token);
@@ -129,7 +128,7 @@ public sealed class ListRecordingsQueryHandlerTests
             .ReturnsAsync(Result<IReadOnlyList<RecordingListItem>>.Failure("Service error"));
 
         var handler = CreateHandler();
-        var query = new ListRecordingsQuery();
+        var query = new ListRecordings.Query();
 
         // Act
         var result = await handler.Handle(query, CancellationToken.None);
@@ -141,9 +140,9 @@ public sealed class ListRecordingsQueryHandlerTests
 
     #region Helper Methods
 
-    private ListRecordingsQueryHandler CreateHandler()
+    private ListRecordings.Handler CreateHandler()
     {
-        return new ListRecordingsQueryHandler(
+        return new ListRecordings.Handler(
             _mockRecordingService.Object,
             _mockLogger.Object);
     }

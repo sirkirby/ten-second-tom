@@ -2,8 +2,9 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using TenSecondTom.Features.Setup.Models;
-using TenSecondTom.Features.Setup.Queries;
 using Xunit;
+using TenSecondTom.Features.Setup;
+using TenSecondTom.Features.Setup.Services;
 
 namespace TenSecondTom.Tests.Unit.Features.Setup.Queries;
 

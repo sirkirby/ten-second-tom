@@ -1,8 +1,8 @@
 using Spectre.Console;
-using TenSecondTom.Features.Auth.Commands;
+using TenSecondTom.Features.Auth;
 using TenSecondTom.Shared.OutputFormatters;
 using TenSecondTom.Shared.Constants;
-using AuthHandler = TenSecondTom.Features.Auth.Handlers.LoginCommandHandler;
+using AuthHandler = TenSecondTom.Features.Auth.Login.Handler;
 
 namespace TenSecondTom.Infrastructure.Cli;
 
@@ -30,7 +30,7 @@ public static class LoginCommandHandler
                 AnsiConsole.WriteLine();
             }
 
-            var command = new LoginCommand();
+            var command = new Login.Command();
             var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
 
             if (jsonOutput)

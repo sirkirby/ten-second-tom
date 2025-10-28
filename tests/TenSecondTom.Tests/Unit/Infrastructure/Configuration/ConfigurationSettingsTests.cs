@@ -170,7 +170,8 @@ public sealed class ConfigurationSettingsTests
                 ApiKey = "test-api-key",
                 Model = null // No model specified
             },
-            Storage = new StorageConfiguration { MemoryDirectory = "/tmp/memory" }
+            RootDirectory = "/tmp/memory",
+            Storage = new StorageConfiguration()
         };
 
         // Act
@@ -222,5 +223,216 @@ public sealed class ConfigurationSettingsTests
         settings.Should().NotBeNull();
         settings!.Llm.Model.Should().Be("gpt-4o", "environment variables use __ delimiter which maps to : internally");
         settings.Llm.Provider.Should().Be(LlmProvider.OpenAI);
+    }
+
+    [Fact]
+    public void IsValid_WithValidConfiguration_ReturnsTrue()
+    {
+        // Arrange
+        var settings = new ConfigurationSettings
+        {
+            Ssh = new SshConfiguration { KeyPath = "/path/to/key" },
+            Llm = new LlmConfiguration
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "test-api-key"
+            },
+            RootDirectory = "/tmp/memory",
+            Storage = new StorageConfiguration(),
+            Optional = new OptionalConfiguration { RetentionDays = 30 }
+        };
+
+        // Act
+        bool isValid = settings.IsValid();
+
+        // Assert
+        isValid.Should().BeTrue("all required fields are present and valid");
+    }
+
+    [Fact]
+    public void IsValid_WithMissingSshKeyPathAndAgent_ReturnsFalse()
+    {
+        // Arrange
+        var settings = new ConfigurationSettings
+        {
+            Ssh = new SshConfiguration { KeyPath = null, AgentSocketPath = null },
+            Llm = new LlmConfiguration
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "test-api-key"
+            },
+            RootDirectory = "/tmp/memory",
+            Storage = new StorageConfiguration()
+        };
+
+        // Act
+        bool isValid = settings.IsValid();
+
+        // Assert
+        isValid.Should().BeFalse("SSH configuration must have either key path or agent socket");
+    }
+
+    [Fact]
+    public void IsValid_WithAgentSocketPathButNoKeyPath_ReturnsTrue()
+    {
+        // Arrange
+        var settings = new ConfigurationSettings
+        {
+            Ssh = new SshConfiguration { KeyPath = null, AgentSocketPath = "/path/to/agent.sock" },
+            Llm = new LlmConfiguration
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "test-api-key"
+            },
+            RootDirectory = "/tmp/memory",
+            Storage = new StorageConfiguration()
+        };
+
+        // Act
+        bool isValid = settings.IsValid();
+
+        // Assert
+        isValid.Should().BeTrue("agent socket path is a valid alternative to key path");
+    }
+
+    [Fact]
+    public void IsValid_WithMissingApiKey_ReturnsFalse()
+    {
+        // Arrange
+        var settings = new ConfigurationSettings
+        {
+            Ssh = new SshConfiguration { KeyPath = "/path/to/key" },
+            Llm = new LlmConfiguration
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = null
+            },
+            RootDirectory = "/tmp/memory",
+            Storage = new StorageConfiguration()
+        };
+
+        // Act
+        bool isValid = settings.IsValid();
+
+        // Assert
+        isValid.Should().BeFalse("API key is required");
+    }
+
+    [Fact]
+    public void IsValid_WithEmptyApiKey_ReturnsFalse()
+    {
+        // Arrange
+        var settings = new ConfigurationSettings
+        {
+            Ssh = new SshConfiguration { KeyPath = "/path/to/key" },
+            Llm = new LlmConfiguration
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = ""
+            },
+            RootDirectory = "/tmp/memory",
+            Storage = new StorageConfiguration()
+        };
+
+        // Act
+        bool isValid = settings.IsValid();
+
+        // Assert
+        isValid.Should().BeFalse("empty API key is not valid");
+    }
+
+    [Fact]
+    public void IsValid_WithMissingMemoryDirectory_ReturnsFalse()
+    {
+        // Arrange
+        var settings = new ConfigurationSettings
+        {
+            RootDirectory = null!,
+            Ssh = new SshConfiguration { KeyPath = "/path/to/key" },
+            Llm = new LlmConfiguration
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "test-api-key"
+            },
+            Storage = new StorageConfiguration()
+        };
+
+        // Act
+        bool isValid = settings.IsValid();
+
+        // Assert
+        isValid.Should().BeFalse("memory directory is required");
+    }
+
+    [Fact]
+    public void IsValid_WithZeroRetentionDays_ReturnsFalse()
+    {
+        // Arrange
+        var settings = new ConfigurationSettings
+        {
+            Ssh = new SshConfiguration { KeyPath = "/path/to/key" },
+            Llm = new LlmConfiguration
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "test-api-key"
+            },
+            RootDirectory = "/tmp/memory",
+            Storage = new StorageConfiguration(),
+            Optional = new OptionalConfiguration { RetentionDays = 0 }
+        };
+
+        // Act
+        bool isValid = settings.IsValid();
+
+        // Assert
+        isValid.Should().BeFalse("retention days must be positive");
+    }
+
+    [Fact]
+    public void IsValid_WithUnlimitedRetentionDays_ReturnsTrue()
+    {
+        // Arrange - -1 represents unlimited retention
+        var settings = new ConfigurationSettings
+        {
+            Ssh = new SshConfiguration { KeyPath = "/path/to/key" },
+            Llm = new LlmConfiguration
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "test-api-key"
+            },
+            RootDirectory = "/tmp/memory",
+            Storage = new StorageConfiguration(),
+            Optional = new OptionalConfiguration { RetentionDays = -1 }
+        };
+
+        // Act
+        bool isValid = settings.IsValid();
+
+        // Assert
+        isValid.Should().BeTrue("retention days of -1 represents unlimited retention and is valid");
+    }
+
+    [Fact]
+    public void IsValid_WithInvalidNegativeRetentionDays_ReturnsFalse()
+    {
+        // Arrange - Any negative value other than -1 is invalid
+        var settings = new ConfigurationSettings
+        {
+            Ssh = new SshConfiguration { KeyPath = "/path/to/key" },
+            Llm = new LlmConfiguration
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "test-api-key"
+            },
+            RootDirectory = "/tmp/memory",
+            Storage = new StorageConfiguration(),
+            Optional = new OptionalConfiguration { RetentionDays = -5 }
+        };
+
+        // Act
+        bool isValid = settings.IsValid();
+
+        // Assert
+        isValid.Should().BeFalse("retention days must be positive or -1 for unlimited");
     }
 }

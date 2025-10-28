@@ -1,9 +1,9 @@
+using TenSecondTom.Features.Audio;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using TenSecondTom.Features.Audio.Commands;
-using TenSecondTom.Features.Audio.Handlers;
+
 using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Features.Audio.Services;
@@ -14,7 +14,7 @@ using TenSecondTom.Shared.Constants;
 namespace TenSecondTom.Tests.Features.Audio.Handlers;
 
 /// <summary>
-/// Tests for <see cref="TranscribeAudioCommandHandler"/>.
+/// Tests for <see cref="TranscribeAudio.Handler"/>.
 /// Validates STT provider selection, transcription orchestration, and fallback logic.
 /// </summary>
 public sealed class TranscribeAudioCommandHandlerTests
@@ -23,7 +23,7 @@ public sealed class TranscribeAudioCommandHandlerTests
     private readonly Mock<ISttProvider> _mockLocalProvider;
     private readonly Mock<ISttProvider> _mockOpenAiProvider;
     private readonly Mock<IOptions<AudioConfiguration>> _mockAudioConfig;
-    private readonly Mock<ILogger<TranscribeAudioCommandHandler>> _mockLogger;
+    private readonly Mock<ILogger<TranscribeAudio.Handler>> _mockLogger;
 
     public TranscribeAudioCommandHandlerTests()
     {
@@ -31,7 +31,7 @@ public sealed class TranscribeAudioCommandHandlerTests
         _mockLocalProvider = new Mock<ISttProvider>();
         _mockOpenAiProvider = new Mock<ISttProvider>();
         _mockAudioConfig = new Mock<IOptions<AudioConfiguration>>();
-        _mockLogger = new Mock<ILogger<TranscribeAudioCommandHandler>>();
+        _mockLogger = new Mock<ILogger<TranscribeAudio.Handler>>();
 
         _mockLocalProvider.Setup(p => p.Engine).Returns(SttEngine.Local);
         _mockOpenAiProvider.Setup(p => p.Engine).Returns(SttEngine.OpenAI);
@@ -45,7 +45,7 @@ public sealed class TranscribeAudioCommandHandlerTests
     {
         // Arrange
         var audioPath = "/path/to/audio.wav";
-        var command = new TranscribeAudioCommand
+        var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
             AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
@@ -83,7 +83,7 @@ public sealed class TranscribeAudioCommandHandlerTests
     {
         // Arrange
         var audioPath = "/path/to/audio.wav";
-        var command = new TranscribeAudioCommand
+        var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
             AudioConfig = CreateTestAudioConfig()
@@ -116,7 +116,7 @@ public sealed class TranscribeAudioCommandHandlerTests
     {
         // Arrange
         var audioPath = "/path/to/audio.wav";
-        var command = new TranscribeAudioCommand
+        var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
             AudioConfig = CreateTestAudioConfig(sttProvider: SttProviders.OpenAI)
@@ -148,7 +148,7 @@ public sealed class TranscribeAudioCommandHandlerTests
     public async Task Handle_WhenProviderUnavailable_ReturnsFailure()
     {
         // Arrange
-        var command = new TranscribeAudioCommand
+        var command = new TranscribeAudio.Command
         {
             AudioFilePath = "/path/to/audio.wav",
             AudioConfig = CreateTestAudioConfig()
@@ -174,7 +174,7 @@ public sealed class TranscribeAudioCommandHandlerTests
     {
         // Arrange
         var audioPath = "/path/to/audio.wav";
-        var command = new TranscribeAudioCommand
+        var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
             AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
@@ -203,7 +203,7 @@ public sealed class TranscribeAudioCommandHandlerTests
     {
         // Arrange
         var audioPath = "/path/to/audio.wav";
-        var command = new TranscribeAudioCommand
+        var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
             AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
@@ -235,7 +235,7 @@ public sealed class TranscribeAudioCommandHandlerTests
     {
         // Arrange
         var audioPath = "/path/to/audio.wav";
-        var command = new TranscribeAudioCommand
+        var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
             AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
@@ -268,7 +268,7 @@ public sealed class TranscribeAudioCommandHandlerTests
     {
         // Arrange
         var audioPath = "/path/to/audio.wav";
-        var command = new TranscribeAudioCommand
+        var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
             AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
@@ -309,7 +309,7 @@ public sealed class TranscribeAudioCommandHandlerTests
     {
         // Arrange
         var audioPath = "/path/to/audio.wav";
-        var command = new TranscribeAudioCommand
+        var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
             AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
@@ -340,7 +340,7 @@ public sealed class TranscribeAudioCommandHandlerTests
     public async Task Handle_RespectsCancellationToken()
     {
         // Arrange
-        var command = new TranscribeAudioCommand
+        var command = new TranscribeAudio.Command
         {
             AudioFilePath = "/path/to/audio.wav",
             AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
@@ -366,7 +366,7 @@ public sealed class TranscribeAudioCommandHandlerTests
     public async Task Handle_WithEmptyAudioPath_ThrowsException()
     {
         // Arrange
-        var command = new TranscribeAudioCommand
+        var command = new TranscribeAudio.Command
         {
             AudioFilePath = string.Empty,
             AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
@@ -382,9 +382,9 @@ public sealed class TranscribeAudioCommandHandlerTests
             .WithMessage("*audio*path*");
     }
 
-    private TranscribeAudioCommandHandler CreateHandler()
+    private TranscribeAudio.Handler CreateHandler()
     {
-        return new TranscribeAudioCommandHandler(_mockFactory.Object, _mockAudioConfig.Object, _mockLogger.Object);
+        return new TranscribeAudio.Handler(_mockFactory.Object, _mockAudioConfig.Object, _mockLogger.Object);
     }
 
     private static AudioConfiguration CreateDefaultAudioConfiguration()

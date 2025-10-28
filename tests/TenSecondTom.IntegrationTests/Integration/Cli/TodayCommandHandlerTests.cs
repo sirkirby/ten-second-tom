@@ -1,11 +1,10 @@
-using TenSecondTom.Shared.Contracts;
 using FluentAssertions;
+using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using TenSecondTom.Features.Today.Commands;
-using TenSecondTom.Features.Today.Handlers;
+using TenSecondTom.Features.Today;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Shared.Models;
@@ -84,7 +83,7 @@ public sealed class TodayCommandHandlerTests
     public async Task ExecuteAsync_WithEditorCancelled_DoesNotCreateEntry()
     {
         // Arrange
-        var mockHandler = new Mock<IRequestHandler<CreateDailyEntryCommand, Result<DailyEntry>>>();
+        var mockHandler = new Mock<IRequestHandler<CreateDailyEntry.Command, Result<DailyEntry>>>();
         var mockAuthService = new Mock<IAuthenticationService>();
         var mockEditor = new Mock<IInteractiveTextEditor>();
 
@@ -130,7 +129,7 @@ public sealed class TodayCommandHandlerTests
 
         mockHandler.Verify(
             h => h.Handle(
-                It.IsAny<CreateDailyEntryCommand>(),
+                It.IsAny<CreateDailyEntry.Command>(),
                 It.IsAny<CancellationToken>()),
             Times.Never); // Handler should not be called
     }
@@ -139,7 +138,7 @@ public sealed class TodayCommandHandlerTests
     public async Task ExecuteAsync_WithEditorError_DoesNotCreateEntry()
     {
         // Arrange
-        var mockHandler = new Mock<IRequestHandler<CreateDailyEntryCommand, Result<DailyEntry>>>();
+        var mockHandler = new Mock<IRequestHandler<CreateDailyEntry.Command, Result<DailyEntry>>>();
         var mockAuthService = new Mock<IAuthenticationService>();
         var mockEditor = new Mock<IInteractiveTextEditor>();
 
@@ -185,7 +184,7 @@ public sealed class TodayCommandHandlerTests
 
         mockHandler.Verify(
             h => h.Handle(
-                It.IsAny<CreateDailyEntryCommand>(),
+                It.IsAny<CreateDailyEntry.Command>(),
                 It.IsAny<CancellationToken>()),
             Times.Never); // Handler should not be called on error
     }

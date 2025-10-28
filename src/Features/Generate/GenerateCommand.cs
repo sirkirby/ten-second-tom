@@ -2,10 +2,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
-using TenSecondTom.Features.Generate.Commands;
-using TenSecondTom.Features.Generate.Queries;
-using TenSecondTom.Features.Templates.Queries;
+using TenSecondTom.Features.Templates;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Options;
@@ -38,7 +37,7 @@ public static class GenerateCommand
         bool jsonOutput,
         string? templateName = null)
     {
-        var logger = serviceProvider.GetRequiredService<ILogger<Handlers.GenerateOutputCommandHandler>>();
+        var logger = serviceProvider.GetRequiredService<ILogger<GenerateOutput.Handler>>();
         var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
 
         // Show warning if using mock authentication (only in non-JSON mode)
@@ -69,8 +68,8 @@ public static class GenerateCommand
             }
 
             // Step 1: List available recordings
-            var listRecordingsHandler = serviceProvider.GetRequiredService<Handlers.ListRecordingsQueryHandler>();
-            var recordingsQuery = new ListRecordingsQuery { CancellationToken = CancellationToken.None };
+            var listRecordingsHandler = serviceProvider.GetRequiredService<ListRecordings.Handler>();
+            var recordingsQuery = new ListRecordings.Query { CancellationToken = CancellationToken.None };
             var recordingsResult = await listRecordingsHandler.Handle(recordingsQuery, CancellationToken.None);
 
             if (!recordingsResult.IsSuccess)
@@ -118,16 +117,18 @@ public static class GenerateCommand
             }
 
             // Step 3: List available templates
-            var listTemplatesHandler = serviceProvider.GetRequiredService<Templates.Handlers.ListTemplatesQueryHandler>();
-            var templatesQuery = new ListTemplatesQuery(FilterByType: null, IncludeInvalid: false);
-            var templatesResult = await listTemplatesHandler.Handle(templatesQuery, CancellationToken.None);
+            var templateProvider = serviceProvider.GetRequiredService<ITemplateProvider>();
+            var templatesResult = await templateProvider.ListTemplatesAsync(
+                filterByType: null,
+                includeInvalid: false,
+                CancellationToken.None);
 
             if (!templatesResult.IsSuccess)
             {
                 return HandleError(jsonOutput, $"Failed to list templates: {templatesResult.Error}");
             }
 
-            if (templatesResult.Value.Templates.Count == 0)
+            if (templatesResult.Value.Count == 0)
             {
                 return HandleError(jsonOutput, "No prompt templates found. Please configure templates using 'setup' command.");
             }
@@ -136,16 +137,16 @@ public static class GenerateCommand
             // Only include templates compatible with single recording processing
             // (Daily and BusinessMeeting types use {{USER_INPUT}} and {{DATE}} placeholders)
             var compatibleTypes = new[] { TemplateType.Daily, TemplateType.BusinessMeeting };
-            var templates = templatesResult.Value.Templates
+            var templates = templatesResult.Value
                 .Where(t => compatibleTypes.Contains(t.TemplateType))
                 .ToList();
-            
+
             if (templates.Count == 0)
             {
                 return HandleError(jsonOutput, "No compatible templates found for generate command.");
             }
 
-            Templates.Models.TemplateListItem selectedTemplate;
+            TemplateInfo selectedTemplate;
 
             // T042: If --template provided, resolve template name case-insensitively
             if (templateName is not null)
@@ -177,7 +178,7 @@ public static class GenerateCommand
             else
             {
                 // Interactive: show selection prompt
-                var templatePrompt = new SelectionPrompt<Templates.Models.TemplateListItem>()
+                var templatePrompt = new SelectionPrompt<TemplateInfo>()
                     .Title("[cyan]Select a template:[/]")
                     .PageSize(10)
                     .AddChoices(templates)
@@ -193,8 +194,8 @@ public static class GenerateCommand
             int maxInputTokens = llmOptions.MaxInputTokens;
 
             // Step 6: Generate output with LLM
-            var generateHandler = serviceProvider.GetRequiredService<Handlers.GenerateOutputCommandHandler>();
-            var generateCommand = new GenerateOutputCommand
+            var generateHandler = serviceProvider.GetRequiredService<GenerateOutput.Handler>();
+            var generateCommand = new GenerateOutput.Command
             {
                 TranscriptFilePath = selectedRecording.TranscriptFilePath,
                 RecordingBaseName = selectedRecording.RecordingBaseName,

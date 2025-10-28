@@ -3,11 +3,12 @@ using System.IO.Abstractions.TestingHelpers;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using TenSecondTom.Features.Templates.Commands;
-using TenSecondTom.Features.Templates.Handlers;
+using static TenSecondTom.Features.Templates.InstallDefaultTemplates;
+using TenSecondTom.Features.Templates;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Shared.Results;
 using Xunit;
+using TenSecondTom.Features.Setup;
 
 namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
 
@@ -18,14 +19,14 @@ namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
 public sealed class SetupWithTemplatesIntegrationTests
 {
     private readonly MockFileSystem _fileSystem;
-    private readonly Mock<ILogger<InstallDefaultTemplatesHandler>> _handlerLogger;
+    private readonly Mock<ILogger<InstallDefaultTemplates.Handler>> _handlerLogger;
     private readonly Mock<ILogger<YamlFrontMatterParser>> _parserLogger;
     private readonly string _testDirectory;
 
     public SetupWithTemplatesIntegrationTests()
     {
         _fileSystem = new MockFileSystem();
-        _handlerLogger = new Mock<ILogger<InstallDefaultTemplatesHandler>>();
+        _handlerLogger = new Mock<ILogger<InstallDefaultTemplates.Handler>>();
         _parserLogger = new Mock<ILogger<YamlFrontMatterParser>>();
         _testDirectory = "/Users/test/.memory/templates";
     }
@@ -34,18 +35,18 @@ public sealed class SetupWithTemplatesIntegrationTests
     public async Task InstallTemplates_EndToEnd_CreatesAllTemplateFiles()
     {
         // Arrange
-        var handler = new InstallDefaultTemplatesHandler(
+        var handler = new InstallDefaultTemplates.Handler(
             _fileSystem,
             _handlerLogger.Object);
 
-        var command = new InstallDefaultTemplatesCommand
+        var command = new InstallDefaultTemplates.Command
         {
             TargetDirectory = _testDirectory,
             OverwriteExisting = false
         };
 
         // Act
-        Result<InstallDefaultTemplatesResult> result = await handler.Handle(
+        Result<InstallDefaultTemplates.CommandResult> result = await handler.Handle(
             command,
             CancellationToken.None);
 
@@ -82,11 +83,11 @@ public sealed class SetupWithTemplatesIntegrationTests
     public async Task InstallTemplates_WhenAlreadyInstalled_SkipsExistingFiles()
     {
         // Arrange
-        var handler = new InstallDefaultTemplatesHandler(
+        var handler = new InstallDefaultTemplates.Handler(
             _fileSystem,
             _handlerLogger.Object);
 
-        var command = new InstallDefaultTemplatesCommand
+        var command = new InstallDefaultTemplates.Command
         {
             TargetDirectory = _testDirectory,
             OverwriteExisting = false
@@ -96,7 +97,7 @@ public sealed class SetupWithTemplatesIntegrationTests
         await handler.Handle(command, CancellationToken.None);
 
         // Act - Second installation
-        Result<InstallDefaultTemplatesResult> result = await handler.Handle(
+        Result<InstallDefaultTemplates.CommandResult> result = await handler.Handle(
             command,
             CancellationToken.None);
 
@@ -111,7 +112,7 @@ public sealed class SetupWithTemplatesIntegrationTests
     public async Task InstallTemplates_WithOverwrite_ReplacesExistingFiles()
     {
         // Arrange
-        var handler = new InstallDefaultTemplatesHandler(
+        var handler = new InstallDefaultTemplates.Handler(
             _fileSystem,
             _handlerLogger.Object);
 
@@ -120,14 +121,14 @@ public sealed class SetupWithTemplatesIntegrationTests
         string dailyPath = _fileSystem.Path.Combine(_testDirectory, "daily-summary.md");
         await _fileSystem.File.WriteAllTextAsync(dailyPath, "MODIFIED CONTENT");
 
-        var command = new InstallDefaultTemplatesCommand
+        var command = new InstallDefaultTemplates.Command
         {
             TargetDirectory = _testDirectory,
             OverwriteExisting = true
         };
 
         // Act
-        Result<InstallDefaultTemplatesResult> result = await handler.Handle(
+        Result<InstallDefaultTemplates.CommandResult> result = await handler.Handle(
             command,
             CancellationToken.None);
 

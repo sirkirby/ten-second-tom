@@ -1,6 +1,5 @@
 using Spectre.Console;
-using TenSecondTom.Features.Search.Handlers;
-using TenSecondTom.Features.Search.Queries;
+using TenSecondTom.Features.Search;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.OutputFormatters;
@@ -26,7 +25,7 @@ public static class SearchCommandHandler
     /// <param name="jsonOutput">Whether to output results in JSON format.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     public static async Task ExecuteAsync(
-        SearchMemoriesQueryHandler handler,
+        SearchMemories.Handler handler,
         IAuthenticationService authService,
         StorageOptions storageOptions,
         string query,
@@ -54,7 +53,7 @@ public static class SearchCommandHandler
             }
 
             // Execute search
-            var searchQuery = new SearchMemoriesQuery(query, fromDate, toDate);
+            var searchQuery = new SearchMemories.Query(query, fromDate, toDate);
             var result = await handler.Handle(searchQuery, cancellationToken).ConfigureAwait(false);
 
             if (!result.IsSuccess)

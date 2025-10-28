@@ -1,3 +1,4 @@
+using TenSecondTom.Features.Audio;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

@@ -1,8 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
-using TenSecondTom.Features.ThisWeek.Commands;
-using TenSecondTom.Features.ThisWeek.Handlers;
+using TenSecondTom.Features.ThisWeek;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Constants;
@@ -31,7 +30,7 @@ public static class ThisWeekCommandHandler
     /// <returns>A task representing the asynchronous operation.</returns>
     public static async Task ExecuteAsync(
         IServiceProvider serviceProvider,
-        CreateWeeklyReviewHandler handler,
+        CreateWeeklyReview.Handler handler,
         IAuthenticationService authService,
         DateTimeOffset? fromDate,
         DateTimeOffset? toDate,
@@ -93,7 +92,7 @@ public static class ThisWeekCommandHandler
 
         AnsiConsole.WriteLine();
 
-        var command = new CreateWeeklyReviewCommand
+        var command = new CreateWeeklyReview.Command
         {
             CustomDateRange = customDateRange,
             LlmProviderOverride = providerOverride

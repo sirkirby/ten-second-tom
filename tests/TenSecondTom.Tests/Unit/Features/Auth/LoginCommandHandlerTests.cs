@@ -1,8 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using TenSecondTom.Features.Auth.Commands;
-using TenSecondTom.Features.Auth.Handlers;
+using TenSecondTom.Features.Auth;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
@@ -10,27 +9,27 @@ using TenSecondTom.Shared.Results;
 namespace TenSecondTom.Tests.Unit.Features.Auth;
 
 /// <summary>
-/// Unit tests for <see cref="LoginCommandHandler"/>.
+/// Unit tests for <see cref="Login.Handler"/>.
 /// Tests the login command handler's ability to authenticate users.
 /// </summary>
 public sealed class LoginCommandHandlerTests
 {
     private readonly Mock<IAuthenticationService> _mockAuthService;
-    private readonly Mock<ILogger<LoginCommandHandler>> _mockLogger;
-    private readonly LoginCommandHandler _handler;
+    private readonly Mock<ILogger<Login.Handler>> _mockLogger;
+    private readonly Login.Handler _handler;
 
     public LoginCommandHandlerTests()
     {
         _mockAuthService = new Mock<IAuthenticationService>();
-        _mockLogger = new Mock<ILogger<LoginCommandHandler>>();
-        _handler = new LoginCommandHandler(_mockAuthService.Object, _mockLogger.Object);
+        _mockLogger = new Mock<ILogger<Login.Handler>>();
+        _handler = new Login.Handler(_mockAuthService.Object, _mockLogger.Object);
     }
 
     [Fact]
     public async Task Handle_WithValidCredentials_AuthenticatesSuccessfully()
     {
         // Arrange
-        var command = new LoginCommand();
+        var command = new Login.Command();
         var expectedSession = new UserSession
         {
             SessionId = Guid.NewGuid(),
@@ -57,7 +56,7 @@ public sealed class LoginCommandHandlerTests
     public async Task Handle_WhenAlreadyAuthenticated_ReturnsExistingSession()
     {
         // Arrange
-        var command = new LoginCommand();
+        var command = new Login.Command();
         var existingSession = new UserSession
         {
             SessionId = Guid.NewGuid(),
@@ -87,7 +86,7 @@ public sealed class LoginCommandHandlerTests
     public async Task Handle_WithMissingSshKey_ReturnsError()
     {
         // Arrange
-        var command = new LoginCommand();
+        var command = new Login.Command();
         _mockAuthService
             .Setup(x => x.AuthenticateAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<UserSession>.Failure("No SSH key found in ~/.ssh/"));
@@ -104,7 +103,7 @@ public sealed class LoginCommandHandlerTests
     public async Task Handle_WithIncorrectPassphrase_ReturnsError()
     {
         // Arrange
-        var command = new LoginCommand();
+        var command = new Login.Command();
         _mockAuthService
             .Setup(x => x.AuthenticateAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<UserSession>.Failure("Incorrect passphrase. 2 attempts remaining."));
@@ -121,7 +120,7 @@ public sealed class LoginCommandHandlerTests
     public async Task Handle_WhenAuthenticationFails_ReturnsError()
     {
         // Arrange
-        var command = new LoginCommand();
+        var command = new Login.Command();
         _mockAuthService
             .Setup(x => x.AuthenticateAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<UserSession>.Failure("Authentication failed after 3 attempts."));
@@ -138,7 +137,7 @@ public sealed class LoginCommandHandlerTests
     public async Task Handle_PropagatesCancellationToken()
     {
         // Arrange
-        var command = new LoginCommand();
+        var command = new Login.Command();
         using var cancellationTokenSource = new CancellationTokenSource();
         var session = new UserSession
         {
@@ -166,7 +165,7 @@ public sealed class LoginCommandHandlerTests
     public async Task Handle_LogsLoginAttempt()
     {
         // Arrange
-        var command = new LoginCommand();
+        var command = new Login.Command();
         var session = new UserSession
         {
             SessionId = Guid.NewGuid(),
@@ -198,7 +197,7 @@ public sealed class LoginCommandHandlerTests
     public async Task Handle_LogsSuccessfulLogin()
     {
         // Arrange
-        var command = new LoginCommand();
+        var command = new Login.Command();
         var sessionId = Guid.NewGuid();
         var session = new UserSession
         {
@@ -231,7 +230,7 @@ public sealed class LoginCommandHandlerTests
     public async Task Handle_LogsFailedLogin()
     {
         // Arrange
-        var command = new LoginCommand();
+        var command = new Login.Command();
         var errorMessage = "Authentication failed after 3 attempts.";
         _mockAuthService
             .Setup(x => x.AuthenticateAsync(It.IsAny<CancellationToken>()))
