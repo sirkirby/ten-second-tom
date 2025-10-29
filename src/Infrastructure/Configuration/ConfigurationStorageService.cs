@@ -22,7 +22,9 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
     {
         WriteIndented = true,
         // Default PascalCase naming matches .NET configuration system
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = true,
+        // Serialize enums as strings (e.g., "OpenAI" instead of 0)
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
     };
 
     public ConfigurationStorageService(

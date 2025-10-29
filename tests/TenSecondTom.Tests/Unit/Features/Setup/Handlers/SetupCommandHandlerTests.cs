@@ -631,6 +631,97 @@ public sealed class SetupCommandHandlerTests
         savedConfig!.Optional.EnableTelemetry.Should().BeFalse();
     }
 
+    [Fact]
+    public async Task Handle_WithReconfiguration_PreservesAudioConfiguration()
+    {
+        // Arrange
+        var handler = CreateHandler();
+        var existingAudioConfig = new AudioConfigurationDisplay
+        {
+            SttProvider = "openai",
+            SttApiKey = "sk-audio123",
+            SttFallbackEnabled = true,
+            SttFallbackProvider = "whisper-cpp",
+            SttFallbackApiKey = "fallback-key",
+            KeepFiles = false,
+            Recorder = new RecorderConfigurationDisplay
+            {
+                InputVolume = 1.5,
+                EnableNoiseReduction = false,
+                EnableFrequencyFilters = true
+            },
+            Preprocessing = new PreprocessingConfigurationDisplay
+            {
+                RemoveSilence = false,
+                SilenceThresholdDb = -40,
+                MinimumSilenceDurationMs = 1000
+            }
+        };
+
+        var existingConfig = new ConfigurationSettings
+        {
+            Ssh = new SshConfiguration
+            {
+                KeyPath = "/Users/test/.ssh/id_ed25519",
+                KeySource = SshKeySource.FileSystem,
+                AgentSocketPath = null
+            },
+            Llm = new LlmConfiguration
+            {
+                Provider = LlmProvider.OpenAI,
+                ApiKey = "sk-test123456789012345678901234567890123456789012",
+                Model = null
+            },
+            RootDirectory = "/Users/test/.memory/ten-second-tom",
+            Storage = new StorageConfiguration
+            {
+                CreateIfMissing = true
+            },
+            Optional = new OptionalConfiguration
+            {
+                LogLevel = Microsoft.Extensions.Logging.LogLevel.Information,
+                RetentionDays = 30,
+                EnableTelemetry = false
+            },
+            Audio = existingAudioConfig,
+            CreatedAt = DateTime.UtcNow.AddDays(-30),
+            LastModifiedAt = null,
+            ConfigurationVersion = "1.0"
+        };
+
+        var command = new SetupCommand
+        {
+            Force = true,
+            NonInteractive = false,
+            ExistingConfiguration = existingConfig
+        };
+
+        ConfigurationSettings? savedConfig = null;
+
+        SetupHappyPathMocksExceptStorage();
+
+        _mockStorageService
+            .Setup(x => x.SaveAsync(It.IsAny<ConfigurationSettings>(), It.IsAny<CancellationToken>()))
+            .Callback<ConfigurationSettings, CancellationToken>((config, ct) => savedConfig = config)
+            .ReturnsAsync(Result<string>.Success("/path"));
+
+        // Act
+        await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        savedConfig.Should().NotBeNull();
+        savedConfig!.Audio.Should().NotBeNull();
+        savedConfig.Audio.SttProvider.Should().Be("openai");
+        savedConfig.Audio.SttApiKey.Should().Be("sk-audio123");
+        savedConfig.Audio.SttFallbackEnabled.Should().BeTrue();
+        savedConfig.Audio.SttFallbackProvider.Should().Be("whisper-cpp");
+        savedConfig.Audio.KeepFiles.Should().BeFalse();
+        savedConfig.Audio.Recorder.InputVolume.Should().Be(1.5);
+        savedConfig.Audio.Recorder.EnableNoiseReduction.Should().BeFalse();
+        savedConfig.Audio.Preprocessing.RemoveSilence.Should().BeFalse();
+        savedConfig.Audio.Preprocessing.SilenceThresholdDb.Should().Be(-40);
+    }
+
     // NOTE: This test is commented out because Setup.Handler no longer uses IConfiguration directly.
     // Environment variable configuration is now handled at the Program.cs level and tested in integration tests.
     // See SetupWithTemplatesIntegrationTests for end-to-end environment variable testing.

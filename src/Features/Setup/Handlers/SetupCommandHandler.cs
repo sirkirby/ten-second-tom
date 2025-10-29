@@ -180,6 +180,7 @@ public sealed class SetupCommandHandler
                     RetentionDays = retentionDays ?? -1, // -1 means unlimited (never delete)
                     EnableTelemetry = false
                 },
+                Audio = command.ExistingConfiguration?.Audio ?? new AudioConfigurationDisplay(),
                 CreatedAt = command.ExistingConfiguration?.CreatedAt ?? DateTime.UtcNow,
                 LastModifiedAt = isReconfiguration ? DateTime.UtcNow : null,
                 ConfigurationVersion = "1.0"

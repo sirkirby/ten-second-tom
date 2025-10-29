@@ -23,6 +23,7 @@ public sealed class ApplicationBootstrapper
     private readonly IServiceProvider _serviceProvider;
     private readonly IConfiguration _configuration;
     private readonly ILogger<ApplicationBootstrapper> _logger;
+    private readonly SetupCommandFactory _setupCommandFactory;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ApplicationBootstrapper"/> class.
@@ -30,11 +31,13 @@ public sealed class ApplicationBootstrapper
     public ApplicationBootstrapper(
         IServiceProvider serviceProvider,
         IConfiguration configuration,
-        ILogger<ApplicationBootstrapper> logger)
+        ILogger<ApplicationBootstrapper> logger,
+        SetupCommandFactory setupCommandFactory)
     {
         _serviceProvider = serviceProvider;
         _configuration = configuration;
         _logger = logger;
+        _setupCommandFactory = setupCommandFactory ?? throw new ArgumentNullException(nameof(setupCommandFactory));
     }
 
     /// <summary>
@@ -242,14 +245,11 @@ public sealed class ApplicationBootstrapper
     /// </summary>
     private async Task<Result<Features.Setup.Models.ConfigurationSettings>> RunSetupAsync(bool force, CancellationToken cancellationToken)
     {
+        // Use factory to create SetupCommand with existing config loaded (centralized logic)
+        var setupCommand = await _setupCommandFactory.CreateAsync(force, nonInteractive: false, cancellationToken)
+            .ConfigureAwait(false);
+        
         var setupHandler = _serviceProvider.GetRequiredService<SetupCommandHandler>();
-        var setupCommand = new SetupCommand
-        {
-            Force = force,
-            NonInteractive = false,
-            ExistingConfiguration = null
-        };
-
         return await setupHandler.Handle(setupCommand, cancellationToken).ConfigureAwait(false);
     }
 

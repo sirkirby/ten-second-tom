@@ -320,7 +320,7 @@ internal static class ConfigCommandBuilder
         table.AddRow("  Model", modelDisplay);
 
         string apiKeyDisplay = showSecrets
-            ? config.Llm.ApiKey ?? "[dim]Not set[/]"
+            ? (config.Llm.ApiKey?.EscapeMarkup() ?? "[dim]Not set[/]")
             : MaskApiKey(config.Llm.ApiKey);
         table.AddRow("  API Key", apiKeyDisplay);
 

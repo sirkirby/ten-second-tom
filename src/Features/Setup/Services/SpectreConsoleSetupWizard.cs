@@ -167,7 +167,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
 
         if (!string.IsNullOrEmpty(currentApiKey))
         {
-            prompt.DefaultValue(MaskApiKey(currentApiKey));
+            prompt.DefaultValue(currentApiKey);
         }
 
         var apiKey = _console.Prompt(prompt);
@@ -420,7 +420,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
 
         if (!string.IsNullOrEmpty(currentApiKey))
         {
-            prompt.DefaultValue(MaskApiKey(currentApiKey));
+            prompt.DefaultValue(currentApiKey);
         }
 
         var apiKey = _console.Prompt(prompt);
