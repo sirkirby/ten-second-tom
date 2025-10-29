@@ -2,7 +2,9 @@ using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Setup.Commands;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Setup.Services;
+using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Infrastructure.Storage;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Results;
 
@@ -17,17 +19,20 @@ public sealed class SetupCommandHandler
     private readonly IConfigurationStorageService _storageService;
     private readonly ISetupWizardUI _wizardUI;
     private readonly ISshKeyDetectorFactory _sshKeyDetectorFactory;
+    private readonly IStorageProviderFactory _storageProviderFactory;
     private readonly ILogger<SetupCommandHandler> _logger;
 
     public SetupCommandHandler(
         IConfigurationStorageService storageService,
         ISetupWizardUI wizardUI,
         ISshKeyDetectorFactory sshKeyDetectorFactory,
+        IStorageProviderFactory storageProviderFactory,
         ILogger<SetupCommandHandler> logger)
     {
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
         _wizardUI = wizardUI ?? throw new ArgumentNullException(nameof(wizardUI));
         _sshKeyDetectorFactory = sshKeyDetectorFactory ?? throw new ArgumentNullException(nameof(sshKeyDetectorFactory));
+        _storageProviderFactory = storageProviderFactory ?? throw new ArgumentNullException(nameof(storageProviderFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -121,37 +126,86 @@ public sealed class SetupCommandHandler
                 return Result<ConfigurationSettings>.Failure($"Setup cancelled: No API key provided. Visit {keyUrl} to create an API key, then run 'tom setup' again.");
             }
 
-            // Step 4: Memory Directory Configuration
-            _wizardUI.ShowStepHeader(4, 8, "Memory Storage Location");
-            var memoryDirectory = await _wizardUI.PromptForMemoryDirectoryAsync(
-                command.ExistingConfiguration?.RootDirectory,
+            // Step 4: Storage Provider Selection
+            _wizardUI.ShowStepHeader(4, 10, "Storage Provider Selection");
+            var availableProviders = _storageProviderFactory.GetAvailableProviders();
+            var selectedStorageProvider = await _wizardUI.PromptForStorageProviderAsync(
+                availableProviders,
+                command.ExistingConfiguration?.Storage.ProviderId,
                 cancellationToken);
 
-            if (string.IsNullOrWhiteSpace(memoryDirectory))
+            if (selectedStorageProvider == null)
             {
-                memoryDirectory = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    DirectoryNames.ApplicationRoot);
+                _wizardUI.ShowWarning("No storage provider selected. Defaulting to 'default' provider.");
+                selectedStorageProvider = availableProviders.FirstOrDefault(p =>
+                    p.ProviderId.Equals(StorageProviderIds.Default, StringComparison.OrdinalIgnoreCase));
+
+                if (selectedStorageProvider == null)
+                {
+                    _wizardUI.ShowError("Setup cannot continue without a storage provider.");
+                    return Result<ConfigurationSettings>.Failure("Setup cancelled: No storage provider available.");
+                }
             }
 
-            // Step 5: Logging Level
-            _wizardUI.ShowStepHeader(5, 8, "Logging Level");
+            // Step 5: Root Directory Configuration (provider-specific)
+            string? rootDirectory;
+            string? memorySubdirectory = null;
+
+            if (selectedStorageProvider.ProviderId.Equals(StorageProviderIds.Obsidian, StringComparison.OrdinalIgnoreCase))
+            {
+                // Obsidian-specific configuration
+                _wizardUI.ShowStepHeader(5, 10, "Obsidian Vault Location");
+                rootDirectory = await _wizardUI.PromptForObsidianVaultPathAsync(
+                    command.ExistingConfiguration?.RootDirectory,
+                    cancellationToken);
+
+                if (string.IsNullOrWhiteSpace(rootDirectory))
+                {
+                    _wizardUI.ShowError("Setup cannot continue without a valid Obsidian vault path.");
+                    return Result<ConfigurationSettings>.Failure("Setup cancelled: No vault path provided. Run 'tom setup' again.");
+                }
+
+                // Step 6: Obsidian Subdirectory (optional)
+                _wizardUI.ShowStepHeader(6, 10, "TST Subdirectory (Optional)");
+                memorySubdirectory = await _wizardUI.PromptForSubdirectoryAsync(
+                    "Subdirectory name (leave empty for vault root):",
+                    command.ExistingConfiguration?.Storage.MemorySubdirectory,
+                    cancellationToken);
+            }
+            else
+            {
+                // Default provider configuration
+                _wizardUI.ShowStepHeader(5, 10, "Memory Storage Location");
+                rootDirectory = await _wizardUI.PromptForRootDirectoryAsync(
+                    command.ExistingConfiguration?.RootDirectory,
+                    cancellationToken);
+
+                if (string.IsNullOrWhiteSpace(rootDirectory))
+                {
+                    rootDirectory = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                        DirectoryNames.ApplicationRoot);
+                }
+            }
+
+            // Step 7: Logging Level
+            _wizardUI.ShowStepHeader(7, 10, "Logging Level");
             var logLevel = await _wizardUI.PromptForLogLevelAsync(
                 command.ExistingConfiguration?.Optional.LogLevel,
                 cancellationToken);
 
-            // Step 6: Data Retention
-            _wizardUI.ShowStepHeader(6, 8, "Data Retention");
+            // Step 8: Data Retention
+            _wizardUI.ShowStepHeader(8, 10, "Data Retention");
             var retentionDays = await _wizardUI.PromptForRetentionDaysAsync(
                 command.ExistingConfiguration?.Optional.RetentionDays,
                 cancellationToken);
 
-            // Step 7: Configuration Summary
-            _wizardUI.ShowStepHeader(7, 8, "Configuration Summary");
-            
+            // Step 9: Configuration Summary
+            _wizardUI.ShowStepHeader(9, 10, "Configuration Summary");
+
             var newConfiguration = new ConfigurationSettings
             {
-                RootDirectory = memoryDirectory,
+                RootDirectory = rootDirectory!,
                 Ssh = new SshConfiguration
                 {
                     KeyPath = selectedSshKey?.FilePath,
@@ -172,7 +226,13 @@ public sealed class SetupCommandHandler
                 },
                 Storage = new StorageConfiguration
                 {
-                    CreateIfMissing = true
+                    ProviderId = selectedStorageProvider.ProviderId,
+                    MemorySubdirectory = memorySubdirectory,
+                    CreateIfMissing = true,
+                    RetentionPolicy = Shared.Models.RetentionPolicy.Indefinite,
+                    AutoPurge = false,
+                    MaxFileSizeBytes = null,
+                    CompressionEnabled = false
                 },
                 Optional = new OptionalConfiguration
                 {
@@ -195,8 +255,8 @@ public sealed class SetupCommandHandler
                 return Result<ConfigurationSettings>.Failure("Setup cancelled: User chose not to save configuration. Run 'tom setup' to try again.");
             }
 
-            // Step 8: Save Configuration
-            _wizardUI.ShowStepHeader(8, 8, "Saving Configuration");
+            // Step 10: Save Configuration
+            _wizardUI.ShowStepHeader(10, 10, "Saving Configuration");
             _wizardUI.ShowStatus("Saving configuration...");
 
             var saveResult = await _storageService.SaveAsync(newConfiguration, cancellationToken).ConfigureAwait(false);

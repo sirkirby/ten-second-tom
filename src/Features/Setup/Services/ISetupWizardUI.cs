@@ -44,10 +44,52 @@ public interface ISetupWizardUI
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Prompts user to enter memory directory path
+    /// Prompts user to enter memory directory path (legacy - use PromptForRootDirectoryAsync for new code)
     /// </summary>
+    [Obsolete("Use PromptForRootDirectoryAsync instead. This method is for backward compatibility only.", false)]
     Task<string?> PromptForMemoryDirectoryAsync(
         string? currentDirectory,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Prompts user to enter root directory path for all Ten Second Tom data
+    /// </summary>
+    Task<string?> PromptForRootDirectoryAsync(
+        string? currentDirectory,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Prompts user to select a storage provider
+    /// </summary>
+    /// <param name="availableProviders">List of available storage providers</param>
+    /// <param name="currentProviderId">Currently selected provider ID, if any</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Selected storage provider metadata, or null if cancelled</returns>
+    Task<Infrastructure.Storage.StorageProviderMetadata?> PromptForStorageProviderAsync(
+        IReadOnlyList<Infrastructure.Storage.StorageProviderMetadata> availableProviders,
+        string? currentProviderId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Prompts user to enter Obsidian vault path with validation
+    /// </summary>
+    /// <param name="currentPath">Current vault path, if any</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Vault path, or null if cancelled</returns>
+    Task<string?> PromptForObsidianVaultPathAsync(
+        string? currentPath,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Prompts user for a subdirectory name within the root directory
+    /// </summary>
+    /// <param name="prompt">The question to ask the user</param>
+    /// <param name="currentValue">Current subdirectory value</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Subdirectory name, or null if cancelled or empty string if user wants root level</returns>
+    Task<string?> PromptForSubdirectoryAsync(
+        string prompt,
+        string? currentValue,
         CancellationToken cancellationToken);
 
     /// <summary>

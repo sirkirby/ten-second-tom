@@ -468,6 +468,125 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         return Task.FromResult<string?>(choices[selected]);
     }
 
+    public Task<string?> PromptForRootDirectoryAsync(
+        string? currentDirectory,
+        CancellationToken cancellationToken)
+    {
+        var defaultDir = currentDirectory ??
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                DirectoryNames.ApplicationRoot);
+
+        _console.MarkupLine("[grey]ℹ️  Root Directory:[/]");
+        _console.MarkupLine("[grey]   This is the base directory for all Ten Second Tom data (config, memories, templates).[/]");
+        _console.WriteLine();
+
+        var prompt = new TextPrompt<string>("Where should I store your Ten Second Tom data?")
+            .DefaultValue(defaultDir)
+            .AllowEmpty();
+
+        var directory = _console.Prompt(prompt);
+        return Task.FromResult<string?>(directory);
+    }
+
+    public Task<Infrastructure.Storage.StorageProviderMetadata?> PromptForStorageProviderAsync(
+        IReadOnlyList<Infrastructure.Storage.StorageProviderMetadata> availableProviders,
+        string? currentProviderId,
+        CancellationToken cancellationToken)
+    {
+        if (!availableProviders.Any())
+        {
+            ShowWarning("No storage providers available.");
+            return Task.FromResult<Infrastructure.Storage.StorageProviderMetadata?>(null);
+        }
+
+        _console.MarkupLine("[grey]ℹ️  Storage Provider:[/]");
+        _console.MarkupLine("[grey]   Choose where to store your memory entries:[/]");
+        _console.MarkupLine("[grey]   • Default: TST-native file structure (recommended for new users)[/]");
+        _console.MarkupLine("[grey]   • Obsidian: Store entries in your Obsidian vault for seamless note integration[/]");
+        _console.WriteLine();
+
+        var choices = availableProviders.ToDictionary(
+            p => $"{p.DisplayName} - {p.Description}".EscapeMarkup(),
+            p => p
+        );
+
+        var prompt = new SelectionPrompt<string>()
+            .Title("Select storage provider:")
+            .PageSize(10)
+            .AddChoices(choices.Keys);
+
+        // Highlight current provider if set
+        if (!string.IsNullOrEmpty(currentProviderId))
+        {
+            var currentProvider = availableProviders.FirstOrDefault(p =>
+                p.ProviderId.Equals(currentProviderId, StringComparison.OrdinalIgnoreCase));
+            if (currentProvider != null)
+            {
+                prompt.HighlightStyle(new Style(Color.Green));
+            }
+        }
+
+        var selected = _console.Prompt(prompt);
+        return Task.FromResult<Infrastructure.Storage.StorageProviderMetadata?>(choices[selected]);
+    }
+
+    public Task<string?> PromptForObsidianVaultPathAsync(
+        string? currentPath,
+        CancellationToken cancellationToken)
+    {
+        _console.MarkupLine("[grey]ℹ️  Obsidian Vault Path:[/]");
+        _console.MarkupLine("[grey]   Enter the path to your Obsidian vault directory.[/]");
+        _console.MarkupLine("[grey]   The vault must contain a .obsidian directory to be valid.[/]");
+        _console.WriteLine();
+
+        var defaultPath = currentPath ??
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documents", "Obsidian");
+
+        var prompt = new TextPrompt<string>("Obsidian vault path:")
+            .DefaultValue(defaultPath)
+            .AllowEmpty();
+
+        var vaultPath = _console.Prompt(prompt);
+
+        // Basic validation - check if .obsidian directory exists
+        if (!string.IsNullOrWhiteSpace(vaultPath))
+        {
+            var obsidianDir = Path.Combine(vaultPath, ".obsidian");
+            if (!Directory.Exists(obsidianDir))
+            {
+                ShowWarning($"Warning: .obsidian directory not found at {obsidianDir}");
+                _console.MarkupLine("[yellow]This may not be a valid Obsidian vault. Continue anyway? (y/n)[/]");
+                var response = _console.ReadLine();
+                if (!response?.Equals("y", StringComparison.OrdinalIgnoreCase) ?? true)
+                {
+                    return Task.FromResult<string?>(null);
+                }
+            }
+        }
+
+        return Task.FromResult<string?>(vaultPath);
+    }
+
+    public Task<string?> PromptForSubdirectoryAsync(
+        string prompt,
+        string? currentValue,
+        CancellationToken cancellationToken)
+    {
+        _console.MarkupLine("[grey]ℹ️  TST Subdirectory:[/]");
+        _console.MarkupLine("[grey]   Optional: Store Ten Second Tom entries in a subdirectory of your vault.[/]");
+        _console.MarkupLine("[grey]   Leave empty to store entries at the root level of your vault.[/]");
+        _console.WriteLine();
+
+        var textPrompt = new TextPrompt<string>(prompt)
+            .DefaultValue(currentValue ?? "ten-second-tom")
+            .AllowEmpty();
+
+        var subdirectory = _console.Prompt(textPrompt);
+
+        // Return null if empty (root level)
+        return Task.FromResult(string.IsNullOrWhiteSpace(subdirectory) ? null : subdirectory);
+    }
+
     private static string MaskApiKey(string? apiKey)
     {
         if (string.IsNullOrEmpty(apiKey))
