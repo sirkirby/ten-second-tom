@@ -22,6 +22,9 @@ public static class SetupFeatureExtensions
         services.AddTransient<SetupCommandHandler>();
         services.AddTransient<ConfigCommandHandler>();
         
+        // Setup command factory (centralizes logic for creating SetupCommand with existing config)
+        services.AddTransient<SetupCommandFactory>();
+        
         // Application bootstrapper (coordinates startup/setup logic)
         services.AddTransient<ApplicationBootstrapper>();
         

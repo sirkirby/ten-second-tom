@@ -539,15 +539,11 @@ public static class CommandRegistry
             bool nonInteractive = parseResult.GetValue(nonInteractiveOption);
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
 
-            var handler = serviceProvider.GetRequiredService<SetupCommandHandler>();
-            
-            var command = new SetupCommand
-            {
-                Force = force,
-                NonInteractive = nonInteractive,
-                ExistingConfiguration = null
-            };
+            // Use factory to create SetupCommand with existing config loaded (centralized logic)
+            var factory = serviceProvider.GetRequiredService<SetupCommandFactory>();
+            var command = await factory.CreateAsync(force, nonInteractive, CancellationToken.None).ConfigureAwait(false);
 
+            var handler = serviceProvider.GetRequiredService<SetupCommandHandler>();
             var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
 
             if (result.IsSuccess)
