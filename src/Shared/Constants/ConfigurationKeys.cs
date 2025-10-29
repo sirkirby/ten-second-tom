@@ -29,6 +29,14 @@ public static class ConfigurationKeys
     public const string RootDirectoryKey = "TenSecondTom:RootDirectory";
 
     /// <summary>
+    /// Configuration key for the memory directory (legacy, backward compatibility only).
+    /// Use RootDirectoryKey for new configurations.
+    /// Environment variable: TenSecondTom__MemoryDirectory
+    /// </summary>
+    [Obsolete("Use RootDirectoryKey instead. This constant is for backward compatibility only.", false)]
+    public const string MemoryDirectoryKey = "TenSecondTom:MemoryDirectory";
+
+    /// <summary>
     /// Configuration key for the LLM provider (OpenAI, Anthropic).
     /// Environment variable: TenSecondTom__Llm__Provider
     /// </summary>

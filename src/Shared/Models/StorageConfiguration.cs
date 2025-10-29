@@ -6,10 +6,31 @@ namespace TenSecondTom.Shared.Models;
 public record StorageConfiguration
 {
     /// <summary>
-    /// Gets the directory path where memory entries are stored.
-    /// Default: ".memory"
+    /// Gets the root directory path for all Ten Second Tom data.
+    /// This is the top-level directory containing all subdirectories.
+    /// Default: "./ten-second-tom" or "~/ten-second-tom"
     /// </summary>
-    public required string MemoryDirectory { get; init; }
+    public required string RootDirectory { get; init; }
+
+    /// <summary>
+    /// Gets the storage provider ID (e.g., "default", "obsidian").
+    /// Default: "default"
+    /// </summary>
+    public required string ProviderId { get; init; }
+
+    /// <summary>
+    /// Gets the optional subdirectory name for memory entries within the root directory.
+    /// When set, memory entries are stored under {RootDirectory}/{MemorySubdirectory}/
+    /// Default: null (store directly in root)
+    /// </summary>
+    public string? MemorySubdirectory { get; init; }
+
+    /// <summary>
+    /// Gets the legacy memory directory path (backward compatibility only).
+    /// Use <see cref="RootDirectory"/> for new configurations.
+    /// </summary>
+    [Obsolete("Use RootDirectory instead. This property is for backward compatibility only.", false)]
+    public string? MemoryDirectory { get; init; }
 
     /// <summary>
     /// Gets the retention policy for memory entries.

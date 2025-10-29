@@ -55,13 +55,24 @@ public static class ServiceCollectionExtensions
         // Register StorageOptions with custom binding (RootDirectory is at root, other properties in Storage section)
         services.Configure<StorageOptions>(options =>
         {
-            // Root directory is at root level: TenSecondTom:RootDirectory
-            options.MemoryDirectory = configuration[ConfigurationKeys.RootDirectoryKey]
+            // Root directory is at root level: TenSecondTom:RootDirectory (or legacy MemoryDirectory)
+#pragma warning disable CS0618 // Type or member is obsolete
+            options.RootDirectory = configuration[ConfigurationKeys.RootDirectoryKey]
+                ?? configuration[ConfigurationKeys.MemoryDirectoryKey]  // Legacy fallback
                 ?? Path.Combine(".", DirectoryNames.ApplicationRoot);
+#pragma warning restore CS0618
 
             // Other properties are in Storage section: TenSecondTom:Storage
             var storageSection = configuration.GetSection(StorageOptions.SectionName);
             storageSection.Bind(options);
+
+            // Backward compatibility: if legacy MemoryDirectory was explicitly set, preserve it
+#pragma warning disable CS0618 // Type or member is obsolete
+            if (configuration[ConfigurationKeys.MemoryDirectoryKey] != null)
+            {
+                options.MemoryDirectory = configuration[ConfigurationKeys.MemoryDirectoryKey];
+            }
+#pragma warning restore CS0618
         });
         services.AddSingleton<IValidateOptions<StorageOptions>, StorageOptionsValidator>();
 
@@ -94,18 +105,55 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IFileSystem, FileSystem>();
         services.AddSingleton<ConfigurationChecker>();
 
-        services.AddSingleton<IMemoryStorageProvider>(serviceProvider =>
+        // Register storage provider factory (assembly scanning)
+        services.AddSingleton<IStorageProviderFactory, StorageProviderFactory>();
+
+        // Register IStorageProvider (resolved via factory based on configuration)
+        services.AddSingleton<IStorageProvider>(serviceProvider =>
         {
-            var storageOptions = serviceProvider.GetRequiredService<IOptions<StorageOptions>>();
-            var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
-                .CreateLogger<FileSystemStorageProvider>();
+            var factory = serviceProvider.GetRequiredService<IStorageProviderFactory>();
+            var options = serviceProvider.GetRequiredService<IOptions<StorageOptions>>();
+            var logger = serviceProvider.GetRequiredService<ILogger<IStorageProvider>>();
 
-            // Get memory directory from options (with fallback for safety)
-            string baseDirectory = storageOptions.Value.MemoryDirectory ??
-                Path.Combine(".", DirectoryNames.ApplicationRoot);
+            string providerId = options.Value.ProviderId;
 
-            return new FileSystemStorageProvider(baseDirectory, logger);
+            logger.LogInformation("Creating storage provider: {ProviderId}", providerId);
+
+            var result = factory.CreateProvider(providerId);
+
+            if (!result.IsSuccess)
+            {
+                logger.LogError("Failed to create storage provider '{ProviderId}': {Error}. Falling back to default provider.",
+                    providerId, result.Error);
+
+                // Fallback to default provider
+                result = factory.CreateProvider(StorageProviderIds.Default);
+
+                if (!result.IsSuccess)
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to create default storage provider: {result.Error}");
+                }
+            }
+
+            var provider = result.Value;
+
+            // Initialize provider synchronously (acceptable for DI registration at startup)
+            var initResult = provider.InitializeAsync(CancellationToken.None)
+                .GetAwaiter()
+                .GetResult();
+
+            if (!initResult.IsSuccess)
+            {
+                throw new InvalidOperationException(
+                    $"Storage provider initialization failed: {initResult.Error}");
+            }
+
+            return provider;
         });
+
+        // Register IMemoryStorageProvider as alias to IStorageProvider (backward compatibility)
+        services.AddSingleton<IMemoryStorageProvider>(sp => sp.GetRequiredService<IStorageProvider>());
 
         services.AddSingleton<ILlmProviderFactory, LlmProviderFactory>();
 
@@ -121,10 +169,23 @@ public static class ServiceCollectionExtensions
             var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
 
             // Templates are in the configured root directory under templates/ subdirectory
-            // TenSecondTom:MemoryDirectory is the root (e.g., ~/ten-second-tom or ./.memory)
+            // TenSecondTom:RootDirectory is the root (e.g., ~/ten-second-tom or ./.memory)
             // Structure: {root}/templates/, {root}/today/, {root}/thisweek/
-            string rootDirectory = storageOptions.Value.MemoryDirectory ??
-                Path.Combine(".", DirectoryNames.ApplicationRoot);
+            string rootDirectory = storageOptions.Value.RootDirectory;
+
+#pragma warning disable CS0618 // Type or member is obsolete
+            // Backward compatibility: fall back to MemoryDirectory
+            if (string.IsNullOrWhiteSpace(rootDirectory))
+            {
+                rootDirectory = storageOptions.Value.MemoryDirectory;
+            }
+#pragma warning restore CS0618
+
+            if (string.IsNullOrWhiteSpace(rootDirectory))
+            {
+                rootDirectory = Path.Combine(".", DirectoryNames.ApplicationRoot);
+            }
+
             string templatesDirectory = Path.Combine(rootDirectory, DirectoryNames.Templates);
 
             // Create FileSystem loader (primary)

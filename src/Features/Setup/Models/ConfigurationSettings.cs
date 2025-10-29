@@ -158,15 +158,53 @@ public sealed record LlmConfiguration
 
 /// <summary>
 /// Storage configuration.
-/// Note: Storage provider settings will be added here in future features.
+/// Defines storage provider selection and settings.
 /// The RootDirectory (where config and data live) is at ConfigurationSettings root level.
 /// </summary>
 public sealed record StorageConfiguration
 {
     /// <summary>
+    /// Gets the storage provider ID (e.g., "default", "obsidian").
+    /// Default: "default"
+    /// </summary>
+    public string ProviderId { get; init; } = StorageProviderIds.Default;
+
+    /// <summary>
+    /// Gets the optional subdirectory name for memory entries within the root directory.
+    /// When set, memory entries are stored under {RootDirectory}/{MemorySubdirectory}/
+    /// Default: null (store directly in root)
+    /// Primarily used by Obsidian provider to isolate TST entries in a vault subdirectory.
+    /// </summary>
+    public string? MemorySubdirectory { get; init; }
+
+    /// <summary>
     /// Gets whether to create directories if they don't exist
     /// </summary>
     public bool CreateIfMissing { get; init; } = true;
+
+    /// <summary>
+    /// Gets the retention policy for memory entries.
+    /// Default: Indefinite (never auto-purge)
+    /// </summary>
+    public Shared.Models.RetentionPolicy RetentionPolicy { get; init; } = Shared.Models.RetentionPolicy.Indefinite;
+
+    /// <summary>
+    /// Gets whether to automatically purge entries based on retention policy.
+    /// Default: false (manual purging only)
+    /// </summary>
+    public bool AutoPurge { get; init; }
+
+    /// <summary>
+    /// Gets the optional maximum file size in bytes for memory entries.
+    /// If null, no size limit is enforced.
+    /// </summary>
+    public long? MaxFileSizeBytes { get; init; }
+
+    /// <summary>
+    /// Gets whether to compress memory entries.
+    /// Default: false (no compression)
+    /// </summary>
+    public bool CompressionEnabled { get; init; }
 }
 
 /// <summary>
