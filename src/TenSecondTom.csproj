@@ -28,6 +28,7 @@
     <TrimmerRootAssembly Include="Anthropic.SDK" />
     <TrimmerRootAssembly Include="MediatR" />
     <TrimmerRootAssembly Include="FluentValidation" />
+    <TrimmerRootAssembly Include="TenSecondTom" />
   </ItemGroup>
 
   <ItemGroup>
