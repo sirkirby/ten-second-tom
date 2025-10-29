@@ -19,13 +19,15 @@
     <NoWarn>$(NoWarn);CA1515;CA1716</NoWarn>
   </PropertyGroup>
 
-  <!-- Preserve assemblies that are loaded via reflection (e.g., Serilog sinks) -->
+  <!-- Preserve assemblies that are loaded via reflection (e.g., Serilog sinks, MediatR handlers) -->
   <ItemGroup>
     <TrimmerRootAssembly Include="Serilog.Sinks.Console" />
     <TrimmerRootAssembly Include="Serilog.Sinks.File" />
     <TrimmerRootAssembly Include="Serilog.Enrichers.Environment" />
     <TrimmerRootAssembly Include="Serilog.Settings.Configuration" />
     <TrimmerRootAssembly Include="Anthropic.SDK" />
+    <TrimmerRootAssembly Include="MediatR" />
+    <TrimmerRootAssembly Include="FluentValidation" />
   </ItemGroup>
 
   <ItemGroup>
@@ -46,7 +48,9 @@
     <PackageReference Include="Anthropic.SDK" Version="5.5.3" />
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
     <PackageReference Include="FluentValidation" Version="12.0.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.0.0" />
     <PackageReference Include="Markdig" Version="0.42.0" />
+    <PackageReference Include="MediatR" Version="13.1.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.9" />
     <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="9.0.9" />
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="9.0.9" />

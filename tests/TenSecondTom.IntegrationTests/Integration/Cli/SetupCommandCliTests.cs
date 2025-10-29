@@ -212,8 +212,8 @@ public sealed class SetupCommandCliTests : IDisposable
     [Fact]
     public async Task ConfigCommand_InvalidSubcommand_ProducesError()
     {
-        // Act
-        var (output, error, exitCode) = await RunCliCommandAsync("config --invalid-subcommand");
+        // Act - increased timeout for CI environments
+        var (output, error, exitCode) = await RunCliCommandAsync("config --invalid-subcommand", timeoutMs: 10000);
 
         // Assert
         exitCode.Should().NotBe(0, "invalid subcommand should produce non-zero exit code");

@@ -9,9 +9,7 @@ using TenSecondTom.Features.Setup;
 using TenSecondTom.Features.Shell;
 using TenSecondTom.Features.Templates;
 using TenSecondTom.Features.ThisWeek;
-using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Features.Today;
-using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.DependencyInjection;
 using TenSecondTom.Infrastructure.Llm;
@@ -92,8 +90,8 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
         _serviceProvider.GetService<IAuthenticationService>().Should().NotBeNull();
 
         // Assert - Feature handlers (can be resolved without additional dependencies)
-        _serviceProvider.GetService<CreateDailyEntryHandler>().Should().NotBeNull();
-        _serviceProvider.GetService<CreateWeeklyReviewHandler>().Should().NotBeNull();
+        _serviceProvider.GetService<CreateDailyEntry.Handler>().Should().NotBeNull();
+        _serviceProvider.GetService<CreateWeeklyReview.Handler>().Should().NotBeNull();
 
         // Note: LLM providers (OpenAILlmProvider, AnthropicLlmProvider) require ChatClient dependencies
         // and are tested separately via the LlmProviderFactory
@@ -124,8 +122,8 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
         _serviceProvider = _services.BuildServiceProvider();
 
         // Act
-        var instance1 = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
-        var instance2 = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var instance1 = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
+        var instance2 = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
 
         // Assert - Different instances should be returned (transient)
         instance1.Should().NotBeSameAs(instance2);
@@ -194,8 +192,8 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
             _serviceProvider.GetRequiredService<ILlmProviderFactory>();
             _serviceProvider.GetRequiredService<IPromptTemplateLoader>();
             _serviceProvider.GetRequiredService<IAuthenticationService>();
-            _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
-            _serviceProvider.GetRequiredService<CreateWeeklyReviewHandler>();
+            _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
+            _serviceProvider.GetRequiredService<CreateWeeklyReview.Handler>();
         };
 
         resolvingServices.Should().NotThrow();
@@ -221,7 +219,7 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
 
         // Act
         using var serviceProvider = services.BuildServiceProvider();
-        var resolveHandler = () => serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var resolveHandler = () => serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
 
         // Assert - Should throw because required LlmOptions configuration is missing
         resolveHandler.Should().Throw<OptionsValidationException>()
@@ -301,10 +299,10 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
         // Act & Assert - Handlers should successfully resolve all their constructor dependencies
         var resolvingHandlers = () =>
         {
-            var dailyHandler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+            var dailyHandler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
             dailyHandler.Should().NotBeNull();
 
-            var weeklyHandler = _serviceProvider.GetRequiredService<CreateWeeklyReviewHandler>();
+            var weeklyHandler = _serviceProvider.GetRequiredService<CreateWeeklyReview.Handler>();
             weeklyHandler.Should().NotBeNull();
         };
 

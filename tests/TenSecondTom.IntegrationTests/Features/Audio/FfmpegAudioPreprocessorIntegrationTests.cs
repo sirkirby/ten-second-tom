@@ -5,6 +5,7 @@ using Moq;
 using TenSecondTom.Features.Audio.Services;
 using TenSecondTom.Infrastructure.Configuration;
 using Xunit;
+using TenSecondTom.Features.Audio;
 
 namespace TenSecondTom.IntegrationTests.Features.Audio;
 

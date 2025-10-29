@@ -1,8 +1,8 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using TenSecondTom.Features.Templates.Models;
 using TenSecondTom.Infrastructure.Cli;
+using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Shared.Models;
 
 namespace TenSecondTom.Tests.Unit.Infrastructure.Cli;
@@ -30,7 +30,7 @@ public sealed class TemplateSelectionUITests
     {
         // Arrange
         var ui = CreateUI();
-        var templates = new List<TemplateListItem>
+        var templates = new List<TemplateInfo>
         {
             CreateListItem("daily-summary", "Daily Summary", isDefault: true)
         };
@@ -50,7 +50,7 @@ public sealed class TemplateSelectionUITests
     {
         // Arrange
         var ui = CreateUI();
-        var templates = new List<TemplateListItem>
+        var templates = new List<TemplateInfo>
         {
             CreateListItem("daily-summary", "Daily Summary", isDefault: true),
             CreateListItem("custom-daily", "Custom Daily", isDefault: false)
@@ -73,7 +73,7 @@ public sealed class TemplateSelectionUITests
     {
         // Arrange
         var ui = CreateUI();
-        var templates = new List<TemplateListItem>();
+        var templates = new List<TemplateInfo>();
 
         // Act
         var act = async () => await ui.SelectTemplateAsync(
@@ -107,7 +107,7 @@ public sealed class TemplateSelectionUITests
     {
         // Arrange
         var ui = CreateUI();
-        var templates = new List<TemplateListItem>
+        var templates = new List<TemplateInfo>
         {
             CreateListItem("daily-summary", "Daily Summary", isDefault: true),
             CreateListItem("apple-daily", "Apple Daily", isDefault: false),
@@ -131,7 +131,7 @@ public sealed class TemplateSelectionUITests
     {
         // Arrange
         var ui = CreateUI();
-        var templates = new List<TemplateListItem>
+        var templates = new List<TemplateInfo>
         {
             CreateListItem("daily-summary", "Daily Summary", isDefault: true),
             CreateListItem("custom-daily", "Custom Daily", isDefault: false)
@@ -153,7 +153,7 @@ public sealed class TemplateSelectionUITests
     {
         // Arrange
         var ui = CreateUI();
-        var templates = new List<TemplateListItem>
+        var templates = new List<TemplateInfo>
         {
             CreateListItem("daily-summary", "Daily Summary",
                 description: "Default template for daily entries", isDefault: true),
@@ -177,7 +177,7 @@ public sealed class TemplateSelectionUITests
     {
         // Arrange
         var ui = CreateUI();
-        var templates = new List<TemplateListItem>
+        var templates = new List<TemplateInfo>
         {
             CreateListItem("daily-1", "Template 1", isDefault: true),
             CreateListItem("daily-2", "Template 2", isDefault: false)
@@ -199,7 +199,7 @@ public sealed class TemplateSelectionUITests
     {
         // Arrange
         var ui = CreateUI();
-        var templates = new List<TemplateListItem>
+        var templates = new List<TemplateInfo>
         {
             CreateListItem("weekly-review", "Weekly Review", isDefault: true)
         };
@@ -220,7 +220,7 @@ public sealed class TemplateSelectionUITests
     {
         // Arrange
         var ui = CreateUI();
-        var templates = new List<TemplateListItem>
+        var templates = new List<TemplateInfo>
         {
             CreateListItem("daily-summary", "Daily Summary", isDefault: true),
             CreateListItem("custom-daily", "Custom Daily", isDefault: false)
@@ -245,7 +245,7 @@ public sealed class TemplateSelectionUITests
     {
         // Arrange
         var ui = CreateUI();
-        var templates = new List<TemplateListItem>
+        var templates = new List<TemplateInfo>
         {
             CreateListItem("daily-summary", "Daily Summary", isDefault: true)
         };
@@ -272,7 +272,7 @@ public sealed class TemplateSelectionUITests
     {
         // Arrange
         var ui = CreateUI();
-        var templates = new List<TemplateListItem>
+        var templates = new List<TemplateInfo>
         {
             CreateListItem("daily-summary", "Daily Summary", isDefault: true)
         };
@@ -294,7 +294,7 @@ public sealed class TemplateSelectionUITests
         // Arrange
         var ui = CreateUI();
         var longDescription = new string('x', 500); // Very long description
-        var templates = new List<TemplateListItem>
+        var templates = new List<TemplateInfo>
         {
             CreateListItem("daily-1", "Template 1",
                 description: longDescription, isDefault: true),
@@ -317,7 +317,7 @@ public sealed class TemplateSelectionUITests
     {
         // Arrange
         var ui = CreateUI();
-        var templates = new List<TemplateListItem>
+        var templates = new List<TemplateInfo>
         {
             CreateListItem("special-chars", "Daily [Summary] - \"v2.0\"",
                 isDefault: true)
@@ -340,20 +340,19 @@ public sealed class TemplateSelectionUITests
         return new TemplateSelectionUI(_mockLogger.Object);
     }
 
-    private static TemplateListItem CreateListItem(
+    private static TemplateInfo CreateListItem(
         string templateId,
         string title,
         string? description = null,
         bool isDefault = false)
     {
-        return new TemplateListItem
-        {
-            TemplateId = templateId,
-            Title = title,
-            Description = description ?? string.Empty,
-            Source = isDefault ? TemplateSource.Embedded : TemplateSource.FileSystem,
-            IsDefault = isDefault,
-            TemplateType = TemplateType.Daily
-        };
+        return new TemplateInfo(
+            TemplateId: templateId,
+            Title: title,
+            Description: description ?? string.Empty,
+            TemplateType: TemplateType.Daily,
+            Source: isDefault ? TemplateSource.Embedded : TemplateSource.FileSystem,
+            IsDefault: isDefault
+        );
     }
 }

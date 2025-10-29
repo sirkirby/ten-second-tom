@@ -1,8 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using TenSecondTom.Features.Search.Handlers;
-using TenSecondTom.Features.Search.Queries;
+using TenSecondTom.Features.Search;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Storage;
 using TenSecondTom.Shared.Models;
@@ -12,23 +11,23 @@ using Xunit;
 namespace TenSecondTom.Tests.Unit.Features.Search;
 
 /// <summary>
-/// Unit tests for SearchMemoriesQueryHandler.
+/// Unit tests for SearchMemories.Handler.
 /// Validates query handling, authentication checks, and search result filtering.
 /// </summary>
 public sealed class SearchMemoriesQueryHandlerTests
 {
     private readonly Mock<IMemoryStorageProvider> _mockStorageProvider;
     private readonly Mock<IAuthenticationService> _mockAuthService;
-    private readonly Mock<ILogger<SearchMemoriesQueryHandler>> _mockLogger;
-    private readonly SearchMemoriesQueryHandler _handler;
+    private readonly Mock<ILogger<SearchMemories.Handler>> _mockLogger;
+    private readonly SearchMemories.Handler _handler;
 
     public SearchMemoriesQueryHandlerTests()
     {
         _mockStorageProvider = new Mock<IMemoryStorageProvider>();
         _mockAuthService = new Mock<IAuthenticationService>();
-        _mockLogger = new Mock<ILogger<SearchMemoriesQueryHandler>>();
+        _mockLogger = new Mock<ILogger<SearchMemories.Handler>>();
 
-        _handler = new SearchMemoriesQueryHandler(
+        _handler = new SearchMemories.Handler(
             _mockStorageProvider.Object,
             _mockAuthService.Object,
             _mockLogger.Object);
@@ -38,7 +37,7 @@ public sealed class SearchMemoriesQueryHandlerTests
     public async Task Handle_WithValidQuery_ReturnsMatchingEntries()
     {
         // Arrange
-        var query = new SearchMemoriesQuery("meeting");
+        var query = new SearchMemories.Query("meeting");
         var mockEntries = new List<MemoryEntry>
         {
             CreateDailyEntry("today-10-01-2025-1", "Had a productive morning meeting"),
@@ -67,7 +66,7 @@ public sealed class SearchMemoriesQueryHandlerTests
     public async Task Handle_WithNoResults_ReturnsEmptyList()
     {
         // Arrange
-        var query = new SearchMemoriesQuery("nonexistent");
+        var query = new SearchMemories.Query("nonexistent");
 
         _mockAuthService.Setup(x => x.IsAuthenticatedAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
         _mockStorageProvider.Setup(x => x.SearchEntriesAsync(
@@ -91,7 +90,7 @@ public sealed class SearchMemoriesQueryHandlerTests
         // Arrange
         var startDate = new DateTime(2025, 10, 1);
         var endDate = new DateTime(2025, 10, 7);
-        var query = new SearchMemoriesQuery("test", startDate, endDate);
+        var query = new SearchMemories.Query("test", startDate, endDate);
 
         _mockAuthService.Setup(x => x.IsAuthenticatedAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
         _mockStorageProvider.Setup(x => x.SearchEntriesAsync(
@@ -117,7 +116,7 @@ public sealed class SearchMemoriesQueryHandlerTests
     public async Task Handle_WhenNotAuthenticated_ReturnsAuthenticationError()
     {
         // Arrange
-        var query = new SearchMemoriesQuery("test");
+        var query = new SearchMemories.Query("test");
         _mockAuthService.Setup(x => x.IsAuthenticatedAsync(It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
         // Act
@@ -132,7 +131,7 @@ public sealed class SearchMemoriesQueryHandlerTests
     public async Task Handle_WithCaseInsensitiveQuery_SearchesCorrectly()
     {
         // Arrange
-        var query = new SearchMemoriesQuery("MEETING");
+        var query = new SearchMemories.Query("MEETING");
         var mockEntries = new List<MemoryEntry>
         {
             CreateDailyEntry("today-10-01-2025-1", "Had a morning meeting")
@@ -158,7 +157,7 @@ public sealed class SearchMemoriesQueryHandlerTests
     public async Task Handle_WhenStorageFails_ReturnsError()
     {
         // Arrange
-        var query = new SearchMemoriesQuery("test");
+        var query = new SearchMemories.Query("test");
         _mockAuthService.Setup(x => x.IsAuthenticatedAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
         _mockStorageProvider.Setup(x => x.SearchEntriesAsync(
             It.IsAny<string>(),
@@ -179,7 +178,7 @@ public sealed class SearchMemoriesQueryHandlerTests
     public async Task Handle_WithEmptyQuery_ReturnsValidationError()
     {
         // Arrange
-        var query = new SearchMemoriesQuery("");
+        var query = new SearchMemories.Query("");
         _mockAuthService.Setup(x => x.IsAuthenticatedAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         // Act
@@ -194,7 +193,7 @@ public sealed class SearchMemoriesQueryHandlerTests
     public async Task Handle_WithWhitespaceQuery_ReturnsValidationError()
     {
         // Arrange
-        var query = new SearchMemoriesQuery("   ");
+        var query = new SearchMemories.Query("   ");
         _mockAuthService.Setup(x => x.IsAuthenticatedAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         // Act

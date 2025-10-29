@@ -132,7 +132,7 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
         loadResult.Value.Should().NotBeNull();
         loadResult.Value.Llm.Provider.Should().Be(originalSettings.Llm.Provider);
         loadResult.Value.Llm.ApiKey.Should().Be(originalSettings.Llm.ApiKey);
-        loadResult.Value.Storage.MemoryDirectory.Should().Be(originalSettings.Storage.MemoryDirectory);
+        loadResult.Value.RootDirectory.Should().Be(originalSettings.RootDirectory);
     }
 
     [Fact]
@@ -149,7 +149,7 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
         result.Should().NotBeNull();
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeNull();
-        result.Value.Storage.MemoryDirectory.Should().NotBeNullOrEmpty();
+        result.Value.RootDirectory.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
@@ -195,10 +195,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
                 ApiKey = "sk-ant-api03-test1234567890abcdefghijklmnopqrstuvwxyz",
                 Model = "claude-3-5-sonnet-20241022"
             },
-            Storage = new StorageConfiguration
-            {
-                MemoryDirectory = "/Users/test/.tom/memory"
-            },
+            RootDirectory = "/Users/test/.tom/memory",
+            Storage = new StorageConfiguration(),
             Optional = new OptionalConfiguration
             {
                 LogLevel = Microsoft.Extensions.Logging.LogLevel.Information,
@@ -223,7 +221,7 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
         loaded.Llm.ApiKey.Should().Be(settings.Llm.ApiKey);
         loaded.Llm.Model.Should().Be(settings.Llm.Model);
 
-        loaded.Storage.MemoryDirectory.Should().Be(settings.Storage.MemoryDirectory);
+        loaded.RootDirectory.Should().Be(settings.RootDirectory);
         loaded.Optional.LogLevel.Should().Be(settings.Optional.LogLevel);
         loaded.Optional.RetentionDays.Should().Be(settings.Optional.RetentionDays);
     }
@@ -304,10 +302,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
                 ApiKey = "sk-test123",
                 Model = null
             },
-            Storage = new StorageConfiguration
-            {
-                MemoryDirectory = "/test/memory"
-            },
+            RootDirectory = "/test/memory",
+            Storage = new StorageConfiguration(),
             Optional = new OptionalConfiguration
             {
                 LogLevel = Microsoft.Extensions.Logging.LogLevel.Warning,
@@ -569,10 +565,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
                 Provider = LlmProvider.OpenAI,
                 ApiKey = "sk-test123"
             },
-            Storage = new StorageConfiguration
-            {
-                MemoryDirectory = "/test/memory"
-            },
+            RootDirectory = "/test/memory",
+            Storage = new StorageConfiguration(),
             Optional = new OptionalConfiguration()
         };
 
@@ -593,6 +587,68 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
         // Optional fields should have defaults
         loaded.Optional.LogLevel.Should().Be(Microsoft.Extensions.Logging.LogLevel.Information);
         loaded.Optional.RetentionDays.Should().Be(30);
+    }
+
+    [Fact]
+    public async Task LoadAsync_WithAudioConfiguration_PreservesAllAudioFields()
+    {
+        // Arrange
+        var config = CreateMockConfiguration();
+        var service = new ConfigurationStorageService(_mockLogger.Object, config, _testAppSettingsPath);
+
+        // Create configuration with specific audio settings
+        var settingsWithAudio = CreateValidConfigurationSettings() with
+        {
+            Audio = new AudioConfigurationDisplay
+            {
+                SttProvider = "openai-whisper",
+                SttApiKey = "sk-test-whisper-key",
+                SttFallbackEnabled = true,
+                SttFallbackProvider = "whisper.cpp",
+                SttFallbackApiKey = "fallback-key",
+                KeepFiles = true,
+                Recorder = new RecorderConfigurationDisplay
+                {
+                    InputVolume = 0.8,
+                    EnableNoiseReduction = true,
+                    EnableFrequencyFilters = false
+                },
+                Preprocessing = new PreprocessingConfigurationDisplay
+                {
+                    RemoveSilence = true,
+                    SilenceThresholdDb = -45,
+                    MinimumSilenceDurationMs = 600
+                }
+            }
+        };
+
+        // Act - Save and Load
+        var saveResult = await service.SaveAsync(settingsWithAudio, CancellationToken.None);
+        saveResult.IsSuccess.Should().BeTrue();
+
+        var loadResult = await service.LoadAsync(CancellationToken.None);
+
+        // Assert - All audio fields preserved
+        loadResult.IsSuccess.Should().BeTrue();
+        var loaded = loadResult.Value;
+
+        // Audio provider and keys
+        loaded.Audio.SttProvider.Should().Be("openai-whisper");
+        loaded.Audio.SttApiKey.Should().Be("sk-test-whisper-key");
+        loaded.Audio.SttFallbackEnabled.Should().BeTrue();
+        loaded.Audio.SttFallbackProvider.Should().Be("whisper.cpp");
+        loaded.Audio.SttFallbackApiKey.Should().Be("fallback-key");
+        loaded.Audio.KeepFiles.Should().BeTrue();
+
+        // Recorder configuration
+        loaded.Audio.Recorder.InputVolume.Should().Be(0.8);
+        loaded.Audio.Recorder.EnableNoiseReduction.Should().BeTrue();
+        loaded.Audio.Recorder.EnableFrequencyFilters.Should().BeFalse();
+
+        // Preprocessing configuration
+        loaded.Audio.Preprocessing.RemoveSilence.Should().BeTrue();
+        loaded.Audio.Preprocessing.SilenceThresholdDb.Should().Be(-45);
+        loaded.Audio.Preprocessing.MinimumSilenceDurationMs.Should().Be(600);
     }
 
     #region Helper Methods
@@ -624,10 +680,8 @@ public sealed class ConfigurationStorageServiceTests : IDisposable
                 Provider = LlmProvider.OpenAI,
                 ApiKey = "sk-test1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKL"
             },
-            Storage = new StorageConfiguration
-            {
-                MemoryDirectory = "/Users/test/.tom/memory"
-            },
+            RootDirectory = "/Users/test/.tom/memory",
+            Storage = new StorageConfiguration(),
             Optional = new OptionalConfiguration
             {
                 LogLevel = Microsoft.Extensions.Logging.LogLevel.Information,

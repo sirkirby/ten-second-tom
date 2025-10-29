@@ -7,6 +7,7 @@ using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.IntegrationTests.TestHelpers;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Features.Setup;
 
 namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
 
@@ -50,9 +51,10 @@ public sealed class UserSecretsPersistenceTests : UserSecretsTestFixture
         
         var configuration = new ConfigurationSettings
         {
+            RootDirectory = _testDirectory.BasePath,
             Ssh = new SshConfiguration { KeyPath = "/home/user/.ssh/id_ed25519" },
             Llm = new LlmConfiguration { Provider = LlmProvider.OpenAI, ApiKey = "sk-test-key-12345" },
-            Storage = new StorageConfiguration { MemoryDirectory = _testDirectory.BasePath },
+            Storage = new StorageConfiguration(),
             Optional = new OptionalConfiguration { RetentionDays = 30, LogLevel = LogLevel.Information },
             CreatedAt = DateTime.UtcNow
         };
@@ -74,9 +76,10 @@ public sealed class UserSecretsPersistenceTests : UserSecretsTestFixture
         
         var originalConfig = new ConfigurationSettings
         {
+            RootDirectory = _testDirectory.BasePath,
             Ssh = new SshConfiguration { KeyPath = "/home/user/.ssh/test_key" },
             Llm = new LlmConfiguration { Provider = LlmProvider.Anthropic, ApiKey = "sk-ant-test-key" },
-            Storage = new StorageConfiguration { MemoryDirectory = _testDirectory.BasePath },
+            Storage = new StorageConfiguration(),
             Optional = new OptionalConfiguration { RetentionDays = 60, LogLevel = LogLevel.Debug },
             CreatedAt = new DateTime(2025, 10, 10, 12, 0, 0, DateTimeKind.Utc)
         };
@@ -94,7 +97,7 @@ public sealed class UserSecretsPersistenceTests : UserSecretsTestFixture
         loadedConfig.Ssh.KeyPath.Should().Be(originalConfig.Ssh.KeyPath);
         loadedConfig.Llm.Provider.Should().Be(originalConfig.Llm.Provider);
         loadedConfig.Llm.ApiKey.Should().Be(originalConfig.Llm.ApiKey);
-        loadedConfig.Storage.MemoryDirectory.Should().Be(originalConfig.Storage.MemoryDirectory);
+        loadedConfig.RootDirectory.Should().Be(originalConfig.RootDirectory);
         loadedConfig.Optional.RetentionDays.Should().Be(originalConfig.Optional.RetentionDays);
         loadedConfig.Optional.LogLevel.Should().Be(originalConfig.Optional.LogLevel);
         // Note: DateTime is stored in User Secrets as string and may lose timezone info during round-trip
@@ -110,9 +113,10 @@ public sealed class UserSecretsPersistenceTests : UserSecretsTestFixture
         
         var firstConfig = new ConfigurationSettings
         {
+            RootDirectory = _testDirectory.BasePath,
             Ssh = new SshConfiguration { KeyPath = "/home/user/.ssh/key1" },
             Llm = new LlmConfiguration { Provider = LlmProvider.OpenAI, ApiKey = "sk-first-key" },
-            Storage = new StorageConfiguration { MemoryDirectory = _testDirectory.BasePath },
+            Storage = new StorageConfiguration(),
             Optional = new OptionalConfiguration { RetentionDays = 30 },
             CreatedAt = DateTime.UtcNow
         };
@@ -169,11 +173,12 @@ public sealed class UserSecretsPersistenceTests : UserSecretsTestFixture
         
         var configuration = new ConfigurationSettings
         {
+            RootDirectory = _testDirectory.BasePath,
             Ssh = new SshConfiguration { KeyPath = "/home/user/.ssh/id_ed25519" },
             Llm = new LlmConfiguration { Provider = LlmProvider.OpenAI, ApiKey = "sk-test-key" },
-            Storage = new StorageConfiguration { MemoryDirectory = _testDirectory.BasePath },
-            Optional = new OptionalConfiguration 
-            { 
+            Storage = new StorageConfiguration(),
+            Optional = new OptionalConfiguration
+            {
                 RetentionDays = 0, // Special value for unlimited retention
                 LogLevel = LogLevel.None // Special value for default
             },
@@ -203,23 +208,21 @@ public sealed class UserSecretsPersistenceTests : UserSecretsTestFixture
         
         var configuration = new ConfigurationSettings
         {
-            Ssh = new SshConfiguration 
-            { 
+            RootDirectory = _testDirectory.BasePath,
+            Ssh = new SshConfiguration
+            {
                 KeyPath = "/home/user/.ssh/id_ed25519",
                 KeySource = SshKeySource.SystemAgent
             },
-            Llm = new LlmConfiguration 
-            { 
-                Provider = LlmProvider.OpenAI, 
+            Llm = new LlmConfiguration
+            {
+                Provider = LlmProvider.OpenAI,
                 ApiKey = "sk-test-key-with-special-chars!@#$%",
                 Model = "gpt-4"
             },
-            Storage = new StorageConfiguration 
-            { 
-                MemoryDirectory = _testDirectory.BasePath 
-            },
-            Optional = new OptionalConfiguration 
-            { 
+            Storage = new StorageConfiguration(),
+            Optional = new OptionalConfiguration
+            {
                 RetentionDays = 90,
                 LogLevel = LogLevel.Warning
             },
@@ -245,7 +248,7 @@ public sealed class UserSecretsPersistenceTests : UserSecretsTestFixture
         loadedConfig.Llm.Model.Should().Be(configuration.Llm.Model);
         
         // Storage configuration
-        loadedConfig.Storage.MemoryDirectory.Should().Be(configuration.Storage.MemoryDirectory);
+        loadedConfig.RootDirectory.Should().Be(configuration.RootDirectory);
         
         // Optional configuration
         loadedConfig.Optional.RetentionDays.Should().Be(configuration.Optional.RetentionDays);
@@ -268,9 +271,10 @@ public sealed class UserSecretsPersistenceTests : UserSecretsTestFixture
         
         var configuration = new ConfigurationSettings
         {
+            RootDirectory = _testDirectory.BasePath,
             Ssh = new SshConfiguration { KeyPath = "/home/user/.ssh/id_ed25519" },
             Llm = new LlmConfiguration { Provider = LlmProvider.OpenAI, ApiKey = "sk-test-key" },
-            Storage = new StorageConfiguration { MemoryDirectory = _testDirectory.BasePath },
+            Storage = new StorageConfiguration(),
             Optional = new OptionalConfiguration { RetentionDays = 30 },
             CreatedAt = DateTime.UtcNow
         };

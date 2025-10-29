@@ -4,23 +4,22 @@ using Microsoft.Extensions.Options;
 using Moq;
 using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Features.Setup.Models;
-using TenSecondTom.Features.Templates.Handlers;
+using TenSecondTom.Features.Templates;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
 using TenSecondTom.Shared.Models;
-using TenSecondTom.Features.Today.Commands;
-using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Features.Today.Models;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Features.Today;
 
 namespace TenSecondTom.Tests.Features.Today.Handlers;
 
 /// <summary>
-/// Tests for <see cref="CreateVoiceNoteEntryHandler"/>.
+/// Tests for <see cref="CreateVoiceNoteEntry.Handler"/>.
 /// Validates voice note entry generation with audio metadata, transcript, and LLM summary.
 /// </summary>
 public sealed class CreateVoiceNoteEntryHandlerTests
@@ -30,7 +29,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
     private readonly Mock<IPromptTemplateLoader> _mockPromptLoader;
     private readonly Mock<IAuthenticationService> _mockAuthService;
     private readonly Mock<IOptions<LlmOptions>> _mockLlmOptions;
-    private readonly Mock<ILogger<CreateVoiceNoteEntryHandler>> _mockLogger;
+    private readonly Mock<ILogger<CreateVoiceNoteEntry.Handler>> _mockLogger;
     private readonly Mock<ITemplateSelectionUI> _mockTemplateSelectionUI;
     private readonly Mock<ILlmProvider> _mockLlmProvider;
 
@@ -41,7 +40,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         _mockPromptLoader = new Mock<IPromptTemplateLoader>();
         _mockAuthService = new Mock<IAuthenticationService>();
         _mockLlmOptions = new Mock<IOptions<LlmOptions>>();
-        _mockLogger = new Mock<ILogger<CreateVoiceNoteEntryHandler>>();
+        _mockLogger = new Mock<ILogger<CreateVoiceNoteEntry.Handler>>();
         _mockTemplateSelectionUI = new Mock<ITemplateSelectionUI>();
         _mockLlmProvider = new Mock<ILlmProvider>();
 
@@ -83,7 +82,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
             WordCount = 10
         };
 
-        var command = new CreateVoiceNoteEntryCommand
+        var command = new CreateVoiceNoteEntry.Command
         {
             TranscriptText = transcription.TranscriptText,
             Recording = recording,
@@ -142,7 +141,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
             WordCount = 2
         };
 
-        var command = new CreateVoiceNoteEntryCommand
+        var command = new CreateVoiceNoteEntry.Command
         {
             TranscriptText = transcription.TranscriptText,
             Recording = recording,
@@ -170,7 +169,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
             recording.FilePath,
             "This is a longer transcript with multiple sentences. It should be rendered in a collapsible section.");
 
-        var command = new CreateVoiceNoteEntryCommand
+        var command = new CreateVoiceNoteEntry.Command
         {
             TranscriptText = transcription.TranscriptText,
             Recording = recording,
@@ -198,7 +197,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
             recording.FilePath,
             "Today I worked on implementing voice notes with TDD. I wrote comprehensive tests first.");
 
-        var command = new CreateVoiceNoteEntryCommand
+        var command = new CreateVoiceNoteEntry.Command
         {
             TranscriptText = transcription.TranscriptText,
             Recording = recording,
@@ -232,7 +231,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         var recording = CreateSampleRecording();
         var transcription = CreateSampleTranscription(recording.FilePath, "Test transcript");
 
-        var command = new CreateVoiceNoteEntryCommand
+        var command = new CreateVoiceNoteEntry.Command
         {
             TranscriptText = transcription.TranscriptText,
             Recording = recording,
@@ -260,7 +259,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         var recording = CreateSampleRecording();
         var transcription = CreateSampleTranscription(recording.FilePath, "Test transcript");
 
-        var command = new CreateVoiceNoteEntryCommand
+        var command = new CreateVoiceNoteEntry.Command
         {
             TranscriptText = transcription.TranscriptText,
             Recording = recording,
@@ -290,7 +289,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         var recording = CreateSampleRecording();
         var transcription = CreateSampleTranscription(recording.FilePath, "Test transcript");
 
-        var command = new CreateVoiceNoteEntryCommand
+        var command = new CreateVoiceNoteEntry.Command
         {
             TranscriptText = transcription.TranscriptText,
             Recording = recording,
@@ -320,7 +319,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
             recording.FilePath,
             "Transcript with **bold** and `code` and [links](http://example.com)");
 
-        var command = new CreateVoiceNoteEntryCommand
+        var command = new CreateVoiceNoteEntry.Command
         {
             TranscriptText = transcription.TranscriptText,
             Recording = recording,
@@ -347,7 +346,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         var recording = CreateSampleRecording();
         var transcription = CreateSampleTranscription(recording.FilePath, string.Empty);
 
-        var command = new CreateVoiceNoteEntryCommand
+        var command = new CreateVoiceNoteEntry.Command
         {
             TranscriptText = string.Empty,
             Recording = recording,
@@ -372,7 +371,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         var recording = CreateSampleRecording();
         var transcription = CreateSampleTranscription(recording.FilePath, "Test transcript");
 
-        var command = new CreateVoiceNoteEntryCommand
+        var command = new CreateVoiceNoteEntry.Command
         {
             TranscriptText = transcription.TranscriptText,
             Recording = recording,
@@ -405,7 +404,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         var sensitiveText = "This is private confidential information";
         var transcription = CreateSampleTranscription(recording.FilePath, sensitiveText);
 
-        var command = new CreateVoiceNoteEntryCommand
+        var command = new CreateVoiceNoteEntry.Command
         {
             TranscriptText = transcription.TranscriptText,
             Recording = recording,
@@ -438,7 +437,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         var recording = CreateSampleRecording();
         var transcription = CreateSampleTranscription(recording.FilePath, "Valid transcript text");
 
-        var command = new CreateVoiceNoteEntryCommand
+        var command = new CreateVoiceNoteEntry.Command
         {
             TranscriptText = transcription.TranscriptText,
             Recording = recording,
@@ -465,7 +464,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         var recording = CreateSampleRecording();
         var transcription = CreateSampleTranscription(recording.FilePath, "Test transcript");
 
-        var command = new CreateVoiceNoteEntryCommand
+        var command = new CreateVoiceNoteEntry.Command
         {
             TranscriptText = transcription.TranscriptText,
             Recording = recording,
@@ -490,7 +489,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         result.Error.Should().Contain("Authentication required");
     }
 
-    private CreateVoiceNoteEntryHandler CreateHandler()
+    private CreateVoiceNoteEntry.Handler CreateHandler()
     {
         // Setup auth service mock
         _mockAuthService
@@ -561,20 +560,17 @@ Successfully implemented voice note feature with TDD approach.";
             .Setup(x => x.SaveAsync(It.IsAny<MemoryEntry>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((MemoryEntry entry, CancellationToken _) => Result<MemoryEntry>.Success(entry));
 
-        // Create real ListTemplatesQueryHandler instance with mocked dependencies
-        var listTemplatesLogger = Mock.Of<ILogger<TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler>>();
-        var listTemplatesHandler = new TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler(
-            _mockPromptLoader.Object,
-            listTemplatesLogger);
+        // Create mock for ITemplateProvider
+        var mockTemplateProvider = new Mock<ITemplateProvider>();
 
-        return new CreateVoiceNoteEntryHandler(
+        return new CreateVoiceNoteEntry.Handler(
             _mockStorage.Object,
             _mockLlmFactory.Object,
             _mockPromptLoader.Object,
             _mockAuthService.Object,
             _mockLlmOptions.Object,
             _mockLogger.Object,
-            listTemplatesHandler,
+            mockTemplateProvider.Object,
             _mockTemplateSelectionUI.Object);
     }
 

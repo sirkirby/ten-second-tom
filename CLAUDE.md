@@ -35,43 +35,229 @@ Follow this order (TDD):
 
 ### Code Organization Patterns
 
-**Vertical Slice Architecture**: Each feature is self-contained.
+**Vertical Slice Architecture with Co-location Pattern**: Each feature is self-contained with all related code co-located.
 
-**NOTE**: The canonical project structure is defined in `.specify/memory/constitution.md` (Project Structure Standards). Always consult the constitution for authoritative structural guidance.
+**NOTE**: The canonical project structure is defined in `.specify/memory/constitution.md` (Project Structure Standards v1.7.0). Always consult the constitution for authoritative structural guidance.
 
 ```text
 src/Features/[FeatureName]/
-├── Commands/          # Command classes (mutations)
-├── Queries/           # Query classes (reads) [if needed]
-├── Handlers/          # Business logic handlers
-├── Validation/        # FluentValidation validators [if needed]
+├── [UseCase].cs       # Co-located Command/Query, Validator, Handler (see pattern below)
+├── Migrations/        # Feature bootstrap migrations [if needed]
+├── Services/          # Feature-specific domain services [if needed]
 └── DependencyInjection.cs  # Feature-specific DI registration
 
-src/Infrastructure/    # Cross-cutting concerns (DI, config, logging)
-src/Shared/           # Shared models, abstractions, extensions
+src/Infrastructure/    # Cross-cutting concerns (DI, config, logging, behaviors)
+├── Behaviors/         # MediatR pipeline behaviors
+├── Configuration/     # App configuration setup
+├── Logging/           # Serilog configuration
+└── DependencyInjection/
+
+src/Shared/           # Shared models, abstractions, utilities
+├── Models/           # Common domain models
+├── Options/          # Configuration options classes
+├── Constants/        # Centralized constants
+└── Extensions/       # Extension methods
 
 tests/TenSecondTom.Tests/Features/[FeatureName]/
+└── [UseCase]Tests.cs  # Tests mirror use case structure
+
 tests/TenSecondTom.IntegrationTests/Features/[FeatureName]/
 ```
 
-**CQRS Pattern**: Separate commands from queries.
+**Co-location Pattern** (REQUIRED): All code for a single use case in one file as nested classes.
 
 ```csharp
-// Command (mutation)
-public sealed record CreateUserCommand(string Username, string Email) 
-    : IRequest<Result<Guid>>;
+namespace TenSecondTom.Features.[FeatureName];
 
-// Query (read)
-public sealed record GetUserQuery(Guid UserId) 
-    : IRequest<Result<UserDto>>;
-
-// Handler
-public sealed class CreateUserCommandHandler 
-    : IRequestHandler<CreateUserCommand, Result<Guid>>
+/// <summary>
+/// [Brief description of what this use case does]
+/// </summary>
+public static class [UseCase]
 {
-    // Implementation
+    /// <summary>
+    /// Command/Query representing the request
+    /// </summary>
+    public sealed record Command(...parameters...)
+        : IRequest<Result<TResponse>>;
+
+    /// <summary>
+    /// Validator for the command (auto-discovered by FluentValidation)
+    /// </summary>
+    public sealed class Validator : AbstractValidator<Command>
+    {
+        public Validator()
+        {
+            // Validation rules
+        }
+    }
+
+    /// <summary>
+    /// Handler executing the business logic (auto-discovered by MediatR)
+    /// </summary>
+    public sealed class Handler(
+        IDependency1 dep1,
+        IDependency2 dep2,
+        ILogger<Handler> logger)
+        : IRequestHandler<Command, Result<TResponse>>
+    {
+        public async Task<Result<TResponse>> Handle(
+            Command request,
+            CancellationToken cancellationToken)
+        {
+            // Business logic here
+            // Input is already validated by ValidationPipelineBehavior
+            // Execution is already logged by RequestLoggingPipelineBehavior
+        }
+    }
 }
 ```
+
+**Benefits of Co-location**:
+- ✅ Single source of truth - everything for one use case in one place
+- ✅ Reduced navigation - no jumping between folders
+- ✅ Easier to understand - see command, validation, and logic together
+- ✅ Industry pattern - used by ConciergeWorkflowServices, FastEndpoints, Jimmy Bogard
+- ✅ Zero boilerplate - assembly scanning auto-discovers nested classes
+
+**Example Use Cases**:
+- `CreateDailyEntry.cs` - Contains `CreateDailyEntry.Command`, `.Validator`, `.Handler`
+- `ListTemplates.cs` - Contains `ListTemplates.Query`, `.Handler` (validator optional)
+- `GenerateOutput.cs` - Contains `GenerateOutput.Command`, `.Validator`, `.Handler`
+
+## Configuration Management (REQUIRED)
+
+### .NET Options Pattern
+
+**All configuration MUST use the .NET Options Pattern. Direct `IConfiguration` access with string keys is PROHIBITED.**
+
+```csharp
+// ❌ PROHIBITED - Stringly-typed configuration
+public class MyService
+{
+    private readonly IConfiguration _configuration;
+
+    public MyService(IConfiguration configuration)
+    {
+        _configuration = configuration;
+    }
+
+    public void DoWork()
+    {
+        var apiKey = _configuration["MyApp:ApiKey"]; // NO! Magic string, no type safety
+        var timeout = int.Parse(_configuration["MyApp:Timeout"]); // NO! Runtime errors
+    }
+}
+
+// ✅ REQUIRED - Options Pattern with strongly-typed configuration
+// 1. Create Options class in src/Shared/Options/
+namespace TenSecondTom.Shared.Options;
+
+/// <summary>
+/// Configuration options for MyService.
+/// Maps to the "TenSecondTom:MyService" configuration section.
+/// </summary>
+/// <remarks>
+/// Configuration example (appsettings.json):
+/// <code>
+/// {
+///   "TenSecondTom": {
+///     "MyService": {
+///       "ApiKey": "your-key-here",
+///       "Timeout": 30
+///     }
+///   }
+/// }
+/// </code>
+///
+/// Environment variables:
+/// - TenSecondTom__MyService__ApiKey
+/// - TenSecondTom__MyService__Timeout
+/// </remarks>
+public sealed class MyServiceOptions
+{
+    public const string SectionName = "TenSecondTom:MyService";
+
+    public required string ApiKey { get; init; }
+    public int Timeout { get; init; } = 30;
+}
+
+// 2. Create Validator in src/Shared/Options/Validation/
+public sealed class MyServiceOptionsValidator : IValidateOptions<MyServiceOptions>
+{
+    public ValidateOptionsResult Validate(string? name, MyServiceOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(options.ApiKey))
+            return ValidateOptionsResult.Fail("ApiKey is required");
+
+        if (options.Timeout <= 0)
+            return ValidateOptionsResult.Fail("Timeout must be positive");
+
+        return ValidateOptionsResult.Success;
+    }
+}
+
+// 3. Register in ServiceCollectionExtensions.cs
+services.Configure<MyServiceOptions>(configuration.GetSection(MyServiceOptions.SectionName));
+services.AddSingleton<IValidateOptions<MyServiceOptions>, MyServiceOptionsValidator>();
+
+// 4. Inject and use in service
+public sealed class MyService(IOptions<MyServiceOptions> options)
+{
+    private readonly MyServiceOptions _options = options.Value;
+
+    public void DoWork()
+    {
+        var apiKey = _options.ApiKey; // ✅ Type-safe, IntelliSense support
+        var timeout = _options.Timeout; // ✅ No parsing, validated on startup
+    }
+}
+```
+
+### Options Pattern Interfaces
+
+Choose the right interface based on your needs:
+
+- **`IOptions<T>`**: Singleton - configuration doesn't change during application lifetime
+  ```csharp
+  public MyService(IOptions<MyServiceOptions> options)
+  {
+      _options = options.Value; // Read once and cache
+  }
+  ```
+
+- **`IOptionsSnapshot<T>`**: Scoped - configuration reloads per scope (e.g., per CLI command execution)
+  ```csharp
+  public MyService(IOptionsSnapshot<MyServiceOptions> options)
+  {
+      _options = options.Value; // Reloads per scope
+  }
+  ```
+
+- **`IOptionsMonitor<T>`**: Singleton with change notifications - hot-reload scenarios
+  ```csharp
+  public MyService(IOptionsMonitor<MyServiceOptions> monitor)
+  {
+      _monitor = monitor;
+      _monitor.OnChange(options => {
+          // React to configuration changes
+      });
+  }
+  ```
+
+**For most CLI scenarios, use `IOptions<T>` since configuration is typically static during a single command execution.**
+
+### Options Pattern Checklist
+
+When creating configuration for a new feature:
+
+1. ✅ Create `*Options.cs` in `src/Shared/Options/`
+2. ✅ Add `public const string SectionName` to options class
+3. ✅ Use `required` for mandatory properties or provide sensible defaults
+4. ✅ Add comprehensive XML documentation with config examples
+5. ✅ Create `*OptionsValidator.cs` in `src/Shared/Options/Validation/`
+6. ✅ Register both options and validator in `ServiceCollectionExtensions.cs`
+7. ✅ Inject `IOptions<T>` (or `IOptionsSnapshot<T>`) into services
+8. ✅ Never inject `IConfiguration` directly for accessing config values
 
 ## Code Style Rules
 
@@ -122,11 +308,19 @@ _logger.LogInformation("Processing request for user {UserId}", userId);
 
 ### Naming Conventions
 
-- Commands: `CreateUserCommand`, `UpdateSettingsCommand`
-- Queries: `GetUserQuery`, `ListUsersQuery`
-- Handlers: `CreateUserCommandHandler`, `GetUserQueryHandler`
-- Tests: `CreateUserCommandHandlerTests`
+**Co-location Pattern** (since v1.7.0):
+- Use case files: `[Verb][Noun].cs` (e.g., `CreateUser.cs`, `ListUsers.cs`, `GenerateOutput.cs`)
+- Nested Command: `public sealed record Command(...) : IRequest<Result<T>>`
+- Nested Query: `public sealed record Query(...) : IRequest<Result<T>>`
+- Nested Validator: `public sealed class Validator : AbstractValidator<Command>`
+- Nested Handler: `public sealed class Handler(...) : IRequestHandler<Command, Result<T>>`
+- Test files: `[UseCase]Tests.cs` (e.g., `CreateUserTests.cs`, `ListUsersTests.cs`)
+
+**Other Conventions**:
 - Interfaces: `IUserRepository`, `IEmailService`
+- Options classes: `[Feature]Options` (e.g., `StorageOptions`, `LlmOptions`)
+- Validators: `[Options]Validator` (e.g., `StorageOptionsValidator`)
+- DI method: `Add[FeatureName]Feature` (e.g., `AddAuthFeature`, `AddTemplatesFeature`)
 
 ### Error Handling Pattern
 
@@ -175,17 +369,19 @@ Every feature needs:
 
 ### Test Structure (AAA Pattern)
 
+**Co-location Pattern Tests** (since v1.7.0):
+
 ```csharp
-public sealed class CreateUserCommandHandlerTests
+public sealed class CreateUserTests
 {
     [Fact]
     public async Task Handle_WithValidCommand_CreatesUser()
     {
         // Arrange
         var repository = new Mock<IUserRepository>();
-        var logger = Mock.Of<ILogger<CreateUserCommandHandler>>();
-        var handler = new CreateUserCommandHandler(repository.Object, logger);
-        var command = new CreateUserCommand("john", "john@example.com");
+        var logger = Mock.Of<ILogger<CreateUser.Handler>>();
+        var handler = new CreateUser.Handler(repository.Object, logger);
+        var command = new CreateUser.Command("john", "john@example.com");
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -194,8 +390,8 @@ public sealed class CreateUserCommandHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeEmpty();
         repository.Verify(r => r.AddAsync(
-            It.Is<User>(u => u.Username == "john"), 
-            It.IsAny<CancellationToken>()), 
+            It.Is<User>(u => u.Username == "john"),
+            It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -207,7 +403,7 @@ public sealed class CreateUserCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new CreateUserCommand(username, "test@example.com");
+        var command = new CreateUser.Command(username, "test@example.com");
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -344,17 +540,45 @@ public sealed class User
     }
 }
 
-// ✅ Configuration from environment
-public sealed class DatabaseConfig
+// ✅ Configuration using Options Pattern (REQUIRED)
+// Options class in Shared/Options/
+namespace TenSecondTom.Shared.Options;
+
+/// <summary>
+/// Configuration options for database connection.
+/// Maps to the "TenSecondTom:Database" configuration section.
+/// </summary>
+public sealed class DatabaseOptions
 {
+    public const string SectionName = "TenSecondTom:Database";
     public required string ConnectionString { get; init; }
 }
 
-// In Program.cs
-var config = builder.Configuration
-    .GetSection("Database")
-    .Get<DatabaseConfig>() 
-    ?? throw new InvalidOperationException("Database config missing");
+// Validator in Shared/Options/Validation/
+public sealed class DatabaseOptionsValidator : IValidateOptions<DatabaseOptions>
+{
+    public ValidateOptionsResult Validate(string? name, DatabaseOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(options.ConnectionString))
+            return ValidateOptionsResult.Fail("ConnectionString is required");
+        return ValidateOptionsResult.Success;
+    }
+}
+
+// Registration in ServiceCollectionExtensions.cs
+services.Configure<DatabaseOptions>(configuration.GetSection(DatabaseOptions.SectionName));
+services.AddSingleton<IValidateOptions<DatabaseOptions>, DatabaseOptionsValidator>();
+
+// Usage in service (inject IOptions<T>)
+public sealed class DatabaseService(IOptions<DatabaseOptions> options)
+{
+    private readonly DatabaseOptions _options = options.Value;
+
+    public void Connect()
+    {
+        var connectionString = _options.ConnectionString; // Type-safe!
+    }
+}
 
 // ✅ Constants for shared identifiers (in Shared/Constants/)
 public static class UserRoles
@@ -486,8 +710,8 @@ When making suggestions, prioritize in this order:
 
 ---
 
-**Constitution**: `.specify/memory/constitution.md` v1.3.0  
-**Last Updated**: 2025-10-21
+**Constitution**: `.specify/memory/constitution.md` v1.7.0
+**Last Updated**: 2025-10-28
 
 When in doubt, consult the constitution or ask the user for clarification.
 

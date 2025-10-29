@@ -99,7 +99,10 @@ internal static class Program
 
             // Infrastructure (cross-cutting concerns)
             services.AddInfrastructureServices();
-            
+
+            // Application services (MediatR, FluentValidation with assembly scanning)
+            services.AddApplicationServices();
+
             // Feature slices (vertical slice architecture)
             services.AddAllFeatures();
             

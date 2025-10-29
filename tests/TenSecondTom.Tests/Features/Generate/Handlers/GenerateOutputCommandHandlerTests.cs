@@ -2,8 +2,6 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using TenSecondTom.Features.Generate.Commands;
-using TenSecondTom.Features.Generate.Handlers;
 using TenSecondTom.Features.Generate.Models;
 using TenSecondTom.Features.Generate.Services;
 using TenSecondTom.Features.Setup.Models;
@@ -12,11 +10,12 @@ using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Features.Generate;
 
 namespace TenSecondTom.Tests.Features.Generate.Handlers;
 
 /// <summary>
-/// Tests for <see cref="GenerateOutputCommandHandler"/> implementation.
+/// Tests for <see cref="GenerateOutput.Handler"/> implementation.
 /// Validates the full orchestration of output generation including validation,
 /// template loading, transcript processing, LLM interaction, and output storage.
 /// </summary>
@@ -29,7 +28,7 @@ public sealed class GenerateOutputCommandHandlerTests
     private readonly Mock<ILlmProviderFactory> _mockLlmProviderFactory;
     private readonly Mock<IOptions<LlmOptions>> _mockLlmOptions;
     private readonly Mock<IOutputStorageService> _mockOutputStorageService;
-    private readonly Mock<ILogger<GenerateOutputCommandHandler>> _mockLogger;
+    private readonly Mock<ILogger<GenerateOutput.Handler>> _mockLogger;
 
     public GenerateOutputCommandHandlerTests()
     {
@@ -40,7 +39,7 @@ public sealed class GenerateOutputCommandHandlerTests
         _mockLlmProviderFactory = new Mock<ILlmProviderFactory>();
         _mockLlmOptions = new Mock<IOptions<LlmOptions>>();
         _mockOutputStorageService = new Mock<IOutputStorageService>();
-        _mockLogger = new Mock<ILogger<GenerateOutputCommandHandler>>();
+        _mockLogger = new Mock<ILogger<GenerateOutput.Handler>>();
 
         // Setup default LLM provider properties
         _mockLlmProvider.Setup(p => p.ProviderName).Returns("TestProvider");
@@ -423,9 +422,9 @@ public sealed class GenerateOutputCommandHandlerTests
 
     #region Helper Methods
 
-    private GenerateOutputCommandHandler CreateHandler()
+    private GenerateOutput.Handler CreateHandler()
     {
-        return new GenerateOutputCommandHandler(
+        return new GenerateOutput.Handler(
             _mockRecordingService.Object,
             _mockTemplateLoader.Object,
             _mockTranscriptProcessor.Object,
@@ -435,9 +434,9 @@ public sealed class GenerateOutputCommandHandlerTests
             _mockLogger.Object);
     }
 
-    private static GenerateOutputCommand CreateTestCommand()
+    private static GenerateOutput.Command CreateTestCommand()
     {
-        return new GenerateOutputCommand
+        return new GenerateOutput.Command
         {
             TranscriptFilePath = "/test/recording/10-21-2025_1.txt",
             RecordingBaseName = "10-21-2025_1",

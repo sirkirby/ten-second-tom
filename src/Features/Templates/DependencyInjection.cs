@@ -1,10 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
-using TenSecondTom.Features.Templates.Commands;
-using TenSecondTom.Features.Templates.Handlers;
-using TenSecondTom.Features.Templates.Queries;
 using TenSecondTom.Features.Templates.Services;
-using TenSecondTom.Shared.Contracts;
-using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Templates;
 
@@ -18,19 +13,21 @@ public static class TemplatesFeatureExtensions
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// MediatR assembly scanning automatically discovers and registers all IRequestHandler implementations
+    /// from co-located use case files (InstallDefaultTemplates.Handler, ListTemplates.Handler).
+    ///
+    /// Domain services (TemplateValidator) are registered explicitly for direct dependency injection.
+    /// </remarks>
     public static IServiceCollection AddTemplatesFeature(this IServiceCollection services)
     {
-        // Register handlers (dual registration: concrete + interface)
-        services.AddTransient<InstallDefaultTemplatesHandler>();
-        services.AddTransient<IRequestHandler<InstallDefaultTemplatesCommand, Result<InstallDefaultTemplatesResult>>>(
-            sp => sp.GetRequiredService<InstallDefaultTemplatesHandler>());
+        // Register domain services
+        services.AddTransient<TemplateValidator>();
 
-        services.AddTransient<ListTemplatesQueryHandler>();
-        services.AddTransient<IRequestHandler<ListTemplatesQuery, Result<ListTemplatesQueryResult>>>(
-            sp => sp.GetRequiredService<ListTemplatesQueryHandler>());
-
-        // Register services
-        services.AddTransient<TemplateMigrationService>();
+        // MediatR handlers are auto-discovered via assembly scanning
+        // No explicit registration needed for:
+        // - InstallDefaultTemplates.Handler
+        // - ListTemplates.Handler
 
         return services;
     }

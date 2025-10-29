@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using TenSecondTom.Features.Generate.Services;
+using TenSecondTom.Features.Generate;
 
 namespace TenSecondTom.Tests.Features.Generate.Services;
 

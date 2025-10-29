@@ -3,6 +3,7 @@ using TenSecondTom.Features.Audio.Services;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
 using Xunit;
+using TenSecondTom.Features.Audio;
 
 namespace TenSecondTom.Tests.Unit.Features.Audio.Services;
 

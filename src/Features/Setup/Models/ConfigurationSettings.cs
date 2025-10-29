@@ -11,6 +11,21 @@ namespace TenSecondTom.Features.Setup.Models;
 public sealed record ConfigurationSettings
 {
     /// <summary>
+    /// Gets or sets the application root directory where config, memories, and other app data is stored.
+    /// This is the base directory for all application data, not storage-specific.
+    /// Future storage providers (database, cloud, etc.) will still use this for local config.
+    /// </summary>
+    /// <remarks>
+    /// Default: ~/ten-second-tom
+    /// Can be overridden via:
+    /// - Environment variable: TenSecondTom__RootDirectory
+    /// - config.json: TenSecondTom:RootDirectory
+    /// </remarks>
+    public string RootDirectory { get; set; } = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        DirectoryNames.ApplicationRoot);
+
+    /// <summary>
     /// Gets the SSH authentication configuration
     /// </summary>
     public SshConfiguration Ssh { get; init; } = new();
@@ -23,12 +38,7 @@ public sealed record ConfigurationSettings
     /// <summary>
     /// Gets the storage configuration
     /// </summary>
-    public StorageConfiguration Storage { get; init; } = new() 
-    { 
-        MemoryDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            DirectoryNames.ApplicationRoot)
-    };
+    public StorageConfiguration Storage { get; init; } = new();
 
     /// <summary>
     /// Gets the optional configuration settings
@@ -65,19 +75,19 @@ public sealed record ConfigurationSettings
             return false;
 
         // LLM provider must be set
-        if (!Enum.IsDefined(Llm.Provider))
+        if (!Enum.IsDefined<LlmProvider>(Llm.Provider))
             return false;
 
         // API key must be set
         if (string.IsNullOrEmpty(Llm.ApiKey))
             return false;
 
-        // Memory directory must be set
-        if (string.IsNullOrEmpty(Storage.MemoryDirectory))
+        // Root directory must be set
+        if (string.IsNullOrEmpty(RootDirectory))
             return false;
 
-        // Retention days must be positive
-        if (Optional.RetentionDays <= 0)
+        // Retention days must be positive or -1 (unlimited)
+        if (Optional.RetentionDays <= 0 && Optional.RetentionDays != -1)
             return false;
 
         return true;
@@ -147,17 +157,14 @@ public sealed record LlmConfiguration
 }
 
 /// <summary>
-/// Storage configuration
+/// Storage configuration.
+/// Note: Storage provider settings will be added here in future features.
+/// The RootDirectory (where config and data live) is at ConfigurationSettings root level.
 /// </summary>
 public sealed record StorageConfiguration
 {
     /// <summary>
-    /// Gets the directory for storing memories
-    /// </summary>
-    public required string MemoryDirectory { get; init; }
-
-    /// <summary>
-    /// Gets whether to create the directory if it doesn't exist
+    /// Gets whether to create directories if they don't exist
     /// </summary>
     public bool CreateIfMissing { get; init; } = true;
 }

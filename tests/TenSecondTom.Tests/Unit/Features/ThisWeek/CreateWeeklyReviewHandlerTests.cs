@@ -3,8 +3,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using TenSecondTom.Features.Setup.Models;
-using TenSecondTom.Features.ThisWeek.Commands;
-using TenSecondTom.Features.ThisWeek.Handlers;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Configuration;
@@ -15,11 +13,12 @@ using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Features.ThisWeek;
 
 namespace TenSecondTom.Tests.Unit.Features.ThisWeek;
 
 /// <summary>
-/// Unit tests for CreateWeeklyReviewHandler per contract specification.
+/// Unit tests for CreateWeeklyReview.Handler per contract specification.
 /// Tests the weekly review aggregation workflow from daily entries to weekly summary.
 /// </summary>
 public sealed class CreateWeeklyReviewHandlerTests
@@ -30,10 +29,10 @@ public sealed class CreateWeeklyReviewHandlerTests
     private readonly Mock<IPromptTemplateLoader> _mockPromptLoader;
     private readonly Mock<IAuthenticationService> _mockAuthService;
     private readonly Mock<IOptions<LlmOptions>> _mockLlmOptions;
-    private readonly Mock<ILogger<CreateWeeklyReviewHandler>> _mockLogger;
-    private readonly TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler _listTemplatesHandler;
+    private readonly Mock<ILogger<CreateWeeklyReview.Handler>> _mockLogger;
+    private readonly Mock<ITemplateProvider> _mockTemplateProvider;
     private readonly Mock<ITemplateSelectionUI> _mockTemplateSelectionUI;
-    private readonly CreateWeeklyReviewHandler _handler;
+    private readonly CreateWeeklyReview.Handler _handler;
 
     public CreateWeeklyReviewHandlerTests()
     {
@@ -43,11 +42,8 @@ public sealed class CreateWeeklyReviewHandlerTests
         _mockPromptLoader = new Mock<IPromptTemplateLoader>();
         _mockAuthService = new Mock<IAuthenticationService>();
         _mockLlmOptions = new Mock<IOptions<LlmOptions>>();
-        _mockLogger = new Mock<ILogger<CreateWeeklyReviewHandler>>();
-        var mockListTemplatesLogger = new Mock<ILogger<TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler>>();
-        _listTemplatesHandler = new TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler(
-            _mockPromptLoader.Object,
-            mockListTemplatesLogger.Object);
+        _mockLogger = new Mock<ILogger<CreateWeeklyReview.Handler>>();
+        _mockTemplateProvider = new Mock<ITemplateProvider>();
         _mockTemplateSelectionUI = new Mock<ITemplateSelectionUI>();
 
         // Setup default LLM options
@@ -105,14 +101,14 @@ Noticed pattern of afternoon productivity dips.
                 OutputTokens = 200
             }));
 
-        _handler = new CreateWeeklyReviewHandler(
+        _handler = new CreateWeeklyReview.Handler(
             _mockStorage.Object,
             _mockLlmFactory.Object,
             _mockPromptLoader.Object,
             _mockAuthService.Object,
             _mockLlmOptions.Object,
             _mockLogger.Object,
-            _listTemplatesHandler,
+            _mockTemplateProvider.Object,
             _mockTemplateSelectionUI.Object);
     }
 
@@ -131,7 +127,7 @@ Noticed pattern of afternoon productivity dips.
         _mockStorage.Setup(s => s.SaveAsync(It.IsAny<WeeklyEntry>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((WeeklyEntry entry, CancellationToken _) => Result<MemoryEntry>.Success(entry));
 
-        var command = new CreateWeeklyReviewCommand();
+        var command = new CreateWeeklyReview.Command();
 
         // Act
         Result<WeeklyEntry> result = await _handler.Handle(command, CancellationToken.None);
@@ -155,7 +151,7 @@ Noticed pattern of afternoon productivity dips.
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyList<MemoryEntry>>.Success(Array.Empty<MemoryEntry>()));
 
-        var command = new CreateWeeklyReviewCommand();
+        var command = new CreateWeeklyReview.Command();
 
         // Act
         Result<WeeklyEntry> result = await _handler.Handle(command, CancellationToken.None);
@@ -188,7 +184,7 @@ Noticed pattern of afternoon productivity dips.
         _mockStorage.Setup(s => s.SaveAsync(It.IsAny<WeeklyEntry>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((WeeklyEntry entry, CancellationToken _) => Result<MemoryEntry>.Success(entry));
 
-        var command = new CreateWeeklyReviewCommand { CustomDateRange = customRange };
+        var command = new CreateWeeklyReview.Command { CustomDateRange = customRange };
 
         // Act
         Result<WeeklyEntry> result = await _handler.Handle(command, CancellationToken.None);
@@ -214,7 +210,7 @@ Noticed pattern of afternoon productivity dips.
         _mockStorage.Setup(s => s.SaveAsync(It.IsAny<WeeklyEntry>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((WeeklyEntry entry, CancellationToken _) => Result<MemoryEntry>.Success(entry));
 
-        var command = new CreateWeeklyReviewCommand();
+        var command = new CreateWeeklyReview.Command();
 
         // Act
         Result<WeeklyEntry> result = await _handler.Handle(command, CancellationToken.None);
@@ -249,7 +245,7 @@ Noticed pattern of afternoon productivity dips.
                 It.IsAny<double?>()))
             .ThrowsAsync(new InvalidOperationException("LLM service unavailable"));
 
-        var command = new CreateWeeklyReviewCommand();
+        var command = new CreateWeeklyReview.Command();
 
         // Act
         Result<WeeklyEntry> result = await _handler.Handle(command, CancellationToken.None);
@@ -280,7 +276,7 @@ Noticed pattern of afternoon productivity dips.
         _mockStorage.Setup(s => s.SaveAsync(It.IsAny<WeeklyEntry>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((WeeklyEntry entry, CancellationToken _) => Result<MemoryEntry>.Success(entry));
 
-        var command = new CreateWeeklyReviewCommand { CustomDateRange = customRange };
+        var command = new CreateWeeklyReview.Command { CustomDateRange = customRange };
 
         // Act
         Result<WeeklyEntry> result = await _handler.Handle(command, CancellationToken.None);
@@ -299,7 +295,7 @@ Noticed pattern of afternoon productivity dips.
             EndDate = DateTimeOffset.UtcNow
         };
 
-        var command = new CreateWeeklyReviewCommand { CustomDateRange = customRange };
+        var command = new CreateWeeklyReview.Command { CustomDateRange = customRange };
 
         // Act
         Result<WeeklyEntry> result = await _handler.Handle(command, CancellationToken.None);
@@ -324,7 +320,7 @@ Noticed pattern of afternoon productivity dips.
         _mockStorage.Setup(s => s.SaveAsync(It.IsAny<WeeklyEntry>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((WeeklyEntry entry, CancellationToken _) => Result<MemoryEntry>.Success(entry));
 
-        var command = new CreateWeeklyReviewCommand();
+        var command = new CreateWeeklyReview.Command();
 
         // Act
         Result<WeeklyEntry> result = await _handler.Handle(command, CancellationToken.None);
@@ -350,7 +346,7 @@ Noticed pattern of afternoon productivity dips.
         _mockStorage.Setup(s => s.SaveAsync(It.IsAny<WeeklyEntry>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((WeeklyEntry entry, CancellationToken _) => Result<MemoryEntry>.Success(entry));
 
-        var command = new CreateWeeklyReviewCommand();
+        var command = new CreateWeeklyReview.Command();
 
         // Act
         Result<WeeklyEntry> result = await _handler.Handle(command, CancellationToken.None);
@@ -376,7 +372,7 @@ Noticed pattern of afternoon productivity dips.
         _mockStorage.Setup(s => s.SaveAsync(It.IsAny<WeeklyEntry>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((WeeklyEntry entry, CancellationToken _) => Result<MemoryEntry>.Success(entry));
 
-        var command = new CreateWeeklyReviewCommand();
+        var command = new CreateWeeklyReview.Command();
 
         // Act
         Result<WeeklyEntry> result = await _handler.Handle(command, CancellationToken.None);

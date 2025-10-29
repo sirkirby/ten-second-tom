@@ -3,8 +3,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using TenSecondTom.Features.Today.Commands;
-using TenSecondTom.Features.Today.Handlers;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Configuration;
@@ -15,11 +13,12 @@ using TenSecondTom.IntegrationTests.TestHelpers;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Features.Today;
 
 namespace TenSecondTom.IntegrationTests.Integration.Features.Today;
 
 /// <summary>
-/// Integration tests for CreateDailyEntryCommand with template selection (T032).
+/// Integration tests for CreateDailyEntry.Command with template selection (T032).
 /// Tests end-to-end flow including template selection step.
 /// Tests cover:
 /// - Template selection is invoked before LLM call
@@ -48,17 +47,17 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
     public async Task Handle_WithMultipleTemplates_InvokesTemplateSelection()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
 
         SetupMultipleDailyTemplates();
         _mockTemplateSelectionUI
             .Setup(ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TemplateInfo>>(),
                 "today",
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync("custom-daily");
 
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Had a productive meeting\nFinish the design doc\nEnergized"
         };
@@ -72,7 +71,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
         // Verify template selection UI was invoked
         _mockTemplateSelectionUI.Verify(
             ui => ui.SelectTemplateAsync(
-                It.Is<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(
+                It.Is<IReadOnlyList<TemplateInfo>>(
                     templates => templates.Count >= 2),
                 "today",
                 It.IsAny<CancellationToken>()),
@@ -84,11 +83,11 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
     public async Task Handle_WithSingleTemplate_AutoSelectsWithoutUI()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
 
         SetupSingleDailyTemplate();
 
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Had a productive meeting\nFinish the design doc\nEnergized"
         };
@@ -102,7 +101,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
         // Verify template selection UI was NOT invoked (auto-selection)
         _mockTemplateSelectionUI.Verify(
             ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TemplateInfo>>(),
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()),
             Times.Never,
@@ -113,17 +112,17 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
     public async Task Handle_FiltersOnlyDailyTemplates_DoesNotShowWeeklyTemplates()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
 
         SetupMixedDailyAndWeeklyTemplates();
         _mockTemplateSelectionUI
             .Setup(ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TemplateInfo>>(),
                 "today",
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync("daily-summary");
 
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Meeting\nCode review\nGood"
         };
@@ -137,7 +136,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
         // Verify only daily templates were passed to UI
         _mockTemplateSelectionUI.Verify(
             ui => ui.SelectTemplateAsync(
-                It.Is<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(
+                It.Is<IReadOnlyList<TemplateInfo>>(
                     templates => templates.All(t => t.TemplateType == TemplateType.Daily)),
                 "today",
                 It.IsAny<CancellationToken>()),
@@ -149,14 +148,14 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
     public async Task Handle_UsesSelectedTemplate_ForPromptGeneration()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
 
         var selectedTemplateContent = "# Custom Prompt\nUser input: {{USER_INPUT}}";
         SetupMultipleDailyTemplates();
 
         _mockTemplateSelectionUI
             .Setup(ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TemplateInfo>>(),
                 "today",
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync("custom-daily");
@@ -172,7 +171,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
                 Source = TemplateSource.FileSystem
             }));
 
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Meeting\nCode review\nGood"
         };
@@ -194,17 +193,17 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
     public async Task Handle_WhenTemplateSelectionCancelled_ReturnsFailure()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
 
         SetupMultipleDailyTemplates();
         _mockTemplateSelectionUI
             .Setup(ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TemplateInfo>>(),
                 "today",
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new OperationCanceledException("User cancelled template selection"));
 
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Meeting\nCode review\nGood"
         };
@@ -221,11 +220,11 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
     public async Task Handle_WhenNoTemplatesAvailable_FallsBackToEmbedded()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
 
         SetupNoTemplates();
 
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Meeting\nCode review\nGood"
         };
@@ -239,7 +238,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
         // Template selection UI should not be invoked
         _mockTemplateSelectionUI.Verify(
             ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TemplateInfo>>(),
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()),
             Times.Never,
@@ -250,14 +249,14 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
     public async Task Handle_TemplateSelectionFlow_OccursBeforeLLMCall()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<CreateDailyEntryHandler>();
+        var handler = _serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
         var callSequence = new List<string>();
 
         SetupMultipleDailyTemplates();
 
         _mockTemplateSelectionUI
             .Setup(ui => ui.SelectTemplateAsync(
-                It.IsAny<IReadOnlyList<TenSecondTom.Features.Templates.Models.TemplateListItem>>(),
+                It.IsAny<IReadOnlyList<TemplateInfo>>(),
                 "today",
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(() =>
@@ -284,7 +283,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
                 });
             });
 
-        var command = new CreateDailyEntryCommand
+        var command = new CreateDailyEntry.Command
         {
             Content = "Meeting\nCode review\nGood"
         };
@@ -480,10 +479,12 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
         // Add template infrastructure
         services.AddSingleton(_mockTemplateLoader.Object);
         services.AddSingleton(_mockTemplateSelectionUI.Object);
-        services.AddSingleton<TenSecondTom.Features.Templates.Handlers.ListTemplatesQueryHandler>();
+
+        // Add TemplateProvider (required by CreateDailyEntry.Handler)
+        services.AddSingleton<ITemplateProvider, TemplateProvider>();
 
         // Add handler
-        services.AddSingleton<CreateDailyEntryHandler>();
+        services.AddSingleton<CreateDailyEntry.Handler>();
 
         return services.BuildServiceProvider();
     }

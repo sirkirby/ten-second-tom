@@ -1,23 +1,23 @@
 using System.CommandLine;
+using TenSecondTom.Features.Setup.Handlers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
-using TenSecondTom.Features.Search.Handlers;
+using TenSecondTom.Features.Search;
 using TenSecondTom.Features.Setup.Commands;
-using TenSecondTom.Features.Setup.Handlers;
+using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Shell.Models;
 using TenSecondTom.Features.Shell.Services;
-using TenSecondTom.Features.ThisWeek.Handlers;
-using TenSecondTom.Features.Today.Handlers;
+using TenSecondTom.Features.ThisWeek;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.OutputFormatters;
-using AuthLoginHandler = TenSecondTom.Features.Auth.Handlers.LoginCommandHandler;
-using AuthLogoutHandler = TenSecondTom.Features.Auth.Handlers.LogoutCommandHandler;
+using AuthLoginHandler = TenSecondTom.Features.Auth.Login.Handler;
+using AuthLogoutHandler = TenSecondTom.Features.Auth.Logout.Handler;
 
 namespace TenSecondTom.Infrastructure.Cli;
 
@@ -290,7 +290,7 @@ public static class CommandRegistry
             DateTimeOffset? toDate = parseResult.GetValue(toDateOption);
             string? provider = parseResult.GetValue(providerOption);
 
-            var handler = serviceProvider.GetRequiredService<CreateWeeklyReviewHandler>();
+            var handler = serviceProvider.GetRequiredService<CreateWeeklyReview.Handler>();
             var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
             await ThisWeekCommandHandler.ExecuteAsync(serviceProvider, handler, authService, fromDate, toDate, provider, jsonOutput).ConfigureAwait(false);
         });
@@ -375,7 +375,7 @@ public static class CommandRegistry
             DateTime? toDate = parseResult.GetValue(toDateOption);
 
             // Resolve required services. If not registered (e.g., minimal custom test host) fail gracefully.
-            var handler = serviceProvider.GetService<SearchMemoriesQueryHandler>();
+            var handler = serviceProvider.GetService<SearchMemories.Handler>();
             if (handler is null)
             {
                 if (jsonOutput)

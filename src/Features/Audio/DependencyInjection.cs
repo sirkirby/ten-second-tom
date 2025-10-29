@@ -1,12 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using TenSecondTom.Features.Audio.Commands;
-using TenSecondTom.Features.Audio.Handlers;
-using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Features.Audio.Services;
-using TenSecondTom.Shared.Contracts;
-using TenSecondTom.Shared.Models;
-using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Audio;
 
@@ -45,18 +39,11 @@ public static class AudioFeatureExtensions
             return new SttProviderFactory(localProvider, openAiProvider, logger);
         });
 
-        // Register command handlers (dual registration: concrete + interface)
-        services.AddScoped<RecordAudioCommandHandler>();
-        services.AddScoped<IRequestHandler<RecordAudioCommand, Result<AudioRecording>>>(
-            sp => sp.GetRequiredService<RecordAudioCommandHandler>());
-
-        services.AddScoped<TranscribeAudioCommandHandler>();
-        services.AddScoped<IRequestHandler<TranscribeAudioCommand, Result<TranscriptionResult>>>(
-            sp => sp.GetRequiredService<TranscribeAudioCommandHandler>());
-
-        services.AddScoped<RecordCommandHandler>();
-        services.AddScoped<IRequestHandler<RecordCommand, Result<StoredRecording>>>(
-            sp => sp.GetRequiredService<RecordCommandHandler>());
+        // Register concrete handlers for direct resolution
+        // IRequestHandler interfaces are auto-registered by MediatR assembly scanning
+        services.AddScoped<RecordAudio.Handler>();
+        services.AddScoped<TranscribeAudio.Handler>();
+        services.AddScoped<Record.Handler>();
 
         return services;
     }

@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <!-- Suppress code analysis warnings for test namespaces -->
-    <NoWarn>$(NoWarn);CA1716</NoWarn>
+    <NoWarn>$(NoWarn);CA1716;CA1707</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

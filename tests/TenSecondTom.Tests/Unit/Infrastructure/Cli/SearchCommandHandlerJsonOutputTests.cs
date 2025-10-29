@@ -2,7 +2,7 @@ using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using TenSecondTom.Features.Search.Handlers;
+using TenSecondTom.Features.Search;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Storage;
@@ -35,11 +35,11 @@ public sealed class SearchCommandHandlerJsonOutputTests : IDisposable
         // Arrange
         var mockStorageProvider = new Mock<IMemoryStorageProvider>();
         var mockAuthService = new Mock<IAuthenticationService>();
-        var mockLogger = new Mock<ILogger<SearchMemoriesQueryHandler>>();
+        var mockLogger = new Mock<ILogger<SearchMemories.Handler>>();
 
         var storageOptions = new StorageOptions { MemoryDirectory = "/Users/test/.memory" };
 
-        var handler = new SearchMemoriesQueryHandler(
+        var handler = new SearchMemories.Handler(
             mockStorageProvider.Object,
             mockAuthService.Object,
             mockLogger.Object);
@@ -81,11 +81,11 @@ public sealed class SearchCommandHandlerJsonOutputTests : IDisposable
         // Arrange
         var mockStorageProvider = new Mock<IMemoryStorageProvider>();
         var mockAuthService = new Mock<IAuthenticationService>();
-        var mockLogger = new Mock<ILogger<SearchMemoriesQueryHandler>>();
+        var mockLogger = new Mock<ILogger<SearchMemories.Handler>>();
 
         var storageOptions = new StorageOptions { MemoryDirectory = "/Users/test/.memory" };
 
-        var handler = new SearchMemoriesQueryHandler(
+        var handler = new SearchMemories.Handler(
             mockStorageProvider.Object,
             mockAuthService.Object,
             mockLogger.Object);

@@ -4,6 +4,7 @@ using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.IntegrationTests.TestHelpers;
 using Xunit;
+using TenSecondTom.Features.Setup;
 
 namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
 
@@ -194,10 +195,8 @@ public sealed class ModelSelectionFlowTests : UserSecretsTestFixture
             {
                 KeyPath = "/tmp/test_key"
             },
-            Storage = new StorageConfiguration
-            {
-                MemoryDirectory = "/tmp/test_memory"
-            },
+            RootDirectory = "/tmp/test_memory",
+            Storage = new StorageConfiguration(),
             Optional = new OptionalConfiguration
             {
                 LogLevel = Microsoft.Extensions.Logging.LogLevel.Information,

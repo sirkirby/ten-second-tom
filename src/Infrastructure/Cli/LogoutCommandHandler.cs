@@ -1,8 +1,8 @@
 using Spectre.Console;
-using TenSecondTom.Features.Auth.Commands;
+using TenSecondTom.Features.Auth;
 using TenSecondTom.Shared.OutputFormatters;
 using TenSecondTom.Shared.Constants;
-using AuthHandler = TenSecondTom.Features.Auth.Handlers.LogoutCommandHandler;
+using AuthHandler = TenSecondTom.Features.Auth.Logout.Handler;
 
 namespace TenSecondTom.Infrastructure.Cli;
 
@@ -24,7 +24,7 @@ public static class LogoutCommandHandler
 
         try
         {
-            var command = new LogoutCommand();
+            var command = new Logout.Command();
             var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
 
             if (jsonOutput)

@@ -1,4 +1,4 @@
-using TenSecondTom.Features.Templates.Models;
+using TenSecondTom.Infrastructure.Prompts;
 
 namespace TenSecondTom.Infrastructure.Cli;
 
@@ -17,7 +17,7 @@ public interface ITemplateSelectionUI
     /// The ID of the selected template, or null if selection was cancelled or no templates available.
     /// </returns>
     Task<string?> SelectTemplateAsync(
-        IReadOnlyList<TemplateListItem> templates,
+        IReadOnlyList<TemplateInfo> templates,
         string commandContext,
         CancellationToken cancellationToken = default);
 }

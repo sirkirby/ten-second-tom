@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Renci.SshNet;
 using TenSecondTom.Features.Setup.Models;
-using TenSecondTom.Features.Setup.Queries;
+using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Shared.Constants;
 
 namespace TenSecondTom.Infrastructure.Auth.SshProviders;

@@ -10,7 +10,7 @@ using Xunit;
 namespace TenSecondTom.Tests.Unit.Infrastructure.Cli;
 
 /// <summary>
-/// Tests that the search command fails gracefully (without throwing) when the SearchMemoriesQueryHandler
+/// Tests that the search command fails gracefully (without throwing) when the SearchMemories.Handler
 /// has not been registered in the service provider. This guards against unhandled exceptions when a
 /// minimal or custom service provider is used (e.g., in focused tests or tooling scenarios).
 /// </summary>

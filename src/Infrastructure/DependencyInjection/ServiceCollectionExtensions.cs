@@ -1,13 +1,17 @@
 using System.IO.Abstractions;
 using Anthropic.SDK;
+using FluentValidation;
+using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenAI;
 using OpenAI.Chat;
+using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Auth.SshProviders;
+using TenSecondTom.Infrastructure.Behaviors;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
@@ -36,6 +40,10 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        // Register ConfigurationSettings (complete settings model used by /config show)
+        // Structure aligned: RootDirectory is at root level (TenSecondTom:RootDirectory), not nested under Storage
+        services.Configure<ConfigurationSettings>(configuration.GetSection("TenSecondTom"));
+
         // Register LlmOptions with validation
         services.Configure<LlmOptions>(configuration.GetSection(LlmOptions.SectionName));
         services.AddSingleton<IValidateOptions<LlmOptions>, LlmOptionsValidator>();
@@ -44,11 +52,11 @@ public static class ServiceCollectionExtensions
         services.Configure<AuthOptions>(configuration.GetSection(AuthOptions.SectionName));
         services.AddSingleton<IValidateOptions<AuthOptions>, AuthOptionsValidator>();
 
-        // Register StorageOptions with custom binding (MemoryDirectory is at root, other properties in Storage section)
+        // Register StorageOptions with custom binding (RootDirectory is at root, other properties in Storage section)
         services.Configure<StorageOptions>(options =>
         {
-            // MemoryDirectory is at root level: TenSecondTom:MemoryDirectory
-            options.MemoryDirectory = configuration[ConfigurationKeys.MemoryDirectoryKey]
+            // Root directory is at root level: TenSecondTom:RootDirectory
+            options.MemoryDirectory = configuration[ConfigurationKeys.RootDirectoryKey]
                 ?? Path.Combine(".", DirectoryNames.ApplicationRoot);
 
             // Other properties are in Storage section: TenSecondTom:Storage
@@ -138,7 +146,11 @@ public static class ServiceCollectionExtensions
                 embeddedLoader,
                 compositeLogger);
         });
-        
+
+        // Register template provider abstraction
+        // This decouples features from Templates feature by providing infrastructure-level template access
+        services.AddSingleton<ITemplateProvider, TemplateProvider>();
+
         // Register SSH agent client
         services.AddSingleton<ISshAgentClient>(serviceProvider =>
         {
@@ -296,6 +308,54 @@ public static class ServiceCollectionExtensions
             
             return new FallbackTextEditor(primaryEditor, fallbackEditor, fallbackLogger);
         });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers application services using assembly scanning for automatic discovery.
+    /// This includes MediatR handlers, FluentValidation validators, and pipeline behaviors.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// Assembly scanning eliminates manual handler/validator registration. To add new features:
+    /// 1. Create a handler implementing IRequestHandler&lt;TRequest, TResponse&gt;
+    /// 2. Create a validator inheriting AbstractValidator&lt;TRequest&gt; (optional)
+    /// 3. MediatR and FluentValidation will automatically discover and register them.
+    ///
+    /// Pipeline behaviors execute in registration order:
+    /// 1. RequestLoggingPipelineBehavior - Logs all requests (outermost)
+    /// 2. ValidationPipelineBehavior - Validates input (before handler)
+    /// 3. Handler - Executes business logic
+    ///
+    /// MediatR License: For distributed CLI applications like Ten Second Tom, the MediatR
+    /// license warning is suppressed via logging configuration (see appsettings.json).
+    /// This is the recommended approach per MediatR documentation for client applications.
+    /// </remarks>
+    public static IServiceCollection AddApplicationServices(this IServiceCollection services)
+    {
+        // Register MediatR with assembly scanning and pipeline behaviors
+        // Scans the main application assembly containing all features
+        //
+        // License Note: The MediatR license warning is suppressed via Serilog configuration
+        // in appsettings.json ("LuckyPennySoftware.MediatR.License": "None"). This is the
+        // recommended approach for distributed client applications per MediatR documentation.
+        services.AddMediatR(config =>
+        {
+            config.RegisterServicesFromAssembly(typeof(ServiceCollectionExtensions).Assembly);
+
+            // Register pipeline behaviors in execution order
+            // Behaviors execute in the order they're registered
+            config.AddOpenBehavior(typeof(RequestLoggingPipelineBehavior<,>)); // Outermost - logs everything
+            config.AddOpenBehavior(typeof(ValidationPipelineBehavior<,>));     // Inner - validates before handler
+        });
+
+        // Register FluentValidation with assembly scanning to auto-discover all validators
+        // includeInternalTypes: true allows validators to be internal for better encapsulation
+        services.AddValidatorsFromAssembly(
+            typeof(ServiceCollectionExtensions).Assembly,
+            includeInternalTypes: true);
 
         return services;
     }

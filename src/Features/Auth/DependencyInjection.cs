@@ -1,9 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using TenSecondTom.Features.Auth.Commands;
-using TenSecondTom.Features.Auth.Handlers;
-using TenSecondTom.Shared.Contracts;
-using TenSecondTom.Shared.Models;
-using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Auth;
 
@@ -17,16 +12,16 @@ public static class AuthFeatureExtensions
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// MediatR assembly scanning automatically discovers and registers IRequestHandler interfaces.
+    /// Concrete handlers are registered here for direct dependency injection when needed.
+    /// </remarks>
     public static IServiceCollection AddAuthFeature(this IServiceCollection services)
     {
-        // Register command handlers (dual registration: concrete + interface)
-        services.AddTransient<LoginCommandHandler>();
-        services.AddTransient<IRequestHandler<LoginCommand, Result<UserSession>>>(
-            sp => sp.GetRequiredService<LoginCommandHandler>());
-
-        services.AddTransient<LogoutCommandHandler>();
-        services.AddTransient<IRequestHandler<LogoutCommand, Result<bool>>>(
-            sp => sp.GetRequiredService<LogoutCommandHandler>());
+        // Register concrete handlers for direct resolution
+        // IRequestHandler interfaces are auto-registered by MediatR assembly scanning
+        services.AddTransient<Login.Handler>();
+        services.AddTransient<Logout.Handler>();
 
         return services;
     }

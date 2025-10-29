@@ -22,10 +22,11 @@ public static class ConfigurationKeys
     public const string Root = "TenSecondTom";
 
     /// <summary>
-    /// Configuration key for the memory directory where all data is stored.
-    /// Environment variable: TenSecondTom__MemoryDirectory
+    /// Configuration key for the application root directory where config, memories, and all app data is stored.
+    /// This is the base directory for all application data, not storage-specific.
+    /// Environment variable: TenSecondTom__RootDirectory
     /// </summary>
-    public const string MemoryDirectoryKey = "TenSecondTom:MemoryDirectory";
+    public const string RootDirectoryKey = "TenSecondTom:RootDirectory";
 
     /// <summary>
     /// Configuration key for the LLM provider (OpenAI, Anthropic).

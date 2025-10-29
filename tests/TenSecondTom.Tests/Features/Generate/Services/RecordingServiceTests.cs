@@ -8,6 +8,7 @@ using TenSecondTom.Features.Generate.Models;
 using TenSecondTom.Features.Generate.Services;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Options;
+using TenSecondTom.Features.Generate;
 
 namespace TenSecondTom.Tests.Features.Generate.Services;
 

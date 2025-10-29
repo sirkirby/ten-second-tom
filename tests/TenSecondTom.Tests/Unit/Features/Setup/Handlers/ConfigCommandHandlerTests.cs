@@ -6,7 +6,7 @@ using Moq;
 using TenSecondTom.Features.Setup.Commands;
 using TenSecondTom.Features.Setup.Handlers;
 using TenSecondTom.Features.Setup.Models;
-using TenSecondTom.Features.Setup.Validation;
+using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Options;
@@ -22,7 +22,7 @@ namespace TenSecondTom.Tests.Unit.Features.Setup.Handlers;
 public sealed class ConfigCommandHandlerTests
 {
     private readonly Mock<IConfigurationStorageService> _mockStorageService;
-    private readonly Mock<IConfiguration> _mockConfiguration;
+    private readonly Mock<IOptionsMonitor<ConfigurationSettings>> _mockConfigMonitor;
     private readonly Mock<ISetupWizardUI> _mockSetupWizard;
     private readonly Mock<IApiKeyValidator> _mockOpenAIValidator;
     private readonly Mock<IApiKeyValidator> _mockAnthropicValidator;
@@ -33,7 +33,7 @@ public sealed class ConfigCommandHandlerTests
     public ConfigCommandHandlerTests()
     {
         _mockStorageService = new Mock<IConfigurationStorageService>();
-        _mockConfiguration = new Mock<IConfiguration>();
+        _mockConfigMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
         _mockSetupWizard = new Mock<ISetupWizardUI>();
         _mockOpenAIValidator = new Mock<IApiKeyValidator>();
         _mockAnthropicValidator = new Mock<IApiKeyValidator>();
@@ -43,58 +43,32 @@ public sealed class ConfigCommandHandlerTests
         _mockOpenAIValidator.Setup(v => v.Provider).Returns(LlmProvider.OpenAI);
         _mockAnthropicValidator.Setup(v => v.Provider).Returns(LlmProvider.Anthropic);
 
-        // Setup default configuration values
-        _mockConfiguration.Setup(c => c[ConfigurationKeys.LlmProviderKey]).Returns((string?)null);
-        _mockConfiguration.Setup(c => c[ConfigurationKeys.LlmApiKeyKey]).Returns((string?)null);
-        _mockConfiguration.Setup(c => c[ConfigurationKeys.LlmModelKey]).Returns((string?)null);
+        // Setup default configuration monitor
+        _mockConfigMonitor.Setup(c => c.CurrentValue).Returns(CreateValidConfiguration());
 
         var validators = new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object };
 
-        // Create mock options with default values
-        var mockLlmOptions = CreateMockOptions(new LlmOptions
-        {
-            Provider = LlmProvider.OpenAI,
-            ApiKey = "sk-test-key",
-            Model = "gpt-4",
-            MaxInputTokens = 100000
-        });
-
-        var mockAuthOptions = CreateMockOptions(new AuthOptions
-        {
-            KeySource = SshKeySource.FileSystem,
-            KeyPath = "~/.ssh/id_ed25519"
-        });
-
-        var mockStorageOptions = CreateMockOptions(new StorageOptions
-        {
-            MemoryDirectory = "~/.ten-second-tom/memory"
-        });
-
-        var mockAudioOptions = CreateMockOptions(new AudioConfiguration
-        {
-            SttProvider = SttProviders.WhisperCpp,
-            Recorder = new RecorderConfiguration(),
-            Preprocessing = new PreprocessingConfiguration()
-        });
-
         _handler = new ConfigCommandHandler(
             _mockStorageService.Object,
-            _mockConfiguration.Object,
+            _mockConfigMonitor.Object,
             _mockSetupWizard.Object,
             validators,
             _mockAppSettingsStorage.Object,
-            mockLlmOptions.Object,
-            mockAuthOptions.Object,
-            mockStorageOptions.Object,
-            mockAudioOptions.Object,
             _mockLogger.Object);
     }
 
-    private static Mock<IOptions<T>> CreateMockOptions<T>(T value) where T : class
+    private ConfigCommandHandler CreateHandlerWithConfig(ConfigurationSettings config)
     {
-        var mock = new Mock<IOptions<T>>();
-        mock.Setup(m => m.Value).Returns(value);
-        return mock;
+        var mockMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
+        mockMonitor.Setup(c => c.CurrentValue).Returns(config);
+
+        return new ConfigCommandHandler(
+            _mockStorageService.Object,
+            mockMonitor.Object,
+            _mockSetupWizard.Object,
+            new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object },
+            _mockAppSettingsStorage.Object,
+            _mockLogger.Object);
     }
 
     #region Constructor Tests
@@ -102,23 +76,13 @@ public sealed class ConfigCommandHandlerTests
     [Fact]
     public void Constructor_WithNullStorageService_ShouldThrowArgumentNullException()
     {
-        // Arrange
-        var mockLlmOptions = CreateMockOptions(new LlmOptions { Provider = LlmProvider.OpenAI, ApiKey = "test", Model = "test" });
-        var mockAuthOptions = CreateMockOptions(new AuthOptions { KeySource = SshKeySource.FileSystem });
-        var mockStorageOptions = CreateMockOptions(new StorageOptions { MemoryDirectory = "test" });
-        var mockAudioOptions = CreateMockOptions(new AudioConfiguration());
-
         // Act & Assert
         var act = () => new ConfigCommandHandler(
             null!,
-            _mockConfiguration.Object,
+            _mockConfigMonitor.Object,
             _mockSetupWizard.Object,
             new[] { _mockOpenAIValidator.Object },
             _mockAppSettingsStorage.Object,
-            mockLlmOptions.Object,
-            mockAuthOptions.Object,
-            mockStorageOptions.Object,
-            mockAudioOptions.Object,
             _mockLogger.Object);
 
         act.Should().Throw<ArgumentNullException>()
@@ -126,25 +90,31 @@ public sealed class ConfigCommandHandlerTests
     }
 
     [Fact]
-    public void Constructor_WithNullSetupWizard_ShouldThrowArgumentNullException()
+    public void Constructor_WithNullConfigMonitor_ShouldThrowArgumentNullException()
     {
-        // Arrange
-        var mockLlmOptions = CreateMockOptions(new LlmOptions { Provider = LlmProvider.OpenAI, ApiKey = "test", Model = "test" });
-        var mockAuthOptions = CreateMockOptions(new AuthOptions { KeySource = SshKeySource.FileSystem });
-        var mockStorageOptions = CreateMockOptions(new StorageOptions { MemoryDirectory = "test" });
-        var mockAudioOptions = CreateMockOptions(new AudioConfiguration());
-
         // Act & Assert
         var act = () => new ConfigCommandHandler(
             _mockStorageService.Object,
-            _mockConfiguration.Object,
+            null!,
+            _mockSetupWizard.Object,
+            new[] { _mockOpenAIValidator.Object },
+            _mockAppSettingsStorage.Object,
+            _mockLogger.Object);
+
+        act.Should().Throw<ArgumentNullException>()
+            .WithParameterName("configMonitor");
+    }
+
+    [Fact]
+    public void Constructor_WithNullSetupWizard_ShouldThrowArgumentNullException()
+    {
+        // Act & Assert
+        var act = () => new ConfigCommandHandler(
+            _mockStorageService.Object,
+            _mockConfigMonitor.Object,
             null!,
             new[] { _mockOpenAIValidator.Object },
             _mockAppSettingsStorage.Object,
-            mockLlmOptions.Object,
-            mockAuthOptions.Object,
-            mockStorageOptions.Object,
-            mockAudioOptions.Object,
             _mockLogger.Object);
 
         act.Should().Throw<ArgumentNullException>()
@@ -154,23 +124,13 @@ public sealed class ConfigCommandHandlerTests
     [Fact]
     public void Constructor_WithNullValidators_ShouldThrowArgumentNullException()
     {
-        // Arrange
-        var mockLlmOptions = CreateMockOptions(new LlmOptions { Provider = LlmProvider.OpenAI, ApiKey = "test", Model = "test" });
-        var mockAuthOptions = CreateMockOptions(new AuthOptions { KeySource = SshKeySource.FileSystem });
-        var mockStorageOptions = CreateMockOptions(new StorageOptions { MemoryDirectory = "test" });
-        var mockAudioOptions = CreateMockOptions(new AudioConfiguration());
-
         // Act & Assert
         var act = () => new ConfigCommandHandler(
             _mockStorageService.Object,
-            _mockConfiguration.Object,
+            _mockConfigMonitor.Object,
             _mockSetupWizard.Object,
             null!,
             _mockAppSettingsStorage.Object,
-            mockLlmOptions.Object,
-            mockAuthOptions.Object,
-            mockStorageOptions.Object,
-            mockAudioOptions.Object,
             _mockLogger.Object);
 
         act.Should().Throw<ArgumentNullException>()
@@ -180,23 +140,13 @@ public sealed class ConfigCommandHandlerTests
     [Fact]
     public void Constructor_WithNullAppSettingsStorage_ShouldThrowArgumentNullException()
     {
-        // Arrange
-        var mockLlmOptions = CreateMockOptions(new LlmOptions { Provider = LlmProvider.OpenAI, ApiKey = "test", Model = "test" });
-        var mockAuthOptions = CreateMockOptions(new AuthOptions { KeySource = SshKeySource.FileSystem });
-        var mockStorageOptions = CreateMockOptions(new StorageOptions { MemoryDirectory = "test" });
-        var mockAudioOptions = CreateMockOptions(new AudioConfiguration());
-
         // Act & Assert
         var act = () => new ConfigCommandHandler(
             _mockStorageService.Object,
-            _mockConfiguration.Object,
+            _mockConfigMonitor.Object,
             _mockSetupWizard.Object,
             new[] { _mockOpenAIValidator.Object },
             null!,
-            mockLlmOptions.Object,
-            mockAuthOptions.Object,
-            mockStorageOptions.Object,
-            mockAudioOptions.Object,
             _mockLogger.Object);
 
         act.Should().Throw<ArgumentNullException>()
@@ -206,23 +156,13 @@ public sealed class ConfigCommandHandlerTests
     [Fact]
     public void Constructor_WithNullLogger_ShouldThrowArgumentNullException()
     {
-        // Arrange
-        var mockLlmOptions = CreateMockOptions(new LlmOptions { Provider = LlmProvider.OpenAI, ApiKey = "test", Model = "test" });
-        var mockAuthOptions = CreateMockOptions(new AuthOptions { KeySource = SshKeySource.FileSystem });
-        var mockStorageOptions = CreateMockOptions(new StorageOptions { MemoryDirectory = "test" });
-        var mockAudioOptions = CreateMockOptions(new AudioConfiguration());
-
         // Act & Assert
         var act = () => new ConfigCommandHandler(
             _mockStorageService.Object,
-            _mockConfiguration.Object,
+            _mockConfigMonitor.Object,
             _mockSetupWizard.Object,
             new[] { _mockOpenAIValidator.Object },
             _mockAppSettingsStorage.Object,
-            mockLlmOptions.Object,
-            mockAuthOptions.Object,
-            mockStorageOptions.Object,
-            mockAudioOptions.Object,
             null!);
 
         act.Should().Throw<ArgumentNullException>()
@@ -238,13 +178,21 @@ public sealed class ConfigCommandHandlerTests
     {
         // Arrange
         var config = CreateValidConfiguration();
-        _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<ConfigurationSettings>.Success(config));
+        var mockMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
+        mockMonitor.Setup(c => c.CurrentValue).Returns(config);
+
+        var handler = new ConfigCommandHandler(
+            _mockStorageService.Object,
+            mockMonitor.Object,
+            _mockSetupWizard.Object,
+            new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object },
+            _mockAppSettingsStorage.Object,
+            _mockLogger.Object);
 
         var command = new ConfigCommand { Action = ConfigAction.Show };
 
         // Act
-        var result = await _handler.Handle(command, CancellationToken.None);
+        var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -253,27 +201,9 @@ public sealed class ConfigCommandHandlerTests
         result.Value.Llm.Should().BeEquivalentTo(config.Llm);
         result.Value.Storage.Should().BeEquivalentTo(config.Storage);
         result.Value.Optional.Should().BeEquivalentTo(config.Optional);
-        result.Value.Audio.Should().NotBeNull(); // Audio config is always populated from IConfiguration
-        
-        _mockStorageService.Verify(s => s.LoadAsync(It.IsAny<CancellationToken>()), Times.Once);
-    }
 
-    [Fact]
-    public async Task HandleShow_WithNoConfiguration_ShouldReturnFailure()
-    {
-        // Arrange
-        _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<ConfigurationSettings>.Failure("No config found"));
-
-        var command = new ConfigCommand { Action = ConfigAction.Show };
-
-        // Act
-        var result = await _handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("No configuration found");
-        result.Error.Should().Contain("tom setup");
+        // Verify IOptionsMonitor.CurrentValue was accessed
+        mockMonitor.Verify(c => c.CurrentValue, Times.Once);
     }
 
     [Fact]
@@ -281,13 +211,21 @@ public sealed class ConfigCommandHandlerTests
     {
         // Arrange
         var config = CreateValidConfiguration();
-        _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<ConfigurationSettings>.Success(config));
+        var mockMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
+        mockMonitor.Setup(c => c.CurrentValue).Returns(config);
+
+        var handler = new ConfigCommandHandler(
+            _mockStorageService.Object,
+            mockMonitor.Object,
+            _mockSetupWizard.Object,
+            new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object },
+            _mockAppSettingsStorage.Object,
+            _mockLogger.Object);
 
         var command = new ConfigCommand { Action = ConfigAction.Show, ShowSecrets = true };
 
         // Act
-        await _handler.Handle(command, CancellationToken.None);
+        await handler.Handle(command, CancellationToken.None);
 
         // Assert
         _mockLogger.Verify(
@@ -575,8 +513,8 @@ public sealed class ConfigCommandHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value!.Storage.MemoryDirectory.Should().NotBeNullOrEmpty();
-        Path.IsPathRooted(result.Value.Storage.MemoryDirectory).Should().BeTrue("path should be absolute");
+        result.Value!.RootDirectory.Should().NotBeNullOrEmpty();
+        Path.IsPathRooted(result.Value.RootDirectory).Should().BeTrue("path should be absolute");
     }
 
     [Fact]
@@ -906,34 +844,58 @@ public sealed class ConfigCommandHandlerTests
     {
         // Arrange
         var config = CreateValidConfiguration();
-        _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<ConfigurationSettings>.Success(config));
+        var mockMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
+        mockMonitor.Setup(c => c.CurrentValue).Returns(config);
+
+        var handler = new ConfigCommandHandler(
+            _mockStorageService.Object,
+            mockMonitor.Object,
+            _mockSetupWizard.Object,
+            new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object },
+            _mockAppSettingsStorage.Object,
+            _mockLogger.Object);
 
         var command = new ConfigCommand { Action = ConfigAction.Validate };
 
         // Act
-        var result = await _handler.Handle(command, CancellationToken.None);
+        var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().BeSameAs(config);
+        result.Value.Should().Be(config);
     }
 
     [Fact]
     public async Task HandleValidate_WithNoConfiguration_ShouldReturnFailure()
     {
-        // Arrange
-        _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<ConfigurationSettings>.Failure("No config"));
+        // Arrange - Invalid config with no SSH or LLM settings
+        var emptyConfig = new ConfigurationSettings
+        {
+            Ssh = new SshConfiguration(), // No key path or agent
+            Llm = new LlmConfiguration(), // No provider or API key
+            RootDirectory = "/tmp/test",
+            Storage = new StorageConfiguration()
+        };
+
+        var mockMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
+        mockMonitor.Setup(c => c.CurrentValue).Returns(emptyConfig);
+
+        var handler = new ConfigCommandHandler(
+            _mockStorageService.Object,
+            mockMonitor.Object,
+            _mockSetupWizard.Object,
+            new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object },
+            _mockAppSettingsStorage.Object,
+            _mockLogger.Object);
 
         var command = new ConfigCommand { Action = ConfigAction.Validate };
 
         // Act
-        var result = await _handler.Handle(command, CancellationToken.None);
+        var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("No configuration found");
+        result.Error.Should().Contain("Configuration validation failed");
         result.Error.Should().Contain("tom setup");
     }
 
@@ -943,18 +905,27 @@ public sealed class ConfigCommandHandlerTests
         // Arrange
         var invalidConfig = new ConfigurationSettings
         {
-            Ssh = new SshConfiguration(),
-            Llm = new LlmConfiguration { Provider = LlmProvider.OpenAI, ApiKey = null },
-            Storage = new StorageConfiguration { MemoryDirectory = "/tmp/test" }
+            Ssh = new SshConfiguration(), // No key path or agent
+            Llm = new LlmConfiguration { Provider = LlmProvider.OpenAI, ApiKey = null }, // No API key
+            RootDirectory = "/tmp/test",
+            Storage = new StorageConfiguration()
         };
 
-        _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<ConfigurationSettings>.Success(invalidConfig));
+        var mockMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
+        mockMonitor.Setup(c => c.CurrentValue).Returns(invalidConfig);
+
+        var handler = new ConfigCommandHandler(
+            _mockStorageService.Object,
+            mockMonitor.Object,
+            _mockSetupWizard.Object,
+            new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object },
+            _mockAppSettingsStorage.Object,
+            _mockLogger.Object);
 
         var command = new ConfigCommand { Action = ConfigAction.Validate };
 
         // Act
-        var result = await _handler.Handle(command, CancellationToken.None);
+        var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeFalse();
@@ -992,13 +963,21 @@ public sealed class ConfigCommandHandlerTests
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
-        _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new OperationCanceledException());
+        var mockMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
+        mockMonitor.Setup(c => c.CurrentValue).Throws(new OperationCanceledException());
+
+        var handler = new ConfigCommandHandler(
+            _mockStorageService.Object,
+            mockMonitor.Object,
+            _mockSetupWizard.Object,
+            new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object },
+            _mockAppSettingsStorage.Object,
+            _mockLogger.Object);
 
         var command = new ConfigCommand { Action = ConfigAction.Show };
 
         // Act
-        var result = await _handler.Handle(command, cts.Token);
+        var result = await handler.Handle(command, cts.Token);
 
         // Assert
         // Handler catches exceptions and returns failure result
@@ -1015,13 +994,21 @@ public sealed class ConfigCommandHandlerTests
     public async Task Handle_WhenExceptionThrown_ShouldReturnFailureResult()
     {
         // Arrange
-        _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("Test exception"));
+        var mockMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
+        mockMonitor.Setup(c => c.CurrentValue).Throws(new InvalidOperationException("Test exception"));
+
+        var handler = new ConfigCommandHandler(
+            _mockStorageService.Object,
+            mockMonitor.Object,
+            _mockSetupWizard.Object,
+            new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object },
+            _mockAppSettingsStorage.Object,
+            _mockLogger.Object);
 
         var command = new ConfigCommand { Action = ConfigAction.Show };
 
         // Act
-        var result = await _handler.Handle(command, CancellationToken.None);
+        var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeFalse();
@@ -1181,9 +1168,9 @@ public sealed class ConfigCommandHandlerTests
                 ApiKey = "sk-test1234567890abcdef",
                 Model = "gpt-4"
             },
+            RootDirectory = "~/.ten-second-tom/memory",
             Storage = new StorageConfiguration
             {
-                MemoryDirectory = "~/.ten-second-tom/memory",
                 CreateIfMissing = true
             },
             Optional = new OptionalConfiguration
