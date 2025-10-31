@@ -7,9 +7,9 @@ namespace TenSecondTom.Shared.OutputFormatters;
 /// Enables source generation for trimmed/AOT scenarios.
 /// </summary>
 [JsonSerializable(typeof(JsonOutputFormatter.JsonOutput))]
-[JsonSerializable(typeof(TenSecondTom.Infrastructure.Cli.SearchResultData))]
-[JsonSerializable(typeof(TenSecondTom.Infrastructure.Cli.SearchResultEntry))]
-[JsonSerializable(typeof(List<TenSecondTom.Infrastructure.Cli.SearchResultEntry>))]
+[JsonSerializable(typeof(TenSecondTom.Features.Search.Models.SearchResultData))]
+[JsonSerializable(typeof(TenSecondTom.Features.Search.Models.SearchResultEntry))]
+[JsonSerializable(typeof(List<TenSecondTom.Features.Search.Models.SearchResultEntry>))]
 internal partial class JsonOutputContext : JsonSerializerContext
 {
 }

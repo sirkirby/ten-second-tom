@@ -29,7 +29,8 @@ public sealed class AutoPurgeServiceTests
         // Arrange
         var config = new StorageConfiguration
         {
-            MemoryDirectory = ".memory",
+            RootDirectory = ".memory",
+            ProviderId = "default",
             AutoPurge = false,
             RetentionPolicy = RetentionPolicy.Days30
         };
@@ -56,7 +57,8 @@ public sealed class AutoPurgeServiceTests
         // Arrange
         var config = new StorageConfiguration
         {
-            MemoryDirectory = ".memory",
+            RootDirectory = ".memory",
+            ProviderId = "default",
             AutoPurge = true,
             RetentionPolicy = RetentionPolicy.Indefinite
         };
@@ -83,7 +85,8 @@ public sealed class AutoPurgeServiceTests
         // Arrange
         var config = new StorageConfiguration
         {
-            MemoryDirectory = ".memory",
+            RootDirectory = ".memory",
+            ProviderId = "default",
             AutoPurge = true,
             RetentionPolicy = RetentionPolicy.Days30
         };
@@ -113,7 +116,8 @@ public sealed class AutoPurgeServiceTests
         // Arrange
         var config = new StorageConfiguration
         {
-            MemoryDirectory = ".memory",
+            RootDirectory = ".memory",
+            ProviderId = "default",
             AutoPurge = true,
             RetentionPolicy = RetentionPolicy.Days90
         };
@@ -143,7 +147,8 @@ public sealed class AutoPurgeServiceTests
         // Arrange
         var config = new StorageConfiguration
         {
-            MemoryDirectory = ".memory",
+            RootDirectory = ".memory",
+            ProviderId = "default",
             AutoPurge = true,
             RetentionPolicy = RetentionPolicy.OneYear
         };
@@ -173,7 +178,8 @@ public sealed class AutoPurgeServiceTests
         // Arrange
         var config = new StorageConfiguration
         {
-            MemoryDirectory = ".memory",
+            RootDirectory = ".memory",
+            ProviderId = "default",
             AutoPurge = true,
             RetentionPolicy = RetentionPolicy.TwoYears
         };
@@ -203,7 +209,8 @@ public sealed class AutoPurgeServiceTests
         // Arrange
         var config = new StorageConfiguration
         {
-            MemoryDirectory = ".memory",
+            RootDirectory = ".memory",
+            ProviderId = "default",
             AutoPurge = true,
             RetentionPolicy = RetentionPolicy.Days30
         };
@@ -229,7 +236,8 @@ public sealed class AutoPurgeServiceTests
         // Arrange
         var config = new StorageConfiguration
         {
-            MemoryDirectory = ".memory",
+            RootDirectory = ".memory",
+            ProviderId = "default",
             AutoPurge = true,
             RetentionPolicy = RetentionPolicy.Days30
         };
@@ -254,7 +262,8 @@ public sealed class AutoPurgeServiceTests
         // Arrange
         var config = new StorageConfiguration
         {
-            MemoryDirectory = ".memory",
+            RootDirectory = ".memory",
+            ProviderId = "default",
             AutoPurge = true,
             RetentionPolicy = RetentionPolicy.Days30
         };

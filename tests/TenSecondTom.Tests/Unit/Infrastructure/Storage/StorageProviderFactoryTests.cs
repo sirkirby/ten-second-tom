@@ -15,7 +15,7 @@ namespace TenSecondTom.Tests.Unit.Infrastructure.Storage;
 /// Critical path tests for StorageProviderFactory.
 /// Focuses on provider discovery, creation, and error handling.
 /// </summary>
-public sealed class StorageProviderFactoryTests
+public sealed class StorageProviderFactoryTests : IDisposable
 {
     private readonly ServiceProvider _serviceProvider;
     private readonly ILogger<StorageProviderFactory> _logger;
@@ -49,7 +49,7 @@ public sealed class StorageProviderFactoryTests
 
         // Assert
         providers.Should().NotBeEmpty("factory should discover providers via assembly scanning");
-        providers.Should().HaveCountGreaterOrEqualTo(2, "at minimum default and obsidian providers should be discovered");
+        providers.Should().HaveCountGreaterThanOrEqualTo(2, "at minimum default and obsidian providers should be discovered");
 
         // Verify default provider exists
         var defaultProvider = providers.FirstOrDefault(p =>
@@ -140,7 +140,9 @@ public sealed class StorageProviderFactoryTests
     public void Constructor_WithNullServiceProvider_ShouldThrowArgumentNullException()
     {
         // Act
+#pragma warning disable CA1806 // FluentAssertions will invoke the action
         Action act = () => new StorageProviderFactory(null!, _logger);
+#pragma warning restore CA1806
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -151,7 +153,9 @@ public sealed class StorageProviderFactoryTests
     public void Constructor_WithNullLogger_ShouldThrowArgumentNullException()
     {
         // Act
+#pragma warning disable CA1806 // FluentAssertions will invoke the action
         Action act = () => new StorageProviderFactory(_serviceProvider, null!);
+#pragma warning restore CA1806
 
         // Assert
         act.Should().Throw<ArgumentNullException>()

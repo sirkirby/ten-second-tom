@@ -86,13 +86,27 @@ public sealed class StorageOptions
     public string ProviderId { get; set; } = StorageProviderIds.Default;
 
     /// <summary>
-    /// Gets or sets the optional subdirectory name for memory entries within the root directory.
+    /// Gets or sets the provider-specific storage path.
     /// </summary>
     /// <remarks>
-    /// When set, memory entries are stored under {RootDirectory}/{MemorySubdirectory}/
-    /// When null/empty, memory entries are stored directly under {RootDirectory}/
-    /// Example: "memory" results in ~/ten-second-tom/memory/today/
-    /// Default: null (store directly in root).
+    /// This path specifies where the storage provider should store memory entries.
+    /// - For default provider: null (uses RootDirectory for both config and storage)
+    /// - For Obsidian provider: The vault root path where memory entries are stored
+    /// When null, the provider uses RootDirectory as the storage location.
+    /// Default: null (use RootDirectory).
+    /// Example: "/Users/chris/Documents/MyVault" for Obsidian
+    /// </remarks>
+    public string? ProviderPath { get; set; }
+
+    /// <summary>
+    /// Gets or sets the optional subdirectory name for memory entries within the provider path.
+    /// </summary>
+    /// <remarks>
+    /// When set, memory entries are stored under {ProviderPath or RootDirectory}/{MemorySubdirectory}/
+    /// When null/empty, memory entries are stored directly under {ProviderPath or RootDirectory}/
+    /// Example: "memory" results in ~/ten-second-tom/memory/today/ (default provider)
+    ///          or /Users/chris/Documents/MyVault/memory/today/ (Obsidian provider)
+    /// Default: null (store directly in storage root).
     /// Primarily used by Obsidian provider to isolate TST entries in a vault subdirectory.
     /// </remarks>
     public string? MemorySubdirectory { get; set; }

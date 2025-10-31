@@ -28,10 +28,10 @@ public sealed class RecordingServiceTests
         _mockStorageOptions = new Mock<IOptions<StorageOptions>>();
         _testMemoryDirectory = "/test/memory";
 
-        // Setup storage options to return test memory directory
+        // Setup storage options to return test root directory
         _mockStorageOptions
             .Setup(o => o.Value)
-            .Returns(new StorageOptions { MemoryDirectory = _testMemoryDirectory });
+            .Returns(new StorageOptions { RootDirectory = _testMemoryDirectory });
     }
 
     #region ListRecordingsAsync Tests

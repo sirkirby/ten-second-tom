@@ -11,6 +11,7 @@ using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Shell.Models;
 using TenSecondTom.Features.Shell.Services;
 using TenSecondTom.Features.ThisWeek;
+using TenSecondTom.Features.Today;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;

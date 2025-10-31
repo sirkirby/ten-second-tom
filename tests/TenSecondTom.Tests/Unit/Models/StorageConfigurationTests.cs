@@ -15,46 +15,50 @@ public sealed class StorageConfigurationTests
         // Arrange & Act
         var config = new StorageConfiguration
         {
-            MemoryDirectory = ".memory",
+            RootDirectory = ".memory",
+            ProviderId = "default",
             RetentionPolicy = RetentionPolicy.Indefinite,
             AutoPurge = false
         };
 
         // Assert
         config.Should().NotBeNull();
-        config.MemoryDirectory.Should().Be(".memory");
+        config.RootDirectory.Should().Be(".memory");
+        config.ProviderId.Should().Be("default");
         config.RetentionPolicy.Should().Be(RetentionPolicy.Indefinite);
         config.AutoPurge.Should().BeFalse();
     }
 
     [Fact]
-    public void MemoryDirectory_DefaultPath_ShouldBeDotMemory()
+    public void RootDirectory_DefaultPath_ShouldBeDotMemory()
     {
         // Arrange & Act
         var config = new StorageConfiguration
         {
-            MemoryDirectory = ".memory",
+            RootDirectory = ".memory",
+            ProviderId = "default",
             RetentionPolicy = RetentionPolicy.Indefinite,
             AutoPurge = false
         };
 
         // Assert
-        config.MemoryDirectory.Should().Be(".memory");
+        config.RootDirectory.Should().Be(".memory");
     }
 
     [Fact]
-    public void MemoryDirectory_CanBeCustomPath()
+    public void RootDirectory_CanBeCustomPath()
     {
         // Arrange & Act
         var config = new StorageConfiguration
         {
-            MemoryDirectory = "/custom/path/to/memory",
+            RootDirectory = "/custom/path/to/memory",
+            ProviderId = "default",
             RetentionPolicy = RetentionPolicy.Days90,
             AutoPurge = true
         };
 
         // Assert
-        config.MemoryDirectory.Should().Be("/custom/path/to/memory");
+        config.RootDirectory.Should().Be("/custom/path/to/memory");
     }
 
     [Fact]
@@ -113,7 +117,8 @@ public sealed class StorageConfigurationTests
         // Arrange & Act
         var config = new StorageConfiguration
         {
-            MemoryDirectory = ".memory",
+            RootDirectory = ".memory",
+            ProviderId = "default",
             RetentionPolicy = RetentionPolicy.Days30,
             AutoPurge = true
         };
@@ -128,7 +133,8 @@ public sealed class StorageConfigurationTests
         // Arrange & Act
         var config = new StorageConfiguration
         {
-            MemoryDirectory = ".memory",
+            RootDirectory = ".memory",
+            ProviderId = "default",
             RetentionPolicy = RetentionPolicy.Days90,
             AutoPurge = false
         };
@@ -143,7 +149,8 @@ public sealed class StorageConfigurationTests
         // Arrange
         var original = new StorageConfiguration
         {
-            MemoryDirectory = ".memory",
+            RootDirectory = ".memory",
+            ProviderId = "default",
             RetentionPolicy = RetentionPolicy.Indefinite,
             AutoPurge = false
         };
@@ -164,20 +171,21 @@ public sealed class StorageConfigurationTests
     [InlineData("~/memories", RetentionPolicy.OneYear, false)]
     [InlineData("/var/data/memory", RetentionPolicy.TwoYears, true)]
     public void Create_WithVariousConfigurations_ShouldSucceed(
-        string memoryDirectory,
+        string rootDirectory,
         RetentionPolicy retentionPolicy,
         bool autoPurge)
     {
         // Arrange & Act
         var config = new StorageConfiguration
         {
-            MemoryDirectory = memoryDirectory,
+            RootDirectory = rootDirectory,
+            ProviderId = "default",
             RetentionPolicy = retentionPolicy,
             AutoPurge = autoPurge
         };
 
         // Assert
-        config.MemoryDirectory.Should().Be(memoryDirectory);
+        config.RootDirectory.Should().Be(rootDirectory);
         config.RetentionPolicy.Should().Be(retentionPolicy);
         config.AutoPurge.Should().Be(autoPurge);
     }
@@ -187,11 +195,12 @@ public sealed class StorageConfigurationTests
     {
         // Even with Indefinite retention, AutoPurge can be true
         // (it just won't purge anything since there's no retention limit)
-        
+
         // Arrange & Act
         var config = new StorageConfiguration
         {
-            MemoryDirectory = ".memory",
+            RootDirectory = ".memory",
+            ProviderId = "default",
             RetentionPolicy = RetentionPolicy.Indefinite,
             AutoPurge = true
         };
@@ -207,7 +216,8 @@ public sealed class StorageConfigurationTests
         // Arrange & Act
         var config = new StorageConfiguration
         {
-            MemoryDirectory = ".memory",
+            RootDirectory = ".memory",
+            ProviderId = "default",
             RetentionPolicy = RetentionPolicy.Days90,
             AutoPurge = false,
             MaxFileSizeBytes = 10_485_760 // 10 MB
@@ -223,7 +233,8 @@ public sealed class StorageConfigurationTests
         // Arrange & Act
         var config = new StorageConfiguration
         {
-            MemoryDirectory = ".memory",
+            RootDirectory = ".memory",
+            ProviderId = "default",
             RetentionPolicy = RetentionPolicy.Indefinite,
             AutoPurge = false,
             MaxFileSizeBytes = null
@@ -239,7 +250,8 @@ public sealed class StorageConfigurationTests
         // Arrange & Act
         var config = new StorageConfiguration
         {
-            MemoryDirectory = ".memory",
+            RootDirectory = ".memory",
+            ProviderId = "default",
             RetentionPolicy = RetentionPolicy.OneYear,
             AutoPurge = true,
             CompressionEnabled = true
@@ -255,7 +267,8 @@ public sealed class StorageConfigurationTests
         // Arrange & Act
         var config = new StorageConfiguration
         {
-            MemoryDirectory = ".memory",
+            RootDirectory = ".memory",
+            ProviderId = "default",
             RetentionPolicy = RetentionPolicy.Days30,
             AutoPurge = false,
             CompressionEnabled = false

@@ -267,6 +267,121 @@ public sealed class EmbeddedPromptTemplateLoader : IPromptTemplateLoader
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<Result<string>> LoadRawTemplateContentAsync(
+        string templateId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(templateId))
+        {
+            return Result<string>.Failure("Template ID cannot be null or empty");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            // First, check for user override
+            Result<string>? userOverrideResult = await TryLoadRawUserOverrideAsync(
+                templateId,
+                cancellationToken).ConfigureAwait(false);
+
+            if (userOverrideResult is not null)
+            {
+                return userOverrideResult.Value;
+            }
+
+            // Fallback to embedded resource
+            return await LoadRawEmbeddedTemplateAsync(templateId, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+#pragma warning disable CA1031 // Do not catch general exception types - we want to handle all exceptions gracefully
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            return Result<string>.Failure(
+                $"Failed to load raw template content for '{templateId}': {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Attempts to load raw user override template content from the filesystem.
+    /// </summary>
+    /// <param name="templateId">The template ID to load.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>
+    /// A successful result containing the raw template content if found,
+    /// or null if no override exists or loading fails (to trigger fallback to embedded).
+    /// </returns>
+    private async Task<Result<string>?> TryLoadRawUserOverrideAsync(
+        string templateId,
+        CancellationToken cancellationToken)
+    {
+        if (_baseDirectory is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            string templatePath = Path.Combine(_baseDirectory, "templates", $"{templateId}.md");
+
+            if (!File.Exists(templatePath))
+            {
+                return null;
+            }
+
+            string rawContent = await File.ReadAllTextAsync(templatePath, cancellationToken)
+                .ConfigureAwait(false);
+
+            return Result<string>.Success(rawContent);
+        }
+#pragma warning disable CA1031 // Do not catch general exception types - intentional fallback behavior
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+            // If user override fails to load, fall back to embedded resource
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Loads raw template content from embedded assembly resources.
+    /// Returns the full file content including YAML front matter.
+    /// </summary>
+    /// <param name="templateId">The template ID to load.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>
+    /// A result containing the raw embedded template content (with YAML front matter),
+    /// or a failure result if the template is not found in embedded resources.
+    /// </returns>
+    private static async Task<Result<string>> LoadRawEmbeddedTemplateAsync(
+        string templateId,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        Assembly assembly = typeof(EmbeddedPromptTemplateLoader).Assembly;
+        string resourceName = $"{EmbeddedResourcePrefix}.{templateId}.md";
+
+        using Stream? resourceStream = assembly.GetManifestResourceStream(resourceName);
+
+        if (resourceStream is null)
+        {
+            return Result<string>.Failure(
+                $"Template '{templateId}' not found in embedded resources");
+        }
+
+        using StreamReader reader = new(resourceStream);
+        string rawContent = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+
+        return Result<string>.Success(rawContent);
+    }
+
     /// <summary>
     /// Determines the template type from a template ID.
     /// Maps known template IDs to their corresponding types.

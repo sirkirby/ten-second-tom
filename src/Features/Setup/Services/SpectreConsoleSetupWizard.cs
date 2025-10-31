@@ -556,7 +556,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             {
                 ShowWarning($"Warning: .obsidian directory not found at {obsidianDir}");
                 _console.MarkupLine("[yellow]This may not be a valid Obsidian vault. Continue anyway? (y/n)[/]");
-                var response = _console.ReadLine();
+                var response = Console.ReadLine();
                 if (!response?.Equals("y", StringComparison.OrdinalIgnoreCase) ?? true)
                 {
                     return Task.FromResult<string?>(null);

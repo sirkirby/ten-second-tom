@@ -30,7 +30,7 @@ public sealed class OutputStorageServiceTests
 
         _mockStorageOptions
             .Setup(o => o.Value)
-            .Returns(new StorageOptions { MemoryDirectory = _testMemoryDirectory });
+            .Returns(new StorageOptions { RootDirectory = _testMemoryDirectory });
     }
 
     #region BuildOutputFilePath Tests

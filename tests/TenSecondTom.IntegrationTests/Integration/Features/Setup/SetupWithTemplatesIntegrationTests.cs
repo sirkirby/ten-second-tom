@@ -21,6 +21,7 @@ public sealed class SetupWithTemplatesIntegrationTests
     private readonly MockFileSystem _fileSystem;
     private readonly Mock<ILogger<InstallDefaultTemplates.Handler>> _handlerLogger;
     private readonly Mock<ILogger<YamlFrontMatterParser>> _parserLogger;
+    private readonly EmbeddedPromptTemplateLoader _embeddedLoader;
     private readonly string _testDirectory;
 
     public SetupWithTemplatesIntegrationTests()
@@ -28,6 +29,8 @@ public sealed class SetupWithTemplatesIntegrationTests
         _fileSystem = new MockFileSystem();
         _handlerLogger = new Mock<ILogger<InstallDefaultTemplates.Handler>>();
         _parserLogger = new Mock<ILogger<YamlFrontMatterParser>>();
+        var yamlParser = new YamlFrontMatterParser(_parserLogger.Object);
+        _embeddedLoader = new EmbeddedPromptTemplateLoader(baseDirectory: null, yamlParser: yamlParser);
         _testDirectory = "/Users/test/.memory/templates";
     }
 
@@ -37,6 +40,7 @@ public sealed class SetupWithTemplatesIntegrationTests
         // Arrange
         var handler = new InstallDefaultTemplates.Handler(
             _fileSystem,
+            _embeddedLoader,
             _handlerLogger.Object);
 
         var command = new InstallDefaultTemplates.Command
@@ -85,6 +89,7 @@ public sealed class SetupWithTemplatesIntegrationTests
         // Arrange
         var handler = new InstallDefaultTemplates.Handler(
             _fileSystem,
+            _embeddedLoader,
             _handlerLogger.Object);
 
         var command = new InstallDefaultTemplates.Command
@@ -114,6 +119,7 @@ public sealed class SetupWithTemplatesIntegrationTests
         // Arrange
         var handler = new InstallDefaultTemplates.Handler(
             _fileSystem,
+            _embeddedLoader,
             _handlerLogger.Object);
 
         // Pre-create a modified file

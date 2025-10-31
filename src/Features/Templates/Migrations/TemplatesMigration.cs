@@ -31,8 +31,8 @@ public sealed class TemplatesMigration : IFeatureMigration
         var fileSystem = services.GetRequiredService<IFileSystem>();
         var sender = services.GetRequiredService<ISender>();
 
-        // Get memory directory from storage options
-        string rootDirectory = storageOptions.Value.MemoryDirectory;
+        // Get root directory from storage options
+        string? rootDirectory = storageOptions.Value.RootDirectory;
         logger.LogDebug("Root directory from configuration: {RootDirectory}", rootDirectory);
 
         if (string.IsNullOrWhiteSpace(rootDirectory))

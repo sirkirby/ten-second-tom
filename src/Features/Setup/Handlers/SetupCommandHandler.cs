@@ -147,26 +147,41 @@ public sealed class SetupCommandHandler
                 }
             }
 
-            // Step 5: Root Directory Configuration (provider-specific)
-            string? rootDirectory;
+            // Step 5: Application Root Directory Configuration
+            _wizardUI.ShowStepHeader(5, 10, "Application Root Directory");
+            _wizardUI.ShowStatus("This is where config.json and templates/ will be stored.");
+            var rootDirectory = await _wizardUI.PromptForRootDirectoryAsync(
+                command.ExistingConfiguration?.RootDirectory,
+                cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(rootDirectory))
+            {
+                rootDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    DirectoryNames.ApplicationRoot);
+            }
+
+            // Step 6: Storage Provider Configuration (provider-specific)
+            string? providerPath = null;
             string? memorySubdirectory = null;
 
             if (selectedStorageProvider.ProviderId.Equals(StorageProviderIds.Obsidian, StringComparison.OrdinalIgnoreCase))
             {
                 // Obsidian-specific configuration
-                _wizardUI.ShowStepHeader(5, 10, "Obsidian Vault Location");
-                rootDirectory = await _wizardUI.PromptForObsidianVaultPathAsync(
-                    command.ExistingConfiguration?.RootDirectory,
+                _wizardUI.ShowStepHeader(6, 10, "Obsidian Vault Location");
+                _wizardUI.ShowStatus("This is where your memory entries (today, thisweek, recordings) will be stored.");
+                providerPath = await _wizardUI.PromptForObsidianVaultPathAsync(
+                    command.ExistingConfiguration?.Storage.ProviderPath,
                     cancellationToken);
 
-                if (string.IsNullOrWhiteSpace(rootDirectory))
+                if (string.IsNullOrWhiteSpace(providerPath))
                 {
                     _wizardUI.ShowError("Setup cannot continue without a valid Obsidian vault path.");
                     return Result<ConfigurationSettings>.Failure("Setup cancelled: No vault path provided. Run 'tom setup' again.");
                 }
 
-                // Step 6: Obsidian Subdirectory (optional)
-                _wizardUI.ShowStepHeader(6, 10, "TST Subdirectory (Optional)");
+                // Step 6.5: Obsidian Subdirectory (optional)
+                _wizardUI.ShowStatus("Optionally create a subdirectory under the vault for Ten Second Tom entries.");
                 memorySubdirectory = await _wizardUI.PromptForSubdirectoryAsync(
                     "Subdirectory name (leave empty for vault root):",
                     command.ExistingConfiguration?.Storage.MemorySubdirectory,
@@ -174,18 +189,10 @@ public sealed class SetupCommandHandler
             }
             else
             {
-                // Default provider configuration
-                _wizardUI.ShowStepHeader(5, 10, "Memory Storage Location");
-                rootDirectory = await _wizardUI.PromptForRootDirectoryAsync(
-                    command.ExistingConfiguration?.RootDirectory,
-                    cancellationToken);
-
-                if (string.IsNullOrWhiteSpace(rootDirectory))
-                {
-                    rootDirectory = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                        DirectoryNames.ApplicationRoot);
-                }
+                // Default provider uses RootDirectory for both config and storage
+                _wizardUI.ShowStepHeader(6, 10, "Default Storage Configuration");
+                _wizardUI.ShowStatus("Memory entries will be stored in the application root directory.");
+                // providerPath stays null - provider will use RootDirectory
             }
 
             // Step 7: Logging Level
@@ -227,6 +234,7 @@ public sealed class SetupCommandHandler
                 Storage = new StorageConfiguration
                 {
                     ProviderId = selectedStorageProvider.ProviderId,
+                    ProviderPath = providerPath,
                     MemorySubdirectory = memorySubdirectory,
                     CreateIfMissing = true,
                     RetentionPolicy = Shared.Models.RetentionPolicy.Indefinite,

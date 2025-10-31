@@ -47,7 +47,7 @@ public sealed class ObsidianStorageProvider : IStorageProvider
     }
 
     /// <inheritdoc/>
-    public async Task<Result> InitializeAsync(CancellationToken cancellationToken)
+    public Task<Result> InitializeAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -57,43 +57,28 @@ public sealed class ObsidianStorageProvider : IStorageProvider
             string obsidianDir = Path.Combine(vaultRoot, ".obsidian");
             if (!Directory.Exists(obsidianDir))
             {
-                return Result.Failure($"Not a valid Obsidian vault: .obsidian directory not found at {vaultRoot}");
+                return Task.FromResult(Result.Failure($"Not a valid Obsidian vault: .obsidian directory not found at {vaultRoot}"));
             }
 
             // Get memory directory (vault root or subdirectory)
             string memoryDir = GetMemoryDirectory();
 
+            // Create TST memory directory if it doesn't exist
+            // Feature-specific subdirectories (today/, thisweek/, recording/) will be created
+            // on-demand by FileSystemStorageProvider when entries are saved
             if (!Directory.Exists(memoryDir))
             {
                 Directory.CreateDirectory(memoryDir);
                 _logger.LogInformation("Created TST memory directory in vault: {Directory}", memoryDir);
             }
 
-            // Create Obsidian-friendly subdirectories
-            var subdirectories = new[]
-            {
-                "Daily Notes",    // Obsidian convention for daily entries
-                "Weekly Reviews", // Obsidian convention for weekly entries
-                "Templates"       // Templates (consistent with TST)
-            };
-
-            foreach (var subdirectory in subdirectories)
-            {
-                string path = Path.Combine(memoryDir, subdirectory);
-                if (!Directory.Exists(path))
-                {
-                    Directory.CreateDirectory(path);
-                    _logger.LogDebug("Created subdirectory: {Directory}", path);
-                }
-            }
-
             _logger.LogInformation("Obsidian storage provider initialized successfully in vault: {VaultRoot}", vaultRoot);
-            return Result.Success();
+            return Task.FromResult(Result.Success());
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to initialize Obsidian storage provider");
-            return Result.Failure($"Obsidian vault initialization failed: {ex.Message}");
+            return Task.FromResult(Result.Failure($"Obsidian vault initialization failed: {ex.Message}"));
         }
     }
 
@@ -148,11 +133,7 @@ public sealed class ObsidianStorageProvider : IStorageProvider
 
     /// <inheritdoc/>
     public Task<Result<MemoryEntry>> SaveAsync(MemoryEntry entry, CancellationToken cancellationToken)
-    {
-        // Transform entry for Obsidian-friendly naming if needed
-        var obsidianEntry = TransformEntryForObsidian(entry);
-        return _innerProvider.SaveAsync(obsidianEntry, cancellationToken);
-    }
+        => _innerProvider.SaveAsync(entry, cancellationToken);
 
     /// <inheritdoc/>
     public Task<Result<IReadOnlyList<MemoryEntry>>> GetEntriesAsync(
@@ -187,20 +168,27 @@ public sealed class ObsidianStorageProvider : IStorageProvider
     {
         var options = _options.Value;
 
-        // Use RootDirectory for vault location
-        string? vaultRoot = options.RootDirectory;
+        // Use ProviderPath for vault location (preferred)
+        string? vaultRoot = options.ProviderPath;
 
-#pragma warning disable CS0618 // Type or member is obsolete
+        // Fall back to RootDirectory for backward compatibility (pre-ProviderPath configurations)
         if (string.IsNullOrWhiteSpace(vaultRoot))
         {
-            vaultRoot = options.MemoryDirectory; // Backward compatibility
+            vaultRoot = options.RootDirectory;
+        }
+
+#pragma warning disable CS0618 // Type or member is obsolete
+        // Fall back to legacy MemoryDirectory for even older configurations
+        if (string.IsNullOrWhiteSpace(vaultRoot))
+        {
+            vaultRoot = options.MemoryDirectory;
         }
 #pragma warning restore CS0618
 
         if (string.IsNullOrWhiteSpace(vaultRoot))
         {
             throw new InvalidOperationException(
-                "RootDirectory must be configured to point to an Obsidian vault. " +
+                "Storage.ProviderPath must be configured to point to an Obsidian vault. " +
                 "Run 'tom setup' to configure your Obsidian vault path.");
         }
 
@@ -221,55 +209,4 @@ public sealed class ObsidianStorageProvider : IStorageProvider
             : Path.Combine(vaultRoot, subdirectory);
     }
 
-    /// <summary>
-    /// Transforms a memory entry for Obsidian-friendly file paths.
-    /// Obsidian prefers more human-readable file names and flat structures.
-    /// </summary>
-    private MemoryEntry TransformEntryForObsidian(MemoryEntry entry)
-    {
-        // For daily entries, use Obsidian's daily notes convention: YYYY-MM-DD Entry N.md
-        // For weekly entries, use: YYYY Week WW Entry N.md
-        // This makes entries more discoverable in Obsidian's file explorer
-
-        if (entry is DailyEntry dailyEntry)
-        {
-            // Transform: "today/2025/10/today-10-28-2025-1.md"
-            // To: "Daily Notes/2025-10-28 Entry 1.md"
-            string obsidianPath = Path.Combine(
-                "Daily Notes",
-                $"{dailyEntry.Timestamp:yyyy-MM-dd} Entry {dailyEntry.EntryNumber}.md");
-
-            return dailyEntry with { FilePath = obsidianPath };
-        }
-
-        if (entry is WeeklyEntry weeklyEntry)
-        {
-            // Transform: "thisweek/2025/week-43/thisweek-week-43-2025-1.md"
-            // To: "Weekly Reviews/2025 Week 43 Entry 1.md"
-            int weekNumber = GetWeekNumber(weeklyEntry.Timestamp.DateTime);
-            string obsidianPath = Path.Combine(
-                "Weekly Reviews",
-                $"{weeklyEntry.Timestamp.Year} Week {weekNumber:D2} Entry {weeklyEntry.EntryNumber}.md");
-
-            return weeklyEntry with { FilePath = obsidianPath };
-        }
-
-        // For other entry types, keep the original path
-        return entry;
-    }
-
-    /// <summary>
-    /// Gets the ISO 8601 week number for a given date.
-    /// </summary>
-    private static int GetWeekNumber(DateTime date)
-    {
-        var culture = System.Globalization.CultureInfo.InvariantCulture;
-        var calendar = culture.Calendar;
-        var dateTimeFormatInfo = culture.DateTimeFormat;
-
-        return calendar.GetWeekOfYear(
-            date,
-            dateTimeFormatInfo.CalendarWeekRule,
-            dateTimeFormatInfo.FirstDayOfWeek);
-    }
 }

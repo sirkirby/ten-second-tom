@@ -6,6 +6,7 @@ using TenSecondTom.Features.Setup.Handlers;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Infrastructure.Storage;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Results;
 using Xunit;
@@ -21,6 +22,7 @@ public sealed class SetupCommandHandlerTests
     private readonly Mock<IConfigurationStorageService> _mockStorageService;
     private readonly Mock<ISetupWizardUI> _mockWizardUI;
     private readonly Mock<ISshKeyDetectorFactory> _mockSshKeyDetectorFactory;
+    private readonly Mock<IStorageProviderFactory> _mockStorageProviderFactory;
     private readonly Mock<ILogger<SetupCommandHandler>> _mockLogger;
 
     public SetupCommandHandlerTests()
@@ -28,6 +30,7 @@ public sealed class SetupCommandHandlerTests
         _mockStorageService = new Mock<IConfigurationStorageService>();
         _mockWizardUI = new Mock<ISetupWizardUI>();
         _mockSshKeyDetectorFactory = new Mock<ISshKeyDetectorFactory>();
+        _mockStorageProviderFactory = new Mock<IStorageProviderFactory>();
         _mockLogger = new Mock<ILogger<SetupCommandHandler>>();
     }
 
@@ -41,6 +44,7 @@ public sealed class SetupCommandHandlerTests
             null!,
             _mockWizardUI.Object,
             _mockSshKeyDetectorFactory.Object,
+            _mockStorageProviderFactory.Object,
             _mockLogger.Object);
 
         act.Should().Throw<ArgumentNullException>()
@@ -55,6 +59,7 @@ public sealed class SetupCommandHandlerTests
             _mockStorageService.Object,
             null!,
             _mockSshKeyDetectorFactory.Object,
+            _mockStorageProviderFactory.Object,
             _mockLogger.Object);
 
         act.Should().Throw<ArgumentNullException>()
@@ -69,6 +74,7 @@ public sealed class SetupCommandHandlerTests
             _mockStorageService.Object,
             _mockWizardUI.Object,
             null!,
+            _mockStorageProviderFactory.Object,
             _mockLogger.Object);
 
         act.Should().Throw<ArgumentNullException>()
@@ -83,6 +89,7 @@ public sealed class SetupCommandHandlerTests
             _mockStorageService.Object,
             _mockWizardUI.Object,
             _mockSshKeyDetectorFactory.Object,
+            _mockStorageProviderFactory.Object,
             null!);
 
         act.Should().Throw<ArgumentNullException>()
@@ -182,9 +189,9 @@ public sealed class SetupCommandHandlerTests
         // Act
         await handler.Handle(command, CancellationToken.None);
 
-        // Assert
-        stepSequence.Should().ContainInOrder(1, 2, 3, 4, 5, 6, 7, 8);
-        stepSequence.Should().HaveCount(8);
+        // Assert - Now has 10 steps with application root and storage provider configuration
+        stepSequence.Should().ContainInOrder(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+        stepSequence.Should().HaveCount(10);
     }
 
     [Fact]
@@ -295,10 +302,11 @@ public sealed class SetupCommandHandlerTests
         SetupSshKeySelectionMock();
         SetupProviderSelectionMock();
         SetupApiKeyMock();
+        SetupStorageProviderSelectionMock();
         SetupMemoryDirectoryMock();
         SetupLogLevelMock();
         SetupRetentionDaysMock();
-        
+
         _mockWizardUI
             .Setup(x => x.ShowSummaryAndConfirmAsync(It.IsAny<ConfigurationSettings>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
@@ -432,7 +440,7 @@ public sealed class SetupCommandHandlerTests
 
         // Assert
         _mockWizardUI.Verify(
-            x => x.ShowStatus(It.Is<string>(s => s.Contains(storagePath))),
+            x => x.ShowStatus(It.Is<string>(s => s.Contains("Configuration saved to") && s.Contains(storagePath))),
             Times.Once);
     }
 
@@ -533,7 +541,7 @@ public sealed class SetupCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WithDefaultMemoryDirectory_UsesHomeDirectoryPath()
+    public async Task Handle_WithDefaultRootDirectory_UsesHomeDirectoryPath()
     {
         // Arrange
         var handler = CreateHandler();
@@ -541,7 +549,7 @@ public sealed class SetupCommandHandlerTests
 
         SetupHappyPathMocksExceptMemoryDirectory();
         _mockWizardUI
-            .Setup(x => x.PromptForMemoryDirectoryAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.PromptForRootDirectoryAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(string.Empty); // User accepts default
 
         ConfigurationSettings? savedConfig = null;
@@ -885,6 +893,7 @@ public sealed class SetupCommandHandlerTests
             _mockStorageService.Object,
             _mockWizardUI.Object,
             _mockSshKeyDetectorFactory.Object,
+            _mockStorageProviderFactory.Object,
             _mockLogger.Object);
     }
 
@@ -894,6 +903,7 @@ public sealed class SetupCommandHandlerTests
         SetupSshKeySelectionMock();
         SetupProviderSelectionMock();
         SetupApiKeyMock();
+        SetupStorageProviderSelectionMock();
         SetupMemoryDirectoryMock();
         SetupLogLevelMock();
         SetupRetentionDaysMock();
@@ -907,6 +917,7 @@ public sealed class SetupCommandHandlerTests
         SetupSshKeySelectionMock();
         SetupProviderSelectionMock();
         SetupApiKeyMock();
+        SetupStorageProviderSelectionMock();
         SetupMemoryDirectoryMock();
         SetupLogLevelMock();
         SetupRetentionDaysMock();
@@ -919,6 +930,7 @@ public sealed class SetupCommandHandlerTests
         SetupSshKeySelectionMock();
         SetupProviderSelectionMock();
         SetupApiKeyMock();
+        SetupStorageProviderSelectionMock();
         SetupLogLevelMock();
         SetupRetentionDaysMock();
         SetupConfirmationMock();
@@ -931,6 +943,7 @@ public sealed class SetupCommandHandlerTests
         SetupSshKeySelectionMock();
         SetupProviderSelectionMock();
         SetupApiKeyMock();
+        SetupStorageProviderSelectionMock();
         SetupMemoryDirectoryMock();
         SetupLogLevelMock();
         SetupRetentionDaysMock();
@@ -996,8 +1009,21 @@ public sealed class SetupCommandHandlerTests
     private void SetupMemoryDirectoryMock()
     {
         _mockWizardUI
-            .Setup(x => x.PromptForMemoryDirectoryAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.PromptForRootDirectoryAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("/Users/test/.memory/ten-second-tom");
+    }
+
+    private void SetupStorageProviderSelectionMock()
+    {
+        _mockWizardUI
+            .Setup(x => x.PromptForStorageProviderAsync(
+                It.IsAny<IReadOnlyList<StorageProviderMetadata>>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new StorageProviderMetadata(
+                ProviderId: StorageProviderIds.Default,
+                DisplayName: "Default File System",
+                Description: "Standard file system storage"));
     }
 
     private void SetupLogLevelMock()

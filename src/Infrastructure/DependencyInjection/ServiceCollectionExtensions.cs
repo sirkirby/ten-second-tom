@@ -171,7 +171,7 @@ public static class ServiceCollectionExtensions
             // Templates are in the configured root directory under templates/ subdirectory
             // TenSecondTom:RootDirectory is the root (e.g., ~/ten-second-tom or ./.memory)
             // Structure: {root}/templates/, {root}/today/, {root}/thisweek/
-            string rootDirectory = storageOptions.Value.RootDirectory;
+            string? rootDirectory = storageOptions.Value.RootDirectory;
 
 #pragma warning disable CS0618 // Type or member is obsolete
             // Backward compatibility: fall back to MemoryDirectory
@@ -206,6 +206,33 @@ public static class ServiceCollectionExtensions
                 fileSystemLoader,
                 embeddedLoader,
                 compositeLogger);
+        });
+
+        // Register EmbeddedPromptTemplateLoader separately for direct injection
+        // (e.g., InstallDefaultTemplates needs direct access to embedded templates)
+        services.AddSingleton<EmbeddedPromptTemplateLoader>(serviceProvider =>
+        {
+            var storageOptions = serviceProvider.GetRequiredService<IOptions<StorageOptions>>();
+            var yamlParser = serviceProvider.GetRequiredService<YamlFrontMatterParser>();
+
+            string? rootDirectory = storageOptions.Value.RootDirectory;
+
+#pragma warning disable CS0618 // Type or member is obsolete
+            // Backward compatibility: fall back to MemoryDirectory
+            if (string.IsNullOrWhiteSpace(rootDirectory))
+            {
+                rootDirectory = storageOptions.Value.MemoryDirectory;
+            }
+#pragma warning restore CS0618
+
+            if (string.IsNullOrWhiteSpace(rootDirectory))
+            {
+                rootDirectory = Path.Combine(".", DirectoryNames.ApplicationRoot);
+            }
+
+            return new EmbeddedPromptTemplateLoader(
+                baseDirectory: rootDirectory,
+                yamlParser: yamlParser);
         });
 
         // Register template provider abstraction

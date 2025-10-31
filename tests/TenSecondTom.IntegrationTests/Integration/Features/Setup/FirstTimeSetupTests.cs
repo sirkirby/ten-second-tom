@@ -270,7 +270,7 @@ public sealed class FirstTimeSetupTests : IDisposable
             It.IsAny<CancellationToken>()))
             .ReturnsAsync("sk-test-api-key");
         
-        mockWizardUI.Setup(w => w.PromptForMemoryDirectoryAsync(
+        mockWizardUI.Setup(w => w.PromptForRootDirectoryAsync(
             It.IsAny<string?>(),
             It.IsAny<CancellationToken>()))
             .ReturnsAsync(_testDirectory.BasePath);
@@ -315,6 +315,18 @@ public sealed class FirstTimeSetupTests : IDisposable
                 SourcesChecked = new[] { SshKeySource.FileSystem }
             });
         services.AddSingleton(mockSshDetector.Object);
+
+        // Storage provider factory (required by SetupCommandHandler)
+        var mockStorageProviderFactory = new Mock<TenSecondTom.Infrastructure.Storage.IStorageProviderFactory>();
+        mockStorageProviderFactory.Setup(f => f.GetAvailableProviders())
+            .Returns(new List<TenSecondTom.Infrastructure.Storage.StorageProviderMetadata>
+            {
+                new TenSecondTom.Infrastructure.Storage.StorageProviderMetadata(
+                    ProviderId: "default",
+                    DisplayName: "Default File System",
+                    Description: "Standard file system storage")
+            });
+        services.AddSingleton(mockStorageProviderFactory.Object);
 
         // Template infrastructure services (required by SetupCommandHandler)
         services.AddSingleton<System.IO.Abstractions.IFileSystem, System.IO.Abstractions.FileSystem>();

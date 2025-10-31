@@ -1,4 +1,4 @@
-namespace TenSecondTom.Infrastructure.Cli;
+namespace TenSecondTom.Features.Search.Models;
 
 /// <summary>
 /// DTO for search command JSON output data.

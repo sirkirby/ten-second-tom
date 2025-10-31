@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using TenSecondTom.Features.Today;
 using TenSecondTom.Infrastructure.Auth;
-using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 using TenSecondTom.Shared.TextEditing.Models;

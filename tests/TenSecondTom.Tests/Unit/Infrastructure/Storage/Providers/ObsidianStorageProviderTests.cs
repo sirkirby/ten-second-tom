@@ -5,6 +5,7 @@ using Moq;
 using TenSecondTom.Infrastructure.Storage.Providers;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Options;
+using TenSecondTom.Shared.Results;
 using Xunit;
 
 namespace TenSecondTom.Tests.Unit.Infrastructure.Storage.Providers;
@@ -21,7 +22,7 @@ public sealed class ObsidianStorageProviderTests : IDisposable
     public ObsidianStorageProviderTests()
     {
         _testVaultDirectory = Path.Combine(Path.GetTempPath(), $"obsidian-vault-{Guid.NewGuid()}");
-        _loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
+        _loggerFactory = LoggerFactory.Create(builder => { });
     }
 
     [Fact]
@@ -82,14 +83,15 @@ public sealed class ObsidianStorageProviderTests : IDisposable
         // Assert
         result.IsSuccess.Should().BeTrue("initialization should succeed with valid Obsidian vault");
 
-        // Verify Obsidian-friendly subdirectories were created
-        Directory.Exists(Path.Combine(_testVaultDirectory, "Daily Notes")).Should().BeTrue();
-        Directory.Exists(Path.Combine(_testVaultDirectory, "Weekly Reviews")).Should().BeTrue();
-        Directory.Exists(Path.Combine(_testVaultDirectory, "Templates")).Should().BeTrue();
+        // Verify base vault is valid (no subdirectories pre-created)
+        // Feature-specific subdirectories (today/, thisweek/, recording/) will be created
+        // on-demand by FileSystemStorageProvider when entries are saved
+        Directory.Exists(_testVaultDirectory).Should().BeTrue();
+        Directory.Exists(Path.Combine(_testVaultDirectory, ".obsidian")).Should().BeTrue();
     }
 
     [Fact]
-    public async Task InitializeAsync_WithSubdirectory_ShouldCreateNestedStructure()
+    public async Task InitializeAsync_WithSubdirectory_ShouldCreateBaseDirectory()
     {
         // Arrange
         CreateValidObsidianVault(_testVaultDirectory);
@@ -109,12 +111,11 @@ public sealed class ObsidianStorageProviderTests : IDisposable
         // Assert
         result.IsSuccess.Should().BeTrue();
 
-        // Verify TST entries are isolated in subdirectory
+        // Verify TST base subdirectory is created
+        // Feature-specific subdirectories (today/, thisweek/, recording/) will be created
+        // on-demand by FileSystemStorageProvider when entries are saved
         var tstPath = Path.Combine(_testVaultDirectory, subdirName);
         Directory.Exists(tstPath).Should().BeTrue("TST subdirectory should be created");
-        Directory.Exists(Path.Combine(tstPath, "Daily Notes")).Should().BeTrue();
-        Directory.Exists(Path.Combine(tstPath, "Weekly Reviews")).Should().BeTrue();
-        Directory.Exists(Path.Combine(tstPath, "Templates")).Should().BeTrue();
     }
 
     [Fact]
@@ -223,7 +224,7 @@ public sealed class ObsidianStorageProviderTests : IDisposable
     }
 
     [Fact]
-    public void ObsidianProvider_WithLegacyMemoryDirectory_ShouldUseAsVaultRoot()
+    public async Task ObsidianProvider_WithLegacyMemoryDirectory_ShouldUseAsVaultRoot()
     {
         // Arrange
         CreateValidObsidianVault(_testVaultDirectory);
@@ -239,7 +240,7 @@ public sealed class ObsidianStorageProviderTests : IDisposable
 
         // Act
         var provider = new ObsidianStorageProvider(options, Mock.Of<ILogger<ObsidianStorageProvider>>(), _loggerFactory);
-        var initResult = provider.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
+        var initResult = await provider.InitializeAsync(CancellationToken.None);
 
         // Assert
         initResult.IsSuccess.Should().BeTrue("Obsidian provider should work with legacy MemoryDirectory as vault path");

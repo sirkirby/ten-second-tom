@@ -159,7 +159,7 @@ public sealed record LlmConfiguration
 /// <summary>
 /// Storage configuration.
 /// Defines storage provider selection and settings.
-/// The RootDirectory (where config and data live) is at ConfigurationSettings root level.
+/// The RootDirectory (where config and templates live) is at ConfigurationSettings root level.
 /// </summary>
 public sealed record StorageConfiguration
 {
@@ -170,9 +170,17 @@ public sealed record StorageConfiguration
     public string ProviderId { get; init; } = StorageProviderIds.Default;
 
     /// <summary>
-    /// Gets the optional subdirectory name for memory entries within the root directory.
-    /// When set, memory entries are stored under {RootDirectory}/{MemorySubdirectory}/
-    /// Default: null (store directly in root)
+    /// Gets the provider-specific storage path (e.g., Obsidian vault path).
+    /// For default provider: not used (uses RootDirectory for both config and storage)
+    /// For Obsidian provider: the vault root path where memory entries are stored
+    /// Default: null (use RootDirectory)
+    /// </summary>
+    public string? ProviderPath { get; init; }
+
+    /// <summary>
+    /// Gets the optional subdirectory name for memory entries within the provider path.
+    /// When set, memory entries are stored under {ProviderPath}/{MemorySubdirectory}/
+    /// Default: null (store directly in provider path root)
     /// Primarily used by Obsidian provider to isolate TST entries in a vault subdirectory.
     /// </summary>
     public string? MemorySubdirectory { get; init; }

@@ -1,7 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
-using TenSecondTom.Features.ThisWeek;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Constants;
@@ -9,7 +8,7 @@ using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.OutputFormatters;
 using TenSecondTom.Shared.Results;
 
-namespace TenSecondTom.Infrastructure.Cli;
+namespace TenSecondTom.Features.ThisWeek;
 
 /// <summary>
 /// Handles the execution of the 'thisweek' command.
@@ -67,7 +66,7 @@ public static class ThisWeekCommandHandler
 
         // Build command
         DateRange? customDateRange = null;
-        
+
         if (fromDate.HasValue || toDate.HasValue)
         {
             // Validate custom date range
@@ -157,7 +156,8 @@ public static class ThisWeekCommandHandler
         if (isTruncated)
         {
             var storageOptions = serviceProvider.GetRequiredService<IOptions<StorageOptions>>();
-            string fullPath = Path.Combine(storageOptions.Value.MemoryDirectory, entry.FilePath);
+            var rootDir = storageOptions.Value.RootDirectory ?? Path.Combine(".", DirectoryNames.ApplicationRoot);
+            string fullPath = Path.Combine(rootDir, entry.FilePath);
             AnsiConsole.MarkupLine($"[dim]Full entry:[/] [link]{fullPath.EscapeMarkup()}[/]");
         }
         else

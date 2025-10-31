@@ -332,6 +332,28 @@ internal static class ConfigCommandBuilder
 
         // Storage Configuration
         table.AddRow("[yellow]Storage Configuration[/]", "");
+
+        // Storage Provider
+        var providerDisplay = config.Storage.ProviderId switch
+        {
+            "default" => "Default (Local File System)",
+            "obsidian" => "Obsidian Vault",
+            _ => config.Storage.ProviderId ?? "default"
+        };
+        table.AddRow("  Provider", providerDisplay);
+
+        // Provider Path (for external providers like Obsidian)
+        if (!string.IsNullOrWhiteSpace(config.Storage.ProviderPath))
+        {
+            table.AddRow("  Provider Path", config.Storage.ProviderPath.EscapeMarkup());
+        }
+
+        // Memory Subdirectory (isolation subdirectory within provider)
+        if (!string.IsNullOrWhiteSpace(config.Storage.MemorySubdirectory))
+        {
+            table.AddRow("  Memory Subdirectory", config.Storage.MemorySubdirectory.EscapeMarkup());
+        }
+
         table.AddRow("  Create If Missing", config.Storage.CreateIfMissing ? "Yes" : "No");
 
         // Optional Configuration

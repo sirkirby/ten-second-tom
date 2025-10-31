@@ -84,7 +84,7 @@ public sealed class StorageProviderFactory : IStorageProviderFactory
     /// <summary>
     /// Discovers all IStorageProvider implementations via assembly scanning.
     /// </summary>
-    private IReadOnlyDictionary<string, Type> DiscoverProviders()
+    private Dictionary<string, Type> DiscoverProviders()
     {
         var providers = new Dictionary<string, Type>(StringComparer.OrdinalIgnoreCase);
         var assembly = typeof(IStorageProvider).Assembly;
@@ -102,10 +102,10 @@ public sealed class StorageProviderFactory : IStorageProviderFactory
                 var instance = (IStorageProvider)ActivatorUtilities.CreateInstance(_serviceProvider, type);
                 string providerId = instance.ProviderId.ToLowerInvariant();
 
-                if (providers.ContainsKey(providerId))
+                if (providers.TryGetValue(providerId, out var existingType))
                 {
                     _logger.LogWarning("Duplicate ProviderId '{ProviderId}' found for types {Type1} and {Type2}. Using first registration.",
-                        providerId, providers[providerId].Name, type.Name);
+                        providerId, existingType.Name, type.Name);
                     continue;
                 }
 

@@ -21,7 +21,7 @@ public sealed class DefaultStorageProviderTests : IDisposable
     public DefaultStorageProviderTests()
     {
         _testDirectory = Path.Combine(Path.GetTempPath(), $"tst-test-{Guid.NewGuid()}");
-        _loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
+        _loggerFactory = LoggerFactory.Create(builder => { });
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public sealed class DefaultStorageProviderTests : IDisposable
     }
 
     [Fact]
-    public async Task InitializeAsync_WithValidDirectory_ShouldCreateStructure()
+    public async Task InitializeAsync_WithValidDirectory_ShouldCreateBaseDirectory()
     {
         // Arrange
         var options = CreateOptions(_testDirectory);
@@ -79,12 +79,10 @@ public sealed class DefaultStorageProviderTests : IDisposable
         // Assert
         result.IsSuccess.Should().BeTrue("initialization should succeed with valid directory");
 
-        // Verify directory structure
+        // Verify base directory is created
+        // Feature-specific subdirectories (today/, thisweek/, recording/) will be created
+        // on-demand by FileSystemStorageProvider when entries are saved
         Directory.Exists(_testDirectory).Should().BeTrue("root directory should be created");
-        Directory.Exists(Path.Combine(_testDirectory, DirectoryNames.Today)).Should().BeTrue("today subdirectory should be created");
-        Directory.Exists(Path.Combine(_testDirectory, DirectoryNames.ThisWeek)).Should().BeTrue("thisweek subdirectory should be created");
-        Directory.Exists(Path.Combine(_testDirectory, DirectoryNames.Templates)).Should().BeTrue("templates subdirectory should be created");
-        Directory.Exists(Path.Combine(_testDirectory, DirectoryNames.Config)).Should().BeTrue("config subdirectory should be created");
     }
 
     [Fact]
@@ -125,14 +123,29 @@ public sealed class DefaultStorageProviderTests : IDisposable
         // Arrange
         var parentDir = Path.GetTempPath();
         var testDir = Path.Combine(parentDir, $"nonexistent-{Guid.NewGuid()}");
-        var options = CreateOptions(testDir);
-        var provider = new DefaultStorageProvider(options, Mock.Of<ILogger<DefaultStorageProvider>>(), _loggerFactory);
 
-        // Act
-        var result = await provider.ValidateConfigurationAsync(CancellationToken.None);
+        // Create the directory so validation can test write permissions
+        Directory.CreateDirectory(testDir);
 
-        // Assert
-        result.IsSuccess.Should().BeTrue("validation should succeed if parent directory exists");
+        try
+        {
+            var options = CreateOptions(testDir);
+            var provider = new DefaultStorageProvider(options, Mock.Of<ILogger<DefaultStorageProvider>>(), _loggerFactory);
+
+            // Act
+            var result = await provider.ValidateConfigurationAsync(CancellationToken.None);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue("validation should succeed if directory exists and is writable");
+        }
+        finally
+        {
+            // Clean up
+            if (Directory.Exists(testDir))
+            {
+                Directory.Delete(testDir, true);
+            }
+        }
     }
 
     [Fact]
@@ -152,7 +165,7 @@ public sealed class DefaultStorageProviderTests : IDisposable
     }
 
     [Fact]
-    public void BackwardCompatibility_WithLegacyMemoryDirectory_ShouldWork()
+    public async Task BackwardCompatibility_WithLegacyMemoryDirectory_ShouldWork()
     {
         // Arrange - simulate legacy configuration with MemoryDirectory only
         var options = Options.Create(new StorageOptions
@@ -166,7 +179,7 @@ public sealed class DefaultStorageProviderTests : IDisposable
 
         // Act
         var provider = new DefaultStorageProvider(options, Mock.Of<ILogger<DefaultStorageProvider>>(), _loggerFactory);
-        var initResult = provider.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
+        var initResult = await provider.InitializeAsync(CancellationToken.None);
 
         // Assert
         initResult.IsSuccess.Should().BeTrue("provider should work with legacy MemoryDirectory");
@@ -174,7 +187,7 @@ public sealed class DefaultStorageProviderTests : IDisposable
     }
 
     [Fact]
-    public void RootDirectory_TakesPrecedenceOver_LegacyMemoryDirectory()
+    public async Task RootDirectory_TakesPrecedenceOver_LegacyMemoryDirectory()
     {
         // Arrange - both properties set, RootDirectory should win
         var rootDir = Path.Combine(Path.GetTempPath(), $"root-{Guid.NewGuid()}");
@@ -193,7 +206,7 @@ public sealed class DefaultStorageProviderTests : IDisposable
         {
             // Act
             var provider = new DefaultStorageProvider(options, Mock.Of<ILogger<DefaultStorageProvider>>(), _loggerFactory);
-            var initResult = provider.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
+            var initResult = await provider.InitializeAsync(CancellationToken.None);
 
             // Assert
             initResult.IsSuccess.Should().BeTrue();
@@ -208,7 +221,7 @@ public sealed class DefaultStorageProviderTests : IDisposable
     }
 
     [Fact]
-    public async Task WithMemorySubdirectory_ShouldCreateNestedStructure()
+    public async Task WithMemorySubdirectory_ShouldCreateBaseDirectory()
     {
         // Arrange
         var subdirName = "memory";
@@ -227,11 +240,11 @@ public sealed class DefaultStorageProviderTests : IDisposable
         // Assert
         result.IsSuccess.Should().BeTrue();
 
-        // Verify subdirectories are created under the memory subdirectory
+        // Verify base memory subdirectory is created
+        // Feature-specific subdirectories (today/, thisweek/, recording/) will be created
+        // on-demand by FileSystemStorageProvider when entries are saved
         var memoryPath = Path.Combine(_testDirectory, subdirName);
         Directory.Exists(memoryPath).Should().BeTrue("memory subdirectory should be created");
-        Directory.Exists(Path.Combine(memoryPath, DirectoryNames.Today)).Should().BeTrue();
-        Directory.Exists(Path.Combine(memoryPath, DirectoryNames.ThisWeek)).Should().BeTrue();
     }
 
     public void Dispose()

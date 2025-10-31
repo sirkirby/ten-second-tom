@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TenSecondTom.Features.Setup.Models;
 using static TenSecondTom.Features.Templates.InstallDefaultTemplates;
+using TenSecondTom.Infrastructure.Prompts;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Options;
 
 namespace TenSecondTom.Infrastructure.Configuration;
@@ -17,6 +19,7 @@ public sealed class ConfigurationChecker
     private readonly AuthOptions? _authOptions;
     private readonly StorageOptions? _storageOptions;
     private readonly ILogger<ConfigurationChecker> _logger;
+    private readonly EmbeddedPromptTemplateLoader _embeddedTemplateLoader;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ConfigurationChecker"/> class.
@@ -24,14 +27,17 @@ public sealed class ConfigurationChecker
     /// <param name="llmOptions">LLM configuration options.</param>
     /// <param name="authOptions">Authentication configuration options.</param>
     /// <param name="storageOptions">Storage configuration options.</param>
+    /// <param name="embeddedTemplateLoader">Embedded template loader for restoring templates.</param>
     /// <param name="logger">Logger for diagnostics.</param>
     public ConfigurationChecker(
         IOptions<LlmOptions>? llmOptions,
         IOptions<AuthOptions>? authOptions,
         IOptions<StorageOptions>? storageOptions,
+        EmbeddedPromptTemplateLoader embeddedTemplateLoader,
         ILogger<ConfigurationChecker> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _embeddedTemplateLoader = embeddedTemplateLoader ?? throw new ArgumentNullException(nameof(embeddedTemplateLoader));
 
         // Options may be null during initial setup, so we handle this gracefully
         try
@@ -80,7 +86,7 @@ public sealed class ConfigurationChecker
 
         bool hasLlmProvider = _llmOptions?.Provider != null;
         bool hasLlmApiKey = !string.IsNullOrWhiteSpace(_llmOptions?.ApiKey);
-        bool hasMemoryDirectory = !string.IsNullOrWhiteSpace(_storageOptions?.MemoryDirectory);
+        bool hasMemoryDirectory = !string.IsNullOrWhiteSpace(_storageOptions?.RootDirectory);
 
         bool isConfigured = hasSshConfiguration &&
                            hasLlmProvider &&
@@ -96,7 +102,7 @@ public sealed class ConfigurationChecker
             if (!hasLlmProvider)
                 _logger.LogDebug("Missing: LLM provider (TenSecondTom:Llm:Provider)");
             if (!hasMemoryDirectory)
-                _logger.LogDebug("Missing: Memory directory (TenSecondTom:MemoryDirectory)");
+                _logger.LogDebug("Missing: Root directory (TenSecondTom:RootDirectory)");
             if (!hasLlmApiKey)
                 _logger.LogDebug("Missing: LLM API key (TenSecondTom:Llm:ApiKey)");
         }
@@ -199,10 +205,11 @@ public sealed class ConfigurationChecker
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Get memory directory from options
-        string memoryDirectory = _storageOptions?.MemoryDirectory ?? "./.memory";
+        // Get root directory from options
+        string rootDirectory = _storageOptions?.RootDirectory
+            ?? Path.Combine(".", DirectoryNames.ApplicationRoot);
 
-        string templatesDirectory = fileSystem.Path.Combine(memoryDirectory, "templates");
+        string templatesDirectory = fileSystem.Path.Combine(rootDirectory, DirectoryNames.Templates);
 
         bool healingPerformed = false;
 
@@ -287,7 +294,7 @@ public sealed class ConfigurationChecker
             using var loggerFactory = LoggerFactory.Create(builder => { });
             var handlerLogger = loggerFactory.CreateLogger<Handler>();
 
-            var handler = new Handler(fileSystem, handlerLogger);
+            var handler = new Handler(fileSystem, _embeddedTemplateLoader, handlerLogger);
 
             var command = new Command
             {

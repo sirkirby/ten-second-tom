@@ -25,7 +25,7 @@ public interface IStorageProvider : IMemoryStorageProvider
     /// Used in configuration to select the active provider.
     /// </summary>
     /// <remarks>
-    /// Must be lowercase and URL-friendly. Use constants from <see cref="Constants.StorageProviderIds"/>.
+    /// Must be lowercase and URL-friendly. Use constants from <see cref="TenSecondTom.Shared.Constants.StorageProviderIds"/>.
     /// </remarks>
     string ProviderId { get; }
 

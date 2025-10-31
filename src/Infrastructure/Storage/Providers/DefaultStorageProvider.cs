@@ -47,44 +47,28 @@ public sealed class DefaultStorageProvider : IStorageProvider
     }
 
     /// <inheritdoc/>
-    public async Task<Result> InitializeAsync(CancellationToken cancellationToken)
+    public Task<Result> InitializeAsync(CancellationToken cancellationToken)
     {
         try
         {
             string baseDirectory = GetBaseDirectory();
 
+            // Create base storage directory if it doesn't exist
+            // Feature-specific subdirectories (today/, thisweek/, recording/) will be created
+            // on-demand by FileSystemStorageProvider when entries are saved
             if (!Directory.Exists(baseDirectory))
             {
                 Directory.CreateDirectory(baseDirectory);
                 _logger.LogInformation("Created storage directory: {Directory}", baseDirectory);
             }
 
-            // Create standard subdirectories for TST structure
-            var subdirectories = new[]
-            {
-                DirectoryNames.Today,
-                DirectoryNames.ThisWeek,
-                DirectoryNames.Templates,
-                DirectoryNames.Config
-            };
-
-            foreach (var subdirectory in subdirectories)
-            {
-                string path = Path.Combine(baseDirectory, subdirectory);
-                if (!Directory.Exists(path))
-                {
-                    Directory.CreateDirectory(path);
-                    _logger.LogDebug("Created subdirectory: {Directory}", path);
-                }
-            }
-
             _logger.LogInformation("Storage provider initialized successfully at: {Directory}", baseDirectory);
-            return Result.Success();
+            return Task.FromResult(Result.Success());
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to initialize storage provider");
-            return Result.Failure($"Storage initialization failed: {ex.Message}");
+            return Task.FromResult(Result.Failure($"Storage initialization failed: {ex.Message}"));
         }
     }
 
@@ -176,8 +160,14 @@ public sealed class DefaultStorageProvider : IStorageProvider
     {
         var options = _options.Value;
 
-        // Priority: RootDirectory > MemoryDirectory (legacy) > default
-        string? baseDirectory = options.RootDirectory;
+        // Priority: ProviderPath (if set) > RootDirectory > MemoryDirectory (legacy) > default
+        // For default provider, ProviderPath is typically null and we use RootDirectory
+        string? baseDirectory = options.ProviderPath;
+
+        if (string.IsNullOrWhiteSpace(baseDirectory))
+        {
+            baseDirectory = options.RootDirectory;
+        }
 
 #pragma warning disable CS0618 // Type or member is obsolete
         if (string.IsNullOrWhiteSpace(baseDirectory))
