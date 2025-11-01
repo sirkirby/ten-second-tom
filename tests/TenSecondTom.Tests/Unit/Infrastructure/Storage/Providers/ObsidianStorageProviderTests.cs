@@ -200,6 +200,31 @@ public sealed class ObsidianStorageProviderTests : IDisposable
         // Make directory read-only (platform-specific test)
         if (!OperatingSystem.IsWindows())
         {
+            // On Unix systems, use chmod to remove write permissions
+            var processStartInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "/bin/chmod",
+                Arguments = $"-R u-w \"{_testVaultDirectory}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = System.Diagnostics.Process.Start(processStartInfo);
+            if (process != null)
+            {
+                await process.WaitForExitAsync();
+                if (process.ExitCode != 0)
+                {
+                    var error = await process.StandardError.ReadToEndAsync();
+                    throw new InvalidOperationException($"Failed to set read-only permissions: {error}");
+                }
+            }
+        }
+        else
+        {
+            // On Windows, use FileAttributes.ReadOnly
             var dirInfo = new DirectoryInfo(_testVaultDirectory);
             dirInfo.Attributes |= FileAttributes.ReadOnly;
         }
@@ -252,11 +277,38 @@ public sealed class ObsidianStorageProviderTests : IDisposable
         {
             if (Directory.Exists(_testVaultDirectory))
             {
-                // Remove read-only attribute if set
-                var dirInfo = new DirectoryInfo(_testVaultDirectory);
-                if ((dirInfo.Attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
+                // Restore write permissions before deletion (platform-specific)
+                if (!OperatingSystem.IsWindows())
                 {
-                    dirInfo.Attributes &= ~FileAttributes.ReadOnly;
+                    // On Unix systems, restore write permissions using chmod
+                    try
+                    {
+                        var processStartInfo = new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = "/bin/chmod",
+                            Arguments = $"-R u+w \"{_testVaultDirectory}\"",
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        };
+
+                        using var process = System.Diagnostics.Process.Start(processStartInfo);
+                        process?.WaitForExit();
+                    }
+                    catch
+                    {
+                        // Best effort - continue with deletion attempt
+                    }
+                }
+                else
+                {
+                    // On Windows, remove read-only attribute if set
+                    var dirInfo = new DirectoryInfo(_testVaultDirectory);
+                    if ((dirInfo.Attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
+                    {
+                        dirInfo.Attributes &= ~FileAttributes.ReadOnly;
+                    }
                 }
 
                 Directory.Delete(_testVaultDirectory, true);
