@@ -1,20 +1,15 @@
 using System.CommandLine;
-using TenSecondTom.Features.Setup.Handlers;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
 using TenSecondTom.Features.Search;
-using TenSecondTom.Features.Setup.Commands;
+using TenSecondTom.Features.Setup;
 using TenSecondTom.Features.Setup.Services;
-using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Shell.Models;
 using TenSecondTom.Features.Shell.Services;
 using TenSecondTom.Features.ThisWeek;
 using TenSecondTom.Features.Today;
 using TenSecondTom.Infrastructure.Auth;
-using TenSecondTom.Infrastructure.Configuration;
-using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.OutputFormatters;
 using AuthLoginHandler = TenSecondTom.Features.Auth.Login.Handler;
@@ -540,11 +535,11 @@ public static class CommandRegistry
             bool nonInteractive = parseResult.GetValue(nonInteractiveOption);
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
 
-            // Use factory to create SetupCommand with existing config loaded (centralized logic)
+            // Use factory to create Setup.Command with existing config loaded (centralized logic)
             var factory = serviceProvider.GetRequiredService<SetupCommandFactory>();
             var command = await factory.CreateAsync(force, nonInteractive, CancellationToken.None).ConfigureAwait(false);
 
-            var handler = serviceProvider.GetRequiredService<SetupCommandHandler>();
+            var handler = serviceProvider.GetRequiredService<Setup.Handler>();
             var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
 
             if (result.IsSuccess)

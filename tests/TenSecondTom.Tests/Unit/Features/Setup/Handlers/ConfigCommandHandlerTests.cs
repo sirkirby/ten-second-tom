@@ -3,8 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using TenSecondTom.Features.Setup.Commands;
-using TenSecondTom.Features.Setup.Handlers;
+using TenSecondTom.Features.Setup;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Infrastructure.Configuration;
@@ -15,7 +14,7 @@ using TenSecondTom.Shared.Results;
 namespace TenSecondTom.Tests.Unit.Features.Setup.Handlers;
 
 /// <summary>
-/// Comprehensive unit tests for ConfigCommandHandler
+/// Comprehensive unit tests for Config.Handler
 /// Tests all actions: Show, Set, Reset, Validate
 /// Covers error handling, validation, and configuration updates
 /// </summary>
@@ -27,8 +26,8 @@ public sealed class ConfigCommandHandlerTests
     private readonly Mock<IApiKeyValidator> _mockOpenAIValidator;
     private readonly Mock<IApiKeyValidator> _mockAnthropicValidator;
     private readonly Mock<IAppSettingsStorageService> _mockAppSettingsStorage;
-    private readonly Mock<ILogger<ConfigCommandHandler>> _mockLogger;
-    private readonly ConfigCommandHandler _handler;
+    private readonly Mock<ILogger<Config.Handler>> _mockLogger;
+    private readonly Config.Handler _handler;
 
     public ConfigCommandHandlerTests()
     {
@@ -38,7 +37,7 @@ public sealed class ConfigCommandHandlerTests
         _mockOpenAIValidator = new Mock<IApiKeyValidator>();
         _mockAnthropicValidator = new Mock<IApiKeyValidator>();
         _mockAppSettingsStorage = new Mock<IAppSettingsStorageService>();
-        _mockLogger = new Mock<ILogger<ConfigCommandHandler>>();
+        _mockLogger = new Mock<ILogger<Config.Handler>>();
 
         _mockOpenAIValidator.Setup(v => v.Provider).Returns(LlmProvider.OpenAI);
         _mockAnthropicValidator.Setup(v => v.Provider).Returns(LlmProvider.Anthropic);
@@ -48,7 +47,7 @@ public sealed class ConfigCommandHandlerTests
 
         var validators = new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object };
 
-        _handler = new ConfigCommandHandler(
+        _handler = new Config.Handler(
             _mockStorageService.Object,
             _mockConfigMonitor.Object,
             _mockSetupWizard.Object,
@@ -57,12 +56,12 @@ public sealed class ConfigCommandHandlerTests
             _mockLogger.Object);
     }
 
-    private ConfigCommandHandler CreateHandlerWithConfig(ConfigurationSettings config)
+    private Config.Handler CreateHandlerWithConfig(ConfigurationSettings config)
     {
         var mockMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
         mockMonitor.Setup(c => c.CurrentValue).Returns(config);
 
-        return new ConfigCommandHandler(
+        return new Config.Handler(
             _mockStorageService.Object,
             mockMonitor.Object,
             _mockSetupWizard.Object,
@@ -71,105 +70,9 @@ public sealed class ConfigCommandHandlerTests
             _mockLogger.Object);
     }
 
-    #region Constructor Tests
-
-    [Fact]
-    public void Constructor_WithNullStorageService_ShouldThrowArgumentNullException()
-    {
-        // Act & Assert
-        var act = () => new ConfigCommandHandler(
-            null!,
-            _mockConfigMonitor.Object,
-            _mockSetupWizard.Object,
-            new[] { _mockOpenAIValidator.Object },
-            _mockAppSettingsStorage.Object,
-            _mockLogger.Object);
-
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("storageService");
-    }
-
-    [Fact]
-    public void Constructor_WithNullConfigMonitor_ShouldThrowArgumentNullException()
-    {
-        // Act & Assert
-        var act = () => new ConfigCommandHandler(
-            _mockStorageService.Object,
-            null!,
-            _mockSetupWizard.Object,
-            new[] { _mockOpenAIValidator.Object },
-            _mockAppSettingsStorage.Object,
-            _mockLogger.Object);
-
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("configMonitor");
-    }
-
-    [Fact]
-    public void Constructor_WithNullSetupWizard_ShouldThrowArgumentNullException()
-    {
-        // Act & Assert
-        var act = () => new ConfigCommandHandler(
-            _mockStorageService.Object,
-            _mockConfigMonitor.Object,
-            null!,
-            new[] { _mockOpenAIValidator.Object },
-            _mockAppSettingsStorage.Object,
-            _mockLogger.Object);
-
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("setupWizard");
-    }
-
-    [Fact]
-    public void Constructor_WithNullValidators_ShouldThrowArgumentNullException()
-    {
-        // Act & Assert
-        var act = () => new ConfigCommandHandler(
-            _mockStorageService.Object,
-            _mockConfigMonitor.Object,
-            _mockSetupWizard.Object,
-            null!,
-            _mockAppSettingsStorage.Object,
-            _mockLogger.Object);
-
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("apiKeyValidators");
-    }
-
-    [Fact]
-    public void Constructor_WithNullAppSettingsStorage_ShouldThrowArgumentNullException()
-    {
-        // Act & Assert
-        var act = () => new ConfigCommandHandler(
-            _mockStorageService.Object,
-            _mockConfigMonitor.Object,
-            _mockSetupWizard.Object,
-            new[] { _mockOpenAIValidator.Object },
-            null!,
-            _mockLogger.Object);
-
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("appSettingsStorage");
-    }
-
-    [Fact]
-    public void Constructor_WithNullLogger_ShouldThrowArgumentNullException()
-    {
-        // Act & Assert
-        var act = () => new ConfigCommandHandler(
-            _mockStorageService.Object,
-            _mockConfigMonitor.Object,
-            _mockSetupWizard.Object,
-            new[] { _mockOpenAIValidator.Object },
-            _mockAppSettingsStorage.Object,
-            null!);
-
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("logger");
-    }
-
-    #endregion
+    // Note: Constructor null checks are not performed in handlers.
+    // The DI container ensures non-null dependencies are provided.
+    // This is consistent with other handlers in the codebase (Login.Handler, CreateDailyEntry.Handler, etc.).
 
     #region Show Action Tests
 
@@ -181,7 +84,7 @@ public sealed class ConfigCommandHandlerTests
         var mockMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
         mockMonitor.Setup(c => c.CurrentValue).Returns(config);
 
-        var handler = new ConfigCommandHandler(
+        var handler = new Config.Handler(
             _mockStorageService.Object,
             mockMonitor.Object,
             _mockSetupWizard.Object,
@@ -189,7 +92,7 @@ public sealed class ConfigCommandHandlerTests
             _mockAppSettingsStorage.Object,
             _mockLogger.Object);
 
-        var command = new ConfigCommand { Action = ConfigAction.Show };
+        var command = new Config.Command { Action = ConfigAction.Show };
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -214,7 +117,7 @@ public sealed class ConfigCommandHandlerTests
         var mockMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
         mockMonitor.Setup(c => c.CurrentValue).Returns(config);
 
-        var handler = new ConfigCommandHandler(
+        var handler = new Config.Handler(
             _mockStorageService.Object,
             mockMonitor.Object,
             _mockSetupWizard.Object,
@@ -222,7 +125,7 @@ public sealed class ConfigCommandHandlerTests
             _mockAppSettingsStorage.Object,
             _mockLogger.Object);
 
-        var command = new ConfigCommand { Action = ConfigAction.Show, ShowSecrets = true };
+        var command = new Config.Command { Action = ConfigAction.Show, ShowSecrets = true };
 
         // Act
         await handler.Handle(command, CancellationToken.None);
@@ -246,7 +149,7 @@ public sealed class ConfigCommandHandlerTests
     public async Task HandleSet_WithNullSettingName_ShouldReturnFailure()
     {
         // Arrange
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = null,
@@ -266,7 +169,7 @@ public sealed class ConfigCommandHandlerTests
     public async Task HandleSet_WithEmptySettingName_ShouldReturnFailure()
     {
         // Arrange
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "   ",
@@ -285,7 +188,7 @@ public sealed class ConfigCommandHandlerTests
     public async Task HandleSet_WithNullSettingValue_ShouldReturnFailure()
     {
         // Arrange
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "llm-provider",
@@ -308,7 +211,7 @@ public sealed class ConfigCommandHandlerTests
         _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<ConfigurationSettings>.Failure("No config"));
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "llm-provider",
@@ -332,7 +235,7 @@ public sealed class ConfigCommandHandlerTests
         _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<ConfigurationSettings>.Success(config));
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "unknown-setting",
@@ -361,7 +264,7 @@ public sealed class ConfigCommandHandlerTests
         _mockStorageService.Setup(s => s.SaveAsync(It.IsAny<ConfigurationSettings>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<string>.Success("Configuration saved"));
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "llm-provider",
@@ -387,7 +290,7 @@ public sealed class ConfigCommandHandlerTests
         _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<ConfigurationSettings>.Success(config));
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "llm-provider",
@@ -413,7 +316,7 @@ public sealed class ConfigCommandHandlerTests
         _mockStorageService.Setup(s => s.SaveAsync(It.IsAny<ConfigurationSettings>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<string>.Success("Configuration saved"));
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "LLM-PROVIDER",
@@ -444,7 +347,7 @@ public sealed class ConfigCommandHandlerTests
         _mockOpenAIValidator.Setup(v => v.ValidateFormatAsync(It.IsAny<string>()))
             .ReturnsAsync(new ApiValidationResult { IsValid = true });
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "api-key",
@@ -471,7 +374,7 @@ public sealed class ConfigCommandHandlerTests
         _mockOpenAIValidator.Setup(v => v.ValidateFormatAsync(It.IsAny<string>()))
             .ReturnsAsync(new ApiValidationResult { IsValid = false, ErrorMessage = "Invalid format" });
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "api-key",
@@ -501,7 +404,7 @@ public sealed class ConfigCommandHandlerTests
         _mockStorageService.Setup(s => s.SaveAsync(It.IsAny<ConfigurationSettings>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<string>.Success("Configuration saved"));
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "memory-directory",
@@ -526,7 +429,7 @@ public sealed class ConfigCommandHandlerTests
             .ReturnsAsync(Result<ConfigurationSettings>.Success(config));
 
         // Use a path with null character which is invalid on all systems
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "memory-directory",
@@ -558,7 +461,7 @@ public sealed class ConfigCommandHandlerTests
             _mockStorageService.Setup(s => s.SaveAsync(It.IsAny<ConfigurationSettings>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(Result<string>.Success("Configuration saved"));
 
-            var command = new ConfigCommand
+            var command = new Config.Command
             {
                 Action = ConfigAction.Set,
                 SettingName = "ssh-key-path",
@@ -588,7 +491,7 @@ public sealed class ConfigCommandHandlerTests
         _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<ConfigurationSettings>.Success(config));
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "ssh-key-path",
@@ -624,7 +527,7 @@ public sealed class ConfigCommandHandlerTests
                 .ReturnsAsync(Result<string>.Success("Configuration saved"));
 
             var relativePath = testFile.Replace(homeDir, "~", StringComparison.Ordinal);
-            var command = new ConfigCommand
+            var command = new Config.Command
             {
                 Action = ConfigAction.Set,
                 SettingName = "ssh-key-path",
@@ -659,7 +562,7 @@ public sealed class ConfigCommandHandlerTests
         _mockStorageService.Setup(s => s.SaveAsync(It.IsAny<ConfigurationSettings>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<string>.Success("Configuration saved"));
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "log-level",
@@ -682,7 +585,7 @@ public sealed class ConfigCommandHandlerTests
         _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<ConfigurationSettings>.Success(config));
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "log-level",
@@ -712,7 +615,7 @@ public sealed class ConfigCommandHandlerTests
         _mockStorageService.Setup(s => s.SaveAsync(It.IsAny<ConfigurationSettings>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<string>.Success("Configuration saved"));
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "log-level",
@@ -741,7 +644,7 @@ public sealed class ConfigCommandHandlerTests
         _mockStorageService.Setup(s => s.SaveAsync(It.IsAny<ConfigurationSettings>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<string>.Success("Configuration saved"));
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "retention-days",
@@ -767,7 +670,7 @@ public sealed class ConfigCommandHandlerTests
         _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<ConfigurationSettings>.Success(config));
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "retention-days",
@@ -791,7 +694,7 @@ public sealed class ConfigCommandHandlerTests
         _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<ConfigurationSettings>.Success(config));
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "retention-days",
@@ -820,7 +723,7 @@ public sealed class ConfigCommandHandlerTests
         _mockStorageService.Setup(s => s.SaveAsync(It.IsAny<ConfigurationSettings>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<string>.Failure("Save failed"));
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "retention-days",
@@ -847,7 +750,7 @@ public sealed class ConfigCommandHandlerTests
         var mockMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
         mockMonitor.Setup(c => c.CurrentValue).Returns(config);
 
-        var handler = new ConfigCommandHandler(
+        var handler = new Config.Handler(
             _mockStorageService.Object,
             mockMonitor.Object,
             _mockSetupWizard.Object,
@@ -855,7 +758,7 @@ public sealed class ConfigCommandHandlerTests
             _mockAppSettingsStorage.Object,
             _mockLogger.Object);
 
-        var command = new ConfigCommand { Action = ConfigAction.Validate };
+        var command = new Config.Command { Action = ConfigAction.Validate };
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -880,7 +783,7 @@ public sealed class ConfigCommandHandlerTests
         var mockMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
         mockMonitor.Setup(c => c.CurrentValue).Returns(emptyConfig);
 
-        var handler = new ConfigCommandHandler(
+        var handler = new Config.Handler(
             _mockStorageService.Object,
             mockMonitor.Object,
             _mockSetupWizard.Object,
@@ -888,7 +791,7 @@ public sealed class ConfigCommandHandlerTests
             _mockAppSettingsStorage.Object,
             _mockLogger.Object);
 
-        var command = new ConfigCommand { Action = ConfigAction.Validate };
+        var command = new Config.Command { Action = ConfigAction.Validate };
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -914,7 +817,7 @@ public sealed class ConfigCommandHandlerTests
         var mockMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
         mockMonitor.Setup(c => c.CurrentValue).Returns(invalidConfig);
 
-        var handler = new ConfigCommandHandler(
+        var handler = new Config.Handler(
             _mockStorageService.Object,
             mockMonitor.Object,
             _mockSetupWizard.Object,
@@ -922,7 +825,7 @@ public sealed class ConfigCommandHandlerTests
             _mockAppSettingsStorage.Object,
             _mockLogger.Object);
 
-        var command = new ConfigCommand { Action = ConfigAction.Validate };
+        var command = new Config.Command { Action = ConfigAction.Validate };
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -941,7 +844,7 @@ public sealed class ConfigCommandHandlerTests
     public async Task HandleReset_ShouldReturnNotImplemented()
     {
         // Arrange
-        var command = new ConfigCommand { Action = ConfigAction.Reset };
+        var command = new Config.Command { Action = ConfigAction.Reset };
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
@@ -966,7 +869,7 @@ public sealed class ConfigCommandHandlerTests
         var mockMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
         mockMonitor.Setup(c => c.CurrentValue).Throws(new OperationCanceledException());
 
-        var handler = new ConfigCommandHandler(
+        var handler = new Config.Handler(
             _mockStorageService.Object,
             mockMonitor.Object,
             _mockSetupWizard.Object,
@@ -974,7 +877,7 @@ public sealed class ConfigCommandHandlerTests
             _mockAppSettingsStorage.Object,
             _mockLogger.Object);
 
-        var command = new ConfigCommand { Action = ConfigAction.Show };
+        var command = new Config.Command { Action = ConfigAction.Show };
 
         // Act
         var result = await handler.Handle(command, cts.Token);
@@ -997,7 +900,7 @@ public sealed class ConfigCommandHandlerTests
         var mockMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
         mockMonitor.Setup(c => c.CurrentValue).Throws(new InvalidOperationException("Test exception"));
 
-        var handler = new ConfigCommandHandler(
+        var handler = new Config.Handler(
             _mockStorageService.Object,
             mockMonitor.Object,
             _mockSetupWizard.Object,
@@ -1005,7 +908,7 @@ public sealed class ConfigCommandHandlerTests
             _mockAppSettingsStorage.Object,
             _mockLogger.Object);
 
-        var command = new ConfigCommand { Action = ConfigAction.Show };
+        var command = new Config.Command { Action = ConfigAction.Show };
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -1028,7 +931,7 @@ public sealed class ConfigCommandHandlerTests
         _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<ConfigurationSettings>.Success(config));
 
-        var command = new ConfigCommand { Action = ConfigAction.Show };
+        var command = new Config.Command { Action = ConfigAction.Show };
 
         // Act
         await _handler.Handle(command, CancellationToken.None);
@@ -1054,7 +957,7 @@ public sealed class ConfigCommandHandlerTests
         _mockStorageService.Setup(s => s.SaveAsync(It.IsAny<ConfigurationSettings>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<string>.Success("Configuration saved"));
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "retention-days",
@@ -1093,7 +996,7 @@ public sealed class ConfigCommandHandlerTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync((LlmProvider?)null);
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "llm",
@@ -1127,7 +1030,7 @@ public sealed class ConfigCommandHandlerTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync((LlmProvider?)null);
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "llm",

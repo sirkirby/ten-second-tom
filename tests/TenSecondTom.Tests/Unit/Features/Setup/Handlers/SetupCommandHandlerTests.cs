@@ -1,8 +1,8 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using TenSecondTom.Features.Setup.Commands;
-using TenSecondTom.Features.Setup.Handlers;
+using TenSecondTom.Features.Setup;
+using SetupFeature = TenSecondTom.Features.Setup;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Infrastructure.Configuration;
@@ -11,10 +11,10 @@ using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Results;
 using Xunit;
 
-namespace SetupCommandHandlers;
+namespace TenSecondTom.Tests.Unit.Features.Setup.Handlers;
 
 /// <summary>
-/// Unit tests for <see cref="SetupCommandHandler"/>
+/// Unit tests for <see cref="TenSecondTom.Features.Setup.Setup.Handler"/>
 /// Tests wizard flow orchestration, configuration persistence, validation, and error handling
 /// </summary>
 public sealed class SetupCommandHandlerTests
@@ -23,7 +23,7 @@ public sealed class SetupCommandHandlerTests
     private readonly Mock<ISetupWizardUI> _mockWizardUI;
     private readonly Mock<ISshKeyDetectorFactory> _mockSshKeyDetectorFactory;
     private readonly Mock<IStorageProviderFactory> _mockStorageProviderFactory;
-    private readonly Mock<ILogger<SetupCommandHandler>> _mockLogger;
+    private readonly Mock<ILogger<TenSecondTom.Features.Setup.Setup.Handler>> _mockLogger;
 
     public SetupCommandHandlerTests()
     {
@@ -31,72 +31,12 @@ public sealed class SetupCommandHandlerTests
         _mockWizardUI = new Mock<ISetupWizardUI>();
         _mockSshKeyDetectorFactory = new Mock<ISshKeyDetectorFactory>();
         _mockStorageProviderFactory = new Mock<IStorageProviderFactory>();
-        _mockLogger = new Mock<ILogger<SetupCommandHandler>>();
+        _mockLogger = new Mock<ILogger<TenSecondTom.Features.Setup.Setup.Handler>>();
     }
 
-    #region Constructor Tests
-
-    [Fact]
-    public void Constructor_WithNullStorageService_ThrowsArgumentNullException()
-    {
-        // Act & Assert
-        var act = () => new SetupCommandHandler(
-            null!,
-            _mockWizardUI.Object,
-            _mockSshKeyDetectorFactory.Object,
-            _mockStorageProviderFactory.Object,
-            _mockLogger.Object);
-
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("storageService");
-    }
-
-    [Fact]
-    public void Constructor_WithNullWizardUI_ThrowsArgumentNullException()
-    {
-        // Act & Assert
-        var act = () => new SetupCommandHandler(
-            _mockStorageService.Object,
-            null!,
-            _mockSshKeyDetectorFactory.Object,
-            _mockStorageProviderFactory.Object,
-            _mockLogger.Object);
-
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("wizardUI");
-    }
-
-    [Fact]
-    public void Constructor_WithNullSshKeyDetectorFactory_ThrowsArgumentNullException()
-    {
-        // Act & Assert
-        var act = () => new SetupCommandHandler(
-            _mockStorageService.Object,
-            _mockWizardUI.Object,
-            null!,
-            _mockStorageProviderFactory.Object,
-            _mockLogger.Object);
-
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("sshKeyDetectorFactory");
-    }
-
-    [Fact]
-    public void Constructor_WithNullLogger_ThrowsArgumentNullException()
-    {
-        // Act & Assert
-        var act = () => new SetupCommandHandler(
-            _mockStorageService.Object,
-            _mockWizardUI.Object,
-            _mockSshKeyDetectorFactory.Object,
-            _mockStorageProviderFactory.Object,
-            null!);
-
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("logger");
-    }
-
-    #endregion
+    // Note: Constructor null checks are not performed in handlers.
+    // The DI container ensures non-null dependencies are provided.
+    // This is consistent with other handlers in the codebase (Login.Handler, CreateDailyEntry.Handler, etc.).
 
     #region Happy Path Tests
 
@@ -105,7 +45,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand
+        var command = new TenSecondTom.Features.Setup.Setup.Command
         {
             Force = false,
             NonInteractive = false,
@@ -130,7 +70,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand
+        var command = new TenSecondTom.Features.Setup.Setup.Command
         {
             Force = false,
             NonInteractive = false,
@@ -154,7 +94,7 @@ public sealed class SetupCommandHandlerTests
         // Arrange
         var handler = CreateHandler();
         var existingConfig = CreateValidConfiguration();
-        var command = new SetupCommand
+        var command = new TenSecondTom.Features.Setup.Setup.Command
         {
             Force = true,
             NonInteractive = false,
@@ -177,7 +117,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = false, NonInteractive = false };
         var stepSequence = new List<int>();
 
         _mockWizardUI
@@ -199,7 +139,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = false, NonInteractive = false };
         ConfigurationSettings? savedConfig = null;
 
         SetupHappyPathMocksExceptStorage();
@@ -230,7 +170,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = false, NonInteractive = false };
 
         SetupSshDetectionMock();
         _mockWizardUI
@@ -251,7 +191,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = false, NonInteractive = false };
 
         SetupSshDetectionMock();
         SetupSshKeySelectionMock();
@@ -273,7 +213,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = false, NonInteractive = false };
 
         SetupSshDetectionMock();
         SetupSshKeySelectionMock();
@@ -296,7 +236,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = false, NonInteractive = false };
 
         SetupSshDetectionMock();
         SetupSshKeySelectionMock();
@@ -325,7 +265,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = false, NonInteractive = false };
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
@@ -348,7 +288,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = false, NonInteractive = false };
 
         _mockSshKeyDetectorFactory
             .Setup(x => x.DetectKeysAsync(It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
@@ -367,7 +307,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = false, NonInteractive = false };
 
         SetupHappyPathMocksExceptStorage();
         _mockStorageService
@@ -388,7 +328,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = false, NonInteractive = false };
 
         SetupHappyPathMocksExceptStorage();
         _mockStorageService
@@ -409,7 +349,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = false, NonInteractive = false };
 
         SetupHappyPathMocks();
 
@@ -427,7 +367,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = false, NonInteractive = false };
         var storagePath = "/Users/test/.microsoft/usersecrets/secrets.json";
 
         SetupHappyPathMocksExceptStorage();
@@ -484,7 +424,7 @@ public sealed class SetupCommandHandlerTests
             ConfigurationVersion = "1.0"
         };
 
-        var command = new SetupCommand
+        var command = new TenSecondTom.Features.Setup.Setup.Command
         {
             Force = true,
             NonInteractive = false,
@@ -515,7 +455,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand
+        var command = new TenSecondTom.Features.Setup.Setup.Command
         {
             Force = false,
             NonInteractive = false,
@@ -545,7 +485,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = false, NonInteractive = false };
 
         SetupHappyPathMocksExceptMemoryDirectory();
         _mockWizardUI
@@ -572,7 +512,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = false, NonInteractive = false };
 
         ConfigurationSettings? savedConfig = null;
 
@@ -596,7 +536,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = false, NonInteractive = false };
 
         ConfigurationSettings? savedConfig = null;
 
@@ -620,7 +560,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = false, NonInteractive = false };
 
         ConfigurationSettings? savedConfig = null;
 
@@ -697,7 +637,7 @@ public sealed class SetupCommandHandlerTests
             ConfigurationVersion = "1.0"
         };
 
-        var command = new SetupCommand
+        var command = new TenSecondTom.Features.Setup.Setup.Command
         {
             Force = true,
             NonInteractive = false,
@@ -739,7 +679,7 @@ public sealed class SetupCommandHandlerTests
     // {
     //     // Arrange
     //     var handler = CreateHandler();
-    //     var command = new SetupCommand { Force = false, NonInteractive = false };
+    //     var command = new Setup.Command { Force = false, NonInteractive = false };
     //     var envMemoryDir = "/custom/env/memory";
     //     // Note: Environment configuration setup removed - handler doesn't use IConfiguration directly
     //
@@ -786,7 +726,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand
+        var command = new TenSecondTom.Features.Setup.Setup.Command
         {
             Force = true,
             NonInteractive = false
@@ -813,7 +753,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = false, NonInteractive = false };
 
         SetupHappyPathMocks();
 
@@ -836,7 +776,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = false, NonInteractive = false };
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
@@ -863,7 +803,7 @@ public sealed class SetupCommandHandlerTests
     {
         // Arrange
         var handler = CreateHandler();
-        var command = new SetupCommand { Force = false, NonInteractive = false };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = false, NonInteractive = false };
 
         _mockSshKeyDetectorFactory
             .Setup(x => x.DetectKeysAsync(It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
@@ -887,9 +827,9 @@ public sealed class SetupCommandHandlerTests
 
     #region Helper Methods
 
-    private SetupCommandHandler CreateHandler()
+    private TenSecondTom.Features.Setup.Setup.Handler CreateHandler()
     {
-        return new SetupCommandHandler(
+        return new TenSecondTom.Features.Setup.Setup.Handler(
             _mockStorageService.Object,
             _mockWizardUI.Object,
             _mockSshKeyDetectorFactory.Object,

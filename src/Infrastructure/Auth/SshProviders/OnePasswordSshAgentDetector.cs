@@ -43,8 +43,8 @@ public sealed class OnePasswordSshAgentDetector : ISshKeyDetector
                 try
                 {
                     // Use SSH_AUTH_SOCK temporarily pointing to 1Password
-                    var originalAuthSock = Environment.GetEnvironmentVariable("SSH_AUTH_SOCK");
-                    Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", socketPath);
+                    var originalAuthSock = Environment.GetEnvironmentVariable(SshConstants.AgentPaths.SystemAgentEnvVar);
+                    Environment.SetEnvironmentVariable(SshConstants.AgentPaths.SystemAgentEnvVar, socketPath);
 
                     try
                     {
@@ -110,7 +110,7 @@ public sealed class OnePasswordSshAgentDetector : ISshKeyDetector
                     finally
                     {
                         // Restore original SSH_AUTH_SOCK
-                        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", originalAuthSock);
+                        Environment.SetEnvironmentVariable(SshConstants.AgentPaths.SystemAgentEnvVar, originalAuthSock);
                     }
                 }
                 catch (Exception ex)
@@ -139,8 +139,10 @@ public sealed class OnePasswordSshAgentDetector : ISshKeyDetector
         var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var socketPath = Path.Combine(
             homeDir,
-            "Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
-        );
+            SshConstants.AgentPaths.OnePassword.MacGroupContainers,
+            SshConstants.AgentPaths.OnePassword.MacContainerId,
+            SshConstants.AgentPaths.OnePassword.MacSubdirectory,
+            SshConstants.AgentPaths.OnePassword.MacSocketFile);
 
         return socketPath;
     }

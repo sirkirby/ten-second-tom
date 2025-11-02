@@ -1,15 +1,10 @@
 using System.IO.Abstractions;
-using TenSecondTom.Features.Setup.Handlers;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using TenSecondTom.Features.Setup.Commands;
-using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Infrastructure.Bootstrapping;
 using TenSecondTom.Infrastructure.Configuration;
-using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Setup.Services;
@@ -245,11 +240,11 @@ public sealed class ApplicationBootstrapper
     /// </summary>
     private async Task<Result<Features.Setup.Models.ConfigurationSettings>> RunSetupAsync(bool force, CancellationToken cancellationToken)
     {
-        // Use factory to create SetupCommand with existing config loaded (centralized logic)
+        // Use factory to create Setup.Command with existing config loaded (centralized logic)
         var setupCommand = await _setupCommandFactory.CreateAsync(force, nonInteractive: false, cancellationToken)
             .ConfigureAwait(false);
         
-        var setupHandler = _serviceProvider.GetRequiredService<SetupCommandHandler>();
+        var setupHandler = _serviceProvider.GetRequiredService<Setup.Handler>();
         return await setupHandler.Handle(setupCommand, cancellationToken).ConfigureAwait(false);
     }
 

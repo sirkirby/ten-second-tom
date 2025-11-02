@@ -3,14 +3,13 @@ using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using TenSecondTom.Features.Setup.Commands;
-using TenSecondTom.Features.Setup.Handlers;
+using TenSecondTom.Features.Setup;
+using SetupFeature = TenSecondTom.Features.Setup;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.IntegrationTests.TestHelpers;
 using TenSecondTom.Shared.Results;
-using TenSecondTom.Features.Setup;
 
 namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
 
@@ -34,9 +33,9 @@ public sealed class FirstTimeSetupTests : IDisposable
     public async Task FirstTimeSetup_WithValidInputs_CompletesSuccessfully()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<SetupCommandHandler>();
-        
-        var command = new SetupCommand
+        var handler = _serviceProvider.GetRequiredService<SetupFeature.Setup.Handler>();
+
+        var command = new SetupFeature.Setup.Command
         {
             Force = false,
             NonInteractive = false,
@@ -60,9 +59,9 @@ public sealed class FirstTimeSetupTests : IDisposable
     {
         // Arrange
         var storageService = _serviceProvider.GetRequiredService<IConfigurationStorageService>();
-        var handler = _serviceProvider.GetRequiredService<SetupCommandHandler>();
-        
-        var command = new SetupCommand
+        var handler = _serviceProvider.GetRequiredService<SetupFeature.Setup.Handler>();
+
+        var command = new SetupFeature.Setup.Command
         {
             Force = false,
             NonInteractive = false,
@@ -85,10 +84,10 @@ public sealed class FirstTimeSetupTests : IDisposable
     public async Task FirstTimeSetup_WithCancellation_ReturnsCancelledError()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<SetupCommandHandler>();
+        var handler = _serviceProvider.GetRequiredService<SetupFeature.Setup.Handler>();
         using var cts = new CancellationTokenSource();
         
-        var command = new SetupCommand
+        var command = new SetupFeature.Setup.Command
         {
             Force = false,
             NonInteractive = false,
@@ -111,9 +110,9 @@ public sealed class FirstTimeSetupTests : IDisposable
     public async Task FirstTimeSetup_ValidatesConfiguration()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<SetupCommandHandler>();
-        
-        var command = new SetupCommand
+        var handler = _serviceProvider.GetRequiredService<SetupFeature.Setup.Handler>();
+
+        var command = new SetupFeature.Setup.Command
         {
             Force = false,
             NonInteractive = false,
@@ -132,10 +131,10 @@ public sealed class FirstTimeSetupTests : IDisposable
     public async Task FirstTimeSetup_CreatesMemoryDirectoryIfMissing()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<SetupCommandHandler>();
+        var handler = _serviceProvider.GetRequiredService<SetupFeature.Setup.Handler>();
         var memoryPath = Path.Combine(_testDirectory.BasePath, "memories");
         
-        var command = new SetupCommand
+        var command = new SetupFeature.Setup.Command
         {
             Force = false,
             NonInteractive = false,
@@ -161,9 +160,9 @@ public sealed class FirstTimeSetupTests : IDisposable
     public async Task FirstTimeSetup_SetsDefaultRetentionDays()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<SetupCommandHandler>();
-        
-        var command = new SetupCommand
+        var handler = _serviceProvider.GetRequiredService<SetupFeature.Setup.Handler>();
+
+        var command = new SetupFeature.Setup.Command
         {
             Force = false,
             NonInteractive = false,
@@ -182,9 +181,9 @@ public sealed class FirstTimeSetupTests : IDisposable
     public async Task FirstTimeSetup_MarksConfigurationAsCreated()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<SetupCommandHandler>();
-        
-        var command = new SetupCommand
+        var handler = _serviceProvider.GetRequiredService<SetupFeature.Setup.Handler>();
+
+        var command = new SetupFeature.Setup.Command
         {
             Force = false,
             NonInteractive = false,
@@ -316,7 +315,7 @@ public sealed class FirstTimeSetupTests : IDisposable
             });
         services.AddSingleton(mockSshDetector.Object);
 
-        // Storage provider factory (required by SetupCommandHandler)
+        // Storage provider factory (required by SetupFeature.Setup.Handler)
         var mockStorageProviderFactory = new Mock<TenSecondTom.Infrastructure.Storage.IStorageProviderFactory>();
         mockStorageProviderFactory.Setup(f => f.GetAvailableProviders())
             .Returns(new List<TenSecondTom.Infrastructure.Storage.StorageProviderMetadata>
@@ -328,7 +327,7 @@ public sealed class FirstTimeSetupTests : IDisposable
             });
         services.AddSingleton(mockStorageProviderFactory.Object);
 
-        // Template infrastructure services (required by SetupCommandHandler)
+        // Template infrastructure services (required by SetupFeature.Setup.Handler)
         services.AddSingleton<System.IO.Abstractions.IFileSystem, System.IO.Abstractions.FileSystem>();
         services.AddSingleton<TenSecondTom.Infrastructure.Prompts.YamlFrontMatterParser>();
         services.AddSingleton<TenSecondTom.Infrastructure.Prompts.IPromptTemplateLoader>(serviceProvider =>
@@ -339,7 +338,7 @@ public sealed class FirstTimeSetupTests : IDisposable
                 yamlParser: yamlParser);
         });
 
-        // Template handler registration (required by SetupCommandHandler)
+        // Template handler registration (required by SetupFeature.Setup.Handler)
         services.AddTransient<
             IRequestHandler<
                 TenSecondTom.Features.Templates.InstallDefaultTemplates.Command,
@@ -347,7 +346,7 @@ public sealed class FirstTimeSetupTests : IDisposable
             TenSecondTom.Features.Templates.InstallDefaultTemplates.Handler>();
 
         // Add handler
-        services.AddSingleton<SetupCommandHandler>();
+        services.AddSingleton<SetupFeature.Setup.Handler>();
 
         return services.BuildServiceProvider();
     }

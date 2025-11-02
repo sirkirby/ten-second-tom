@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using TenSecondTom.Features.Setup.Handlers;
 using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Infrastructure.Auth.SshProviders;
 using TenSecondTom.Infrastructure.Configuration;
@@ -18,9 +17,9 @@ public static class SetupFeatureExtensions
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddSetupFeature(this IServiceCollection services)
     {
-        // Command handlers
-        services.AddTransient<SetupCommandHandler>();
-        services.AddTransient<ConfigCommandHandler>();
+        // Command handlers (nested classes - auto-discovered by MediatR, but register for direct DI access)
+        services.AddTransient<Setup.Handler>();
+        services.AddTransient<Config.Handler>();
         
         // Setup command factory (centralizes logic for creating SetupCommand with existing config)
         services.AddTransient<SetupCommandFactory>();

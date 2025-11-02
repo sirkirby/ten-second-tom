@@ -43,8 +43,8 @@ public sealed class SecretiveSshAgentDetector : ISshKeyDetector
                 try
                 {
                     // Use SSH_AUTH_SOCK temporarily pointing to Secretive
-                    var originalAuthSock = Environment.GetEnvironmentVariable("SSH_AUTH_SOCK");
-                    Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", socketPath);
+                    var originalAuthSock = Environment.GetEnvironmentVariable(SshConstants.AgentPaths.SystemAgentEnvVar);
+                    Environment.SetEnvironmentVariable(SshConstants.AgentPaths.SystemAgentEnvVar, socketPath);
 
                     try
                     {
@@ -110,7 +110,7 @@ public sealed class SecretiveSshAgentDetector : ISshKeyDetector
                     finally
                     {
                         // Restore original SSH_AUTH_SOCK
-                        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", originalAuthSock);
+                        Environment.SetEnvironmentVariable(SshConstants.AgentPaths.SystemAgentEnvVar, originalAuthSock);
                     }
                 }
                 catch (Exception ex)
@@ -139,8 +139,10 @@ public sealed class SecretiveSshAgentDetector : ISshKeyDetector
         var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var socketPath = Path.Combine(
             homeDir,
-            "Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh"
-        );
+            SshConstants.AgentPaths.Secretive.MacContainers,
+            SshConstants.AgentPaths.Secretive.MacContainerId,
+            SshConstants.AgentPaths.Secretive.MacDataDirectory,
+            SshConstants.AgentPaths.Secretive.MacSocketFile);
 
         return socketPath;
     }
