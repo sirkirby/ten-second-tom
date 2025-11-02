@@ -246,9 +246,9 @@ Select an LLM provider:
     Anthropic
 
 Select a model (OpenAI):
-  ▸ GPT‑4o (gpt-4o) [Premium] - Flagship reasoning & synthesis model
-    GPT‑4o Mini (gpt-4o-mini) [Standard] - Balanced cost & quality
-    GPT‑3.5 Turbo (gpt-3.5-turbo) [Economy] - Legacy fast inexpensive model
+  ▸ GPT-5 Standard (gpt-5) [Premium] - Flagship model for coding, reasoning, and agentic tasks
+    GPT-5 Mini (gpt-5-mini) [Balanced] - Faster, cost-efficient version for well-defined tasks
+    GPT-5 Nano (gpt-5-nano) [Budget] - Fastest, cheapest model for summarization and classification
 ```
 
 Current selection is highlighted when reconfiguring so you can easily compare or switch.
@@ -259,24 +259,21 @@ You can override the configured model (and/or provider) at runtime without modif
 
 ```bash
 export TenSecondTom__LlmProvider="Anthropic"
-export TenSecondTom__Llm__Model="claude-3-5-sonnet"
+export TenSecondTom__Llm__Model="claude-sonnet-4-5"
 ```
 
 Environment variable values take precedence over user secrets and `appsettings.json`.
 
 #### Supported Providers & Models
 
-| Provider   | Model ID                        | Display Name             | Cost Tier | Default | Description |
-|------------|----------------------------------|--------------------------|-----------|---------|-------------|
-| OpenAI     | `gpt-4o-mini`                   | GPT-4o Mini              | Budget    | ✅       | Fast, cost-effective model |
-| OpenAI     | `gpt-4o`                        | GPT-4o                   | Balanced  |         | High capability, reasonable cost |
-| OpenAI     | `chatgpt-4o-latest`             | ChatGPT-4o Latest        | Balanced  |         | Latest ChatGPT-4 Omni, continuously updated |
-| Anthropic  | `claude-3-haiku-20240307`       | Claude 3 Haiku           | Budget    | ✅       | Fast and cost-effective, version 3.0 |
-| Anthropic  | `claude-3-5-haiku-20241022`     | Claude 3.5 Haiku         | Budget    |         | Improved performance, version 3.5 |
-| Anthropic  | `claude-sonnet-4-20250514`      | Claude Sonnet 4          | Balanced  |         | Balanced capability, Claude 4.0 |
-| Anthropic  | `claude-sonnet-4-5-20250929`    | Claude Sonnet 4.5        | Balanced  |         | Enhanced version, Claude 4.5 |
-| Anthropic  | `claude-opus-4-20250514`        | Claude Opus 4            | Premium   |         | Highest capability, Claude 4.0 |
-| Anthropic  | `claude-opus-4-1-20250805`      | Claude Opus 4.1          | Premium   |         | Top-tier model, Claude 4.1 |
+| Provider   | Model ID              | Display Name          | Cost Tier | Default | Description |
+|------------|-----------------------|-----------------------|-----------|---------|-------------|
+| OpenAI     | `gpt-5-nano`         | GPT-5 Nano           | Budget    |         | Fastest, cheapest model for summarization and classification |
+| OpenAI     | `gpt-5-mini`         | GPT-5 Mini           | Balanced  | ✅       | Faster, cost-efficient version for well-defined tasks |
+| OpenAI     | `gpt-5`              | GPT-5 Standard       | Premium   |         | Flagship model for coding, reasoning, and agentic tasks |
+| Anthropic  | `claude-haiku-4-5`   | Claude Haiku 4.5     | Budget    | ✅       | Fast and compact model for near-instant responsiveness |
+| Anthropic  | `claude-sonnet-4-5`  | Claude Sonnet 4.5    | Balanced  |         | Best model for complex agents and coding with highest intelligence |
+| Anthropic  | `claude-opus-4-1`    | Claude Opus 4.1      | Premium   |         | Exceptional model for specialized complex tasks requiring advanced reasoning |
 
 **Notes:**
 
@@ -297,7 +294,7 @@ Example LLM section in output:
 ```
 LLM Configuration
   Provider : OpenAI
-  Model    : gpt-4o (Premium)
+  Model    : gpt-5-mini (Balanced)
 ```
 
 #### Changing Just the Model Quickly
@@ -770,7 +767,7 @@ command: today
 timestamp: 2025-10-03T14:30:00Z
 entry-number: 1
 llm-provider: OpenAI
-llm-model: gpt-4
+llm-model: gpt-5-mini
 ---
 
 # User Input
@@ -1091,14 +1088,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **Documentation**: 
-  - [Configuration Guide](docs/CONFIGURATION.md)
-  - [Audio Configuration](docs/AUDIO.md)
-  - [Authentication Setup](docs/AUTHENTICATION.md)
-  - [Security Policy](SECURITY.md)
-  - [CI/CD Documentation](docs/CICD.md)
-  - [Environment Setup](docs/ENVIRONMENT.md)
-  - [Code Coverage](docs/COVERAGE.md)
+- **Documentation**:
+  - [Configuration Guide](docs/CONFIGURATION.md) - Primary configuration via setup wizard
+  - [Environment Setup](docs/ENVIRONMENT.md) - Environment variables and advanced configuration
+  - [Obsidian Storage Integration](docs/OBSIDIAN-STORAGE.md) - Detailed Obsidian vault setup guide
+  - [Audio Configuration](docs/AUDIO.md) - Voice recording and transcription settings
+  - [Authentication Setup](docs/AUTHENTICATION.md) - SSH key configuration and management
+  - [Security Policy](SECURITY.md) - Security best practices and secrets management
+  - [CI/CD Documentation](docs/CICD.md) - Continuous integration and deployment setup
+  - [Code Coverage](docs/COVERAGE.md) - Test coverage reports and metrics
 - **Issues**: [GitHub Issues](https://github.com/sirkirby/ten-second-tom/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/sirkirby/ten-second-tom/discussions)
 
