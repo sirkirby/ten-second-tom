@@ -5,6 +5,8 @@ using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Features.Audio.Services;
 using TenSecondTom.Infrastructure.Configuration;
 using MediatR;
+using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Extensions;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
@@ -68,18 +70,15 @@ public static class Record
                 return Result<StoredRecording>.Failure("Invalid RecordCommand: MaxDurationSeconds must be positive");
             }
 
-            // Create recording/ directory if it doesn't exist
-            var memoryDir = _storageOptions.MemoryDirectory;
+            // Get the effective storage directory using extension method
+            var storageBaseDir = _storageOptions.GetEffectiveStorageDirectory();
 
-            if (string.IsNullOrWhiteSpace(memoryDir))
+            if (string.IsNullOrWhiteSpace(storageBaseDir))
             {
-                return Result<StoredRecording>.Failure("Memory directory is not configured");
+                return Result<StoredRecording>.Failure("Storage directory is not configured");
             }
 
-            // Expand home directory if needed
-            memoryDir = memoryDir.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
-
-            var recordingDir = Path.Combine(memoryDir, "recording");
+            var recordingDir = Path.Combine(storageBaseDir, DirectoryNames.Recording);
             if (!Directory.Exists(recordingDir))
             {
                 try

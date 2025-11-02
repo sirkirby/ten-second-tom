@@ -1,11 +1,12 @@
 using Spectre.Console;
-using TenSecondTom.Features.Search;
+using TenSecondTom.Features.Search.Models;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Extensions;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.OutputFormatters;
-using TenSecondTom.Shared.Constants;
 
-namespace TenSecondTom.Infrastructure.Cli;
+namespace TenSecondTom.Features.Search;
 
 /// <summary>
 /// CLI handler for the /search command.
@@ -60,8 +61,8 @@ public static class SearchCommandHandler
             {
                 if (jsonOutput)
                 {
-                    Console.WriteLine(JsonOutputFormatter.FormatFailure(CommandNames.Search, 
-                        result.Error ?? "Unknown error", 
+                    Console.WriteLine(JsonOutputFormatter.FormatFailure(CommandNames.Search,
+                        result.Error ?? "Unknown error",
                         DateTimeOffset.UtcNow));
                 }
                 else
@@ -111,7 +112,7 @@ public static class SearchCommandHandler
                         : fromDate.HasValue
                             ? $"from {fromDate.Value:yyyy-MM-dd}"
                             : $"up to {toDate!.Value:yyyy-MM-dd}";
-                    
+
                     AnsiConsole.MarkupLine($"[grey]Date range: {dateRangeText.EscapeMarkup()}[/]");
                 }
 
@@ -126,13 +127,12 @@ public static class SearchCommandHandler
 
                 AnsiConsole.MarkupLine($"[green]Found {result.Value.Count} result(s)[/]\n");
 
-                // Get memory directory for absolute path display
-                string memoryDirectory = storageOptions.MemoryDirectory
-                    .Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+                // Get the effective storage directory for absolute path display
+                var storageBaseDir = storageOptions.GetEffectiveStorageDirectory();
 
                 // Sort by date (newest first) and display each result
                 var sortedResults = result.Value.OrderByDescending(e => e.Timestamp).ToList();
-                
+
                 for (int i = 0; i < sortedResults.Count; i++)
                 {
                     var entry = sortedResults[i];
@@ -143,7 +143,7 @@ public static class SearchCommandHandler
                         CommandNames.Generate => "Generated Output",
                         _ => entry.Command
                     };
-                    
+
                     var dateText = entry.Command switch
                     {
                         CommandNames.Today => entry.Timestamp.ToString("MMM d, yyyy", System.Globalization.CultureInfo.CurrentCulture),
@@ -153,22 +153,22 @@ public static class SearchCommandHandler
                     };
 
                     // Create excerpt from user input or LLM response (first 80 characters)
-                    var contentToExcerpt = !string.IsNullOrWhiteSpace(entry.UserInput) 
-                        ? entry.UserInput 
+                    var contentToExcerpt = !string.IsNullOrWhiteSpace(entry.UserInput)
+                        ? entry.UserInput
                         : entry.LlmResponse ?? string.Empty;
-                    
-                    var excerpt = contentToExcerpt.Length > 80 
+
+                    var excerpt = contentToExcerpt.Length > 80
                         ? Markup.Escape(contentToExcerpt.Substring(0, 77)) + "..."
                         : Markup.Escape(contentToExcerpt);
 
                     // Build full absolute path for display
-                    string fullPath = Path.Combine(memoryDirectory, entry.FilePath);
+                    string fullPath = Path.Combine(storageBaseDir, entry.FilePath);
 
                     var panel = new Panel($"""
                         [bold]{entryType}[/] | [grey]{dateText}[/] | Entry #{entry.EntryNumber}
-                        
+
                         {excerpt}
-                        
+
                         [grey]→ {Markup.Escape(fullPath)}[/]
                         """)
                         .Border(BoxBorder.Rounded)

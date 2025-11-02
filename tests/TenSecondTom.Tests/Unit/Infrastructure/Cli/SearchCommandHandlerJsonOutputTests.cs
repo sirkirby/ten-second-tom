@@ -37,7 +37,7 @@ public sealed class SearchCommandHandlerJsonOutputTests : IDisposable
         var mockAuthService = new Mock<IAuthenticationService>();
         var mockLogger = new Mock<ILogger<SearchMemories.Handler>>();
 
-        var storageOptions = new StorageOptions { MemoryDirectory = "/Users/test/.memory" };
+        var storageOptions = new StorageOptions { RootDirectory = "/Users/test/.memory" };
 
         var handler = new SearchMemories.Handler(
             mockStorageProvider.Object,
@@ -83,7 +83,7 @@ public sealed class SearchCommandHandlerJsonOutputTests : IDisposable
         var mockAuthService = new Mock<IAuthenticationService>();
         var mockLogger = new Mock<ILogger<SearchMemories.Handler>>();
 
-        var storageOptions = new StorageOptions { MemoryDirectory = "/Users/test/.memory" };
+        var storageOptions = new StorageOptions { RootDirectory = "/Users/test/.memory" };
 
         var handler = new SearchMemories.Handler(
             mockStorageProvider.Object,

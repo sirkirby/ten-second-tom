@@ -1,6 +1,6 @@
 using FluentAssertions;
+using TenSecondTom.Features.Setup;
 using TenSecondTom.Features.Setup.Models;
-using TenSecondTom.Features.Setup.Commands;
 
 namespace TenSecondTom.Tests.Unit.Features.Setup.Commands;
 
@@ -16,7 +16,7 @@ public sealed class SetupCommandTests
     public void SetupCommand_ShouldHaveForceProperty()
     {
         // Arrange & Act
-        var command = new SetupCommand { Force = true };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { Force = true };
 
         // Assert
         command.Force.Should().BeTrue();
@@ -26,7 +26,7 @@ public sealed class SetupCommandTests
     public void SetupCommand_ShouldHaveNonInteractiveProperty()
     {
         // Arrange & Act
-        var command = new SetupCommand { NonInteractive = true };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { NonInteractive = true };
 
         // Assert
         command.NonInteractive.Should().BeTrue();
@@ -39,7 +39,7 @@ public sealed class SetupCommandTests
         var existingConfig = CreateValidConfiguration();
 
         // Act
-        var command = new SetupCommand { ExistingConfiguration = existingConfig };
+        var command = new TenSecondTom.Features.Setup.Setup.Command { ExistingConfiguration = existingConfig };
 
         // Assert
         command.ExistingConfiguration.Should().NotBeNull();
@@ -50,7 +50,7 @@ public sealed class SetupCommandTests
     public void SetupCommand_DefaultValues_ShouldBeFalseAndNull()
     {
         // Arrange & Act
-        var command = new SetupCommand();
+        var command = new TenSecondTom.Features.Setup.Setup.Command();
 
         // Assert
         command.Force.Should().BeFalse("Force should default to false");
@@ -66,7 +66,7 @@ public sealed class SetupCommandTests
     public void FirstTimeSetup_ShouldHaveNoExistingConfiguration()
     {
         // Arrange & Act
-        var command = new SetupCommand
+        var command = new TenSecondTom.Features.Setup.Setup.Command
         {
             Force = false,
             NonInteractive = false,
@@ -85,7 +85,7 @@ public sealed class SetupCommandTests
         var existingConfig = CreateValidConfiguration();
 
         // Act
-        var command = new SetupCommand
+        var command = new TenSecondTom.Features.Setup.Setup.Command
         {
             Force = false,
             NonInteractive = false,
@@ -101,7 +101,7 @@ public sealed class SetupCommandTests
     public void ForcedSetup_ShouldHaveForceFlagSet()
     {
         // Arrange & Act
-        var command = new SetupCommand
+        var command = new TenSecondTom.Features.Setup.Setup.Command
         {
             Force = true,
             NonInteractive = false
@@ -115,7 +115,7 @@ public sealed class SetupCommandTests
     public void NonInteractiveSetup_ShouldHaveNonInteractiveFlagSet()
     {
         // Arrange & Act
-        var command = new SetupCommand
+        var command = new TenSecondTom.Features.Setup.Setup.Command
         {
             Force = false,
             NonInteractive = true
@@ -129,7 +129,7 @@ public sealed class SetupCommandTests
     public void ForcedNonInteractiveSetup_ShouldHaveBothFlagsSet()
     {
         // Arrange & Act
-        var command = new SetupCommand
+        var command = new TenSecondTom.Features.Setup.Setup.Command
         {
             Force = true,
             NonInteractive = true
@@ -144,7 +144,7 @@ public sealed class SetupCommandTests
     public void SetupCancellation_CommandStructure_ShouldSupportCancellation()
     {
         // Arrange & Act
-        var command = new SetupCommand();
+        var command = new TenSecondTom.Features.Setup.Setup.Command();
 
         // Assert
         // Cancellation is handled by the handler via CancellationToken
@@ -156,7 +156,7 @@ public sealed class SetupCommandTests
     public void SetupWithTimeout_CommandStructure_ShouldSupportTimeoutScenarios()
     {
         // Arrange & Act
-        var command = new SetupCommand();
+        var command = new TenSecondTom.Features.Setup.Setup.Command();
 
         // Assert
         // Timeout is enforced by handler/configuration, not command structure
@@ -172,7 +172,7 @@ public sealed class SetupCommandTests
     public void NonInteractiveWithoutExistingConfig_ShouldBeValidScenario()
     {
         // Arrange & Act
-        var command = new SetupCommand
+        var command = new TenSecondTom.Features.Setup.Setup.Command
         {
             NonInteractive = true,
             ExistingConfiguration = null
@@ -188,7 +188,7 @@ public sealed class SetupCommandTests
     public void ForceAndNonInteractive_CanBothBeTrue()
     {
         // Arrange & Act
-        var command = new SetupCommand
+        var command = new TenSecondTom.Features.Setup.Setup.Command
         {
             Force = true,
             NonInteractive = true
@@ -209,13 +209,13 @@ public sealed class SetupCommandTests
     {
         // Arrange
         var config = CreateValidConfiguration();
-        var command1 = new SetupCommand
+        var command1 = new TenSecondTom.Features.Setup.Setup.Command
         {
             Force = true,
             NonInteractive = true,
             ExistingConfiguration = config
         };
-        var command2 = new SetupCommand
+        var command2 = new TenSecondTom.Features.Setup.Setup.Command
         {
             Force = true,
             NonInteractive = true,
@@ -231,8 +231,8 @@ public sealed class SetupCommandTests
     public void SetupCommand_WithDifferentProperties_ShouldNotBeEqual()
     {
         // Arrange
-        var command1 = new SetupCommand { Force = true };
-        var command2 = new SetupCommand { Force = false };
+        var command1 = new TenSecondTom.Features.Setup.Setup.Command { Force = true };
+        var command2 = new TenSecondTom.Features.Setup.Setup.Command { Force = false };
 
         // Act & Assert
         command1.Should().NotBe(command2, "records with different properties should not be equal");
@@ -243,7 +243,7 @@ public sealed class SetupCommandTests
     public void SetupCommand_ShouldSupportWith_Expression()
     {
         // Arrange
-        var original = new SetupCommand { Force = false };
+        var original = new TenSecondTom.Features.Setup.Setup.Command { Force = false };
 
         // Act
         var modified = original with { Force = true };

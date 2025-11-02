@@ -40,4 +40,23 @@ public interface IPromptTemplateLoader
     /// </remarks>
     Task<Result<List<PromptTemplate>>> LoadAllTemplatesAsync(
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Loads raw template content with YAML front matter intact.
+    /// This method returns the unparsed file content, suitable for installation or copying.
+    /// </summary>
+    /// <param name="templateId">The unique identifier of the template to load.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>
+    /// A <see cref="Result{T}"/> containing the raw template content (with YAML front matter) on success,
+    /// or a failure result with an error message if the template cannot be loaded.
+    /// </returns>
+    /// <remarks>
+    /// This method is intended for scenarios where the full template file content is needed,
+    /// such as installing templates to the filesystem. Unlike <see cref="LoadTemplateAsync"/>,
+    /// this method does not parse or strip YAML front matter - it returns the raw file content exactly as stored.
+    /// </remarks>
+    Task<Result<string>> LoadRawTemplateContentAsync(
+        string templateId,
+        CancellationToken cancellationToken = default);
 }

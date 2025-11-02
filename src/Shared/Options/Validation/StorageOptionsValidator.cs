@@ -25,29 +25,75 @@ public sealed class StorageOptionsValidator : IValidateOptions<StorageOptions>
     /// </returns>
     public ValidateOptionsResult Validate(string? name, StorageOptions options)
     {
-        if (string.IsNullOrWhiteSpace(options.MemoryDirectory))
+        // Validate RootDirectory (with backward compatibility for MemoryDirectory)
+        string? rootDirectory = options.RootDirectory;
+
+        // Backward compatibility: fall back to MemoryDirectory if RootDirectory not set
+#pragma warning disable CS0618 // Type or member is obsolete
+        if (string.IsNullOrWhiteSpace(rootDirectory) && !string.IsNullOrWhiteSpace(options.MemoryDirectory))
+        {
+            rootDirectory = options.MemoryDirectory;
+        }
+#pragma warning restore CS0618
+
+        if (string.IsNullOrWhiteSpace(rootDirectory))
         {
             return ValidateOptionsResult.Fail(
-                "MemoryDirectory is required. Set the 'TenSecondTom:MemoryDirectory' configuration value or the 'TenSecondTom__MemoryDirectory' environment variable.");
+                "RootDirectory is required. Set the 'TenSecondTom:RootDirectory' configuration value or the 'TenSecondTom__RootDirectory' environment variable. " +
+                "(Legacy: 'TenSecondTom:MemoryDirectory' is also supported for backward compatibility)");
         }
 
         // Validate path format
         try
         {
             // This will throw if the path contains invalid characters
-            _ = Path.GetFullPath(options.MemoryDirectory);
+            _ = Path.GetFullPath(rootDirectory);
         }
         catch (ArgumentException ex)
         {
             return ValidateOptionsResult.Fail(
-                $"MemoryDirectory contains an invalid path format: '{options.MemoryDirectory}'. Error: {ex.Message}");
+                $"RootDirectory contains an invalid path format: '{rootDirectory}'. Error: {ex.Message}");
         }
         catch (NotSupportedException ex)
         {
             return ValidateOptionsResult.Fail(
-                $"MemoryDirectory path format is not supported: '{options.MemoryDirectory}'. Error: {ex.Message}");
+                $"RootDirectory path format is not supported: '{rootDirectory}'. Error: {ex.Message}");
         }
 
+        // Validate ProviderId
+        if (string.IsNullOrWhiteSpace(options.ProviderId))
+        {
+            return ValidateOptionsResult.Fail(
+                "ProviderId cannot be empty. Set the 'TenSecondTom:Storage:ProviderId' configuration value.");
+        }
+
+        // Validate MemorySubdirectory if specified
+        if (!string.IsNullOrWhiteSpace(options.MemorySubdirectory))
+        {
+            try
+            {
+                // Validate that it's a valid directory name (not a full path)
+                if (Path.IsPathRooted(options.MemorySubdirectory))
+                {
+                    return ValidateOptionsResult.Fail(
+                        $"MemorySubdirectory must be a relative directory name, not an absolute path: '{options.MemorySubdirectory}'");
+                }
+
+                // Check for invalid path characters
+                if (options.MemorySubdirectory.IndexOfAny(Path.GetInvalidPathChars()) >= 0)
+                {
+                    return ValidateOptionsResult.Fail(
+                        $"MemorySubdirectory contains invalid characters: '{options.MemorySubdirectory}'");
+                }
+            }
+            catch (ArgumentException ex)
+            {
+                return ValidateOptionsResult.Fail(
+                    $"MemorySubdirectory is invalid: '{options.MemorySubdirectory}'. Error: {ex.Message}");
+            }
+        }
+
+        // Validate RetentionPolicy
         if (!Enum.IsDefined(options.RetentionPolicy))
         {
             return ValidateOptionsResult.Fail(

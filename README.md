@@ -376,7 +376,57 @@ Configuration precedence (highest to lowest):
 
 ⚠️ **Never commit API keys to version control!** Use the setup wizard or environment variables for secrets. See [SECURITY.md](SECURITY.md) for more details.
 
-### Memory Directory
+### Storage Providers
+
+Ten Second Tom supports **multiple storage providers** to fit your workflow. Choose where to store your memories during the setup wizard.
+
+#### Available Providers
+
+**Default File System** (Recommended for new users)
+- TST-native hierarchical structure optimized for organization
+- Stores entries in: `today/`, `thisweek/`, `templates/`, `config/`
+- Perfect for standalone use
+
+**Obsidian Vault Integration**
+- Store entries directly in your Obsidian vault
+- Bidirectional sync: changes in either app appear in both
+- Obsidian-friendly naming: `"2025-10-28 Entry 1.md"`
+- Optional subdirectory isolation (e.g., `ten-second-tom/` within vault)
+- Perfect for users who already manage notes in Obsidian
+
+📚 **[Read the Obsidian Integration Guide](docs/OBSIDIAN-STORAGE.md)** for detailed setup instructions and migration steps.
+
+#### Selecting a Storage Provider
+
+During initial setup (`tom setup`), you'll be prompted to choose your storage provider:
+
+```bash
+$ tom setup
+
+Step 4 of 10: Storage Provider Selection
+
+ℹ️  Storage Provider:
+   Choose where to store your memory entries:
+   • Default: TST-native file structure (recommended for new users)
+   • Obsidian: Store entries in your Obsidian vault for seamless note integration
+
+? Select storage provider:
+  > Default File System - Stores memory entries in a hierarchical directory...
+    Obsidian Vault - Store entries in an Obsidian vault for seamless integration...
+```
+
+#### Changing Storage Provider
+
+To switch providers or reconfigure storage:
+
+```bash
+tom setup
+# Re-run the setup wizard and select a different provider
+```
+
+**Note**: Switching providers doesn't automatically migrate existing entries. See the [Obsidian Integration Guide](docs/OBSIDIAN-STORAGE.md#migrating-from-default-storage) for migration instructions.
+
+### Memory Directory (Legacy)
 
 By default, memories and configuration are stored in `~/ten-second-tom/` in your home directory:
 
@@ -385,20 +435,18 @@ By default, memories and configuration are stored in `~/ten-second-tom/` in your
 ├── config/
 │   └── config.json        # Your configuration (from setup wizard)
 ├── templates/              # Prompt templates
-├── today/                  # Daily entries
-├── thisweek/              # Weekly reviews
+├── today/                  # Daily entries (Default provider)
+├── thisweek/              # Weekly reviews (Default provider)
 └── recording/             # Voice recordings
 ```
 
-To customize the memory directory location, use the setup wizard:
+To customize the root directory location, use the setup wizard or set via environment variable:
 
 ```bash
-tom config
-# Select "Storage" to change memory directory location
+export TenSecondTom__RootDirectory="~/Documents/my-memories"
 ```
 
-Or set via environment variable:
-
+**Legacy Environment Variable** (still supported):
 ```bash
 export TenSecondTom__MemoryDirectory="~/Documents/my-memories"
 ```

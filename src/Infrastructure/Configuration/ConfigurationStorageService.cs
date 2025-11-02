@@ -265,6 +265,7 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
             RootDirectory = settings.RootDirectory,
             Ssh = settings.Ssh,
             Llm = settings.Llm,
+            Storage = settings.Storage, // Storage provider configuration
             Optional = settings.Optional,
             Audio = settings.Audio,
             Auth = new
@@ -317,6 +318,10 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
             ? JsonSerializer.Deserialize<AudioConfigurationDisplay>(audioElement.GetRawText(), JsonOptions) ?? new AudioConfigurationDisplay()
             : new AudioConfigurationDisplay();
 
+        var storageConfig = tenSecondTomSection.TryGetProperty("Storage", out var storageElement)
+            ? JsonSerializer.Deserialize<StorageConfiguration>(storageElement.GetRawText(), JsonOptions) ?? new StorageConfiguration()
+            : new StorageConfiguration();
+
         // Extract RootDirectory (supports legacy MemoryDirectory key for migration)
         string? rootDirectory = null;
         if (tenSecondTomSection.TryGetProperty("RootDirectory", out var rootDirElement))
@@ -328,8 +333,8 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
             // Legacy support: migrate old MemoryDirectory key to RootDirectory
             rootDirectory = memoryDirElement.GetString();
         }
-        else if (tenSecondTomSection.TryGetProperty("Storage", out var storageElement)
-                 && storageElement.TryGetProperty("MemoryDirectory", out var storageMemDirElement))
+        else if (tenSecondTomSection.TryGetProperty("Storage", out var legacyStorageElement)
+                 && legacyStorageElement.TryGetProperty("MemoryDirectory", out var storageMemDirElement))
         {
             // Legacy support: even older nested structure
             rootDirectory = storageMemDirElement.GetString();
@@ -366,7 +371,7 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
                 ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), DirectoryNames.ApplicationRoot),
             Ssh = sshConfig,
             Llm = llmConfig,
-            Storage = new StorageConfiguration(),
+            Storage = storageConfig,
             Optional = optionalConfig,
             Audio = audioConfig,
             CreatedAt = createdAt,

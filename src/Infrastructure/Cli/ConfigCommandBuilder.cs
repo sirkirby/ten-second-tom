@@ -1,10 +1,9 @@
 using System.CommandLine;
-using TenSecondTom.Features.Setup.Handlers;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
-using TenSecondTom.Features.Setup.Commands;
-using TenSecondTom.Features.Setup.Services;
+using TenSecondTom.Features.Setup;
 using TenSecondTom.Features.Setup.Models;
+using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Infrastructure.Configuration;
 
 namespace TenSecondTom.Infrastructure.Cli;
@@ -33,10 +32,10 @@ internal static class ConfigCommandBuilder
             bool showSecrets = parseResult.GetValue(showSecretsOption);
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
 
-            var handler = serviceProvider.GetRequiredService<ConfigCommandHandler>();
+            var handler = serviceProvider.GetRequiredService<Config.Handler>();
             var storageService = serviceProvider.GetRequiredService<IConfigurationStorageService>();
 
-            var command = new ConfigCommand
+            var command = new Config.Command
             {
                 Action = ConfigAction.Show,
                 SettingName = null,
@@ -94,9 +93,9 @@ internal static class ConfigCommandBuilder
             string settingValue = parseResult.GetValue(settingValueArg)!;
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
 
-            var handler = serviceProvider.GetRequiredService<ConfigCommandHandler>();
+            var handler = serviceProvider.GetRequiredService<Config.Handler>();
 
-            var command = new ConfigCommand
+            var command = new Config.Command
             {
                 Action = ConfigAction.Set,
                 SettingName = settingName,
@@ -140,9 +139,9 @@ internal static class ConfigCommandBuilder
         {
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
 
-            var handler = serviceProvider.GetRequiredService<ConfigCommandHandler>();
+            var handler = serviceProvider.GetRequiredService<Config.Handler>();
 
-            var command = new ConfigCommand
+            var command = new Config.Command
             {
                 Action = ConfigAction.Set,
                 SettingName = "llm",
@@ -189,9 +188,9 @@ internal static class ConfigCommandBuilder
         {
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
 
-            var handler = serviceProvider.GetRequiredService<ConfigCommandHandler>();
+            var handler = serviceProvider.GetRequiredService<Config.Handler>();
 
-            var command = new ConfigCommand
+            var command = new Config.Command
             {
                 Action = ConfigAction.Validate,
                 SettingName = null,
@@ -235,9 +234,9 @@ internal static class ConfigCommandBuilder
         {
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
 
-            var handler = serviceProvider.GetRequiredService<ConfigCommandHandler>();
+            var handler = serviceProvider.GetRequiredService<Config.Handler>();
 
-            var command = new ConfigCommand
+            var command = new Config.Command
             {
                 Action = ConfigAction.Set,
                 SettingName = "audio",
@@ -332,6 +331,28 @@ internal static class ConfigCommandBuilder
 
         // Storage Configuration
         table.AddRow("[yellow]Storage Configuration[/]", "");
+
+        // Storage Provider
+        var providerDisplay = config.Storage.ProviderId switch
+        {
+            "default" => "Default (Local File System)",
+            "obsidian" => "Obsidian Vault",
+            _ => config.Storage.ProviderId ?? "default"
+        };
+        table.AddRow("  Provider", providerDisplay);
+
+        // Provider Path (for external providers like Obsidian)
+        if (!string.IsNullOrWhiteSpace(config.Storage.ProviderPath))
+        {
+            table.AddRow("  Provider Path", config.Storage.ProviderPath.EscapeMarkup());
+        }
+
+        // Memory Subdirectory (isolation subdirectory within provider)
+        if (!string.IsNullOrWhiteSpace(config.Storage.MemorySubdirectory))
+        {
+            table.AddRow("  Memory Subdirectory", config.Storage.MemorySubdirectory.EscapeMarkup());
+        }
+
         table.AddRow("  Create If Missing", config.Storage.CreateIfMissing ? "Yes" : "No");
 
         // Optional Configuration

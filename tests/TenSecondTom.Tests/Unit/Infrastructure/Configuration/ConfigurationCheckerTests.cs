@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Options;
 
@@ -16,10 +17,15 @@ namespace TenSecondTom.Tests.Unit.Infrastructure.Configuration;
 public sealed class ConfigurationCheckerTests
 {
     private readonly Mock<ILogger<ConfigurationChecker>> _mockLogger;
+    private readonly EmbeddedPromptTemplateLoader _embeddedTemplateLoader;
 
     public ConfigurationCheckerTests()
     {
         _mockLogger = new Mock<ILogger<ConfigurationChecker>>();
+        var yamlParser = new YamlFrontMatterParser(Mock.Of<ILogger<YamlFrontMatterParser>>());
+        _embeddedTemplateLoader = new EmbeddedPromptTemplateLoader(
+            baseDirectory: null,
+            yamlParser: yamlParser);
     }
 
     #region Complete Configuration Tests
@@ -43,7 +49,7 @@ public sealed class ConfigurationCheckerTests
             },
             storageOptions: new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             });
 
         // Act
@@ -72,7 +78,7 @@ public sealed class ConfigurationCheckerTests
             },
             storageOptions: new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             });
 
         // Act
@@ -101,7 +107,7 @@ public sealed class ConfigurationCheckerTests
             },
             storageOptions: new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             });
 
         // Act
@@ -130,7 +136,7 @@ public sealed class ConfigurationCheckerTests
             },
             storageOptions: new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             });
 
         // Act
@@ -159,7 +165,7 @@ public sealed class ConfigurationCheckerTests
             authOptions: null, // SSH configuration missing entirely
             storageOptions: new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             });
 
         // Act
@@ -190,7 +196,7 @@ public sealed class ConfigurationCheckerTests
             },
             storageOptions: new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             });
 
         // Act
@@ -213,7 +219,7 @@ public sealed class ConfigurationCheckerTests
             },
             storageOptions: new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             });
 
         // Act
@@ -225,7 +231,7 @@ public sealed class ConfigurationCheckerTests
     }
 
     [Fact]
-    public void IsConfigured_WithMissingMemoryDirectory_ReturnsFalse()
+    public void IsConfigured_WithMissingRootDirectory_ReturnsFalse()
     {
         // Arrange
         var checker = CreateConfigurationChecker(
@@ -241,14 +247,14 @@ public sealed class ConfigurationCheckerTests
                 KeyPath = "~/.ssh/id_ed25519",
                 KeySource = SshKeySource.FileSystem
             },
-            storageOptions: null); // Memory directory missing
+            storageOptions: null); // Root directory missing
 
         // Act
         var result = checker.IsConfigured();
 
         // Assert
-        result.Should().BeFalse("Memory directory is required");
-        VerifyLogContains(LogLevel.Debug, "Missing: Memory directory");
+        result.Should().BeFalse("Root directory is required");
+        VerifyLogContains(LogLevel.Debug, "Missing: Root directory");
     }
 
     [Fact]
@@ -274,8 +280,9 @@ public sealed class ConfigurationCheckerTests
             }),
             Options.Create(new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             }),
+            _embeddedTemplateLoader,
             _mockLogger.Object);
 
         // Act
@@ -309,8 +316,9 @@ public sealed class ConfigurationCheckerTests
             }),
             Options.Create(new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             }),
+            _embeddedTemplateLoader,
             _mockLogger.Object);
 
         // Act
@@ -345,7 +353,7 @@ public sealed class ConfigurationCheckerTests
         var mockStorageOptions = new Mock<IOptions<StorageOptions>>();
         var storageOptionsValue = new StorageOptions
         {
-            MemoryDirectory = ""
+            RootDirectory = ""
         };
         mockStorageOptions.Setup(x => x.Value).Returns(storageOptionsValue);
 
@@ -353,6 +361,7 @@ public sealed class ConfigurationCheckerTests
             mockLlmOptions.Object,
             mockAuthOptions.Object,
             mockStorageOptions.Object,
+            _embeddedTemplateLoader,
             _mockLogger.Object);
 
         // Act
@@ -387,7 +396,7 @@ public sealed class ConfigurationCheckerTests
         var mockStorageOptions = new Mock<IOptions<StorageOptions>>();
         var storageOptionsValue = new StorageOptions
         {
-            MemoryDirectory = "   "
+            RootDirectory = "   "
         };
         mockStorageOptions.Setup(x => x.Value).Returns(storageOptionsValue);
 
@@ -395,6 +404,7 @@ public sealed class ConfigurationCheckerTests
             mockLlmOptions.Object,
             mockAuthOptions.Object,
             mockStorageOptions.Object,
+            _embeddedTemplateLoader,
             _mockLogger.Object);
 
         // Act
@@ -427,7 +437,7 @@ public sealed class ConfigurationCheckerTests
             },
             storageOptions: new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             });
 
         // Act
@@ -467,7 +477,7 @@ public sealed class ConfigurationCheckerTests
         // Assert
         VerifyLogContains(LogLevel.Debug, "Missing: SSH configuration");
         VerifyLogContains(LogLevel.Debug, "Missing: LLM provider");
-        VerifyLogContains(LogLevel.Debug, "Missing: Memory directory");
+        VerifyLogContains(LogLevel.Debug, "Missing: Root directory");
         VerifyLogContains(LogLevel.Debug, "Missing: LLM API key");
     }
 
@@ -490,7 +500,7 @@ public sealed class ConfigurationCheckerTests
             },
             storageOptions: new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             });
 
         // Act
@@ -529,13 +539,14 @@ public sealed class ConfigurationCheckerTests
                 KeySource = SshKeySource.FileSystem
             }),
             null, // Missing storage options
+            _embeddedTemplateLoader,
             _mockLogger.Object);
 
         // Act
         checker.IsConfigured();
 
         // Assert
-        VerifyLogContains(LogLevel.Debug, "Missing: Memory directory");
+        VerifyLogContains(LogLevel.Debug, "Missing: Root directory");
         VerifyLogContains(LogLevel.Debug, "Missing: LLM API key");
 
         // Should NOT log for present settings
@@ -583,8 +594,9 @@ public sealed class ConfigurationCheckerTests
             }),
             Options.Create(new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             }),
+            _embeddedTemplateLoader,
             null!);
 
         act.Should().Throw<ArgumentNullException>("null logger should throw");
@@ -626,7 +638,7 @@ public sealed class ConfigurationCheckerTests
             },
             storageOptions: new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             });
 
         // Act
@@ -660,8 +672,9 @@ public sealed class ConfigurationCheckerTests
             }),
             Options.Create(new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             }),
+            _embeddedTemplateLoader,
             _mockLogger.Object);
 
         // Act
@@ -694,7 +707,7 @@ public sealed class ConfigurationCheckerTests
             },
             storageOptions: new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             });
 
         // Act
@@ -723,7 +736,7 @@ public sealed class ConfigurationCheckerTests
             },
             storageOptions: new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             });
 
         // Act
@@ -752,7 +765,7 @@ public sealed class ConfigurationCheckerTests
             },
             storageOptions: new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             });
 
         // Act
@@ -786,8 +799,9 @@ public sealed class ConfigurationCheckerTests
             }),
             Options.Create(new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             }),
+            _embeddedTemplateLoader,
             _mockLogger.Object);
 
         // Act
@@ -810,7 +824,7 @@ public sealed class ConfigurationCheckerTests
             },
             storageOptions: new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             });
 
         // Act
@@ -839,7 +853,7 @@ public sealed class ConfigurationCheckerTests
             },
             storageOptions: new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             });
 
         // Act
@@ -872,8 +886,9 @@ public sealed class ConfigurationCheckerTests
             }),
             Options.Create(new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             }),
+            _embeddedTemplateLoader,
             _mockLogger.Object);
 
         // Act
@@ -906,8 +921,9 @@ public sealed class ConfigurationCheckerTests
             }),
             Options.Create(new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             }),
+            _embeddedTemplateLoader,
             _mockLogger.Object);
 
         // Act
@@ -940,7 +956,7 @@ public sealed class ConfigurationCheckerTests
             },
             storageOptions: new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             });
 
         // Act
@@ -969,7 +985,7 @@ public sealed class ConfigurationCheckerTests
             },
             storageOptions: new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             });
 
         // Act
@@ -1005,8 +1021,9 @@ public sealed class ConfigurationCheckerTests
             }),
             Options.Create(new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             }),
+            _embeddedTemplateLoader,
             _mockLogger.Object);
 
         // Act
@@ -1029,7 +1046,7 @@ public sealed class ConfigurationCheckerTests
             },
             storageOptions: new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             });
 
         // Act
@@ -1058,7 +1075,7 @@ public sealed class ConfigurationCheckerTests
             },
             storageOptions: new StorageOptions
             {
-                MemoryDirectory = "~/.ten-second-tom/memory"
+                RootDirectory = "~/.ten-second-tom/memory"
             });
 
         // Act
@@ -1100,6 +1117,7 @@ public sealed class ConfigurationCheckerTests
             llmOptionsWrapper,
             authOptionsWrapper,
             storageOptionsWrapper,
+            _embeddedTemplateLoader,
             _mockLogger.Object);
     }
 

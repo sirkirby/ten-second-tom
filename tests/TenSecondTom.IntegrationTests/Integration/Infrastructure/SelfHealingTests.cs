@@ -374,13 +374,19 @@ public sealed class SelfHealingTests
 
         var storageOptions = Options.Create(new StorageOptions
         {
-            MemoryDirectory = memoryDirectory
+            RootDirectory = memoryDirectory
         });
+
+        var yamlParser = new TenSecondTom.Infrastructure.Prompts.YamlFrontMatterParser(Mock.Of<ILogger<TenSecondTom.Infrastructure.Prompts.YamlFrontMatterParser>>());
+        var embeddedLoader = new TenSecondTom.Infrastructure.Prompts.EmbeddedPromptTemplateLoader(
+            baseDirectory: null,
+            yamlParser: yamlParser);
 
         return new ConfigurationChecker(
             llmOptions,
             authOptions,
             storageOptions,
+            embeddedLoader,
             _mockLogger.Object);
     }
 

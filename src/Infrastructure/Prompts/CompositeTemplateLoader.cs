@@ -144,4 +144,57 @@ public sealed class CompositeTemplateLoader : IPromptTemplateLoader
         // Return empty list rather than failure - graceful degradation
         return Result<List<PromptTemplate>>.Success(new List<PromptTemplate>());
     }
+
+    /// <inheritdoc/>
+    public async Task<Result<string>> LoadRawTemplateContentAsync(
+        string templateId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(templateId))
+        {
+            return Result<string>.Failure("Template ID cannot be null or empty");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Attempt to load from primary loader first
+        Result<string> primaryResult = await _primaryLoader.LoadRawTemplateContentAsync(
+            templateId,
+            cancellationToken).ConfigureAwait(false);
+
+        if (primaryResult.IsSuccess)
+        {
+            _logger.LogDebug("Successfully loaded raw template content '{TemplateId}' from primary loader", templateId);
+            return primaryResult;
+        }
+
+        // Primary failed - log and attempt fallback
+        _logger.LogWarning(
+            "Failed to load raw template content '{TemplateId}' from primary loader: {Error}. Falling back to fallback loader.",
+            templateId,
+            primaryResult.Error);
+
+        Result<string> fallbackResult = await _fallbackLoader.LoadRawTemplateContentAsync(
+            templateId,
+            cancellationToken).ConfigureAwait(false);
+
+        if (fallbackResult.IsSuccess)
+        {
+            _logger.LogInformation(
+                "Successfully loaded raw template content '{TemplateId}' from fallback loader",
+                templateId);
+            return fallbackResult;
+        }
+
+        // Both loaders failed
+        _logger.LogError(
+            "Failed to load raw template content '{TemplateId}' from both primary and fallback loaders. " +
+            "Primary error: {PrimaryError}. Fallback error: {FallbackError}",
+            templateId,
+            primaryResult.Error,
+            fallbackResult.Error);
+
+        return Result<string>.Failure(
+            $"Raw template content '{templateId}' not found. Primary: {primaryResult.Error}. Fallback: {fallbackResult.Error}");
+    }
 }

@@ -1,5 +1,4 @@
 using System.IO.Abstractions;
-using System.Reflection;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Infrastructure.Prompts;
@@ -78,13 +77,14 @@ public static class InstallDefaultTemplates
     /// <remarks>
     /// This handler:
     /// - Creates the templates directory if it doesn't exist
-    /// - Loads embedded template resources from the assembly
+    /// - Uses the template loader to discover and load embedded templates
     /// - Writes templates to disk with YAML front matter intact
     /// - Respects the OverwriteExisting flag to preserve user customizations
     /// - Logs detailed information about the installation process
     /// </remarks>
     public sealed class Handler(
         IFileSystem fileSystem,
+        EmbeddedPromptTemplateLoader embeddedTemplateLoader,
         ILogger<Handler> logger)
         : IRequestHandler<Command, Result<CommandResult>>
     {
@@ -144,18 +144,22 @@ public static class InstallDefaultTemplates
                     $"Failed to create templates directory: {ex.Message}");
             }
 
-            // Load raw embedded templates (with YAML front matter intact)
-            // We load directly from embedded resources instead of using templateLoader
-            // because templateLoader parses and strips the YAML front matter
-            const string embeddedResourcePrefix = "TenSecondTom.Infrastructure.Prompts.Templates";
-            Assembly assembly = typeof(EmbeddedPromptTemplateLoader).Assembly;
+            // Discover all embedded templates using the template loader
+            // This ensures we use the same discovery mechanism as runtime template loading
+            var allTemplatesResult = await embeddedTemplateLoader.LoadAllTemplatesAsync(cancellationToken);
 
-            string[] resourceNames = assembly.GetManifestResourceNames()
-                .Where(name => name.StartsWith(embeddedResourcePrefix, StringComparison.Ordinal) &&
-                              name.EndsWith(".md", StringComparison.Ordinal))
-                .ToArray();
+            if (!allTemplatesResult.IsSuccess)
+            {
+#pragma warning disable CA1848 // Use LoggerMessage delegates for performance
+                logger.LogWarning("Failed to discover embedded templates: {Error}", allTemplatesResult.Error);
+#pragma warning restore CA1848
+                return Result<CommandResult>.Failure(
+                    $"Failed to discover embedded templates: {allTemplatesResult.Error}");
+            }
 
-            if (resourceNames.Length == 0)
+            var templates = allTemplatesResult.Value;
+
+            if (templates.Count == 0)
             {
 #pragma warning disable CA1848 // Use LoggerMessage delegates for performance
                 logger.LogWarning("No embedded templates found to install");
@@ -175,15 +179,11 @@ public static class InstallDefaultTemplates
             int failed = 0;
             var installedIds = new List<string>();
 
-            foreach (string resourceName in resourceNames)
+            foreach (var template in templates)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // Extract template ID from resource name
-                string templateId = resourceName
-                    .Replace($"{embeddedResourcePrefix}.", string.Empty, StringComparison.Ordinal)
-                    .Replace(".md", string.Empty, StringComparison.Ordinal);
-
+                string templateId = template.TemplateId;
                 string fileName = $"{templateId}.md";
                 string filePath = fileSystem.Path.Combine(request.TargetDirectory, fileName);
 
@@ -201,19 +201,24 @@ public static class InstallDefaultTemplates
                         continue;
                     }
 
-                    // Load raw content from embedded resource (with YAML front matter intact)
-                    using Stream? resourceStream = assembly.GetManifestResourceStream(resourceName);
-                    if (resourceStream is null)
+                    // Load raw content using the template loader (with YAML front matter intact)
+                    var rawContentResult = await embeddedTemplateLoader.LoadRawTemplateContentAsync(
+                        templateId,
+                        cancellationToken);
+
+                    if (!rawContentResult.IsSuccess)
                     {
 #pragma warning disable CA1848 // Use LoggerMessage delegates for performance
-                        logger.LogWarning("Failed to load embedded resource: {ResourceName}", resourceName);
+                        logger.LogWarning(
+                            "Failed to load raw content for template {TemplateId}: {Error}",
+                            templateId,
+                            rawContentResult.Error);
 #pragma warning restore CA1848
                         failed++;
                         continue;
                     }
 
-                    using StreamReader reader = new(resourceStream);
-                    string rawContent = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+                    string rawContent = rawContentResult.Value;
 
                     // Write raw template content to file (includes YAML front matter)
                     await fileSystem.File.WriteAllTextAsync(filePath, rawContent, cancellationToken)

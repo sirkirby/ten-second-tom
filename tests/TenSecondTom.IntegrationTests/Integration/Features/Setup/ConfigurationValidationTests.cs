@@ -4,14 +4,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using TenSecondTom.Features.Setup.Commands;
-using TenSecondTom.Features.Setup.Handlers;
+using TenSecondTom.Features.Setup;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.IntegrationTests.TestHelpers;
 using TenSecondTom.Shared.Results;
-using TenSecondTom.Features.Setup;
 
 namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
 
@@ -36,7 +34,7 @@ public sealed class ConfigurationValidationTests : IDisposable
     public async Task ConfigValidation_WithCompleteConfiguration_ReturnsValid()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
+        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
         
         var completeConfig = new ConfigurationSettings
         {
@@ -53,7 +51,7 @@ public sealed class ConfigurationValidationTests : IDisposable
         var mockMonitor = Mock.Get(optionsMonitor);
         mockMonitor.Setup(c => c.CurrentValue).Returns(completeConfig);
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Validate
         };
@@ -71,7 +69,7 @@ public sealed class ConfigurationValidationTests : IDisposable
     public async Task ConfigValidation_WithMissingSshKey_ReturnsError()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
+        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
 
         var incompleteConfig = new ConfigurationSettings
         {
@@ -88,7 +86,7 @@ public sealed class ConfigurationValidationTests : IDisposable
         var mockMonitor = Mock.Get(optionsMonitor);
         mockMonitor.Setup(c => c.CurrentValue).Returns(incompleteConfig);
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Validate
         };
@@ -105,7 +103,7 @@ public sealed class ConfigurationValidationTests : IDisposable
     public async Task ConfigValidation_WithMissingApiKey_ReturnsError()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
+        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
 
         var incompleteConfig = new ConfigurationSettings
         {
@@ -122,7 +120,7 @@ public sealed class ConfigurationValidationTests : IDisposable
         var mockMonitor = Mock.Get(optionsMonitor);
         mockMonitor.Setup(c => c.CurrentValue).Returns(incompleteConfig);
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Validate
         };
@@ -138,7 +136,7 @@ public sealed class ConfigurationValidationTests : IDisposable
     public async Task ConfigValidation_WithMissingMemoryDirectory_ReturnsError()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
+        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
 
         var incompleteConfig = new ConfigurationSettings
         {
@@ -155,7 +153,7 @@ public sealed class ConfigurationValidationTests : IDisposable
         var mockMonitor = Mock.Get(optionsMonitor);
         mockMonitor.Setup(c => c.CurrentValue).Returns(incompleteConfig);
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Validate
         };
@@ -171,7 +169,7 @@ public sealed class ConfigurationValidationTests : IDisposable
     public async Task ConfigValidation_WithInvalidRetentionDays_ReturnsError()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
+        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
 
         var incompleteConfig = new ConfigurationSettings
         {
@@ -188,7 +186,7 @@ public sealed class ConfigurationValidationTests : IDisposable
         var mockMonitor = Mock.Get(optionsMonitor);
         mockMonitor.Setup(c => c.CurrentValue).Returns(incompleteConfig);
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Validate
         };
@@ -204,7 +202,7 @@ public sealed class ConfigurationValidationTests : IDisposable
     public async Task ConfigValidation_WithUnlimitedRetentionDays_ReturnsValid()
     {
         // Arrange - Test that -1 (unlimited) is valid
-        var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
+        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
 
         var configWithUnlimited = new ConfigurationSettings
         {
@@ -221,7 +219,7 @@ public sealed class ConfigurationValidationTests : IDisposable
         var mockMonitor = Mock.Get(optionsMonitor);
         mockMonitor.Setup(c => c.CurrentValue).Returns(configWithUnlimited);
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Validate
         };
@@ -239,7 +237,7 @@ public sealed class ConfigurationValidationTests : IDisposable
     public async Task ConfigValidation_WithNoConfiguration_ReturnsError()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
+        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
 
         // Create an empty/default config (simulates missing configuration)
         var emptyConfig = new ConfigurationSettings
@@ -257,7 +255,7 @@ public sealed class ConfigurationValidationTests : IDisposable
         var mockMonitor = Mock.Get(optionsMonitor);
         mockMonitor.Setup(c => c.CurrentValue).Returns(emptyConfig);
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Validate
         };
@@ -274,7 +272,7 @@ public sealed class ConfigurationValidationTests : IDisposable
     public async Task ConfigValidation_ProvidesHelpfulErrorMessages()
     {
         // Arrange
-        var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
+        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
 
         // Create an empty/default config (simulates missing configuration)
         var emptyConfig = new ConfigurationSettings
@@ -292,7 +290,7 @@ public sealed class ConfigurationValidationTests : IDisposable
         var mockMonitor = Mock.Get(optionsMonitor);
         mockMonitor.Setup(c => c.CurrentValue).Returns(emptyConfig);
 
-        var command = new ConfigCommand
+        var command = new Config.Command
         {
             Action = ConfigAction.Validate
         };
@@ -332,7 +330,7 @@ public sealed class ConfigurationValidationTests : IDisposable
         var mockOptionsMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
         services.AddSingleton(mockOptionsMonitor.Object);
 
-        // Mock ISetupWizardUI (required by ConfigCommandHandler)
+        // Mock ISetupWizardUI (required by Config.Handler)
         var mockWizard = new Mock<ISetupWizardUI>();
         services.AddSingleton(mockWizard.Object);
 
@@ -341,7 +339,7 @@ public sealed class ConfigurationValidationTests : IDisposable
             new List<IApiKeyValidator>());
 
         // Add handler
-        services.AddSingleton<ConfigCommandHandler>();
+        services.AddSingleton<Config.Handler>();
 
         return services.BuildServiceProvider();
     }

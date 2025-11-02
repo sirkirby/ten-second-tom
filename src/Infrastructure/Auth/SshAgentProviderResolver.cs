@@ -1,3 +1,5 @@
+using TenSecondTom.Shared.Constants;
+
 namespace TenSecondTom.Infrastructure.Auth;
 
 /// <summary>
@@ -27,12 +29,13 @@ public static class SshAgentProviderResolver
     /// </summary>
     private static string? GetSystemAgentPath()
     {
-        var path = Environment.GetEnvironmentVariable("SSH_AUTH_SOCK");
+        var path = Environment.GetEnvironmentVariable(SshConstants.AgentPaths.SystemAgentEnvVar);
         return !string.IsNullOrWhiteSpace(path) && File.Exists(path) ? path : null;
     }
 
     /// <summary>
     /// Gets the 1Password SSH agent socket path.
+    /// Platform-aware: supports macOS, Linux, and Windows.
     /// </summary>
     private static string? GetOnePasswordAgentPath()
     {
@@ -43,14 +46,22 @@ public static class SshAgentProviderResolver
         if (OperatingSystem.IsMacOS())
         {
             var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            var path = Path.Combine(home, "Library", "Group Containers", "2BUA8C4S2C.com.1password", "t", "agent.sock");
+            var path = Path.Combine(
+                home,
+                SshConstants.AgentPaths.OnePassword.MacGroupContainers,
+                SshConstants.AgentPaths.OnePassword.MacContainerId,
+                SshConstants.AgentPaths.OnePassword.MacSubdirectory,
+                SshConstants.AgentPaths.OnePassword.MacSocketFile);
             return File.Exists(path) ? path : null;
         }
         
         if (OperatingSystem.IsLinux())
         {
             var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            var path = Path.Combine(home, ".1password", "agent.sock");
+            var path = Path.Combine(
+                home,
+                SshConstants.AgentPaths.OnePassword.LinuxDirectory,
+                SshConstants.AgentPaths.OnePassword.LinuxSocketFile);
             return File.Exists(path) ? path : null;
         }
         
@@ -75,7 +86,12 @@ public static class SshAgentProviderResolver
         }
         
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var path = Path.Combine(home, "Library", "Containers", "com.maxgoedjen.Secretive.SecretAgent", "Data", "socket.ssh");
+        var path = Path.Combine(
+            home,
+            SshConstants.AgentPaths.Secretive.MacContainers,
+            SshConstants.AgentPaths.Secretive.MacContainerId,
+            SshConstants.AgentPaths.Secretive.MacDataDirectory,
+            SshConstants.AgentPaths.Secretive.MacSocketFile);
         return File.Exists(path) ? path : null;
     }
 

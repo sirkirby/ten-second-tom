@@ -3,14 +3,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using TenSecondTom.Features.Setup.Commands;
-using TenSecondTom.Features.Setup.Handlers;
+using TenSecondTom.Features.Setup;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.IntegrationTests.TestHelpers;
 using TenSecondTom.Shared.Results;
-using TenSecondTom.Features.Setup;
 
 namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
 
@@ -57,11 +55,11 @@ public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
         var configBuilder = new ConfigurationBuilder();
         services.AddSingleton<IConfiguration>(configBuilder.Build());
 
-        // Add required validators for ConfigCommandHandler
+        // Add required validators for Config.Handler
         services.AddTransient<IApiKeyValidator, OpenAIApiKeyValidator>();
         services.AddTransient<IApiKeyValidator, AnthropicApiKeyValidator>();
 
-        services.AddTransient<ConfigCommandHandler>();
+        services.AddTransient<Config.Handler>();
 
         _serviceProvider = services.BuildServiceProvider();
 
@@ -79,8 +77,8 @@ public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync((LlmProvider?)null);
         
-        var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
-        var command = new ConfigCommand
+        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "llm"
@@ -103,8 +101,8 @@ public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
         var initialConfig = CreateValidConfiguration();
         await storageService.SaveAsync(initialConfig, CancellationToken.None);
 
-        var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
-        var command = new ConfigCommand
+        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "llm"
@@ -156,8 +154,8 @@ public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
         var initialConfig = CreateValidConfiguration();
         await storageService.SaveAsync(initialConfig, CancellationToken.None);
 
-        var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
-        var command = new ConfigCommand
+        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "llm"
@@ -185,8 +183,8 @@ public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
         var initialConfig = CreateValidConfiguration();
         await storageService.SaveAsync(initialConfig, CancellationToken.None);
 
-        var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
-        var command = new ConfigCommand
+        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "llm"
@@ -228,8 +226,8 @@ public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
         };
         await storageService.SaveAsync(initialConfig, CancellationToken.None);
 
-        var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
-        var command = new ConfigCommand
+        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "llm"
@@ -295,8 +293,8 @@ public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
         };
         await storageService.SaveAsync(initialConfig, CancellationToken.None);
 
-        var handler = _serviceProvider.GetRequiredService<ConfigCommandHandler>();
-        var command = new ConfigCommand
+        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
+        var command = new Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "llm"

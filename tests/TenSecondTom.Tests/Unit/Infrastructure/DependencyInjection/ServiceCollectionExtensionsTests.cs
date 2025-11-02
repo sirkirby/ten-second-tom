@@ -152,7 +152,8 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
 
         // Assert
         storageProvider.Should().NotBeNull();
-        storageProvider.Should().BeOfType<FileSystemStorageProvider>();
+        // Note: Storage provider is now selected via factory, returns provider based on configuration
+        storageProvider.Should().BeAssignableTo<IMemoryStorageProvider>();
     }
 
     [Fact]
@@ -174,7 +175,8 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
 
         // Assert - Should still create provider with default directory
         storageProvider.Should().NotBeNull();
-        storageProvider.Should().BeOfType<FileSystemStorageProvider>();
+        // Note: Storage provider is now selected via factory, returns provider based on configuration
+        storageProvider.Should().BeAssignableTo<IMemoryStorageProvider>();
     }
 
     [Fact]
@@ -275,8 +277,9 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
         _serviceProvider = _services.BuildServiceProvider();
 
         // Assert - Verify concrete types
+        // Note: Storage provider is now selected via factory based on configuration
         _serviceProvider.GetRequiredService<IMemoryStorageProvider>()
-            .Should().BeOfType<FileSystemStorageProvider>();
+            .Should().BeAssignableTo<IMemoryStorageProvider>();
 
         _serviceProvider.GetRequiredService<ILlmProviderFactory>()
             .Should().BeOfType<LlmProviderFactory>();

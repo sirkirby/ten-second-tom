@@ -5,20 +5,20 @@ using Spectre.Console;
 using TenSecondTom.Features.Audio;
 using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Features.Audio.Services;
-using TenSecondTom.Features.Today;
 using TenSecondTom.Features.Today.Models;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Configuration;
 using MediatR;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Extensions;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.OutputFormatters;
 using TenSecondTom.Shared.Results;
 using TenSecondTom.Shared.TextEditing.Services;
 using TenSecondTom.Shared.TextEditing.Models;
 
-namespace TenSecondTom.Infrastructure.Cli;
+namespace TenSecondTom.Features.Today;
 
 /// <summary>
 /// Handles the execution of the 'today' command.
@@ -298,7 +298,8 @@ public static class TodayCommandHandler
             if (isTruncated)
             {
                 var storageOptions = serviceProvider.GetRequiredService<IOptions<StorageOptions>>();
-                string fullPath = Path.Combine(storageOptions.Value.MemoryDirectory, entry.FilePath);
+                var rootDir = storageOptions.Value.RootDirectory ?? Path.Combine(".", DirectoryNames.ApplicationRoot);
+                string fullPath = Path.Combine(rootDir, entry.FilePath);
                 AnsiConsole.WriteLine();
                 AnsiConsole.MarkupLine($"[dim]Full entry:[/] [link]{fullPath.EscapeMarkup()}[/]");
             }
@@ -326,17 +327,12 @@ public static class TodayCommandHandler
         var audioConfig = serviceProvider.GetRequiredService<IOptions<AudioConfiguration>>().Value;
         var logger = serviceProvider.GetRequiredService<ILogger<CreateVoiceNoteEntry.Handler>>();
 
-        // Get memory directory from configuration
-        var memoryDirectory = storageOptions.MemoryDirectory;
+        // Get the effective storage directory using extension method
+        var storageBaseDir = storageOptions.GetEffectiveStorageDirectory();
 
-        // Expand home directory if needed
-        if (!string.IsNullOrWhiteSpace(memoryDirectory))
+        if (string.IsNullOrWhiteSpace(storageBaseDir))
         {
-            memoryDirectory = memoryDirectory.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
-        }
-        if (string.IsNullOrWhiteSpace(memoryDirectory))
-        {
-            var error = "Memory directory not configured. Run 'tom setup' to configure.";
+            var error = "Storage directory not configured. Run 'tom setup' to configure.";
             if (jsonOutput)
             {
                 Console.WriteLine(JsonOutputFormatter.FormatFailure(CommandNames.Today, error, DateTimeOffset.UtcNow));
@@ -580,9 +576,9 @@ public static class TodayCommandHandler
             else
             {
                 // Move audio file to today directory with consistent naming pattern
-                var todayDir = Path.Combine(memoryDirectory, "today");
+                var todayDir = Path.Combine(storageBaseDir, DirectoryNames.Today);
                 Directory.CreateDirectory(todayDir); // Ensure directory exists
-                
+
                 // Extract date and number from entry-id (e.g., "today-10-21-2025-1" -> "10-21-2025_1.wav")
                 var entryIdParts = entry.EntryId.Split('-');
                 if (entryIdParts.Length >= 5)
@@ -593,7 +589,7 @@ public static class TodayCommandHandler
                     var number = entryIdParts[4];
                     var newFilename = $"{month}-{day}-{year}_{number}.wav";
                     var audioDestPath = Path.Combine(todayDir, newFilename);
-                    
+
                     try
                     {
                         File.Move(audioFilePath, audioDestPath, overwrite: true);
@@ -675,7 +671,8 @@ public static class TodayCommandHandler
                 // Show clickable file path
                 if (isTruncated)
                 {
-                    string fullPath = Path.Combine(storageOptions.MemoryDirectory, entry.FilePath);
+                    var rootDir = storageOptions.RootDirectory ?? Path.Combine(".", DirectoryNames.ApplicationRoot);
+                    string fullPath = Path.Combine(rootDir, entry.FilePath);
                     AnsiConsole.WriteLine();
                     AnsiConsole.MarkupLine($"[dim]Full entry:[/] [link]{fullPath.EscapeMarkup()}[/]");
                 }

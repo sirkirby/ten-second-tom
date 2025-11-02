@@ -1,12 +1,11 @@
 using Microsoft.Extensions.Logging;
-using TenSecondTom.Features.Setup.Commands;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Infrastructure.Configuration;
 
 namespace TenSecondTom.Features.Setup.Services;
 
 /// <summary>
-/// Factory for creating SetupCommand instances with proper existing configuration loading.
+/// Factory for creating Setup.Command instances with proper existing configuration loading.
 /// Centralizes the logic to prevent duplication and bugs from inconsistent implementations.
 /// </summary>
 public sealed class SetupCommandFactory
@@ -23,21 +22,21 @@ public sealed class SetupCommandFactory
     }
 
     /// <summary>
-    /// Creates a SetupCommand with existing configuration loaded if available.
+    /// Creates a Setup.Command with existing configuration loaded if available.
     /// This ensures all callers (CLI, Bootstrapper, etc.) consistently preserve existing settings.
     /// </summary>
     /// <param name="force">Force setup to run even if configuration exists.</param>
     /// <param name="nonInteractive">Run setup in non-interactive mode.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A SetupCommand with ExistingConfiguration properly loaded.</returns>
-    public async Task<SetupCommand> CreateAsync(
+    /// <returns>A Setup.Command with ExistingConfiguration properly loaded.</returns>
+    public async Task<Setup.Command> CreateAsync(
         bool force = false,
         bool nonInteractive = false,
         CancellationToken cancellationToken = default)
     {
         var existingConfig = await LoadExistingConfigurationAsync(cancellationToken);
         
-        return new SetupCommand
+        return new Setup.Command
         {
             Force = force,
             NonInteractive = nonInteractive,

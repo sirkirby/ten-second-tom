@@ -1,6 +1,6 @@
 using FluentAssertions;
+using TenSecondTom.Features.Setup;
 using TenSecondTom.Features.Setup.Models;
-using TenSecondTom.Features.Setup.Commands;
 
 namespace TenSecondTom.Tests.Unit.Features.Setup.Commands;
 
@@ -16,7 +16,7 @@ public sealed class ConfigCommandTests
     public void ConfigCommand_ShouldHaveActionProperty()
     {
         // Arrange & Act
-        var command = new ConfigCommand { Action = ConfigAction.Set };
+        var command = new TenSecondTom.Features.Setup.Config.Command { Action = ConfigAction.Set };
 
         // Assert
         command.Action.Should().Be(ConfigAction.Set);
@@ -26,7 +26,7 @@ public sealed class ConfigCommandTests
     public void ConfigCommand_ShouldHaveSettingNameProperty()
     {
         // Arrange & Act
-        var command = new ConfigCommand { SettingName = "llm-provider" };
+        var command = new TenSecondTom.Features.Setup.Config.Command { SettingName = "llm-provider" };
 
         // Assert
         command.SettingName.Should().Be("llm-provider");
@@ -36,7 +36,7 @@ public sealed class ConfigCommandTests
     public void ConfigCommand_ShouldHaveSettingValueProperty()
     {
         // Arrange & Act
-        var command = new ConfigCommand { SettingValue = "OpenAI" };
+        var command = new TenSecondTom.Features.Setup.Config.Command { SettingValue = "OpenAI" };
 
         // Assert
         command.SettingValue.Should().Be("OpenAI");
@@ -46,7 +46,7 @@ public sealed class ConfigCommandTests
     public void ConfigCommand_ShouldHaveShowSecretsProperty()
     {
         // Arrange & Act
-        var command = new ConfigCommand { ShowSecrets = true };
+        var command = new TenSecondTom.Features.Setup.Config.Command { ShowSecrets = true };
 
         // Assert
         command.ShowSecrets.Should().BeTrue();
@@ -56,7 +56,7 @@ public sealed class ConfigCommandTests
     public void ConfigCommand_DefaultValues_ShouldBeShowActionAndFalse()
     {
         // Arrange & Act
-        var command = new ConfigCommand();
+        var command = new TenSecondTom.Features.Setup.Config.Command();
 
         // Assert
         command.Action.Should().Be(ConfigAction.Show, "Action should default to Show");
@@ -121,7 +121,7 @@ public sealed class ConfigCommandTests
     public void ShowCurrentConfiguration_ShouldHaveShowAction()
     {
         // Arrange & Act
-        var command = new ConfigCommand
+        var command = new TenSecondTom.Features.Setup.Config.Command
         {
             Action = ConfigAction.Show,
             ShowSecrets = false
@@ -136,7 +136,7 @@ public sealed class ConfigCommandTests
     public void ShowConfigurationWithSecrets_ShouldHaveShowSecretsFlag()
     {
         // Arrange & Act
-        var command = new ConfigCommand
+        var command = new TenSecondTom.Features.Setup.Config.Command
         {
             Action = ConfigAction.Show,
             ShowSecrets = true
@@ -151,7 +151,7 @@ public sealed class ConfigCommandTests
     public void ChangeLlmProvider_ShouldHaveSetActionAndSettingNameAndValue()
     {
         // Arrange & Act
-        var command = new ConfigCommand
+        var command = new TenSecondTom.Features.Setup.Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "llm-provider",
@@ -168,7 +168,7 @@ public sealed class ConfigCommandTests
     public void UpdateMemoryDirectory_ShouldHaveSetActionWithDirectoryPath()
     {
         // Arrange & Act
-        var command = new ConfigCommand
+        var command = new TenSecondTom.Features.Setup.Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "memory-directory",
@@ -185,7 +185,7 @@ public sealed class ConfigCommandTests
     public void UpdateSshKeyPath_ShouldHaveSetActionWithKeyPath()
     {
         // Arrange & Act
-        var command = new ConfigCommand
+        var command = new TenSecondTom.Features.Setup.Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "ssh-key-path",
@@ -202,7 +202,7 @@ public sealed class ConfigCommandTests
     public void UpdateApiKey_ShouldHaveSetActionWithMaskedValue()
     {
         // Arrange & Act
-        var command = new ConfigCommand
+        var command = new TenSecondTom.Features.Setup.Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "api-key",
@@ -219,7 +219,7 @@ public sealed class ConfigCommandTests
     public void UpdateLogLevel_ShouldHaveSetActionWithValidLogLevel()
     {
         // Arrange & Act
-        var command = new ConfigCommand
+        var command = new TenSecondTom.Features.Setup.Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "log-level",
@@ -236,7 +236,7 @@ public sealed class ConfigCommandTests
     public void UpdateRetentionDays_ShouldHaveSetActionWithPositiveInteger()
     {
         // Arrange & Act
-        var command = new ConfigCommand
+        var command = new TenSecondTom.Features.Setup.Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "retention-days",
@@ -254,7 +254,7 @@ public sealed class ConfigCommandTests
     public void ResetConfiguration_ShouldHaveResetAction()
     {
         // Arrange & Act
-        var command = new ConfigCommand
+        var command = new TenSecondTom.Features.Setup.Config.Command
         {
             Action = ConfigAction.Reset
         };
@@ -267,7 +267,7 @@ public sealed class ConfigCommandTests
     public void ValidateConfiguration_ShouldHaveValidateAction()
     {
         // Arrange & Act
-        var command = new ConfigCommand
+        var command = new TenSecondTom.Features.Setup.Config.Command
         {
             Action = ConfigAction.Validate
         };
@@ -284,7 +284,7 @@ public sealed class ConfigCommandTests
     public void SetAction_WithSettingName_ShouldBeValidStructure()
     {
         // Arrange & Act
-        var command = new ConfigCommand
+        var command = new TenSecondTom.Features.Setup.Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "llm-provider",
@@ -301,7 +301,7 @@ public sealed class ConfigCommandTests
     public void SetAction_WithoutSettingName_ShouldHaveNullSettingName()
     {
         // Arrange & Act
-        var command = new ConfigCommand
+        var command = new TenSecondTom.Features.Setup.Config.Command
         {
             Action = ConfigAction.Set
         };
@@ -315,7 +315,7 @@ public sealed class ConfigCommandTests
     public void SetAction_WithoutSettingValue_ShouldHaveNullSettingValue()
     {
         // Arrange & Act
-        var command = new ConfigCommand
+        var command = new TenSecondTom.Features.Setup.Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "llm-provider"
@@ -330,7 +330,7 @@ public sealed class ConfigCommandTests
     public void ShowAction_WithSettingNameAndValue_ShouldBeIgnored()
     {
         // Arrange & Act
-        var command = new ConfigCommand
+        var command = new TenSecondTom.Features.Setup.Config.Command
         {
             Action = ConfigAction.Show,
             SettingName = "ignored",
@@ -358,7 +358,7 @@ public sealed class ConfigCommandTests
     public void ValidSettingNames_ShouldBeAccepted(string settingName)
     {
         // Arrange & Act
-        var command = new ConfigCommand
+        var command = new TenSecondTom.Features.Setup.Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = settingName,
@@ -376,7 +376,7 @@ public sealed class ConfigCommandTests
     public void SettingNames_ShouldSupportCaseVariations(string inputName, string expectedName)
     {
         // Arrange & Act
-        var command = new ConfigCommand
+        var command = new TenSecondTom.Features.Setup.Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = inputName
@@ -397,14 +397,14 @@ public sealed class ConfigCommandTests
     public void ConfigCommand_WithSameProperties_ShouldBeEqual()
     {
         // Arrange
-        var command1 = new ConfigCommand
+        var command1 = new TenSecondTom.Features.Setup.Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "llm-provider",
             SettingValue = "OpenAI",
             ShowSecrets = true
         };
-        var command2 = new ConfigCommand
+        var command2 = new TenSecondTom.Features.Setup.Config.Command
         {
             Action = ConfigAction.Set,
             SettingName = "llm-provider",
@@ -421,8 +421,8 @@ public sealed class ConfigCommandTests
     public void ConfigCommand_WithDifferentProperties_ShouldNotBeEqual()
     {
         // Arrange
-        var command1 = new ConfigCommand { Action = ConfigAction.Show };
-        var command2 = new ConfigCommand { Action = ConfigAction.Set };
+        var command1 = new TenSecondTom.Features.Setup.Config.Command { Action = ConfigAction.Show };
+        var command2 = new TenSecondTom.Features.Setup.Config.Command { Action = ConfigAction.Set };
 
         // Act & Assert
         command1.Should().NotBe(command2, "records with different properties should not be equal");
@@ -433,7 +433,7 @@ public sealed class ConfigCommandTests
     public void ConfigCommand_ShouldSupportWith_Expression()
     {
         // Arrange
-        var original = new ConfigCommand { Action = ConfigAction.Show };
+        var original = new TenSecondTom.Features.Setup.Config.Command { Action = ConfigAction.Show };
 
         // Act
         var modified = original with { Action = ConfigAction.Set };

@@ -296,6 +296,66 @@ public sealed class FileSystemTemplateLoader : IPromptTemplateLoader
         return Result<List<PromptTemplate>>.Success(templates);
     }
 
+    /// <inheritdoc/>
+    public async Task<Result<string>> LoadRawTemplateContentAsync(
+        string templateId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(templateId))
+        {
+            return Result<string>.Failure("Invalid template ID: cannot be null or empty");
+        }
+
+        // Prevent path traversal attacks
+        if (templateId.Contains('/') || templateId.Contains('\\') || templateId.Contains(".."))
+        {
+            return Result<string>.Failure("Invalid template ID: contains invalid characters");
+        }
+
+        var filePath = Path.Combine(_templatesDirectory, $"{templateId}.md");
+
+        // Security: Verify resolved path stays within templates directory (prevents path traversal)
+        var fullTemplatePath = Path.GetFullPath(filePath);
+        var fullTemplatesDirectory = Path.GetFullPath(_templatesDirectory);
+        if (!fullTemplatePath.StartsWith(fullTemplatesDirectory, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(
+                "Path traversal attempt detected: template path {TemplatePath} is outside templates directory {TemplatesDir}",
+                fullTemplatePath,
+                fullTemplatesDirectory);
+            return Result<string>.Failure("Invalid template ID: path traversal detected");
+        }
+
+        // Check if file exists
+        if (!File.Exists(filePath))
+        {
+            _logger.LogWarning("Template file not found: {FilePath}", filePath);
+            return Result<string>.Failure($"Template not found: {templateId}");
+        }
+
+        // Check file size
+        var fileInfo = new FileInfo(filePath);
+        if (fileInfo.Length > TemplateConstants.MaxFileSizeBytes)
+        {
+            _logger.LogWarning("Template file exceeds size limit: {Size} bytes > {MaxSize} bytes",
+                fileInfo.Length, TemplateConstants.MaxFileSizeBytes);
+            return Result<string>.Failure(
+                $"Template file exceeds size limit of {TemplateConstants.MaxFileSizeBytes / 1_048_576}MB");
+        }
+
+        // Read raw file content with retry logic for concurrent access
+        try
+        {
+            string rawContent = await ReadFileWithRetryAsync(filePath, cancellationToken);
+            return Result<string>.Success(rawContent);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to read template file: {FilePath}", filePath);
+            return Result<string>.Failure($"Failed to read template: {ex.Message}");
+        }
+    }
+
     /// <summary>
     /// Reads a file with retry logic to handle concurrent access issues.
     /// </summary>

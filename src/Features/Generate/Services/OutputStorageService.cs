@@ -26,11 +26,12 @@ public sealed class OutputStorageService : IOutputStorageService
         _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        // Get memory directory and expand home directory if needed
-        var memoryDirectory = (storageOptions ?? throw new ArgumentNullException(nameof(storageOptions))).Value.MemoryDirectory
-            .Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        // Get root directory and expand home directory if needed
+        var rootDirectory = (storageOptions ?? throw new ArgumentNullException(nameof(storageOptions))).Value.RootDirectory
+            ?? Path.Combine(".", DirectoryNames.ApplicationRoot);
+        rootDirectory = rootDirectory.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
-        _recordingDirectory = Path.Combine(memoryDirectory, DirectoryNames.Recording);
+        _recordingDirectory = Path.Combine(rootDirectory, DirectoryNames.Recording);
     }
 
     public async Task<Result<string>> SaveOutputAsync(
