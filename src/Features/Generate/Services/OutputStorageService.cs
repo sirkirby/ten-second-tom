@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TenSecondTom.Features.Generate.Models;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Extensions;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
@@ -26,12 +27,12 @@ public sealed class OutputStorageService : IOutputStorageService
         _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        // Get root directory and expand home directory if needed
-        var rootDirectory = (storageOptions ?? throw new ArgumentNullException(nameof(storageOptions))).Value.RootDirectory
-            ?? Path.Combine(".", DirectoryNames.ApplicationRoot);
-        rootDirectory = rootDirectory.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        ArgumentNullException.ThrowIfNull(storageOptions);
+        var options = storageOptions.Value;
 
-        _recordingDirectory = Path.Combine(rootDirectory, DirectoryNames.Recording);
+        // Get the effective storage directory using extension method
+        var storageBaseDir = options.GetEffectiveStorageDirectory();
+        _recordingDirectory = Path.Combine(storageBaseDir, DirectoryNames.Recording);
     }
 
     public async Task<Result<string>> SaveOutputAsync(
