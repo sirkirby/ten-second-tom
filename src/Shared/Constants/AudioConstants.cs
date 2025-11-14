@@ -37,4 +37,28 @@ public static class AudioConstants
     /// </summary>
     public static string DefaultWhisperModelPath =>
         $"~/{WhisperCacheDirectory}/{DefaultWhisperModelFilename}";
+
+    /// <summary>
+    /// Maximum allowed duration (seconds) for 'today --voice' recording timeout.
+    /// Set to 8 hours (28800 seconds) to allow reasonable values while ensuring eventual timeout.
+    /// </summary>
+    public const int MaxTodayTimeoutSeconds = 28800; // 8 hours
+
+    /// <summary>
+    /// Maximum allowed duration (seconds) for 'record' command timeout.
+    /// Set to 24 hours (86400 seconds) to allow reasonable values while ensuring eventual timeout.
+    /// </summary>
+    public const int MaxRecordTimeoutSeconds = 86400; // 24 hours
+
+    /// <summary>
+    /// Minimum allowed duration (seconds) for 'today --voice' recording timeout.
+    /// Set to 30 seconds to ensure reasonable minimum duration.
+    /// </summary>
+    public const int MinTodayTimeoutSeconds = 30;
+
+    /// <summary>
+    /// Minimum allowed duration (seconds) for 'record' command timeout.
+    /// Set to 60 seconds to ensure reasonable minimum duration.
+    /// </summary>
+    public const int MinRecordTimeoutSeconds = 60;
 }

@@ -96,8 +96,8 @@ public sealed class CreateDailyEntryHandlerTests
             _mockStorage.Object,
             _mockLlmFactory.Object,
             _mockPromptLoader.Object,
-            _mockAuthService.Object,
             _mockLlmOptions.Object,
+            _mockAuthService.Object,
             _mockLogger.Object,
             _mockTemplateProvider.Object,
             _mockTemplateSelectionUI.Object);

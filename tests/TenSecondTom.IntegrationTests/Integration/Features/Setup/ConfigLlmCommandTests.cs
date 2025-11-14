@@ -1,4 +1,5 @@
 using FluentAssertions;
+using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -55,11 +56,18 @@ public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
         var configBuilder = new ConfigurationBuilder();
         services.AddSingleton<IConfiguration>(configBuilder.Build());
 
-        // Add required validators for Config.Handler
+        // Add required validators for ConfigureLlm.Handler
         services.AddTransient<IApiKeyValidator, OpenAIApiKeyValidator>();
         services.AddTransient<IApiKeyValidator, AnthropicApiKeyValidator>();
 
+        // Add MediatR for ConfigureLlm use case
+        services.AddMediatR(config => config.RegisterServicesFromAssembly(typeof(ConfigureLlm).Assembly));
+        
+        // Add Config.Handler (now requires IMediator)
         services.AddTransient<Config.Handler>();
+        
+        // Add ConfigureLlm.Handler for direct testing
+        services.AddTransient<ConfigureLlm.Handler>();
 
         _serviceProvider = services.BuildServiceProvider();
 
@@ -77,12 +85,9 @@ public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync((LlmProvider?)null);
         
-        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
-        var command = new Config.Command
-        {
-            Action = ConfigAction.Set,
-            SettingName = "llm"
-        };
+        // Use ConfigureLlm.Handler directly (LLM config is now handled by ConfigureLlm use case)
+        var handler = _serviceProvider.GetRequiredService<ConfigureLlm.Handler>();
+        var command = new ConfigureLlm.Command();
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -101,12 +106,9 @@ public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
         var initialConfig = CreateValidConfiguration();
         await storageService.SaveAsync(initialConfig, CancellationToken.None);
 
-        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
-        var command = new Config.Command
-        {
-            Action = ConfigAction.Set,
-            SettingName = "llm"
-        };
+        // Use ConfigureLlm.Handler directly (LLM config is now handled by ConfigureLlm use case)
+        var handler = _serviceProvider.GetRequiredService<ConfigureLlm.Handler>();
+        var command = new ConfigureLlm.Command();
 
         // Setup wizard mocks for interactive prompts
         _mockWizard.Setup(w => w.PromptForLlmProviderAsync(
@@ -154,12 +156,9 @@ public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
         var initialConfig = CreateValidConfiguration();
         await storageService.SaveAsync(initialConfig, CancellationToken.None);
 
-        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
-        var command = new Config.Command
-        {
-            Action = ConfigAction.Set,
-            SettingName = "llm"
-        };
+        // Use ConfigureLlm.Handler directly (LLM config is now handled by ConfigureLlm use case)
+        var handler = _serviceProvider.GetRequiredService<ConfigureLlm.Handler>();
+        var command = new ConfigureLlm.Command();
 
         // Setup wizard to simulate cancellation
         _mockWizard.Setup(w => w.PromptForLlmProviderAsync(
@@ -183,12 +182,9 @@ public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
         var initialConfig = CreateValidConfiguration();
         await storageService.SaveAsync(initialConfig, CancellationToken.None);
 
-        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
-        var command = new Config.Command
-        {
-            Action = ConfigAction.Set,
-            SettingName = "llm"
-        };
+        // Use ConfigureLlm.Handler directly (LLM config is now handled by ConfigureLlm use case)
+        var handler = _serviceProvider.GetRequiredService<ConfigureLlm.Handler>();
+        var command = new ConfigureLlm.Command();
 
         // Setup wizard mocks
         _mockWizard.Setup(w => w.PromptForLlmProviderAsync(
@@ -226,12 +222,9 @@ public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
         };
         await storageService.SaveAsync(initialConfig, CancellationToken.None);
 
-        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
-        var command = new Config.Command
-        {
-            Action = ConfigAction.Set,
-            SettingName = "llm"
-        };
+        // Use ConfigureLlm.Handler directly (LLM config is now handled by ConfigureLlm use case)
+        var handler = _serviceProvider.GetRequiredService<ConfigureLlm.Handler>();
+        var command = new ConfigureLlm.Command();
 
         // Setup wizard mocks for changing to Anthropic
         _mockWizard.Setup(w => w.PromptForLlmProviderAsync(
@@ -293,12 +286,9 @@ public sealed class ConfigLlmCommandTests : UserSecretsTestFixture
         };
         await storageService.SaveAsync(initialConfig, CancellationToken.None);
 
-        var handler = _serviceProvider.GetRequiredService<Config.Handler>();
-        var command = new Config.Command
-        {
-            Action = ConfigAction.Set,
-            SettingName = "llm"
-        };
+        // Use ConfigureLlm.Handler directly (LLM config is now handled by ConfigureLlm use case)
+        var handler = _serviceProvider.GetRequiredService<ConfigureLlm.Handler>();
+        var command = new ConfigureLlm.Command();
 
         // Setup wizard mocks - user keeps same provider
         _mockWizard.Setup(w => w.PromptForLlmProviderAsync(

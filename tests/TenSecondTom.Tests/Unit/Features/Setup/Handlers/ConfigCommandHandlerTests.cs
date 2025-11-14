@@ -22,10 +22,8 @@ public sealed class ConfigCommandHandlerTests
 {
     private readonly Mock<IConfigurationStorageService> _mockStorageService;
     private readonly Mock<IOptionsMonitor<ConfigurationSettings>> _mockConfigMonitor;
-    private readonly Mock<ISetupWizardUI> _mockSetupWizard;
     private readonly Mock<IApiKeyValidator> _mockOpenAIValidator;
     private readonly Mock<IApiKeyValidator> _mockAnthropicValidator;
-    private readonly Mock<IAppSettingsStorageService> _mockAppSettingsStorage;
     private readonly Mock<ILogger<Config.Handler>> _mockLogger;
     private readonly Config.Handler _handler;
 
@@ -33,10 +31,8 @@ public sealed class ConfigCommandHandlerTests
     {
         _mockStorageService = new Mock<IConfigurationStorageService>();
         _mockConfigMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
-        _mockSetupWizard = new Mock<ISetupWizardUI>();
         _mockOpenAIValidator = new Mock<IApiKeyValidator>();
         _mockAnthropicValidator = new Mock<IApiKeyValidator>();
-        _mockAppSettingsStorage = new Mock<IAppSettingsStorageService>();
         _mockLogger = new Mock<ILogger<Config.Handler>>();
 
         _mockOpenAIValidator.Setup(v => v.Provider).Returns(LlmProvider.OpenAI);
@@ -50,9 +46,7 @@ public sealed class ConfigCommandHandlerTests
         _handler = new Config.Handler(
             _mockStorageService.Object,
             _mockConfigMonitor.Object,
-            _mockSetupWizard.Object,
             validators,
-            _mockAppSettingsStorage.Object,
             _mockLogger.Object);
     }
 
@@ -64,9 +58,7 @@ public sealed class ConfigCommandHandlerTests
         return new Config.Handler(
             _mockStorageService.Object,
             mockMonitor.Object,
-            _mockSetupWizard.Object,
             new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object },
-            _mockAppSettingsStorage.Object,
             _mockLogger.Object);
     }
 
@@ -87,10 +79,10 @@ public sealed class ConfigCommandHandlerTests
         var handler = new Config.Handler(
             _mockStorageService.Object,
             mockMonitor.Object,
-            _mockSetupWizard.Object,
             new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object },
-            _mockAppSettingsStorage.Object,
             _mockLogger.Object);
+        _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<ConfigurationSettings>.Success(config));
 
         var command = new Config.Command { Action = ConfigAction.Show };
 
@@ -105,8 +97,7 @@ public sealed class ConfigCommandHandlerTests
         result.Value.Storage.Should().BeEquivalentTo(config.Storage);
         result.Value.Optional.Should().BeEquivalentTo(config.Optional);
 
-        // Verify IOptionsMonitor.CurrentValue was accessed
-        mockMonitor.Verify(c => c.CurrentValue, Times.Once);
+        _mockStorageService.Verify(s => s.LoadAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -120,10 +111,10 @@ public sealed class ConfigCommandHandlerTests
         var handler = new Config.Handler(
             _mockStorageService.Object,
             mockMonitor.Object,
-            _mockSetupWizard.Object,
             new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object },
-            _mockAppSettingsStorage.Object,
             _mockLogger.Object);
+        _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<ConfigurationSettings>.Success(config));
 
         var command = new Config.Command { Action = ConfigAction.Show, ShowSecrets = true };
 
@@ -139,6 +130,23 @@ public sealed class ConfigCommandHandlerTests
                 null,
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task HandleShow_WhenStorageLoadFails_ShouldReturnFailure()
+    {
+        // Arrange
+        _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<ConfigurationSettings>.Failure("load failed"));
+
+        var command = new Config.Command { Action = ConfigAction.Show };
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("load failed");
     }
 
     #endregion
@@ -753,9 +761,7 @@ public sealed class ConfigCommandHandlerTests
         var handler = new Config.Handler(
             _mockStorageService.Object,
             mockMonitor.Object,
-            _mockSetupWizard.Object,
             new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object },
-            _mockAppSettingsStorage.Object,
             _mockLogger.Object);
 
         var command = new Config.Command { Action = ConfigAction.Validate };
@@ -786,9 +792,7 @@ public sealed class ConfigCommandHandlerTests
         var handler = new Config.Handler(
             _mockStorageService.Object,
             mockMonitor.Object,
-            _mockSetupWizard.Object,
             new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object },
-            _mockAppSettingsStorage.Object,
             _mockLogger.Object);
 
         var command = new Config.Command { Action = ConfigAction.Validate };
@@ -820,9 +824,7 @@ public sealed class ConfigCommandHandlerTests
         var handler = new Config.Handler(
             _mockStorageService.Object,
             mockMonitor.Object,
-            _mockSetupWizard.Object,
             new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object },
-            _mockAppSettingsStorage.Object,
             _mockLogger.Object);
 
         var command = new Config.Command { Action = ConfigAction.Validate };
@@ -865,28 +867,19 @@ public sealed class ConfigCommandHandlerTests
         // Arrange
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
-
-        var mockMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
-        mockMonitor.Setup(c => c.CurrentValue).Throws(new OperationCanceledException());
-
-        var handler = new Config.Handler(
-            _mockStorageService.Object,
-            mockMonitor.Object,
-            _mockSetupWizard.Object,
-            new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object },
-            _mockAppSettingsStorage.Object,
-            _mockLogger.Object);
+        _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException("cancelled"));
 
         var command = new Config.Command { Action = ConfigAction.Show };
 
         // Act
-        var result = await handler.Handle(command, cts.Token);
+        var result = await _handler.Handle(command, cts.Token);
 
         // Assert
         // Handler catches exceptions and returns failure result
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("Configuration operation failed");
-        result.Error.Should().Contain("canceled");
+        result.Error.Should().Contain("cancelled");
     }
 
     #endregion
@@ -897,21 +890,13 @@ public sealed class ConfigCommandHandlerTests
     public async Task Handle_WhenExceptionThrown_ShouldReturnFailureResult()
     {
         // Arrange
-        var mockMonitor = new Mock<IOptionsMonitor<ConfigurationSettings>>();
-        mockMonitor.Setup(c => c.CurrentValue).Throws(new InvalidOperationException("Test exception"));
-
-        var handler = new Config.Handler(
-            _mockStorageService.Object,
-            mockMonitor.Object,
-            _mockSetupWizard.Object,
-            new[] { _mockOpenAIValidator.Object, _mockAnthropicValidator.Object },
-            _mockAppSettingsStorage.Object,
-            _mockLogger.Object);
+        _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Test exception"));
 
         var command = new Config.Command { Action = ConfigAction.Show };
 
         // Act
-        var result = await handler.Handle(command, CancellationToken.None);
+        var result = await _handler.Handle(command, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeFalse();
@@ -980,27 +965,19 @@ public sealed class ConfigCommandHandlerTests
 
     #endregion
 
-    #region Set Action Tests - LLM Interactive Configuration
+    #region Set Action Tests - Interactive Setting Guidance
 
-    [Fact]
-    public async Task HandleSet_WithLlmSettingName_ShouldTriggerInteractiveConfiguration()
+    [Theory]
+    [InlineData("llm", "Use 'tom config llm'")]
+    [InlineData("audio", "Use 'tom config audio'")]
+    public async Task HandleSet_WithInteractiveSettingName_ReturnsGuidance(string settingName, string expectedMessage)
     {
         // Arrange
-        var config = CreateValidConfiguration();
-        _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<ConfigurationSettings>.Success(config));
-
-        // Setup wizard to return null (cancel)
-        _mockSetupWizard.Setup(w => w.PromptForLlmProviderAsync(
-                It.IsAny<LlmProvider?>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync((LlmProvider?)null);
-
         var command = new Config.Command
         {
             Action = ConfigAction.Set,
-            SettingName = "llm",
-            SettingValue = null // Interactive mode - no value provided
+            SettingName = settingName,
+            SettingValue = null
         };
 
         // Act
@@ -1008,47 +985,9 @@ public sealed class ConfigCommandHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("LLM configuration cancelled");
-        
-        // Verify wizard was called
-        _mockSetupWizard.Verify(w => w.PromptForLlmProviderAsync(
-            It.IsAny<LlmProvider?>(),
-            It.IsAny<CancellationToken>()), Times.Once);
-    }
+        result.Error.Should().Contain(expectedMessage);
 
-    [Fact]
-    public async Task HandleSet_WithLlmSettingNameAndValue_ShouldStillUseInteractiveMode()
-    {
-        // Arrange
-        var config = CreateValidConfiguration();
-        _mockStorageService.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<ConfigurationSettings>.Success(config));
-
-        // Setup wizard to return null (cancel)
-        _mockSetupWizard.Setup(w => w.PromptForLlmProviderAsync(
-                It.IsAny<LlmProvider?>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync((LlmProvider?)null);
-
-        var command = new Config.Command
-        {
-            Action = ConfigAction.Set,
-            SettingName = "llm",
-            SettingValue = "some-value" // Value is ignored for llm setting
-        };
-
-        // Act
-        var result = await _handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        // LLM configuration uses interactive mode regardless of value
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("LLM configuration cancelled");
-        
-        // Verify wizard was called even though value was provided
-        _mockSetupWizard.Verify(w => w.PromptForLlmProviderAsync(
-            It.IsAny<LlmProvider?>(),
-            It.IsAny<CancellationToken>()), Times.Once);
+        _mockStorageService.Verify(s => s.LoadAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     #endregion

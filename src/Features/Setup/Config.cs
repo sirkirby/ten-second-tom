@@ -29,6 +29,7 @@ public static class Config
         /// <summary>
         /// Gets the setting name to modify (required for Set action).
         /// Valid names: llm-provider, api-key, memory-directory, ssh-key-path, log-level, retention-days.
+        /// Use 'tom config llm' or 'tom config audio' for guided configuration flows.
         /// </summary>
         public string? SettingName { get; init; }
 
@@ -55,7 +56,9 @@ public static class Config
             "memory-directory",
             "ssh-key-path",
             "log-level",
-            "retention-days"
+            "retention-days",
+            "llm",
+            "audio"
         ];
 
         public Validator()
@@ -72,10 +75,14 @@ public static class Config
                 .When(x => !string.IsNullOrWhiteSpace(x.SettingName))
                 .WithMessage($"SettingName must be one of: {string.Join(", ", ValidSettingNames)}");
 
-            // SettingValue is required for Set action
+            // SettingValue is required for Set action EXCEPT interactive shortcuts ("llm", "audio")
             RuleFor(x => x.SettingValue)
                 .NotEmpty()
-                .When(x => x.Action == ConfigAction.Set)
+                .When(x =>
+                    x.Action == ConfigAction.Set &&
+                    // If SettingName is null/whitespace, let the SettingName rule handle it
+                    !string.IsNullOrWhiteSpace(x.SettingName) &&
+                    !IsInteractiveShortcut(x.SettingName!))
                 .WithMessage("SettingValue is required for Set action");
 
             // ShowSecrets only valid for Show action
@@ -84,6 +91,7 @@ public static class Config
                 .When(x => x.Action != ConfigAction.Show)
                 .WithMessage("ShowSecrets is only valid for Show action");
         }
+
     }
 
     /// <summary>
@@ -93,9 +101,7 @@ public static class Config
     public sealed class Handler(
         IConfigurationStorageService storageService,
         IOptionsMonitor<ConfigurationSettings> configMonitor,
-        ISetupWizardUI setupWizard,
         IEnumerable<IApiKeyValidator> apiKeyValidators,
-        IAppSettingsStorageService appSettingsStorage,
         ILogger<Handler> logger)
         : IRequestHandler<Command, Result<ConfigurationSettings>>
     {
@@ -128,15 +134,25 @@ public static class Config
             Command command,
             CancellationToken cancellationToken)
         {
-            // Use IOptionsMonitor.CurrentValue to get the latest effective configuration
-            // This includes values from all sources (appsettings.json, config.json, env vars, command line)
-            // merged in the correct precedence order
-            var config = configMonitor.CurrentValue;
-
             logger.LogInformation("Displaying current configuration (ShowSecrets: {ShowSecrets})",
                 command.ShowSecrets);
 
-            return Task.FromResult(Result<ConfigurationSettings>.Success(config));
+            return GetStoredConfigurationAsync(cancellationToken);
+        }
+
+        private async Task<Result<ConfigurationSettings>> GetStoredConfigurationAsync(
+            CancellationToken cancellationToken)
+        {
+            var loadResult = await storageService.LoadAsync(cancellationToken).ConfigureAwait(false);
+
+            if (!loadResult.IsSuccess || loadResult.Value is null)
+            {
+                var error = loadResult.Error ?? "Configuration could not be loaded. Run 'tom setup' to create it.";
+                return Result<ConfigurationSettings>.Failure(error);
+            }
+
+            logger.LogInformation("Loaded configuration from storage for display");
+            return Result<ConfigurationSettings>.Success(loadResult.Value);
         }
 
         private async Task<Result<ConfigurationSettings>> HandleSetAsync(
@@ -149,16 +165,12 @@ public static class Config
                 return Result<ConfigurationSettings>.Failure("Setting name is required. Example: tom config --set llm-provider OpenAI");
             }
 
-            // Special handling for "llm" - interactive configuration
-            if (command.SettingName.Equals("llm", StringComparison.OrdinalIgnoreCase))
-            {
-                return await HandleInteractiveLlmConfigurationAsync(cancellationToken);
-            }
+            var normalizedSettingName = command.SettingName.ToLowerInvariant();
 
-            // Special handling for "audio" - interactive configuration
-            if (command.SettingName.Equals("audio", StringComparison.OrdinalIgnoreCase))
+            // Interactive subcommands live in their own slices; provide guidance rather than delegating.
+            if (IsInteractiveShortcut(normalizedSettingName))
             {
-                return await HandleInteractiveAudioConfigurationAsync(cancellationToken);
+                return Result<ConfigurationSettings>.Failure(GetInteractiveSettingMessage(normalizedSettingName));
             }
 
             if (string.IsNullOrWhiteSpace(command.SettingValue))
@@ -179,7 +191,7 @@ public static class Config
             // Update the specified setting
             var updateResult = await UpdateSettingAsync(
                 currentConfig,
-                command.SettingName.ToLowerInvariant(),
+                normalizedSettingName,
                 command.SettingValue,
                 cancellationToken);
 
@@ -361,425 +373,7 @@ public static class Config
             return Result<ConfigurationSettings>.Success(newConfig);
         }
 
-        /// <summary>
-        /// Handles interactive LLM configuration via 'tom config llm'
-        /// Prompts for provider and model selection, updates configuration
-        /// </summary>
-        private async Task<Result<ConfigurationSettings>> HandleInteractiveLlmConfigurationAsync(
-            CancellationToken cancellationToken)
-        {
-            // Load current configuration
-            var loadResult = await storageService.LoadAsync(cancellationToken);
 
-            if (!loadResult.IsSuccess)
-            {
-                return Result<ConfigurationSettings>.Failure("No configuration found. Run 'tom setup' first to create initial configuration, then use 'tom config llm' to update LLM settings.");
-            }
-
-            var currentConfig = loadResult.Value!;
-
-            logger.LogInformation("Starting interactive LLM configuration");
-
-            // Determine total steps (3 if provider changes, 2 if same provider)
-            bool willChangeProvider = false;
-
-            // Step 1: Prompt for LLM provider
-            setupWizard.ShowStepHeader(1, 3, "LLM Provider Selection");
-            var selectedProvider = await setupWizard.PromptForLlmProviderAsync(
-                currentConfig.Llm.Provider,
-                cancellationToken);
-
-            if (!selectedProvider.HasValue)
-            {
-                logger.LogInformation("LLM configuration cancelled by user");
-                return Result<ConfigurationSettings>.Failure("LLM configuration cancelled. No changes were made.");
-            }
-
-            willChangeProvider = selectedProvider.Value != currentConfig.Llm.Provider;
-            int totalSteps = willChangeProvider ? 3 : 2;
-
-            // Step 2: Prompt for model selection
-            setupWizard.ShowStepHeader(2, totalSteps, "Model Selection");
-
-            // Pass current model only if staying with same provider
-            var currentModelId = selectedProvider.Value == currentConfig.Llm.Provider
-                ? currentConfig.Llm.Model
-                : null;
-
-            var selectedModel = await setupWizard.PromptForModelAsync(
-                selectedProvider.Value,
-                currentModelId,
-                cancellationToken);
-
-            if (selectedModel == null)
-            {
-                logger.LogInformation("Model selection cancelled by user");
-                return Result<ConfigurationSettings>.Failure("Model selection cancelled. No changes were made.");
-            }
-
-            // Step 3: If provider changed, prompt for new API key
-            string? apiKey = currentConfig.Llm.ApiKey;
-            bool providerChanged = selectedProvider.Value != currentConfig.Llm.Provider;
-
-            if (providerChanged)
-            {
-                setupWizard.ShowStepHeader(3, 3, "API Key Configuration");
-                setupWizard.ShowWarning($"Provider changed from {currentConfig.Llm.Provider} to {selectedProvider.Value}. A new API key is required.");
-
-                var newApiKey = await setupWizard.PromptForApiKeyAsync(
-                    selectedProvider.Value,
-                    null, // Don't show current key from different provider
-                    cancellationToken);
-
-                if (string.IsNullOrWhiteSpace(newApiKey))
-                {
-                    logger.LogInformation("API key entry cancelled by user");
-                    return Result<ConfigurationSettings>.Failure("API key is required when changing providers. Configuration not updated.");
-                }
-
-                // Validate the API key format
-                var validator = apiKeyValidators.FirstOrDefault(v => v.Provider == selectedProvider.Value);
-                if (validator != null)
-                {
-                    var validationResult = await validator.ValidateFormatAsync(newApiKey);
-                    if (!validationResult.IsValid)
-                    {
-                        return Result<ConfigurationSettings>.Failure($"Invalid API key format: {validationResult.ErrorMessage}");
-                    }
-                }
-
-                apiKey = newApiKey;
-            }
-
-            // Update configuration
-            var updatedConfig = currentConfig with
-            {
-                Llm = currentConfig.Llm with
-                {
-                    Provider = selectedProvider.Value,
-                    Model = selectedModel.Id,
-                    ApiKey = apiKey,
-                    MaxInputTokens = selectedProvider.Value == LlmProvider.Anthropic
-                        ? LlmConstants.DefaultMaxInputTokensAnthropic
-                        : LlmConstants.DefaultMaxInputTokensOpenAI
-                }
-            };
-
-            var markedConfig = updatedConfig.MarkAsModified();
-
-            // Save updated configuration
-            var saveResult = await storageService.SaveAsync(markedConfig, cancellationToken).ConfigureAwait(false);
-
-            if (!saveResult.IsSuccess)
-            {
-                return Result<ConfigurationSettings>.Failure($"Failed to save configuration: {saveResult.Error}. Changes were not applied. Try again or check file permissions.");
-            }
-
-            logger.LogInformation(
-                "LLM configuration updated successfully: Provider={Provider}, Model={Model}",
-                selectedProvider.Value,
-                selectedModel.Id);
-
-            // Display success message
-            var providerName = selectedProvider.Value == LlmProvider.OpenAI ? "OpenAI" : "Anthropic";
-            setupWizard.ShowSuccess($"✓ LLM configuration updated: {providerName} - {selectedModel.DisplayName} [{selectedModel.CostTier}]");
-
-            return Result<ConfigurationSettings>.Success(markedConfig);
-        }
-
-        private async Task<Result<ConfigurationSettings>> HandleInteractiveAudioConfigurationAsync(
-            CancellationToken cancellationToken)
-        {
-            logger.LogInformation("Starting interactive audio configuration");
-
-            // Load current audio configuration from appsettings.json
-            var loadResult = await appSettingsStorage.LoadAudioConfigurationAsync(cancellationToken);
-
-            if (!loadResult.IsSuccess)
-            {
-                setupWizard.ShowWarning("Could not load current audio configuration. Using defaults.");
-            }
-
-            var currentAudio = loadResult.IsSuccess ? loadResult.Value! : new AudioConfiguration();
-
-            const int totalSteps = 9;
-
-            // Step 1: Input Volume
-            setupWizard.ShowStepHeader(1, totalSteps, "Input Volume");
-            var inputVolume = await setupWizard.PromptForInputVolumeAsync(
-                currentAudio.Recorder.InputVolume,
-                cancellationToken);
-
-            if (!inputVolume.HasValue)
-            {
-                return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
-            }
-
-            // Step 2: Noise Reduction
-            setupWizard.ShowStepHeader(2, totalSteps, "Noise Reduction");
-            var noiseReduction = await setupWizard.PromptForBooleanAsync(
-                "Enable noise reduction during recording?",
-                currentAudio.Recorder.EnableNoiseReduction,
-                cancellationToken);
-
-            if (!noiseReduction.HasValue)
-            {
-                return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
-            }
-
-            // Step 3: Frequency Filters
-            setupWizard.ShowStepHeader(3, totalSteps, "Frequency Filters");
-            var frequencyFilters = await setupWizard.PromptForBooleanAsync(
-                "Enable frequency filters during recording?",
-                currentAudio.Recorder.EnableFrequencyFilters,
-                cancellationToken);
-
-            if (!frequencyFilters.HasValue)
-            {
-                return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
-            }
-
-            // Step 4: Silence Removal
-            setupWizard.ShowStepHeader(4, totalSteps, "Silence Removal");
-            var removeSilence = await setupWizard.PromptForBooleanAsync(
-                "Remove silence from recordings during preprocessing?",
-                currentAudio.Preprocessing.RemoveSilence,
-                cancellationToken);
-
-            if (!removeSilence.HasValue)
-            {
-                return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
-            }
-
-            // Step 5: Silence Threshold (only if silence removal enabled)
-            int silenceThresholdDb = currentAudio.Preprocessing.SilenceThresholdDb;
-            if (removeSilence.Value)
-            {
-                setupWizard.ShowStepHeader(5, totalSteps, "Silence Detection Threshold");
-                var threshold = await setupWizard.PromptForIntAsync(
-                    "Silence threshold in decibels (-60 to -40):",
-                    currentAudio.Preprocessing.SilenceThresholdDb,
-                    -60,
-                    -40,
-                    cancellationToken);
-
-                if (!threshold.HasValue)
-                {
-                    return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
-                }
-                silenceThresholdDb = threshold.Value;
-            }
-            else
-            {
-                setupWizard.ShowStepHeader(5, totalSteps, "Silence Detection Threshold");
-                setupWizard.ShowStatus("Skipped (silence removal disabled)");
-            }
-
-            // Step 6: Minimum Silence Duration (only if silence removal enabled)
-            int minSilenceDurationMs = currentAudio.Preprocessing.MinimumSilenceDurationMs;
-            if (removeSilence.Value)
-            {
-                setupWizard.ShowStepHeader(6, totalSteps, "Minimum Silence Duration");
-                var duration = await setupWizard.PromptForIntAsync(
-                    "Minimum silence duration to remove (ms, 100-2000):",
-                    currentAudio.Preprocessing.MinimumSilenceDurationMs,
-                    100,
-                    2000,
-                    cancellationToken);
-
-                if (!duration.HasValue)
-                {
-                    return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
-                }
-                minSilenceDurationMs = duration.Value;
-            }
-            else
-            {
-                setupWizard.ShowStepHeader(6, totalSteps, "Minimum Silence Duration");
-                setupWizard.ShowStatus("Skipped (silence removal disabled)");
-            }
-
-            // Step 7: Speech-to-Text Provider
-            setupWizard.ShowStepHeader(7, totalSteps, "Speech-to-Text Provider");
-            var sttProvider = await setupWizard.PromptForSttProviderAsync(
-                currentAudio.SttProvider,
-                cancellationToken);
-
-            if (sttProvider == null)
-            {
-                return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
-            }
-
-            // Step 7a: STT API Key (if provider requires it)
-            string? sttApiKey = currentAudio.SttApiKey;
-            if (SttProviders.RequiresApiKey(sttProvider))
-            {
-                sttApiKey = await setupWizard.PromptForSttApiKeyAsync(
-                    sttProvider,
-                    currentAudio.SttApiKey,
-                    cancellationToken);
-
-                if (sttApiKey == null)
-                {
-                    return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
-                }
-            }
-
-            // Step 7b: STT Fallback Provider
-            bool sttFallbackEnabled = currentAudio.SttFallbackEnabled;
-            string? sttFallbackProvider = currentAudio.SttFallbackProvider;
-            string? sttFallbackApiKey = currentAudio.SttFallbackApiKey;
-
-            if (SttProviders.SupportsFallback(sttProvider))
-            {
-                var fallback = await setupWizard.PromptForSttFallbackAsync(
-                    currentAudio.SttFallbackEnabled,
-                    cancellationToken);
-
-                if (!fallback.HasValue)
-                {
-                    return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
-                }
-
-                sttFallbackEnabled = fallback.Value;
-
-                // If fallback is enabled, prompt for provider and API key
-                if (sttFallbackEnabled)
-                {
-                    // Prompt for fallback provider
-                    var fallbackProvider = await setupWizard.PromptForSttFallbackProviderAsync(
-                        currentAudio.SttFallbackProvider,
-                        cancellationToken);
-
-                    if (fallbackProvider == null)
-                    {
-                        return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
-                    }
-
-                    sttFallbackProvider = fallbackProvider;
-
-                    // Prompt for fallback API key
-                    setupWizard.ShowStatus($"Fallback provider '{fallbackProvider}' requires an API key.");
-
-                    var fallbackApiKey = await setupWizard.PromptForSttApiKeyAsync(
-                        fallbackProvider,
-                        currentAudio.SttFallbackApiKey,
-                        cancellationToken);
-
-                    if (fallbackApiKey == null)
-                    {
-                        return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
-                    }
-
-                    sttFallbackApiKey = fallbackApiKey;
-                }
-                else
-                {
-                    // Fallback is disabled, clear the provider and API key
-                    sttFallbackProvider = null;
-                    sttFallbackApiKey = null;
-                }
-            }
-
-            // Step 8: Today Voice Timeout
-            setupWizard.ShowStepHeader(8, totalSteps, "Today Voice Recording Timeout");
-            setupWizard.ShowStatus("When this duration is reached, you'll be prompted to continue or finish recording.");
-            var todayTimeout = await setupWizard.PromptForIntAsync(
-                "Time before prompting to continue 'today --voice' (seconds, 30-600):",
-                currentAudio.Timeouts.TodaySeconds,
-                30,
-                600,
-                cancellationToken);
-
-            if (!todayTimeout.HasValue)
-            {
-                return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
-            }
-
-            // Step 9: Record Command Timeout
-            setupWizard.ShowStepHeader(9, totalSteps, "Record Command Timeout");
-            setupWizard.ShowStatus("When this duration is reached, you'll be prompted to continue or finish recording.");
-            var recordTimeout = await setupWizard.PromptForIntAsync(
-                "Time before prompting to continue 'record' (seconds, 60-1800):",
-                currentAudio.Timeouts.RecordSeconds,
-                60,
-                1800,
-                cancellationToken);
-
-            if (!recordTimeout.HasValue)
-            {
-                return Result<ConfigurationSettings>.Failure("Audio configuration cancelled. No changes were made.");
-            }
-
-            // Build updated audio configuration
-            var updatedAudio = new AudioConfiguration
-            {
-                SttProvider = sttProvider,
-                SttApiKey = sttApiKey,
-                SttFallbackEnabled = sttFallbackEnabled,
-                SttFallbackProvider = sttFallbackProvider,
-                SttFallbackBinaryPath = currentAudio.SttFallbackBinaryPath, // Not modified interactively
-                SttFallbackModel = currentAudio.SttFallbackModel, // Not modified interactively
-                SttFallbackApiKey = sttFallbackApiKey,
-                KeepFiles = currentAudio.KeepFiles, // Not modified interactively
-                Recorder = new RecorderConfiguration
-                {
-                    FfmpegPath = currentAudio.Recorder.FfmpegPath, // Not modified interactively
-                    InputVolume = inputVolume.Value,
-                    EnableNoiseReduction = noiseReduction.Value,
-                    EnableFrequencyFilters = frequencyFilters.Value
-                },
-                SttBinaryPath = currentAudio.SttBinaryPath, // Not modified interactively
-                SttModel = currentAudio.SttModel, // Not modified interactively
-                Preprocessing = new PreprocessingConfiguration
-                {
-                    RemoveSilence = removeSilence.Value,
-                    SilenceThresholdDb = silenceThresholdDb,
-                    MinimumSilenceDurationMs = minSilenceDurationMs
-                },
-                Timeouts = new RecordingTimeoutsConfiguration
-                {
-                    TodaySeconds = todayTimeout.Value,
-                    RecordSeconds = recordTimeout.Value
-                }
-            };
-
-            // Save to appsettings.json
-            var saveResult = await appSettingsStorage.SaveAudioConfigurationAsync(updatedAudio, cancellationToken);
-
-            if (!saveResult.IsSuccess)
-            {
-                return Result<ConfigurationSettings>.Failure($"Failed to save audio configuration: {saveResult.Error}. Changes were not applied.");
-            }
-
-            logger.LogInformation("Audio configuration updated successfully");
-
-            // Display success message with summary
-            setupWizard.ShowSuccess("✓ Audio configuration saved successfully");
-            setupWizard.ShowStatus($"  • Input volume: {inputVolume.Value:F1}");
-            setupWizard.ShowStatus($"  • Noise reduction: {(noiseReduction.Value ? "Enabled" : "Disabled")}");
-            setupWizard.ShowStatus($"  • Frequency filters: {(frequencyFilters.Value ? "Enabled" : "Disabled")}");
-            setupWizard.ShowStatus($"  • Silence removal: {(removeSilence.Value ? "Enabled" : "Disabled")}");
-            if (removeSilence.Value)
-            {
-                setupWizard.ShowStatus($"  • Silence threshold: {silenceThresholdDb} dB");
-                setupWizard.ShowStatus($"  • Min silence duration: {minSilenceDurationMs} ms");
-            }
-            var sttProviderDisplay = sttProvider == SttProviders.WhisperCpp ? "whisper.cpp (local)" : "OpenAI Whisper API (cloud)";
-            setupWizard.ShowStatus($"  • STT provider: {sttProviderDisplay}");
-            if (sttFallbackEnabled)
-            {
-                setupWizard.ShowStatus($"  • STT fallback provider: Enabled ({sttFallbackProvider})");
-            }
-            setupWizard.ShowStatus($"  • Today timeout: {todayTimeout.Value}s");
-            setupWizard.ShowStatus($"  • Record timeout: {recordTimeout.Value}s");
-
-            // Return current configuration (audio config is stored separately in appsettings.json)
-            var configLoadResult = await storageService.LoadAsync(cancellationToken);
-            return configLoadResult.IsSuccess
-                ? Result<ConfigurationSettings>.Success(configLoadResult.Value!)
-                : Result<ConfigurationSettings>.Failure("Audio configuration saved, but could not reload main configuration.");
-        }
 
         private Task<Result<ConfigurationSettings>> HandleResetAsync(CancellationToken cancellationToken)
         {
@@ -803,5 +397,15 @@ public static class Config
             return Task.FromResult(Result<ConfigurationSettings>.Success(config));
         }
     }
-}
 
+    private static bool IsInteractiveShortcut(string settingName)
+        => settingName.Equals("llm", StringComparison.OrdinalIgnoreCase)
+           || settingName.Equals("audio", StringComparison.OrdinalIgnoreCase);
+
+    private static string GetInteractiveSettingMessage(string settingName)
+    {
+        return settingName.Equals("llm", StringComparison.OrdinalIgnoreCase)
+            ? "Use 'tom config llm' to configure LLM provider and model interactively."
+            : "Use 'tom config audio' to configure audio settings interactively.";
+    }
+}

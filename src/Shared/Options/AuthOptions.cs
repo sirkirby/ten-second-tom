@@ -52,7 +52,7 @@ public sealed class AuthOptions
     /// Supports tilde expansion (e.g., "~/.ssh/id_ed25519").
     /// Must point to an ED25519 key as per project requirements.
     /// </remarks>
-    public string? KeyPath { get; init; }
+    public string? KeyPath { get; set; }
 
     /// <summary>
     /// Gets or sets the source where the SSH key is retrieved from.
@@ -66,7 +66,7 @@ public sealed class AuthOptions
     /// <see cref="SshKeySource.ManualPath"/>.
     /// This is a required configuration value.
     /// </remarks>
-    public required SshKeySource KeySource { get; init; }
+    public SshKeySource KeySource { get; set; }
 
     /// <summary>
     /// Gets or sets the socket path for the SSH agent.
@@ -79,7 +79,7 @@ public sealed class AuthOptions
     /// Typically provided via SSH_AUTH_SOCK environment variable on Unix systems.
     /// Example: "/run/user/1000/keyring/ssh" or "/tmp/ssh-agent.sock".
     /// </remarks>
-    public string? AgentSocketPath { get; init; }
+    public string? AgentSocketPath { get; set; }
 
     /// <summary>
     /// Gets or sets the display name for the SSH key.

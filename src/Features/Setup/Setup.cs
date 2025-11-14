@@ -244,17 +244,26 @@ public static class Setup
                 // Step 9: Configuration Summary
                 wizardUI.ShowStepHeader(9, 10, "Configuration Summary");
 
+                var resolvedKeyPath = selectedSshKey?.FilePath ?? request.ExistingConfiguration?.Ssh.KeyPath;
+                var resolvedKeyDisplayName = selectedSshKey?.DisplayName ?? request.ExistingConfiguration?.Ssh.KeyDisplayName;
+                var resolvedKeySource = selectedSshKey?.Source
+                    ?? request.ExistingConfiguration?.Ssh.KeySource
+                    ?? (!string.IsNullOrWhiteSpace(resolvedKeyPath)
+                        ? SshKeySource.ManualPath
+                        : SshKeySource.SystemAgent);
+                var resolvedAgentSocket = ResolveAgentSocketPath(
+                    resolvedKeySource,
+                    request.ExistingConfiguration?.Ssh.AgentSocketPath);
+
                 var newConfiguration = new ConfigurationSettings
                 {
                     RootDirectory = rootDirectory!,
                     Ssh = new SshConfiguration
                     {
-                        KeyPath = selectedSshKey?.FilePath,
-                        KeySource = selectedSshKey?.Source,
-                        KeyDisplayName = selectedSshKey?.DisplayName,
-                        AgentSocketPath = selectedSshKey?.Source != SshKeySource.FileSystem
-                            ? GetAgentSocketPath(selectedSshKey?.Source)
-                            : null
+                        KeyPath = resolvedKeyPath,
+                        KeySource = resolvedKeySource,
+                        KeyDisplayName = resolvedKeyDisplayName,
+                        AgentSocketPath = resolvedAgentSocket
                     },
                     Llm = new LlmConfiguration
                     {
@@ -337,19 +346,34 @@ public static class Setup
         }
 
         /// <summary>
+        /// Determines the SSH agent socket path to persist, preferring any previously stored value.
+        /// </summary>
+        /// <param name="keySource">The currently selected SSH key source.</param>
+        /// <param name="existingAgentSocketPath">Existing socket path from configuration, if any.</param>
+        /// <returns>The socket path, or null for file-based key sources.</returns>
+        private static string? ResolveAgentSocketPath(SshKeySource keySource, string? existingAgentSocketPath)
+        {
+            return keySource switch
+            {
+                SshKeySource.SystemAgent or SshKeySource.OnePasswordAgent or SshKeySource.SecretiveAgent
+                    => string.IsNullOrWhiteSpace(existingAgentSocketPath)
+                        ? GetAgentSocketPath(keySource)
+                        : existingAgentSocketPath,
+                _ => null
+            };
+        }
+
+        /// <summary>
         /// Gets the SSH agent socket path for the specified key source.
         /// Platform-aware: supports macOS, Linux, and Windows.
         /// </summary>
-        /// <param name="source">The SSH key source to get the socket path for.</param>
+        /// <param name="keySource">The SSH key source to get the socket path for.</param>
         /// <returns>The socket path, or null if not available or not applicable.</returns>
-        private static string? GetAgentSocketPath(SshKeySource? source)
+        private static string? GetAgentSocketPath(SshKeySource keySource)
         {
-            if (!source.HasValue)
-                return null;
-
             // Convert SshKeySource to SshAgentProvider and use the existing resolver
             // which already handles platform detection and path resolution
-            var provider = source.Value switch
+            var provider = keySource switch
             {
                 SshKeySource.SystemAgent => SshAgentProvider.System,
                 SshKeySource.OnePasswordAgent => SshAgentProvider.OnePassword,

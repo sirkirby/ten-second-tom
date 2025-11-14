@@ -63,8 +63,8 @@ public static class CreateDailyEntry
         IMemoryStorageProvider storage,
         ILlmProviderFactory llmFactory,
         IPromptTemplateLoader promptLoader,
-        IAuthenticationService authService,
         IOptions<LlmOptions> llmOptions,
+        IAuthenticationService authService,
         ILogger<Handler> logger,
         ITemplateProvider templateProvider,
         ITemplateSelectionUI templateSelectionUI) : IRequestHandler<Command, Result<DailyEntry>>

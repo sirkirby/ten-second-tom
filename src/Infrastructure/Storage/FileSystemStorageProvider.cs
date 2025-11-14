@@ -138,7 +138,7 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
     }
 
     /// <inheritdoc/>
-    public async Task<Result<int>> CountEntriesAsync(string command, DateTime targetDate, CancellationToken cancellationToken)
+    public Task<Result<int>> CountEntriesAsync(string command, DateTime targetDate, CancellationToken cancellationToken)
     {
         try
         {
@@ -146,36 +146,66 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
 
             if (!Directory.Exists(commandDirectory))
             {
-                return Result<int>.Success(0);
+                return Task.FromResult(Result<int>.Success(0));
             }
 
-            string[] files = Directory.GetFiles(commandDirectory, "*.md", SearchOption.AllDirectories);
-            int count = 0;
-
-            foreach (string file in files)
-            {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    break;
-                }
-
-                MemoryEntry? entry = await ParseMarkdownFileAsync(file, cancellationToken).ConfigureAwait(false);
-                
-                if (entry != null && entry.Timestamp.Date == targetDate.Date)
-                {
-                    count++;
-                }
-            }
-
+            int count = CountEntriesByConvention(commandDirectory, command, targetDate);
             _logger.LogDebug("Counted {Count} entries for command {Command} on {Date}", count, command, targetDate);
 
-            return Result<int>.Success(count);
+            return Task.FromResult(Result<int>.Success(count));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to count entries for command {Command}", command);
-            return Result<int>.Failure($"Failed to count entries: {ex.Message}");
+            return Task.FromResult(Result<int>.Failure($"Failed to count entries: {ex.Message}"));
         }
+    }
+
+    private static int CountEntriesByConvention(string commandDirectory, string command, DateTime targetDate)
+        => command switch
+        {
+            CommandNames.Today => CountTodayEntries(commandDirectory, targetDate),
+            CommandNames.ThisWeek => CountThisWeekEntries(commandDirectory, targetDate),
+            _ => CountEntriesByScan(commandDirectory, targetDate)
+        };
+
+    private static int CountTodayEntries(string commandDirectory, DateTime targetDate)
+    {
+        if (!Directory.Exists(commandDirectory))
+        {
+            return 0;
+        }
+
+        string pattern = $"{targetDate:MM-dd-yyyy}_*.md";
+        return Directory.EnumerateFiles(commandDirectory, pattern, SearchOption.TopDirectoryOnly).Count();
+    }
+
+    private static int CountThisWeekEntries(string commandDirectory, DateTime targetDate)
+    {
+        if (!Directory.Exists(commandDirectory))
+        {
+            return 0;
+        }
+
+        int weekNumber = CultureInfo.InvariantCulture.Calendar.GetWeekOfYear(
+            targetDate,
+            CalendarWeekRule.FirstFourDayWeek,
+            DayOfWeek.Monday);
+
+        string prefix = $"{targetDate.Year:0000}-{weekNumber:00}-";
+        return Directory.EnumerateFiles(commandDirectory, $"{prefix}*.md", SearchOption.TopDirectoryOnly).Count();
+    }
+
+    private static int CountEntriesByScan(string commandDirectory, DateTime targetDate)
+    {
+        if (!Directory.Exists(commandDirectory))
+        {
+            return 0;
+        }
+
+        string dateToken = targetDate.ToString("MM-dd-yyyy", CultureInfo.InvariantCulture);
+        return Directory.EnumerateFiles(commandDirectory, "*.md", SearchOption.AllDirectories)
+            .Count(file => Path.GetFileName(file).Contains(dateToken, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <inheritdoc/>

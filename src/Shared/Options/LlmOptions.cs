@@ -54,7 +54,7 @@ public sealed class LlmOptions
     /// or other secure configuration providers. Never commit API keys to source control.
     /// This is a required configuration value.
     /// </remarks>
-    public required string ApiKey { get; init; }
+    public required string ApiKey { get; set; }
 
     /// <summary>
     /// Gets or sets the model identifier for the LLM provider.
@@ -65,7 +65,7 @@ public sealed class LlmOptions
     /// - Anthropic: "claude-3-5-sonnet-20241022", "claude-3-opus-20240229"
     /// This is a required configuration value.
     /// </remarks>
-    public required string Model { get; init; }
+    public required string Model { get; set; }
 
     /// <summary>
     /// Gets or sets the maximum number of input tokens for LLM processing.
