@@ -25,6 +25,7 @@
     <NoWarn>$(NoWarn);CA1031</NoWarn> <!-- Catch general exceptions - needed for Result&lt;T&gt; pattern -->
     <NoWarn>$(NoWarn);CA1062</NoWarn> <!-- Validate parameters - handled by FluentValidation -->
     <NoWarn>$(NoWarn);CA1303</NoWarn> <!-- Localized parameters - CLI doesn't need localization -->
+    <NoWarn>$(NoWarn);SYSLIB1104</NoWarn> <!-- Binding logic not generated - Configuration.GetValue<T?> with nullable generics -->
   </PropertyGroup>
 
   <!-- Source Link -->

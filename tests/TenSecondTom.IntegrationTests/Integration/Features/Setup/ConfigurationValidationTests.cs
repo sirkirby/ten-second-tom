@@ -338,6 +338,9 @@ public sealed class ConfigurationValidationTests : IDisposable
         services.AddSingleton<IEnumerable<IApiKeyValidator>>(
             new List<IApiKeyValidator>());
 
+        // Add MediatR (required by Config.Handler)
+        services.AddMediatR(config => config.RegisterServicesFromAssembly(typeof(Config).Assembly));
+
         // Add handler
         services.AddSingleton<Config.Handler>();
 

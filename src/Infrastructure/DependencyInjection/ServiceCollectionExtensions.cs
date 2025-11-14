@@ -1,3 +1,4 @@
+using System;
 using System.IO.Abstractions;
 using Anthropic.SDK;
 using FluentValidation;
@@ -45,11 +46,23 @@ public static class ServiceCollectionExtensions
         services.Configure<ConfigurationSettings>(configuration.GetSection("TenSecondTom"));
 
         // Register LlmOptions with validation
-        services.Configure<LlmOptions>(configuration.GetSection(LlmOptions.SectionName));
+        var llmSection = configuration.GetSection(LlmOptions.SectionName);
+        services.Configure<LlmOptions>(llmSection);
+        services.PostConfigure<LlmOptions>(options =>
+        {
+            options.ApiKey ??= llmSection.GetValue<string>(nameof(LlmOptions.ApiKey))!;
+            options.Model ??= llmSection.GetValue<string>(nameof(LlmOptions.Model))!;
+        });
         services.AddSingleton<IValidateOptions<LlmOptions>, LlmOptionsValidator>();
 
         // Register AuthOptions with validation
-        services.Configure<AuthOptions>(configuration.GetSection(AuthOptions.SectionName));
+        var authSection = configuration.GetSection(AuthOptions.SectionName);
+        services.Configure<AuthOptions>(authSection);
+        services.PostConfigure<AuthOptions>(options =>
+        {
+            options.KeyPath ??= authSection.GetValue<string>(nameof(AuthOptions.KeyPath));
+            options.AgentSocketPath ??= authSection.GetValue<string>(nameof(AuthOptions.AgentSocketPath));
+        });
         services.AddSingleton<IValidateOptions<AuthOptions>, AuthOptionsValidator>();
 
         // Register StorageOptions with custom binding (RootDirectory is at root, other properties in Storage section)

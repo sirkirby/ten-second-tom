@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using TenSecondTom.Features.Auth;
 using TenSecondTom.Features.Search;
 using TenSecondTom.Features.Setup;
+using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Features.Shell;
 using TenSecondTom.Features.Templates;
 using TenSecondTom.Features.ThisWeek;
@@ -15,6 +16,7 @@ using TenSecondTom.Infrastructure.DependencyInjection;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
+using TenSecondTom.Shared.Options;
 using Xunit;
 
 namespace TenSecondTom.Tests.Unit.Infrastructure.DependencyInjection;
@@ -65,6 +67,9 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
         // Infrastructure (cross-cutting concerns)
         services.AddInfrastructureServices();
 
+        // Application services (MediatR, FluentValidation) - required by Config.Handler
+        services.AddApplicationServices();
+
         // Feature slices (vertical slice architecture)
         services.AddTodayFeature();
         services.AddThisWeekFeature();
@@ -79,7 +84,11 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_RegistersAllRequiredServices()
     {
         // Arrange & Act
-        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        // Get configuration from the pre-built service provider
+        var tempProvider = _services.BuildServiceProvider();
+        var configuration = tempProvider.GetRequiredService<IConfiguration>();
+        tempProvider.Dispose();
+        
         AddAllServices(_services, configuration);
         _serviceProvider = _services.BuildServiceProvider();
 
@@ -88,6 +97,9 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
         _serviceProvider.GetService<ILlmProviderFactory>().Should().NotBeNull();
         _serviceProvider.GetService<IPromptTemplateLoader>().Should().NotBeNull();
         _serviceProvider.GetService<IAuthenticationService>().Should().NotBeNull();
+        var authOptions = _serviceProvider.GetRequiredService<IOptions<AuthOptions>>().Value;
+        authOptions.KeySource.Should().Be(SshKeySource.FileSystem);
+        authOptions.KeyPath.Should().Be("~/.ssh/id_ed25519");
 
         // Assert - Feature handlers (can be resolved without additional dependencies)
         _serviceProvider.GetService<CreateDailyEntry.Handler>().Should().NotBeNull();
@@ -266,6 +278,52 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
 
         // Assert - Should return the same collection for chaining
         result.Should().BeSameAs(_services);
+    }
+
+    [Fact]
+    public void Configuration_BindsAuthOptions_WithKeyPath()
+    {
+        // Arrange
+        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        var section = configuration.GetSection(AuthOptions.SectionName);
+        var options = new AuthOptions();
+        var llmSection = configuration.GetSection(LlmOptions.SectionName);
+        var llmOptions = new LlmOptions
+        {
+            Provider = LlmProvider.OpenAI,
+            ApiKey = string.Empty,
+            Model = string.Empty
+        };
+
+        // Act
+        section.Bind(options);
+        llmSection.Bind(llmOptions);
+
+        // Assert
+        options.KeySource.Should().Be(SshKeySource.FileSystem);
+        options.KeyPath.Should().Be("~/.ssh/id_ed25519");
+        llmOptions.ApiKey.Should().Be("test-api-key");
+    }
+
+    [Fact]
+    public void AddTenSecondTomOptions_ConfiguresAuthOptions()
+    {
+        // Arrange
+        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddLogging();
+
+        // Act
+        services.AddTenSecondTomOptions(configuration);
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<AuthOptions>>().Value;
+        var llmOptions = provider.GetRequiredService<IOptions<LlmOptions>>().Value;
+
+        // Assert
+        options.KeySource.Should().Be(SshKeySource.FileSystem);
+        options.KeyPath.Should().Be("~/.ssh/id_ed25519");
+        llmOptions.ApiKey.Should().Be("test-api-key");
     }
 
     [Fact]

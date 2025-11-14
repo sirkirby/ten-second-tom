@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
 using TenSecondTom.Features.Setup;
@@ -73,14 +74,15 @@ internal static class ConfigCommandBuilder
         });
 
         // Set subcommand
-        var setCommand = new Command("set", "Update a configuration setting");
+        var setCommand = new Command("set", "Update a configuration setting (use 'tom config llm' or 'tom config audio' for guided flows)");
         var settingNameArg = new Argument<string>("setting")
         {
-            Description = "Setting name (llm-provider, api-key, memory-directory, ssh-key-path, log-level, retention-days)"
+            Description = "Setting name (llm-provider, api-key, memory-directory, ssh-key-path, log-level, retention-days). Use subcommands for guided flows."
         };
-        var settingValueArg = new Argument<string>("value")
+        var settingValueArg = new Argument<string?>("value")
         {
-            Description = "New value for the setting"
+            Description = "New value for the setting",
+            Arity = ArgumentArity.ZeroOrOne
         };
 
         setCommand.Arguments.Add(settingNameArg);
@@ -90,8 +92,22 @@ internal static class ConfigCommandBuilder
         setCommand.SetAction(async (parseResult) =>
         {
             string settingName = parseResult.GetValue(settingNameArg)!;
-            string settingValue = parseResult.GetValue(settingValueArg)!;
+            string? settingValue = parseResult.GetValue(settingValueArg);
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
+
+            if (IsInteractiveShortcut(settingName))
+            {
+                var guidance = GetInteractiveSettingMessage(settingName);
+                if (jsonOutput)
+                {
+                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { success = false, error = guidance }));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[yellow]{guidance.EscapeMarkup()}[/]");
+                }
+                return 1;
+            }
 
             var handler = serviceProvider.GetRequiredService<Config.Handler>();
 
@@ -115,55 +131,6 @@ internal static class ConfigCommandBuilder
                 {
                     AnsiConsole.MarkupLine($"[green]✓[/] Updated [yellow]{settingName.EscapeMarkup()}[/] successfully");
                 }
-                return 0;
-            }
-            else
-            {
-                if (jsonOutput)
-                {
-                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { success = false, error = result.Error }));
-                }
-                else
-                {
-                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error.EscapeMarkup()}");
-                }
-                return 1;
-            }
-        });
-
-        // LLM subcommand - interactive configuration for LLM provider and model
-        var llmCommand = new Command("llm", "Configure LLM provider and model interactively");
-        llmCommand.Options.Add(jsonOutputOption);
-
-        llmCommand.SetAction(async (parseResult) =>
-        {
-            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
-
-            var handler = serviceProvider.GetRequiredService<Config.Handler>();
-
-            var command = new Config.Command
-            {
-                Action = ConfigAction.Set,
-                SettingName = "llm",
-                SettingValue = null,
-                ShowSecrets = false
-            };
-
-            var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
-
-            if (result.IsSuccess)
-            {
-                if (jsonOutput)
-                {
-                    var config = result.Value!;
-                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
-                    {
-                        success = true,
-                        provider = config.Llm.Provider.ToString(),
-                        model = config.Llm.Model
-                    }));
-                }
-                // Success message already displayed by handler
                 return 0;
             }
             else
@@ -226,60 +193,50 @@ internal static class ConfigCommandBuilder
             }
         });
 
-        // Audio subcommand - interactive configuration for audio recording and processing
-        var audioCommand = new Command("audio", "Configure audio recording and processing settings interactively");
-        audioCommand.Options.Add(jsonOutputOption);
-
-        audioCommand.SetAction(async (parseResult) =>
+        // Discover and register config subcommands from feature slices via assembly scanning
+        var subcommandBuilders = DiscoverConfigSubcommandBuilders();
+        foreach (var builder in subcommandBuilders)
         {
-            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
-
-            var handler = serviceProvider.GetRequiredService<Config.Handler>();
-
-            var command = new Config.Command
+            var subcommand = builder.BuildConfigSubcommand(serviceProvider, jsonOutputOption);
+            if (subcommand != null)
             {
-                Action = ConfigAction.Set,
-                SettingName = "audio",
-                SettingValue = null,
-                ShowSecrets = false
-            };
-
-            var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
-
-            if (result.IsSuccess)
-            {
-                if (jsonOutput)
-                {
-                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
-                    {
-                        success = true,
-                        message = "Audio configuration updated successfully"
-                    }));
-                }
-                // Success message already displayed by handler
-                return 0;
+                configCommand.Subcommands.Add(subcommand);
             }
-            else
-            {
-                if (jsonOutput)
-                {
-                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { success = false, error = result.Error }));
-                }
-                else
-                {
-                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error.EscapeMarkup()}");
-                }
-                return 1;
-            }
-        });
+        }
 
         configCommand.Subcommands.Add(showCommand);
         configCommand.Subcommands.Add(setCommand);
-        configCommand.Subcommands.Add(llmCommand);
-        configCommand.Subcommands.Add(audioCommand);
         configCommand.Subcommands.Add(validateCommand);
 
         return configCommand;
+    }
+
+    /// <summary>
+    /// Discovers all IConfigSubcommandBuilder implementations via assembly scanning.
+    /// Follows the same pattern as MediatR and FluentValidation auto-discovery.
+    /// </summary>
+    /// <returns>Collection of discovered subcommand builders.</returns>
+    private static IEnumerable<IConfigSubcommandBuilder> DiscoverConfigSubcommandBuilders()
+    {
+        // Scan the main application assembly (same assembly that contains all features)
+        // Use the same assembly reference as MediatR/FluentValidation for consistency
+        var assembly = typeof(TenSecondTom.Infrastructure.DependencyInjection.ServiceCollectionExtensions).Assembly;
+        
+        var builderTypes = assembly.GetTypes()
+            .Where(t => 
+                typeof(IConfigSubcommandBuilder).IsAssignableFrom(t) &&
+                !t.IsInterface &&
+                !t.IsAbstract)
+            .ToList();
+
+        foreach (var builderType in builderTypes)
+        {
+            // Create instance using parameterless constructor (builders are stateless)
+            if (Activator.CreateInstance(builderType) is IConfigSubcommandBuilder builder)
+            {
+                yield return builder;
+            }
+        }
     }
 
     private static void DisplayConfiguration(ConfigurationSettings config, bool showSecrets, string configFilePath)
@@ -433,4 +390,13 @@ internal static class ConfigCommandBuilder
 
         return $"••••{apiKey[^4..]}";
     }
+
+    private static bool IsInteractiveShortcut(string settingName) =>
+        settingName.Equals("llm", StringComparison.OrdinalIgnoreCase) ||
+        settingName.Equals("audio", StringComparison.OrdinalIgnoreCase);
+
+    private static string GetInteractiveSettingMessage(string settingName) =>
+        settingName.Equals("llm", StringComparison.OrdinalIgnoreCase)
+            ? "Use 'tom config llm' to configure LLM provider and model interactively."
+            : "Use 'tom config audio' to configure audio settings interactively.";
 }
