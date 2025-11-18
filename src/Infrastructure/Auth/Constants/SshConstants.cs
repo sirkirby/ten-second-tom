@@ -1,4 +1,4 @@
-namespace TenSecondTom.Shared.Constants;
+namespace TenSecondTom.Infrastructure.Auth.Constants;
 
 /// <summary>
 /// Constants for SSH agent configuration and authentication.

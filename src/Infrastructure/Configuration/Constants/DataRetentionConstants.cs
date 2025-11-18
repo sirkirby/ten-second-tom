@@ -1,4 +1,4 @@
-namespace TenSecondTom.Shared.Constants;
+namespace TenSecondTom.Infrastructure.Configuration.Constants;
 
 /// <summary>
 /// Constants for data retention policies and auto-purge settings.

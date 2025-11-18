@@ -1,4 +1,4 @@
-namespace TenSecondTom.Shared.Constants;
+namespace TenSecondTom.Features.Audio.Constants;
 
 /// <summary>
 /// Provides strongly-typed constants for audio recording and transcription features.

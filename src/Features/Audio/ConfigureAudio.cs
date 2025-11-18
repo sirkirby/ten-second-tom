@@ -1,3 +1,4 @@
+using TenSecondTom.Features.Audio.Constants;
 using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.Logging;
@@ -5,7 +6,7 @@ using TenSecondTom.Features.Setup.Services;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Results;
-using static TenSecondTom.Shared.Constants.SttProviders;
+using static TenSecondTom.Features.Audio.Constants.SttProviders;
 
 namespace TenSecondTom.Features.Audio;
 
@@ -242,7 +243,7 @@ public static class ConfigureAudio
 
             // Step 7a: STT API Key (if provider requires it)
             string? sttApiKey = currentAudio.SttApiKey;
-            if (RequiresApiKey(sttProvider))
+            if (sttProvider == SttProviders.OpenAI)
             {
                 sttApiKey = await setupWizard.PromptForSttApiKeyAsync(
                     sttProvider,
@@ -260,7 +261,7 @@ public static class ConfigureAudio
             string? sttFallbackProvider = currentAudio.SttFallbackProvider;
             string? sttFallbackApiKey = currentAudio.SttFallbackApiKey;
 
-            if (SupportsFallback(sttProvider))
+            if (sttProvider == SttProviders.WhisperCpp)
             {
                 var fallback = await setupWizard.PromptForSttFallbackAsync(
                     currentAudio.SttFallbackEnabled,

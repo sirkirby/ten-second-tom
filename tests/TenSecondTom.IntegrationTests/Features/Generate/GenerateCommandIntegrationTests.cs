@@ -19,69 +19,6 @@ public sealed class GenerateCommandIntegrationTests
     }
 
     /// <summary>
-    /// T038: Integration test for --template with valid template name.
-    /// Verifies non-interactive execution with automatic selection of most recent recording.
-    /// This test MUST FAIL until the --template parameter is added to GenerateCommand.ExecuteAsync (T041).
-    /// </summary>
-    [Fact(Skip = "RED phase: Test will not compile until T041 adds --template parameter to GenerateCommand.ExecuteAsync")]
-    public async Task GenerateCommand_WithValidTemplate_ProcessesMostRecentRecording()
-    {
-        // This test cannot be implemented yet because GenerateCommand.ExecuteAsync doesn't have a template parameter.
-        // When T041 is implemented, remove the Skip attribute and implement this test.
-
-        // Expected behavior after implementation:
-        // 1. Create multiple test recordings in recording/ directory
-        // 2. Create test template in templates/ directory
-        // 3. Execute: GenerateCommand.ExecuteAsync(serviceProvider, jsonOutput: true, templateName: "business-meeting")
-        // 4. Verify: Most recent recording is processed automatically (no interactive prompt)
-        // 5. Verify: Output file created in recording/ directory with naming: {recording}_{template}.md
-
-        await Task.CompletedTask;
-        _output.WriteLine("T038: Placeholder - implement after T041 adds --template parameter");
-    }
-
-    /// <summary>
-    /// T039: Integration test for --template with invalid template name.
-    /// Verifies clear error message listing all available templates.
-    /// This test MUST FAIL until the --template parameter is added (T041) and error handling implemented (T044).
-    /// </summary>
-    [Fact(Skip = "RED phase: Test will not compile until T041 adds --template parameter")]
-    public async Task GenerateCommand_WithInvalidTemplate_ReturnsErrorWithAvailableTemplates()
-    {
-        // Expected behavior after implementation:
-        // 1. Create test recording
-        // 2. Create valid templates (e.g., "daily-summary", "action-items")
-        // 3. Execute with invalid template: GenerateCommand.ExecuteAsync(..., templateName: "nonexistent-template")
-        // 4. Verify: Exit code != 0
-        // 5. Verify: Error message contains list of available templates
-
-        await Task.CompletedTask;
-        _output.WriteLine("T039: Placeholder - implement after T041 and T044");
-    }
-
-    /// <summary>
-    /// T040: Integration test for case-insensitive template matching.
-    /// Verifies that template names match case-insensitively against both TemplateId and Title.
-    /// This test MUST FAIL until template resolution is implemented (T042).
-    /// </summary>
-    [Fact(Skip = "RED phase: Test will not compile until T041 adds --template parameter")]
-    public async Task GenerateCommand_WithCaseInsensitiveTemplate_MatchesCorrectly()
-    {
-        // Expected behavior after implementation:
-        // 1. Create test recording
-        // 2. Create template: "business-meeting.md" with title "Business Meeting Notes"
-        // 3. Test all case variations:
-        //    - "business-meeting" (exact match - lowercase)
-        //    - "Business-Meeting" (title case)
-        //    - "BUSINESS-MEETING" (uppercase)
-        //    - "Business Meeting Notes" (match by Title field)
-        // 4. Verify: All variations successfully match and generate output
-
-        await Task.CompletedTask;
-        _output.WriteLine("T040: Placeholder - implement after T041 and T042");
-    }
-
-    /// <summary>
     /// Smoke test to verify GenerateCommand.ExecuteAsync has the updated signature with templateName parameter.
     /// After T041 implementation, this test verifies the new signature.
     /// </summary>

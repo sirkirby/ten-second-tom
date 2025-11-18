@@ -10,9 +10,9 @@ namespace TenSecondTom.Features.Audio.Models;
 /// <remarks>
 /// Mapping to configuration:
 /// <list type="bullet">
-/// <item><see cref="Auto"/>: SttProvider = <see cref="SttProviders.WhisperCpp"/> with SttFallbackEnabled = true</item>
-/// <item><see cref="Local"/>: SttProvider = <see cref="SttProviders.WhisperCpp"/> with SttFallbackEnabled = false</item>
-/// <item><see cref="OpenAI"/>: SttProvider = <see cref="SttProviders.OpenAI"/></item>
+/// <item><see cref="Auto"/>: SttProvider = "whisper-cpp" with SttFallbackEnabled = true</item>
+/// <item><see cref="Local"/>: SttProvider = "whisper-cpp" with SttFallbackEnabled = false</item>
+/// <item><see cref="OpenAI"/>: SttProvider = "openai"</item>
 /// </list>
 /// </remarks>
 public enum SttSelection

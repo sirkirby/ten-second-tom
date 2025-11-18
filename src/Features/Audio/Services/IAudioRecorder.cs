@@ -37,4 +37,13 @@ public interface IAudioRecorder
         string outputPath,
         int? maxDurationSeconds = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the name of the default/system microphone that will be used for recording.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token for async operation.</param>
+    /// <returns>
+    /// A result containing the microphone name if successful, or an error message if unable to determine.
+    /// </returns>
+    Task<Result<string>> GetDefaultMicrophoneNameAsync(CancellationToken cancellationToken = default);
 }

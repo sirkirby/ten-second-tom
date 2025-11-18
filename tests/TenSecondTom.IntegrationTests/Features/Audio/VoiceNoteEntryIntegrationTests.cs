@@ -22,28 +22,6 @@ public sealed class VoiceNoteEntryIntegrationTests
         _output = output;
     }
 
-    [Fact(Skip = "Manual test only - requires FFmpeg and user interaction")]
-    public async Task TomTodayVoice_WithFfmpegAvailable_CreatesVoiceNoteEntry()
-    {
-        // Arrange
-        var hasFfmpeg = await IsFfmpegAvailable();
-        if (!hasFfmpeg)
-        {
-            _output.WriteLine("FFmpeg not available - skipping test");
-            return;
-        }
-
-        // Act
-        // This would invoke the full CLI command: tom today --voice
-        // Recording would require user input (pressing Enter to stop)
-
-        // Assert
-        // Verify markdown file created with:
-        // - Audio metadata (filename, duration)
-        // - Collapsible transcript section
-        // - LLM summary
-    }
-
     [Fact]
     public async Task FfmpegAudioRecorder_IsAvailable_ReturnsTrue()
     {

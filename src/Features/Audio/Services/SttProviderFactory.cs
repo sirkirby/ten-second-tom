@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using TenSecondTom.Features.Audio.Constants;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
@@ -69,7 +70,7 @@ public sealed class SttProviderFactory : ISttProviderFactory
             SttProviders.OpenAI =>
                 await GetOpenAiProviderAsync(cancellationToken),
             _ => throw new ArgumentException(
-                $"Invalid STT provider: {provider}. Valid values: {string.Join(", ", SttProviders.All)}",
+                $"Invalid STT provider: {provider}. Valid values: {SttProviders.WhisperCpp}, {SttProviders.OpenAI}",
                 nameof(configuration))
         };
     }

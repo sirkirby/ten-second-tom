@@ -38,19 +38,6 @@ public sealed class FfmpegAudioRecorderTests
         };
     }
 
-    [Fact(Skip = "Requires FFmpeg to be installed on the system. Enable manually when FFmpeg is available.")]
-    public async Task IsAvailableAsync_WhenFfmpegExists_ReturnsTrue()
-    {
-        // Arrange
-        var recorder = CreateRecorder();
-
-        // Act
-        var result = await recorder.IsAvailableAsync();
-
-        // Assert
-        result.Should().BeTrue("FFmpeg should be available on PATH in test environment");
-    }
-
     [Fact]
     public async Task IsAvailableAsync_WhenFfmpegDoesNotExist_ReturnsFalse()
     {
@@ -363,6 +350,21 @@ public sealed class FfmpegAudioRecorderTests
         // await act.Should().ThrowAsync<OperationCanceledException>();
 
         await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task GetDefaultMicrophoneNameAsync_RespectsCancellationToken()
+    {
+        // Arrange
+        var recorder = CreateRecorder();
+        var cts = new CancellationTokenSource();
+
+        // Act
+        cts.Cancel();
+        var act = async () => await recorder.GetDefaultMicrophoneNameAsync(cts.Token);
+
+        // Assert
+        await act.Should().ThrowAsync<OperationCanceledException>("operation was cancelled");
     }
 
     private FfmpegAudioRecorder CreateRecorder(AudioConfiguration? config = null)

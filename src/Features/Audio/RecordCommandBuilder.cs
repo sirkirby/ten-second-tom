@@ -1,14 +1,15 @@
+using TenSecondTom.Features.Audio.Constants;
 using System.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
-using TenSecondTom.Features.Audio;
 using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
 
-namespace TenSecondTom.Infrastructure.Cli;
+namespace TenSecondTom.Features.Audio;
 
 /// <summary>
 /// Builds the record command for audio recording with transcription.
@@ -122,6 +123,20 @@ internal static class RecordCommandBuilder
                 return 1;
             }
 
+            // Display microphone information before recording (unless in JSON mode)
+            if (!jsonOutput)
+            {
+                var audioRecorder = serviceProvider.GetService<TenSecondTom.Features.Audio.Services.IAudioRecorder>();
+                if (audioRecorder is not null)
+                {
+                    var micResult = await audioRecorder.GetDefaultMicrophoneNameAsync(CancellationToken.None);
+                    if (micResult.IsSuccess)
+                    {
+                        AnsiConsole.MarkupLine($"[dim]Microphone: {micResult.Value.EscapeMarkup()}[/]");
+                    }
+                }
+            }
+
             // Show recording prompt (unless in JSON mode)
             if (!jsonOutput)
             {
@@ -165,26 +180,18 @@ internal static class RecordCommandBuilder
                     AnsiConsole.WriteLine();
                     AnsiConsole.MarkupLine("[bold]Transcript:[/]");
 
-                    // Read and display the transcription text (strip YAML frontmatter)
+                    // Read and display the transcription text
                     var transcriptContent = File.ReadAllText(recording.TranscriptionFilePath);
-                    var lines = transcriptContent.Split('\n');
-                    bool inFrontmatter = false;
-                    var transcriptText = new System.Text.StringBuilder();
-                    foreach (var line in lines)
-                    {
-                        if (line.Trim() == "---")
-                        {
-                            inFrontmatter = !inFrontmatter;
-                            continue;
-                        }
-                        if (!inFrontmatter && !string.IsNullOrWhiteSpace(line))
-                        {
-                            transcriptText.AppendLine(line);
-                        }
-                    }
+                    var fullTranscript = TranscriptFormatter.StripFrontmatter(transcriptContent);
+                    var (formattedText, wasTruncated, _) = TranscriptFormatter.FormatForDisplay(fullTranscript);
 
-                    AnsiConsole.MarkupLine($"[dim]{transcriptText.ToString().Trim().EscapeMarkup()}[/]");
+                    AnsiConsole.MarkupLine($"[dim]{formattedText.EscapeMarkup()}[/]");
+
                     AnsiConsole.WriteLine();
+                    if (wasTruncated)
+                    {
+                        AnsiConsole.MarkupLine($"[dim]Full transcript: {recording.TranscriptionFilePath.EscapeMarkup()}[/]");
+                    }
                     AnsiConsole.MarkupLine($"[dim]Audio saved: {recording.AudioFilePath.EscapeMarkup()}[/]");
                 }
                 return 0;

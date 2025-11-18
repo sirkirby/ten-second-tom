@@ -231,21 +231,6 @@ public sealed class OpenAIApiKeyValidatorTests
 
     #region Network Validation Tests - Structure & Cancellation
 
-    [Fact(Skip = "Requires mocking OpenAI ChatClient - complex SDK integration")]
-    public void ValidateNetworkAsync_WithValidKey_ReturnsSuccess()
-    {
-        // This test requires mocking the OpenAI SDK's ChatClient which is complex
-        // The actual OpenAI SDK uses internal clients that are difficult to mock
-        // Better suited for integration tests with actual API keys or test API endpoints
-    }
-
-    [Fact(Skip = "Requires mocking OpenAI ChatClient - complex SDK integration")]
-    public void ValidateNetworkAsync_WithInvalidKey_ReturnsNetworkFailure()
-    {
-        // This test requires mocking the OpenAI SDK's ChatClient
-        // Better suited for integration tests
-    }
-
     [Fact]
     public async Task ValidateNetworkAsync_WithCancellation_ReturnsFailureWithCancelledMessage()
     {
@@ -263,43 +248,6 @@ public sealed class OpenAIApiKeyValidatorTests
         result.FormatValid.Should().BeTrue(); // Format check passes before network
         result.NetworkValid.Should().BeFalse();
         result.ErrorMessage.Should().Contain("cancelled");
-    }
-
-    [Fact(Skip = "Requires complex OpenAI SDK mocking for retry simulation")]
-    public void ValidateNetworkAsync_WithRetries_UsesExponentialBackoff()
-    {
-        // This test would verify:
-        // - Attempt 1 fails, waits 1s (2^0)
-        // - Attempt 2 fails, waits 2s (2^1)
-        // - Attempt 3 fails, waits 4s (2^2)
-        // - Attempt 4 fails (maxRetries=3), returns failure
-        // Requires mocking OpenAI ChatClient to throw exceptions
-        // Better suited for integration tests
-    }
-
-    #endregion
-
-    #region Network Validation Logging Tests
-
-    [Fact(Skip = "Requires OpenAI SDK mocking - integration test")]
-    public void ValidateNetworkAsync_LogsAttempts()
-    {
-        // This test would verify debug logging for each attempt
-        // Requires actual or mocked OpenAI API responses
-    }
-
-    [Fact(Skip = "Requires OpenAI SDK mocking - integration test")]
-    public void ValidateNetworkAsync_OnSuccess_LogsInformation()
-    {
-        // This test would verify information log on successful validation
-        // Requires actual or mocked OpenAI API responses
-    }
-
-    [Fact(Skip = "Requires OpenAI SDK mocking - integration test")]
-    public void ValidateNetworkAsync_OnRetry_LogsWarning()
-    {
-        // This test would verify warning log on each failed attempt
-        // Requires actual or mocked OpenAI API responses
     }
 
     #endregion
