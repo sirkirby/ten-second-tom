@@ -1,6 +1,10 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using TenSecondTom.Features.Setup.Constants;
 using TenSecondTom.Features.Setup.Models;
+using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Infrastructure.Auth.Constants;
+using TenSecondTom.Infrastructure.Configuration.Constants;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Results;
 
@@ -280,9 +284,9 @@ public sealed class ConfigurationStorageService : IConfigurationStorageService, 
             },
             Setup = new
             {
-                SshKeyDetectionTimeoutSeconds = SetupWizardConstants.Timeouts.SshKeyDetectionSeconds,
-                ApiValidationTimeoutSeconds = SetupWizardConstants.Timeouts.ApiValidationSeconds,
-                TotalSetupTimeoutSeconds = SetupWizardConstants.Timeouts.TotalSetupSeconds
+                SshKeyDetectionTimeoutSeconds = SetupConstants.Timeouts.SshKeyDetectionSeconds,
+                ApiValidationTimeoutSeconds = SetupConstants.Timeouts.ApiValidationSeconds,
+                TotalSetupTimeoutSeconds = SetupConstants.Timeouts.TotalSetupSeconds
             },
             Configuration = new
             {

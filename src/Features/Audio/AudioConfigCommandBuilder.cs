@@ -2,6 +2,7 @@ using System.CommandLine;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
+using TenSecondTom.Features.Audio.Constants;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Shared.Constants;
 

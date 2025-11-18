@@ -1,3 +1,4 @@
+using TenSecondTom.Infrastructure.Auth.Constants;
 using TenSecondTom.Shared.Constants;
 
 namespace TenSecondTom.Infrastructure.Auth;

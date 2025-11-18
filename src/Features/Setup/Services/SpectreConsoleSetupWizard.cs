@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
+using TenSecondTom.Features.Audio.Constants;
+using TenSecondTom.Features.Setup.Constants;
 using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Shared.Constants;
 
@@ -13,10 +15,10 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
 {
     private static readonly string[] LogLevelChoices =
     [
-        SetupWizardConstants.LogLevelDisplayNames.Debug,
-        SetupWizardConstants.LogLevelDisplayNames.Information,
-        SetupWizardConstants.LogLevelDisplayNames.Warning,
-        SetupWizardConstants.LogLevelDisplayNames.Error
+        SetupConstants.LogLevelDisplayNames.Debug,
+        SetupConstants.LogLevelDisplayNames.Information,
+        SetupConstants.LogLevelDisplayNames.Warning,
+        SetupConstants.LogLevelDisplayNames.Error
     ];
 
     private readonly IAnsiConsole _console;
@@ -74,7 +76,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
     {
         var prompt = new SelectionPrompt<string>()
             .Title("Choose your AI provider:")
-            .AddChoices(SetupWizardConstants.ProviderDisplayNames.GetAvailableDisplayNames());
+            .AddChoices(["OpenAI"]);
 
         if (currentProvider.HasValue)
         {
@@ -156,11 +158,10 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         string? currentApiKey,
         CancellationToken cancellationToken)
     {
-        // Convert enum to provider name constant, then to display name
-        var providerName = provider == LlmProvider.OpenAI 
-            ? LlmProviders.OpenAI 
-            : LlmProviders.Anthropic;
-        var displayName = SetupWizardConstants.ProviderDisplayNames.GetDisplayName(providerName);
+        // Convert enum to display name
+        var displayName = provider == LlmProvider.OpenAI
+            ? "OpenAI"
+            : "Anthropic";
         
         var prompt = new TextPrompt<string>($"Enter your {displayName} API key:")
             .Secret();
@@ -202,10 +203,10 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         
         var logLevel = selected switch
         {
-            SetupWizardConstants.LogLevelDisplayNames.Debug => Microsoft.Extensions.Logging.LogLevel.Debug,
-            SetupWizardConstants.LogLevelDisplayNames.Information => Microsoft.Extensions.Logging.LogLevel.Information,
-            SetupWizardConstants.LogLevelDisplayNames.Warning => Microsoft.Extensions.Logging.LogLevel.Warning,
-            SetupWizardConstants.LogLevelDisplayNames.Error => Microsoft.Extensions.Logging.LogLevel.Error,
+            SetupConstants.LogLevelDisplayNames.Debug => Microsoft.Extensions.Logging.LogLevel.Debug,
+            SetupConstants.LogLevelDisplayNames.Information => Microsoft.Extensions.Logging.LogLevel.Information,
+            SetupConstants.LogLevelDisplayNames.Warning => Microsoft.Extensions.Logging.LogLevel.Warning,
+            SetupConstants.LogLevelDisplayNames.Error => Microsoft.Extensions.Logging.LogLevel.Error,
             _ => Microsoft.Extensions.Logging.LogLevel.Information
         };
 
@@ -217,22 +218,22 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         CancellationToken cancellationToken)
     {
         _console.MarkupLine("[grey]ℹ️  Choose how long to keep your memories before automatic deletion.[/]");
-        _console.MarkupLine($"[grey]   Enter '{SetupWizardConstants.RetentionKeywords.Unlimited}' to keep all memories forever (recommended).[/]");
+        _console.MarkupLine($"[grey]   Enter '{SetupConstants.RetentionKeywords.Unlimited}' to keep all memories forever (recommended).[/]");
         _console.WriteLine();
 
         var prompt = new TextPrompt<string>("How long should memories be kept? (enter 'unlimited' or number of days)")
             .DefaultValue(currentDays.HasValue && currentDays.Value > 0 
                 ? currentDays.Value.ToString() 
-                : SetupWizardConstants.RetentionKeywords.Unlimited)
+                : SetupConstants.RetentionKeywords.Unlimited)
             .AllowEmpty();
 
         var input = _console.Prompt(prompt);
         
         // Parse input: "unlimited", "forever", "0" -> -1, otherwise parse as number
         if (string.IsNullOrWhiteSpace(input) || 
-            input.Equals(SetupWizardConstants.RetentionKeywords.Unlimited, StringComparison.OrdinalIgnoreCase) ||
-            input.Equals(SetupWizardConstants.RetentionKeywords.Forever, StringComparison.OrdinalIgnoreCase) ||
-            input == SetupWizardConstants.RetentionKeywords.Zero)
+            input.Equals(SetupConstants.RetentionKeywords.Unlimited, StringComparison.OrdinalIgnoreCase) ||
+            input.Equals(SetupConstants.RetentionKeywords.Forever, StringComparison.OrdinalIgnoreCase) ||
+            input == SetupConstants.RetentionKeywords.Zero)
         {
             return Task.FromResult<int?>(-1); // -1 means unlimited
         }
@@ -242,7 +243,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             return Task.FromResult<int?>(days);
         }
         
-        ShowWarning($"Invalid input. Please enter a positive number or '{SetupWizardConstants.RetentionKeywords.Unlimited}'. Using unlimited retention.");
+        ShowWarning($"Invalid input. Please enter a positive number or '{SetupConstants.RetentionKeywords.Unlimited}'. Using unlimited retention.");
         return Task.FromResult<int?>(-1);
     }
 
@@ -258,7 +259,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         // Show SSH key display name, or fall back to key path, or "Not set"
         var sshKeyDisplay = settings.Ssh.KeyDisplayName 
             ?? settings.Ssh.KeyPath 
-            ?? SetupWizardConstants.DisplayStrings.NotSet;
+            ?? SetupConstants.DisplayStrings.NotSet;
         
         table.AddRow("SSH Key", sshKeyDisplay.EscapeMarkup());
         table.AddRow("LLM Provider", settings.Llm.Provider.ToString());
@@ -268,8 +269,8 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         
         // Display retention: -1 or 0 means unlimited, otherwise show days
         var retentionDisplay = settings.Optional.RetentionDays <= 0 
-            ? SetupWizardConstants.RetentionKeywords.UnlimitedDisplay 
-            : $"{settings.Optional.RetentionDays} {SetupWizardConstants.DisplayStrings.Days}";
+            ? SetupConstants.RetentionKeywords.UnlimitedDisplay 
+            : $"{settings.Optional.RetentionDays} {SetupConstants.DisplayStrings.Days}";
         table.AddRow("Retention Days", retentionDisplay);
 
         _console.Write(new Rule("[yellow]Configuration Summary[/]"));
@@ -590,7 +591,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
     private static string MaskApiKey(string? apiKey)
     {
         if (string.IsNullOrEmpty(apiKey))
-            return SetupWizardConstants.DisplayStrings.NotSet;
+            return SetupConstants.DisplayStrings.NotSet;
 
         if (apiKey.Length <= 4)
             return new string('*', apiKey.Length);

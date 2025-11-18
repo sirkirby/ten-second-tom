@@ -63,6 +63,33 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
     }
 
     /// <inheritdoc/>
+    public async Task<Result<string>> GetDefaultMicrophoneNameAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                return await GetMacOSDefaultMicrophoneAsync(cancellationToken);
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                return await GetWindowsDefaultMicrophoneAsync(cancellationToken);
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                return await GetLinuxDefaultMicrophoneAsync(cancellationToken);
+            }
+
+            return Result<string>.Failure("Unsupported platform for microphone detection");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Failed to detect default microphone");
+            return Result<string>.Failure($"Unable to detect microphone: {ex.Message}");
+        }
+    }
+
+    /// <inheritdoc/>
     public async Task<Result<AudioRecording>> RecordAsync(
         string outputPath,
         int? maxDurationSeconds = null,
@@ -295,6 +322,208 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
             recording.FileSizeBytes);
 
         return Result<AudioRecording>.Success(recording);
+    }
+
+    /// <summary>
+    /// Gets the default microphone name on macOS by querying system preferences.
+    /// </summary>
+    private async Task<Result<string>> GetMacOSDefaultMicrophoneAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Try to get the actual default input device name from macOS system_profiler
+        var systemProfilerInfo = new ProcessStartInfo
+        {
+            FileName = "system_profiler",
+            Arguments = "SPAudioDataType -json",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        try
+        {
+            using var systemProcess = Process.Start(systemProfilerInfo);
+            if (systemProcess != null)
+            {
+                var output = await systemProcess.StandardOutput.ReadToEndAsync(cancellationToken);
+                await systemProcess.WaitForExitAsync(cancellationToken);
+
+                // Parse JSON output to find the default input device
+                // system_profiler returns JSON with nested structure
+                if (!string.IsNullOrWhiteSpace(output))
+                {
+                    var jsonDoc = System.Text.Json.JsonDocument.Parse(output);
+                    if (jsonDoc.RootElement.TryGetProperty("SPAudioDataType", out var audioDataArray))
+                    {
+                        // Get first element which contains _items array
+                        var firstElement = audioDataArray.EnumerateArray().FirstOrDefault();
+                        if (firstElement.ValueKind != System.Text.Json.JsonValueKind.Undefined &&
+                            firstElement.TryGetProperty("_items", out var items))
+                        {
+                            // Iterate through devices in _items to find default input
+                            foreach (var device in items.EnumerateArray())
+                            {
+                                if (device.TryGetProperty("coreaudio_default_audio_input_device", out var isDefault) &&
+                                    isDefault.GetString() == "spaudio_yes" &&
+                                    device.TryGetProperty("_name", out var name))
+                                {
+                                    var deviceName = name.GetString();
+                                    if (!string.IsNullOrWhiteSpace(deviceName))
+                                    {
+                                        return Result<string>.Success(deviceName);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Let cancellation propagate
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to query system_profiler for default microphone, falling back to generic message");
+        }
+
+        // Fallback: Since we use :default for recording, just indicate that
+        return Result<string>.Success("System Default Input Device");
+    }
+
+    /// <summary>
+    /// Gets the default microphone name on Windows using FFmpeg's dshow.
+    /// </summary>
+    private async Task<Result<string>> GetWindowsDefaultMicrophoneAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = _config.Recorder.FfmpegPath,
+            Arguments = "-list_devices true -f dshow -i dummy",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var process = Process.Start(startInfo);
+        if (process == null)
+        {
+            return Result<string>.Failure("Failed to start FFmpeg for device listing");
+        }
+
+        // FFmpeg outputs device list to stderr
+        var stderr = await process.StandardError.ReadToEndAsync(cancellationToken);
+        await process.WaitForExitAsync(cancellationToken);
+
+        // Parse stderr for audio devices
+        // Example output:
+        // [dshow @ 0x...] DirectShow audio devices
+        // [dshow @ 0x...] "Microphone (Realtek High Definition Audio)"
+
+        var lines = stderr.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var audioDevicesStarted = false;
+
+        foreach (var line in lines)
+        {
+            if (line.Contains("DirectShow audio devices"))
+            {
+                audioDevicesStarted = true;
+                continue;
+            }
+
+            if (audioDevicesStarted && line.Contains('"'))
+            {
+                // Extract device name between quotes
+                var match = System.Text.RegularExpressions.Regex.Match(line, "\"([^\"]+)\"");
+                if (match.Success)
+                {
+                    return Result<string>.Success(match.Groups[1].Value);
+                }
+            }
+        }
+
+        // If we couldn't parse a specific device, return a generic name
+        return Result<string>.Success("Default Microphone");
+    }
+
+    /// <summary>
+    /// Gets the default microphone name on Linux using arecord.
+    /// </summary>
+    private static async Task<Result<string>> GetLinuxDefaultMicrophoneAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "arecord",
+                Arguments = "-l",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(startInfo);
+            if (process == null)
+            {
+                return Result<string>.Success("Default ALSA Microphone");
+            }
+
+            var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitAsync(cancellationToken);
+
+            // Parse output for first capture device
+            // Example output:
+            // card 0: PCH [HDA Intel PCH], device 0: ALC269VC Analog [ALC269VC Analog]
+
+            var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var line in lines)
+            {
+                if (line.Contains("card") && line.Contains(':'))
+                {
+                    // Extract device name after the colon
+                    var parts = line.Split(':', 2);
+                    if (parts.Length > 1)
+                    {
+                        var deviceName = parts[1].Trim();
+                        // Remove the part after the comma if present
+                        var commaIndex = deviceName.IndexOf(',');
+                        if (commaIndex > 0)
+                        {
+                            deviceName = deviceName[..commaIndex].Trim();
+                        }
+                        // Remove text in brackets
+                        deviceName = System.Text.RegularExpressions.Regex.Replace(deviceName, @"\s*\[.*?\]", "").Trim();
+
+                        if (!string.IsNullOrWhiteSpace(deviceName))
+                        {
+                            return Result<string>.Success(deviceName);
+                        }
+                    }
+                }
+            }
+
+            return Result<string>.Success("Default ALSA Microphone");
+        }
+        catch (OperationCanceledException)
+        {
+            // Let cancellation propagate
+            throw;
+        }
+        catch
+        {
+            // If arecord is not available, return generic name
+            return Result<string>.Success("Default ALSA Microphone");
+        }
     }
 
     /// <summary>

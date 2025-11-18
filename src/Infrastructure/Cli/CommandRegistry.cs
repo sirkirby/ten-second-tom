@@ -2,6 +2,7 @@ using System.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
+using TenSecondTom.Features.Audio;
 using TenSecondTom.Features.Search;
 using TenSecondTom.Features.Setup;
 using TenSecondTom.Features.Setup.Services;

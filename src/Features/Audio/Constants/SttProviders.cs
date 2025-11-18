@@ -1,0 +1,27 @@
+namespace TenSecondTom.Features.Audio.Constants;
+
+/// <summary>
+/// Constants representing supported Speech-to-Text providers.
+/// </summary>
+public static class SttProviders
+{
+    /// <summary>
+    /// Local whisper.cpp provider (requires installation, no API key needed).
+    /// </summary>
+    public const string WhisperCpp = "whisper-cpp";
+
+    /// <summary>
+    /// Default whisper.cpp STT model to use.
+    /// </summary>
+    public const string WhisperCppDefaultSTTModel = "ggml-base.en.bin";
+
+    /// <summary>
+    /// OpenAI Whisper API provider (cloud-based, requires API key).
+    /// </summary>
+    public const string OpenAI = "openai";
+
+    /// <summary>
+    /// OpenAI Speech-to-Text model to use.
+    /// </summary>
+    public const string OpenAIDefaultSTTModel = "whisper-1";
+}

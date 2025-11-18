@@ -20,16 +20,10 @@ description: "Task list template for feature implementation"
 
 ## Path Conventions
 
-**This project uses Vertical Slice Architecture** as defined in `.specify/memory/constitution.md`.
-
-**Canonical Structure for Ten Second Tom:**
-- Features: `src/Features/[FeatureName]/Commands|Queries|Handlers|Validation/`
-- Infrastructure: `src/Infrastructure/Configuration|Logging/`
-- Shared: `src/Shared/Models|Abstractions|Extensions/`
-- Unit Tests: `tests/TenSecondTom.Tests/Features/[FeatureName]/`
-- Integration Tests: `tests/TenSecondTom.IntegrationTests/Features/[FeatureName]/`
-
-**All task file paths MUST follow this structure.** Reference the constitution for detailed rules on feature organization and naming conventions.
+- **Single project**: `src/`, `tests/` at repository root
+- **Web app**: `backend/src/`, `frontend/src/`
+- **Mobile**: `api/src/`, `ios/src/` or `android/src/`
+- Paths shown below assume single project - adjust based on plan.md structure
 
 <!-- 
   ============================================================================

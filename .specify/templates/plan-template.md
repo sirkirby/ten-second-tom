@@ -49,46 +49,50 @@ specs/[###-feature]/
 
 ### Source Code (repository root)
 <!--
-  ACTION REQUIRED: This project uses Vertical Slice Architecture as defined in
-  the constitution (.specify/memory/constitution.md - Project Structure Standards).
-  
-  For Ten Second Tom, the structure is:
-  
-  src/Features/[FeatureName]/  - Self-contained vertical slices
-  src/Infrastructure/          - Cross-cutting concerns (DI, config, logging)
-  src/Shared/                  - Shared domain models and abstractions
-  
-  Document below how THIS feature will fit into the canonical structure.
-  List the specific feature folder(s) and files that will be created/modified.
+  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
+  for this feature. Delete unused options and expand the chosen structure with
+  real paths (e.g., apps/admin, packages/something). The delivered plan must
+  not include Option labels.
 -->
 
-```
+```text
+# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
 src/
-├── Features/
-│   └── [YourFeatureName]/
-│       ├── Commands/          # [List specific command files]
-│       ├── Queries/           # [List specific query files if needed]
-│       ├── Handlers/          # [List handler files]
-│       ├── Validation/        # [List validators if needed]
-│       └── DependencyInjection.cs
-├── Infrastructure/            # [Note any infrastructure changes needed]
-└── Shared/                    # [Note any shared models/abstractions needed]
+├── models/
+├── services/
+├── cli/
+└── lib/
 
 tests/
-├── TenSecondTom.Tests/
-│   └── Features/
-│       └── [YourFeatureName]/
-│           ├── Commands/      # [List command tests]
-│           ├── Queries/       # [List query tests]
-│           └── Handlers/      # [List handler tests]
-└── TenSecondTom.IntegrationTests/
-    └── Features/
-        └── [YourFeatureName]/ # [List integration tests]
+├── contract/
+├── integration/
+└── unit/
+
+# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
+backend/
+├── src/
+│   ├── models/
+│   ├── services/
+│   └── api/
+└── tests/
+
+frontend/
+├── src/
+│   ├── components/
+│   ├── pages/
+│   └── services/
+└── tests/
+
+# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
+api/
+└── [same as backend above]
+
+ios/ or android/
+└── [platform-specific structure: feature modules, UI flows, platform tests]
 ```
 
-**Structure Decision**: [Document how this feature follows VSA principles and
-reference the canonical structure from the constitution. Explain any deviations
-with justification.]
+**Structure Decision**: [Document the selected structure and reference the real
+directories captured above]
 
 ## Complexity Tracking
 

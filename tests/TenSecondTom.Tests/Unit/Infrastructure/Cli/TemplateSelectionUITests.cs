@@ -45,29 +45,6 @@ public sealed class TemplateSelectionUITests
         selectedId.Should().Be("daily-summary", "single template should be auto-selected");
     }
 
-    [Fact(Skip = "Requires interactive terminal - Spectre.Console SelectionPrompt needs user input")]
-    public async Task SelectTemplateAsync_WithMultipleTemplates_ShowsSelectionPrompt()
-    {
-        // Arrange
-        var ui = CreateUI();
-        var templates = new List<TemplateInfo>
-        {
-            CreateListItem("daily-summary", "Daily Summary", isDefault: true),
-            CreateListItem("custom-daily", "Custom Daily", isDefault: false)
-        };
-
-        // Act
-        var selectedId = await ui.SelectTemplateAsync(
-            templates,
-            "today",
-            CancellationToken.None);
-
-        // Assert
-        // This test will fail until implementation exists
-        // Implementation should show Spectre.Console SelectionPrompt
-        selectedId.Should().NotBeNullOrEmpty("user should select a template");
-    }
-
     [Fact]
     public async Task SelectTemplateAsync_WithNoTemplates_ThrowsArgumentException()
     {
@@ -100,98 +77,6 @@ public sealed class TemplateSelectionUITests
 
         // Assert
         await act.Should().ThrowAsync<ArgumentNullException>("null template list should throw");
-    }
-
-    [Fact(Skip = "Requires interactive terminal - Spectre.Console SelectionPrompt needs user input")]
-    public async Task SelectTemplateAsync_DisplaysTemplatesInCorrectOrder()
-    {
-        // Arrange
-        var ui = CreateUI();
-        var templates = new List<TemplateInfo>
-        {
-            CreateListItem("daily-summary", "Daily Summary", isDefault: true),
-            CreateListItem("apple-daily", "Apple Daily", isDefault: false),
-            CreateListItem("zebra-daily", "Zebra Daily", isDefault: false)
-        };
-
-        // Act - With multiple templates, should display them
-        var selectedId = await ui.SelectTemplateAsync(
-            templates,
-            "today",
-            CancellationToken.None);
-
-        // Assert
-        selectedId.Should().NotBeNullOrEmpty();
-        // NOTE: This test verifies order is preserved when passed to UI
-        // Visual verification would confirm order in SelectionPrompt
-    }
-
-    [Fact(Skip = "Requires interactive terminal - Spectre.Console SelectionPrompt needs user input")]
-    public async Task SelectTemplateAsync_WithDefaultTemplate_HighlightsAsDefault()
-    {
-        // Arrange
-        var ui = CreateUI();
-        var templates = new List<TemplateInfo>
-        {
-            CreateListItem("daily-summary", "Daily Summary", isDefault: true),
-            CreateListItem("custom-daily", "Custom Daily", isDefault: false)
-        };
-
-        // Act
-        var selectedId = await ui.SelectTemplateAsync(
-            templates,
-            "today",
-            CancellationToken.None);
-
-        // Assert
-        selectedId.Should().NotBeNullOrEmpty();
-        // NOTE: Implementation should mark default templates with [Default] badge
-    }
-
-    [Fact(Skip = "Requires interactive terminal - Spectre.Console SelectionPrompt needs user input")]
-    public async Task SelectTemplateAsync_WithDescriptions_DisplaysDescriptions()
-    {
-        // Arrange
-        var ui = CreateUI();
-        var templates = new List<TemplateInfo>
-        {
-            CreateListItem("daily-summary", "Daily Summary",
-                description: "Default template for daily entries", isDefault: true),
-            CreateListItem("custom-daily", "Custom Daily",
-                description: "My personalized daily template", isDefault: false)
-        };
-
-        // Act
-        var selectedId = await ui.SelectTemplateAsync(
-            templates,
-            "today",
-            CancellationToken.None);
-
-        // Assert
-        selectedId.Should().NotBeNullOrEmpty();
-        // NOTE: Implementation should display descriptions in SelectionPrompt
-    }
-
-    [Fact(Skip = "Requires interactive terminal - Spectre.Console SelectionPrompt needs user input")]
-    public async Task SelectTemplateAsync_WithCommandContext_IncludesContextInTitle()
-    {
-        // Arrange
-        var ui = CreateUI();
-        var templates = new List<TemplateInfo>
-        {
-            CreateListItem("daily-1", "Template 1", isDefault: true),
-            CreateListItem("daily-2", "Template 2", isDefault: false)
-        };
-
-        // Act
-        var selectedId = await ui.SelectTemplateAsync(
-            templates,
-            "today",
-            CancellationToken.None);
-
-        // Assert
-        selectedId.Should().NotBeNullOrEmpty();
-        // NOTE: Implementation should show "Select template for: today" in prompt title
     }
 
     [Fact]
@@ -286,30 +171,6 @@ public sealed class TemplateSelectionUITests
         // Assert
         await act.Should().ThrowAsync<ArgumentException>(
             "invalid command context should throw");
-    }
-
-    [Fact(Skip = "Requires interactive terminal - Spectre.Console SelectionPrompt needs user input")]
-    public async Task SelectTemplateAsync_WithLongDescriptions_TruncatesAppropriately()
-    {
-        // Arrange
-        var ui = CreateUI();
-        var longDescription = new string('x', 500); // Very long description
-        var templates = new List<TemplateInfo>
-        {
-            CreateListItem("daily-1", "Template 1",
-                description: longDescription, isDefault: true),
-            CreateListItem("daily-2", "Template 2", isDefault: false)
-        };
-
-        // Act
-        var selectedId = await ui.SelectTemplateAsync(
-            templates,
-            "today",
-            CancellationToken.None);
-
-        // Assert
-        selectedId.Should().NotBeNullOrEmpty();
-        // NOTE: Implementation should handle long descriptions gracefully
     }
 
     [Fact]
