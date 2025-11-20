@@ -1,5 +1,4 @@
 using TenSecondTom.Shared.Options;
-using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Models;
 
 namespace TenSecondTom.Features.Audio.Services;
@@ -25,7 +24,7 @@ public interface ISttProviderFactory
     /// - If SttProvider is "openai": Return OpenAI provider only.
     /// </remarks>
     Task<ISttProvider?> GetProviderAsync(
-        AudioConfiguration configuration,
+        AudioOptions configuration,
         CancellationToken cancellationToken = default);
 
     /// <summary>

@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using TenSecondTom.Features.Audio.Services;
-using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Options;
 using Xunit;
 using TenSecondTom.Features.Audio;
 
@@ -17,15 +17,15 @@ namespace TenSecondTom.IntegrationTests.Integration.Features.Audio;
 public sealed class FfmpegAudioPreprocessorIntegrationTests
 {
     private readonly Mock<ILogger<FfmpegAudioPreprocessor>> _mockLogger;
-    private readonly AudioConfiguration _config;
+    private readonly AudioOptions _config;
 
     public FfmpegAudioPreprocessorIntegrationTests()
     {
         _mockLogger = new Mock<ILogger<FfmpegAudioPreprocessor>>();
-        _config = new AudioConfiguration
+        _config = new AudioOptions
         {
-            Recorder = new RecorderConfiguration { FfmpegPath = "ffmpeg" },
-            Preprocessing = new PreprocessingConfiguration
+            Recorder = new RecorderOptions { FfmpegPath = "ffmpeg" },
+            Preprocessing = new PreprocessingOptions
             {
                 RemoveSilence = true,
                 SilenceThresholdDb = -50,
@@ -34,7 +34,7 @@ public sealed class FfmpegAudioPreprocessorIntegrationTests
         };
     }
 
-    private FfmpegAudioPreprocessor CreatePreprocessor(AudioConfiguration? config = null)
+    private FfmpegAudioPreprocessor CreatePreprocessor(AudioOptions? config = null)
     {
         var options = Options.Create(config ?? _config);
         return new FfmpegAudioPreprocessor(options, _mockLogger.Object);

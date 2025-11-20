@@ -1,6 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.IntegrationTests.TestHelpers;
 using TenSecondTom.Shared.Models;
 using Xunit;

@@ -5,12 +5,11 @@ using Moq;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Cli;
-using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
 using TenSecondTom.Shared.Constants;
-using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 using TenSecondTom.Features.ThisWeek;
 

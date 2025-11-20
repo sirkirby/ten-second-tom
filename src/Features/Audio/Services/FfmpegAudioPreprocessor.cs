@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Audio.Services;
@@ -12,7 +12,7 @@ namespace TenSecondTom.Features.Audio.Services;
 /// </summary>
 public sealed class FfmpegAudioPreprocessor : IAudioPreprocessor
 {
-    private readonly AudioConfiguration _config;
+    private readonly AudioOptions _config;
     private readonly ILogger<FfmpegAudioPreprocessor> _logger;
 
     /// <summary>
@@ -21,7 +21,7 @@ public sealed class FfmpegAudioPreprocessor : IAudioPreprocessor
     /// <param name="config">Audio configuration options.</param>
     /// <param name="logger">Logger instance.</param>
     public FfmpegAudioPreprocessor(
-        IOptions<AudioConfiguration> config,
+        IOptions<AudioOptions> config,
         ILogger<FfmpegAudioPreprocessor> logger)
     {
         _config = config?.Value ?? throw new ArgumentNullException(nameof(config));

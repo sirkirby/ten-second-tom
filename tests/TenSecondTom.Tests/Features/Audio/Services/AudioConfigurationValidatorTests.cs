@@ -1,6 +1,6 @@
 using FluentAssertions;
 using TenSecondTom.Features.Audio.Services;
-using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Features.Audio.Constants;
 using Xunit;
@@ -17,7 +17,7 @@ public sealed class AudioConfigurationValidatorTests
     public void IsAudioConfigured_WithLocalProviderAndNoFallback_ReturnsTrue()
     {
         // Arrange
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.WhisperCpp,
             SttApiKey = null,
@@ -35,7 +35,7 @@ public sealed class AudioConfigurationValidatorTests
     public void IsAudioConfigured_WithCloudProviderAndApiKey_ReturnsTrue()
     {
         // Arrange
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.OpenAI,
             SttApiKey = "sk-test-key",
@@ -53,7 +53,7 @@ public sealed class AudioConfigurationValidatorTests
     public void IsAudioConfigured_WithCloudProviderAndNoApiKey_ReturnsFalse()
     {
         // Arrange
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.OpenAI,
             SttApiKey = null,
@@ -71,7 +71,7 @@ public sealed class AudioConfigurationValidatorTests
     public void IsAudioConfigured_WithFallbackEnabledAndValidFallback_ReturnsTrue()
     {
         // Arrange
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.WhisperCpp,
             SttApiKey = null,
@@ -91,7 +91,7 @@ public sealed class AudioConfigurationValidatorTests
     public void IsAudioConfigured_WithFallbackEnabledButNoProvider_ReturnsFalse()
     {
         // Arrange
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.WhisperCpp,
             SttApiKey = null,
@@ -111,7 +111,7 @@ public sealed class AudioConfigurationValidatorTests
     public void IsAudioConfigured_WithFallbackEnabledButNoApiKey_ReturnsFalse()
     {
         // Arrange
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.WhisperCpp,
             SttApiKey = null,
@@ -131,7 +131,7 @@ public sealed class AudioConfigurationValidatorTests
     public void GetMissingConfiguration_WithValidConfig_ReturnsEmpty()
     {
         // Arrange
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.WhisperCpp,
             SttApiKey = null,
@@ -149,7 +149,7 @@ public sealed class AudioConfigurationValidatorTests
     public void GetMissingConfiguration_WithMissingCloudApiKey_ReturnsCorrectItem()
     {
         // Arrange
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.OpenAI,
             SttApiKey = null,
@@ -169,7 +169,7 @@ public sealed class AudioConfigurationValidatorTests
     public void GetMissingConfiguration_WithMissingFallbackProvider_ReturnsCorrectItem()
     {
         // Arrange
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.WhisperCpp,
             SttApiKey = null,
@@ -189,7 +189,7 @@ public sealed class AudioConfigurationValidatorTests
     public void GetMissingConfiguration_WithMissingFallbackApiKey_ReturnsCorrectItem()
     {
         // Arrange
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.WhisperCpp,
             SttApiKey = null,
@@ -211,7 +211,7 @@ public sealed class AudioConfigurationValidatorTests
     public void GetMissingConfiguration_WithMultipleMissingItems_ReturnsAllItems()
     {
         // Arrange
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.OpenAI,
             SttApiKey = null,  // Missing primary API key
@@ -233,7 +233,7 @@ public sealed class AudioConfigurationValidatorTests
     public void IsAudioConfigured_WithLocalFallbackToLocal_ReturnsTrue()
     {
         // Arrange - local primary, local fallback (no API keys needed)
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.WhisperCpp,
             SttApiKey = null,
@@ -253,7 +253,7 @@ public sealed class AudioConfigurationValidatorTests
     public void IsAudioConfigured_WithCloudPrimaryCloudFallback_RequiresBothKeys()
     {
         // Arrange - both cloud providers, both need keys
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.OpenAI,
             SttApiKey = "sk-primary-key",

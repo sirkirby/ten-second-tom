@@ -726,12 +726,7 @@ public static class TodayCommandHandler
     /// Builds transcription configuration based on CLI STT selection and AudioOptions.
     /// Maps user-friendly CLI options (auto/local/openai) to the proper configuration.
     /// </summary>
-    /// <remarks>
-    /// This is a Today-feature-specific adapter that converts AudioOptions to the AudioConfiguration
-    /// format required by TranscribeAudio.Command (internal migration type).
-    /// </remarks>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1859:Use concrete types when possible for improved performance", Justification = "Internal type conversion adapter")]
-    private static TenSecondTom.Infrastructure.Configuration.AudioConfiguration BuildTranscriptionConfig(
+    private static TenSecondTom.Shared.Options.AudioOptions BuildTranscriptionConfig(
         string? sttSelection,
         TenSecondTom.Shared.Options.AudioOptions audioOptions)
     {
@@ -740,94 +735,49 @@ public static class TodayCommandHandler
         return normalizedSelection switch
         {
             // "auto": Try local provider first, fallback to configured fallback if enabled
-            "auto" or null => new TenSecondTom.Infrastructure.Configuration.AudioConfiguration
+            "auto" or null => new TenSecondTom.Shared.Options.AudioOptions
             {
                 SttProvider = audioOptions.SttProvider,
-                SttBinaryPath = audioOptions.SttBinaryPath,
-                SttModel = audioOptions.SttModel,
                 SttApiKey = audioOptions.SttApiKey,
                 SttFallbackEnabled = true,
                 SttFallbackProvider = audioOptions.SttFallbackProvider,
+                SttFallbackApiKey = audioOptions.SttFallbackApiKey,
+                SttBinaryPath = audioOptions.SttBinaryPath,
+                SttModel = audioOptions.SttModel,
                 SttFallbackBinaryPath = audioOptions.SttFallbackBinaryPath,
                 SttFallbackModel = audioOptions.SttFallbackModel,
-                SttFallbackApiKey = audioOptions.SttFallbackApiKey,
-                Recorder = new TenSecondTom.Infrastructure.Configuration.RecorderConfiguration
-                {
-                    FfmpegPath = audioOptions.Recorder.FfmpegPath,
-                    InputVolume = audioOptions.Recorder.InputVolume,
-                    EnableNoiseReduction = audioOptions.Recorder.EnableNoiseReduction,
-                    EnableFrequencyFilters = audioOptions.Recorder.EnableFrequencyFilters
-                },
                 KeepFiles = audioOptions.KeepFiles,
-                Preprocessing = new TenSecondTom.Infrastructure.Configuration.PreprocessingConfiguration
-                {
-                    RemoveSilence = audioOptions.Preprocessing.RemoveSilence,
-                    SilenceThresholdDb = audioOptions.Preprocessing.SilenceThresholdDb,
-                    MinimumSilenceDurationMs = audioOptions.Preprocessing.MinimumSilenceDurationMs
-                },
-                Timeouts = new TenSecondTom.Infrastructure.Configuration.RecordingTimeoutsConfiguration
-                {
-                    TodaySeconds = audioOptions.Timeouts.TodaySeconds,
-                    RecordSeconds = audioOptions.Timeouts.RecordSeconds
-                }
+                Recorder = audioOptions.Recorder,
+                Preprocessing = audioOptions.Preprocessing,
+                Timeouts = audioOptions.Timeouts
             },
 
             // "local": Use only the configured local provider (no fallback)
-            "local" => new TenSecondTom.Infrastructure.Configuration.AudioConfiguration
+            "local" => new TenSecondTom.Shared.Options.AudioOptions
             {
                 SttProvider = audioOptions.SttProvider,
-                SttBinaryPath = audioOptions.SttBinaryPath,
-                SttModel = audioOptions.SttModel,
                 SttApiKey = audioOptions.SttApiKey,
                 SttFallbackEnabled = false,
-                Recorder = new TenSecondTom.Infrastructure.Configuration.RecorderConfiguration
-                {
-                    FfmpegPath = audioOptions.Recorder.FfmpegPath,
-                    InputVolume = audioOptions.Recorder.InputVolume,
-                    EnableNoiseReduction = audioOptions.Recorder.EnableNoiseReduction,
-                    EnableFrequencyFilters = audioOptions.Recorder.EnableFrequencyFilters
-                },
+                SttBinaryPath = audioOptions.SttBinaryPath,
+                SttModel = audioOptions.SttModel,
                 KeepFiles = audioOptions.KeepFiles,
-                Preprocessing = new TenSecondTom.Infrastructure.Configuration.PreprocessingConfiguration
-                {
-                    RemoveSilence = audioOptions.Preprocessing.RemoveSilence,
-                    SilenceThresholdDb = audioOptions.Preprocessing.SilenceThresholdDb,
-                    MinimumSilenceDurationMs = audioOptions.Preprocessing.MinimumSilenceDurationMs
-                },
-                Timeouts = new TenSecondTom.Infrastructure.Configuration.RecordingTimeoutsConfiguration
-                {
-                    TodaySeconds = audioOptions.Timeouts.TodaySeconds,
-                    RecordSeconds = audioOptions.Timeouts.RecordSeconds
-                }
+                Recorder = audioOptions.Recorder,
+                Preprocessing = audioOptions.Preprocessing,
+                Timeouts = audioOptions.Timeouts
             },
 
             // "openai": Force OpenAI provider, no fallback
-            "openai" => new TenSecondTom.Infrastructure.Configuration.AudioConfiguration
+            "openai" => new TenSecondTom.Shared.Options.AudioOptions
             {
                 SttProvider = SttProviders.OpenAI,
-                SttBinaryPath = audioOptions.SttBinaryPath,
-                SttModel = audioOptions.SttModel,
                 SttApiKey = audioOptions.SttApiKey,
                 SttFallbackEnabled = false,
-                Recorder = new TenSecondTom.Infrastructure.Configuration.RecorderConfiguration
-                {
-                    FfmpegPath = audioOptions.Recorder.FfmpegPath,
-                    InputVolume = audioOptions.Recorder.InputVolume,
-                    EnableNoiseReduction = audioOptions.Recorder.EnableNoiseReduction,
-                    EnableFrequencyFilters = audioOptions.Recorder.EnableFrequencyFilters
-                },
+                SttBinaryPath = audioOptions.SttBinaryPath,
+                SttModel = audioOptions.SttModel,
                 KeepFiles = audioOptions.KeepFiles,
-                Preprocessing = new TenSecondTom.Infrastructure.Configuration.PreprocessingConfiguration
-                {
-                    RemoveSilence = audioOptions.Preprocessing.RemoveSilence,
-                    SilenceThresholdDb = audioOptions.Preprocessing.SilenceThresholdDb,
-                    MinimumSilenceDurationMs = audioOptions.Preprocessing.MinimumSilenceDurationMs
-                },
-                Timeouts = new TenSecondTom.Infrastructure.Configuration.RecordingTimeoutsConfiguration
-                {
-                    TodaySeconds = audioOptions.Timeouts.TodaySeconds,
-                    RecordSeconds = audioOptions.Timeouts.RecordSeconds
-                }
+                Recorder = audioOptions.Recorder,
+                Preprocessing = audioOptions.Preprocessing,
+                Timeouts = audioOptions.Timeouts
             },
 
             _ => throw new ArgumentException(

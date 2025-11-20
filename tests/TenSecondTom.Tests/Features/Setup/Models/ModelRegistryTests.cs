@@ -1,5 +1,5 @@
 using FluentAssertions;
-using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Models;
 using Xunit;
 using TenSecondTom.Features.Setup;

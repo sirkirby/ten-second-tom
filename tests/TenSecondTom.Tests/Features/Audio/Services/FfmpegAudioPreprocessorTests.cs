@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using TenSecondTom.Features.Audio.Services;
-using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Options;
 using Xunit;
 
 
@@ -17,15 +17,15 @@ namespace TenSecondTom.Tests.Features.Audio.Services;
 public sealed class FfmpegAudioPreprocessorTests
 {
     private readonly Mock<ILogger<FfmpegAudioPreprocessor>> _mockLogger;
-    private readonly AudioConfiguration _config;
+    private readonly AudioOptions _config;
 
     public FfmpegAudioPreprocessorTests()
     {
         _mockLogger = new Mock<ILogger<FfmpegAudioPreprocessor>>();
-        _config = new AudioConfiguration
+        _config = new AudioOptions
         {
-            Recorder = new RecorderConfiguration { FfmpegPath = "ffmpeg" },
-            Preprocessing = new PreprocessingConfiguration
+            Recorder = new RecorderOptions { FfmpegPath = "ffmpeg" },
+            Preprocessing = new PreprocessingOptions
             {
                 RemoveSilence = true,
                 SilenceThresholdDb = -40,
@@ -34,7 +34,7 @@ public sealed class FfmpegAudioPreprocessorTests
         };
     }
 
-    private FfmpegAudioPreprocessor CreatePreprocessor(AudioConfiguration? config = null)
+    private FfmpegAudioPreprocessor CreatePreprocessor(AudioOptions? config = null)
     {
         var options = Options.Create(config ?? _config);
         return new FfmpegAudioPreprocessor(options, _mockLogger.Object);
@@ -44,10 +44,10 @@ public sealed class FfmpegAudioPreprocessorTests
     public async Task IsAvailableAsync_WhenFfmpegDoesNotExist_ReturnsFalse()
     {
         // Arrange
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
-            Recorder = new RecorderConfiguration { FfmpegPath = "nonexistent-ffmpeg-binary" },
-            Preprocessing = new PreprocessingConfiguration()
+            Recorder = new RecorderOptions { FfmpegPath = "nonexistent-ffmpeg-binary" },
+            Preprocessing = new PreprocessingOptions()
         };
         var preprocessor = CreatePreprocessor(config);
 
@@ -105,10 +105,10 @@ public sealed class FfmpegAudioPreprocessorTests
     public async Task PreprocessAsync_WhenRemoveSilenceDisabled_ReturnsSuccessWithoutProcessing()
     {
         // Arrange
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
-            Recorder = new RecorderConfiguration { FfmpegPath = "ffmpeg" },
-            Preprocessing = new PreprocessingConfiguration { RemoveSilence = false }
+            Recorder = new RecorderOptions { FfmpegPath = "ffmpeg" },
+            Preprocessing = new PreprocessingOptions { RemoveSilence = false }
         };
         var preprocessor = CreatePreprocessor(config);
 

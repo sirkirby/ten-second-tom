@@ -5,9 +5,9 @@ using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
-using TenSecondTom.Infrastructure.Configuration;
-using TenSecondTom.Infrastructure.Storage;
 using TenSecondTom.Shared.Options;
+using TenSecondTom.Infrastructure.Storage;
+using TenSecondTom.Infrastructure.Configuration;
 
 namespace TenSecondTom.Tests.Features.Storage;
 

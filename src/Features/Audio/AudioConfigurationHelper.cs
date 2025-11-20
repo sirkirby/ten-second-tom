@@ -1,6 +1,6 @@
 using Spectre.Console;
 using TenSecondTom.Features.Audio.Services;
-using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.OutputFormatters;
 using TenSecondTom.Shared.Results;
 
@@ -27,7 +27,7 @@ public static class AudioConfigurationHelper
     /// <returns>Success result if configured, failure result with error message if not.</returns>
     public static Result<bool> EnsureAudioConfigured(
         IAudioConfigurationValidator validator,
-        AudioConfiguration configuration,
+        AudioOptions configuration,
         string commandName,
         bool jsonOutput)
     {

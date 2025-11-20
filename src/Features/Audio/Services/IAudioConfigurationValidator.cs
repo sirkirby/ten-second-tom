@@ -1,4 +1,4 @@
-using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Options;
 
 namespace TenSecondTom.Features.Audio.Services;
 
@@ -18,12 +18,12 @@ public interface IAudioConfigurationValidator
     /// - If using cloud provider, API key is configured
     /// - If fallback is enabled, fallback provider and key are configured
     /// </remarks>
-    bool IsAudioConfigured(AudioConfiguration configuration);
+    bool IsAudioConfigured(AudioOptions configuration);
 
     /// <summary>
     /// Gets a list of missing configuration items.
     /// </summary>
     /// <param name="configuration">The audio configuration to validate.</param>
     /// <returns>List of missing configuration items, or empty if complete.</returns>
-    IReadOnlyList<string> GetMissingConfiguration(AudioConfiguration configuration);
+    IReadOnlyList<string> GetMissingConfiguration(AudioOptions configuration);
 }

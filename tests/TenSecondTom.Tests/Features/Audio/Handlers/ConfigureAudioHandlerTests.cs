@@ -1,9 +1,8 @@
 using FluentAssertions;
-using MediatR;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Moq;
 using TenSecondTom.Features.Audio;
+using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Abstractions.UI;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
@@ -16,11 +15,6 @@ public sealed class ConfigureAudioHandlerTests
     public async Task Handle_WithCommandLineOverride_UpdatesRecorderTimeoutWithoutPrompts()
     {
         // Arrange
-        var mediator = new Mock<IMediator>();
-        mediator
-            .Setup(m => m.Send(It.IsAny<UpdateAudioConfiguration.Command>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<string>.Success("ok"));
-
         var currentAudio = new AudioOptions
         {
             Recorder = new RecorderOptions
@@ -43,7 +37,17 @@ public sealed class ConfigureAudioHandlerTests
             }
         };
 
-        var options = Options.Create(currentAudio);
+        var sectionStore = new Mock<IConfigurationSectionStore>();
+
+        // Mock ReadSectionAsync to return current config
+        sectionStore
+            .Setup(s => s.ReadSectionAsync<AudioOptions>(AudioOptions.SectionPath, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<AudioOptions>.Success(currentAudio));
+
+        // Mock WriteSectionAsync
+        sectionStore
+            .Setup(s => s.WriteSectionAsync(AudioOptions.SectionPath, It.IsAny<AudioOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<string>.Success("config.json"));
 
         var wizard = new Mock<ISetupWizardUI>();
         wizard.Setup(w => w.ShowSuccess(It.IsAny<string>()));
@@ -52,8 +56,7 @@ public sealed class ConfigureAudioHandlerTests
         var logger = Mock.Of<ILogger<ConfigureAudio.Handler>>();
 
         var handler = new ConfigureAudio.Handler(
-            mediator.Object,
-            options,
+            sectionStore.Object,
             wizard.Object,
             logger);
 
@@ -70,8 +73,9 @@ public sealed class ConfigureAudioHandlerTests
         result.Value.Should().NotBeNull();
         result.Value!.Timeouts.RecordSeconds.Should().Be(3600);
 
-        mediator.Verify(m => m.Send(
-                It.Is<UpdateAudioConfiguration.Command>(cmd => cmd.Config.Timeouts.RecordSeconds == 3600),
+        sectionStore.Verify(s => s.WriteSectionAsync(
+                AudioOptions.SectionPath,
+                It.Is<AudioOptions>(opts => opts.Timeouts.RecordSeconds == 3600),
                 It.IsAny<CancellationToken>()),
             Times.Once);
 

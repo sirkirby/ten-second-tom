@@ -4,20 +4,20 @@ using Microsoft.Extensions.Options;
 using Moq;
 using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Features.Audio.Services;
-using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Options;
 
 namespace TenSecondTom.Tests.Features.Audio.Services;
 
 public sealed class FfmpegAudioRecorderTests
 {
     private readonly Mock<ILogger<FfmpegAudioRecorder>> _mockLogger = new();
-    private readonly AudioConfiguration _config = new()
+    private readonly AudioOptions _config = new()
     {
-        Recorder = new RecorderConfiguration
+        Recorder = new RecorderOptions
         {
             FfmpegPath = "ffmpeg"
         },
-        Timeouts = new RecordingTimeoutsConfiguration
+        Timeouts = new RecordingTimeoutsOptions
         {
             TodaySeconds = 180,
             RecordSeconds = 900
@@ -27,13 +27,13 @@ public sealed class FfmpegAudioRecorderTests
     [Fact]
     public async Task IsAvailableAsync_WhenFfmpegDoesNotExist_ReturnsFalse()
     {
-        var invalidConfig = new AudioConfiguration
+        var invalidConfig = new AudioOptions
         {
-            Recorder = new RecorderConfiguration
+            Recorder = new RecorderOptions
             {
                 FfmpegPath = "nonexistent-ffmpeg-binary"
             },
-            Timeouts = new RecordingTimeoutsConfiguration
+            Timeouts = new RecordingTimeoutsOptions
             {
                 TodaySeconds = 180,
                 RecordSeconds = 900
@@ -47,7 +47,7 @@ public sealed class FfmpegAudioRecorderTests
         result.Should().BeFalse("FFmpeg binary does not exist");
     }
 
-    private FfmpegAudioRecorder CreateRecorder(AudioConfiguration? config = null)
+    private FfmpegAudioRecorder CreateRecorder(AudioOptions? config = null)
     {
         config ??= _config;
         return new FfmpegAudioRecorder(Options.Create(config), _mockLogger.Object);
