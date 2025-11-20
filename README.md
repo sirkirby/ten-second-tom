@@ -28,13 +28,22 @@
 - 🎤 **Voice Entry**: Record audio notes with local-first speech-to-text transcription
 - 📊 **Weekly Reviews**: AI-generated summaries of your week with themes and patterns
 - 🔍 **Searchable Archive**: Full-text search across all your memories (including voice transcripts)
-- 🤖 **Multiple AI Providers**: Support for OpenAI and Anthropic
+- 🤖 **Multiple AI Providers**: Support for OpenAI, Anthropic, and local LLMs (Ollama, LM Studio, etc.)
 - 📝 **Custom Templates**: Create and edit prompt templates to personalize your summaries
 - 📁 **Markdown Storage**: Human-readable files in configured memory directory
 - 🔐 **SSH Authentication**: Secure session management with SSH keys
 - 🎨 **Beautiful Terminal UI**: Rich formatting with Spectre.Console
 - 📤 **JSON Output**: Programmatic access for automation and integrations
 - ⏰ **Auto-Purge**: Configurable data retention policies
+
+### 🔒 Privacy-First: Fully Offline Capable
+
+Ten Second Tom can operate **100% offline** with **zero cloud dependencies**:
+- **Local Speech-to-Text**: Use whisper.cpp for private voice transcription
+- **Local LLM Processing**: Run models via Ollama or LM Studio for AI summaries
+- **Your data stays on your device** - no API calls, no internet required
+
+Perfect for sensitive work, offline environments, or privacy-conscious users.
 
 ---
 
@@ -43,7 +52,10 @@
 ### Core Requirements
 
 - **.NET 9 SDK** or later ([Download](https://dotnet.microsoft.com/download)) - for building from source
-- **OpenAI API Key** or **Anthropic API Key** - for AI-powered summaries
+- **LLM Provider** (choose one):
+  - **OpenAI API Key** - for cloud-based summaries with GPT models
+  - **Anthropic API Key** - for cloud-based summaries with Claude models
+  - **Local LLM** ([Ollama](https://ollama.ai/), [LM Studio](https://lmstudio.ai/), etc.) - for private, offline summaries (no API key needed)
 - **SSH Key** (Ed25519 or RSA) in `~/.ssh/` - for secure authentication
 
 ### Voice Entry Requirements (Optional)
@@ -140,7 +152,7 @@ Files saved to:
 
 Ten Second Tom provides extensive audio configuration for different microphone types and recording scenarios. All settings can be configured via:
 
-1. **Interactive setup wizard** (`tom config`) - Recommended for most users
+1. **Interactive setup wizard** (`tom config audio`) - Recommended for most users
 2. **Environment variables** - For advanced users and CI/CD
 3. **Configuration file** (`~/ten-second-tom/config/config.json`) - Automatically managed by setup wizard
 
@@ -223,7 +235,7 @@ dotnet publish -c Release -o /usr/local/bin/tom
 
 ### LLM Provider & Model Selection
 
-Ten Second Tom supports multiple Large Language Model (LLM) providers and a curated list of production-ready models. You can configure both the provider and model using any of these methods:
+Ten Second Tom supports multiple Large Language Model (LLM) providers including cloud-based and local options. You can configure both the provider and model using any of these methods:
 
 1. Interactive setup wizard (`tom setup`)
 2. Configuration command (`tom config llm`)
@@ -244,12 +256,15 @@ You'll first select a provider, then a curated list of models is displayed with 
 Select an LLM provider:
   ▸ OpenAI
     Anthropic
+    Local (OpenAI Compatible)
 
 Select a model (OpenAI):
   ▸ GPT-5 Standard (gpt-5) [Premium] - Flagship model for coding, reasoning, and agentic tasks
     GPT-5 Mini (gpt-5-mini) [Balanced] - Faster, cost-efficient version for well-defined tasks
     GPT-5 Nano (gpt-5-nano) [Budget] - Fastest, cheapest model for summarization and classification
 ```
+
+For local LLMs, you'll be prompted to configure your server URL (e.g., `http://localhost:11434/v1` for Ollama) and select from available models.
 
 Current selection is highlighted when reconfiguring so you can easily compare or switch.
 
@@ -274,12 +289,15 @@ Environment variable values take precedence over user secrets and `appsettings.j
 | Anthropic  | `claude-haiku-4-5`   | Claude Haiku 4.5     | Budget    | ✅       | Fast and compact model for near-instant responsiveness |
 | Anthropic  | `claude-sonnet-4-5`  | Claude Sonnet 4.5    | Balanced  |         | Best model for complex agents and coding with highest intelligence |
 | Anthropic  | `claude-opus-4-1`    | Claude Opus 4.1      | Premium   |         | Exceptional model for specialized complex tasks requiring advanced reasoning |
+| Local      | Any model ID         | User-defined         | Free      | N/A     | Run local models via Ollama, LM Studio, or any OpenAI-compatible server |
 
 **Notes:**
 
 - Default model (per provider) is used automatically if you leave the model blank during setup.
 - Validation occurs at startup; an invalid provider/model combination produces a clear error with valid suggestions.
 - Model IDs must match the configured provider (e.g., GPT models require OpenAI provider).
+- **Local LLMs**: Model names are not validated - use any model ID from your local server (e.g., `gpt-oss:latest`, `phi4:latest`, `qwen3:8b`, `gemma3:latest`).
+- **Local LLMs**: Requires an OpenAI-compatible API server (Ollama, LM Studio, etc.) running locally.
 - Deprecated models from previous versions are no longer supported - use `tom config llm` to select from current models.
 - Additional models may be added over time; run `tom config llm` to view the current curated list.
 
@@ -304,6 +322,80 @@ tom config llm
 ```
 
 This re-runs only the provider/model selection flow—other settings remain unchanged.
+
+#### Local LLM Configuration
+
+Ten Second Tom supports running **completely offline** using local LLM servers that provide an OpenAI-compatible API.
+
+**Supported Local Servers:**
+- [Ollama](https://ollama.ai/) - Easy-to-use local LLM runner
+- [LM Studio](https://lmstudio.ai/) - GUI-based local model manager
+- [llama.cpp](https://github.com/ggerganov/llama.cpp) - Direct model inference
+- Any OpenAI-compatible API server
+
+**Quick Start with Ollama:**
+
+1. **Install Ollama and pull a model:**
+   - Follow the [Ollama Quickstart Guide](https://github.com/ollama/ollama#quickstart) for installation and model setup
+   - Server runs at `http://localhost:11434` by default
+
+2. **Configure Tom:**
+   ```bash
+   tom config llm --provider LocalOpenAiCompatible --model gpt-oss:latest
+   # Or run interactively:
+   tom config llm
+   # Select "Local (OpenAI Compatible)"
+   # Enter API URL: http://localhost:11434/v1
+   # Select your model
+   ```
+
+3. **Use Tom offline:**
+   ```bash
+   tom today --voice  # Voice + local STT + local LLM = 100% offline!
+   ```
+
+**Configuration via Command Line:**
+
+```bash
+# Quick model switch (preserves your BaseUrl)
+tom config llm --provider LocalOpenAiCompatible --model gpt-oss:latest
+
+# Change both server and model
+tom config llm  # Use interactive mode for full configuration
+```
+
+**Configuration via Environment:**
+
+```bash
+export TenSecondTom__Llm__Provider="LocalOpenAiCompatible"
+export TenSecondTom__Llm__Model="gpt-oss:latest"
+export TenSecondTom__Llm__Providers__LocalOpenAiCompatible__BaseUrl="http://localhost:11434/v1"
+```
+
+**Popular Model Recommendations:**
+
+| Model | Size | Best For | Notes |
+|-------|------|----------|-------|
+| `gpt-oss:latest` | ~2GB | **Recommended** - All tasks | Best tested model for Tom - excellent quality and speed ⭐ |
+| `phi4:latest` | 1.6GB | Summaries, daily entries | Fast and efficient, great for quick tasks |
+| `qwen3:8b` | 4.9GB | Reasoning, weekly reviews | Strong analytical capabilities |
+| `gemma3:latest` | 2-9GB | General purpose | Reliable across different tasks |
+| `llama3:latest` | 4.7GB | General purpose | Solid balance of speed and quality |
+
+**Performance Tips:**
+
+- **First run is slow**: Models load into memory (30-60 seconds for 7B models)
+- **Subsequent runs are fast**: Models stay loaded in memory
+- **Adjust timeout if needed**: Long recordings may need more time (already configured to 15 minutes)
+- **Check model size**: Ensure you have enough RAM (8GB+ recommended for 7B models)
+
+**Switching Back to Cloud:**
+
+```bash
+tom config llm --provider OpenAI --model gpt-5-mini
+# Or Anthropic
+tom config llm --provider Anthropic --model claude-haiku-4-5
+```
 
 ---
 
@@ -417,13 +509,13 @@ Step 4 of 10: Storage Provider Selection
 To switch providers or reconfigure storage:
 
 ```bash
-tom setup
-# Re-run the setup wizard and select a different provider
+tom config storage
+# run the storage configuration wizard and select a different provider
 ```
 
 **Note**: Switching providers doesn't automatically migrate existing entries. See the [Obsidian Integration Guide](docs/OBSIDIAN-STORAGE.md#migrating-from-default-storage) for migration instructions.
 
-### Memory Directory (Legacy)
+### Memory Directory (Default Provider)
 
 By default, memories and configuration are stored in `~/ten-second-tom/` in your home directory:
 
@@ -441,11 +533,6 @@ To customize the root directory location, use the setup wizard or set via enviro
 
 ```bash
 export TenSecondTom__RootDirectory="~/Documents/my-memories"
-```
-
-**Legacy Environment Variable** (still supported):
-```bash
-export TenSecondTom__MemoryDirectory="~/Documents/my-memories"
 ```
 
 ### Data Retention
@@ -679,16 +766,6 @@ All commands in shell mode use a slash prefix:
 
 ### Shell Features
 
-✨ **Autocomplete**: Press Tab to see command suggestions
-
-- Type `/to` + Tab → shows `/today`
-- Works with partial command names
-
-🕐 **Command History**: Navigate previous commands with arrow keys
-
-- Arrow Up/Down to scroll through history
-- History persists during session only (not saved between launches)
-
 ⚡ **Fast Execution**: No re-authentication between commands
 
 - Session remains active throughout shell lifetime
@@ -699,11 +776,6 @@ All commands in shell mode use a slash prefix:
 - First Ctrl+C: Cancels current command, returns to prompt
 - Second Ctrl+C: Exits shell
 - Partial results displayed when available
-
-📄 **Smart Pagination**: Long output is automatically paginated
-
-- Short output displays fully inline
-- Long output uses interactive pager (Space = next page, Q = quit)
 
 ### Shell vs Single Command Mode
 
@@ -1082,7 +1154,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Named after "Ten Second Tom" from *50 First Dates*
 - Built with ❤️ using .NET 9 and modern C# practices
-- Inspired by the need for better personal memory management tools
+- Inspired by the need for better personal memory management and journaling tools
 
 ---
 
