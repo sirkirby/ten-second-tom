@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Options;
-using TenSecondTom.Features.Setup.Models;
+using TenSecondTom.Shared.Models;
 
 namespace TenSecondTom.Shared.Options.Validation;
 
@@ -23,25 +23,28 @@ public sealed class LlmOptionsValidator : IValidateOptions<LlmOptions>
     /// </returns>
     public ValidateOptionsResult Validate(string? name, LlmOptions options)
     {
+        // Allow unconfigured state - ConfigurationChecker.IsConfigured() handles detection
+        // Only validate structure if Provider is configured (indicates intentional configuration)
+        if (!Enum.IsDefined(options.Provider))
+        {
+            // Provider not set or invalid - allow (might be unconfigured or will be caught by IsConfigured)
+            return ValidateOptionsResult.Success;
+        }
+
+        // If Provider is set, validate related fields are consistent
         if (string.IsNullOrWhiteSpace(options.ApiKey))
         {
             return ValidateOptionsResult.Fail(
-                "LLM API key is required. Set the 'TenSecondTom:Llm:ApiKey' configuration value or the 'TenSecondTom__Llm__ApiKey' environment variable.");
-        }
-
-        if (!Enum.IsDefined(options.Provider))
-        {
-            return ValidateOptionsResult.Fail(
-                $"Invalid LLM provider '{options.Provider}'. Valid values are: {string.Join(", ", Enum.GetNames<LlmProvider>())}.");
+                "LLM API key is required when Provider is configured. Set the 'TenSecondTom:Llm:ApiKey' configuration value or the 'TenSecondTom__Llm__ApiKey' environment variable.");
         }
 
         if (string.IsNullOrWhiteSpace(options.Model))
         {
             return ValidateOptionsResult.Fail(
-                "LLM model is required. Set the 'TenSecondTom:Llm:Model' configuration value or the 'TenSecondTom__Llm__Model' environment variable.");
+                "LLM model is required when Provider is configured. Set the 'TenSecondTom:Llm:Model' configuration value or the 'TenSecondTom__Llm__Model' environment variable.");
         }
 
-        if (options.MaxInputTokens <= 0)
+        if (options.MaxInputTokens.HasValue && options.MaxInputTokens <= 0)
         {
             return ValidateOptionsResult.Fail(
                 $"MaxInputTokens must be a positive number. Current value: {options.MaxInputTokens}. Set a valid value in the 'TenSecondTom:Llm:MaxInputTokens' configuration.");

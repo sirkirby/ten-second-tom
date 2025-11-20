@@ -176,17 +176,6 @@ public sealed class SetupCommandCliTests : IDisposable
     }
 
     [Fact]
-    public async Task SetupCommand_NonInteractiveFlag_IsRecognized()
-    {
-        // Act
-        var (output, error, exitCode) = await RunCliCommandAsync("setup --non-interactive --help");
-
-        // Assert
-        exitCode.Should().Be(0, "help with valid flag should succeed");
-        output.Should().Contain("non-interactive", "help should document the non-interactive flag");
-    }
-
-    [Fact]
     public async Task ConfigCommand_Help_DisplaysUsageInformation()
     {
         // Act

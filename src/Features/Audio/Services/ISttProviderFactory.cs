@@ -1,3 +1,4 @@
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Models;
 

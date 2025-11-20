@@ -7,6 +7,8 @@
     <IsPackable>false</IsPackable>
     <!-- Suppress code analysis warnings for test namespaces -->
     <NoWarn>$(NoWarn);CA1716;CA1707</NoWarn>
+    <!-- Suppress obsolete warnings for backward compatibility deprecated items -->
+    <NoWarn>$(NoWarn);CS0618</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

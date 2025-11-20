@@ -1,9 +1,12 @@
+using MediatR;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
-using TenSecondTom.Features.Audio.Constants;
+using TenSecondTom.Features.Audio;
 using TenSecondTom.Features.Setup.Constants;
-using TenSecondTom.Features.Setup.Models;
+using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Abstractions.UI;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Models;
 
 namespace TenSecondTom.Features.Setup.Services;
 
@@ -23,13 +26,16 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
 
     private readonly IAnsiConsole _console;
     private readonly ILogger<SpectreConsoleSetupWizard> _logger;
+    private readonly IMediator _mediator;
 
     public SpectreConsoleSetupWizard(
         IAnsiConsole console,
-        ILogger<SpectreConsoleSetupWizard> logger)
+        ILogger<SpectreConsoleSetupWizard> logger,
+        IMediator mediator)
     {
         _console = console ?? throw new ArgumentNullException(nameof(console));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
     }
 
     public Task<SshKeyInfo?> PromptForSshKeyAsync(
@@ -74,26 +80,28 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         LlmProvider? currentProvider,
         CancellationToken cancellationToken)
     {
+        var choices = new Dictionary<string, LlmProvider>
+        {
+            ["OpenAI"] = LlmProvider.OpenAI,
+            ["Anthropic (Claude)"] = LlmProvider.Anthropic,
+            ["Local (OpenAI Compatible)"] = LlmProvider.LocalOpenAiCompatible
+        };
+
         var prompt = new SelectionPrompt<string>()
             .Title("Choose your AI provider:")
-            .AddChoices(["OpenAI"]);
+            .AddChoices(choices.Keys);
 
         if (currentProvider.HasValue)
         {
-            // Only highlight if the current provider is available (OpenAI)
-            if (currentProvider.Value == LlmProvider.OpenAI)
+            var currentKey = choices.FirstOrDefault(x => x.Value == currentProvider.Value).Key;
+            if (currentKey != null)
             {
                 prompt.HighlightStyle(new Style(Color.Green));
             }
         }
 
         var selected = _console.Prompt(prompt);
-
-        // Since only OpenAI is available, we know the selection must be OpenAI
-        // But we still parse it for consistency
-        var provider = selected.StartsWith("OpenAI", StringComparison.Ordinal) ? LlmProvider.OpenAI : LlmProvider.OpenAI;
-
-        return Task.FromResult<LlmProvider?>(provider);
+        return Task.FromResult<LlmProvider?>(choices[selected]);
     }
 
     public Task<SupportedModel?> PromptForModelAsync(
@@ -248,7 +256,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
     }
 
     public Task<bool> ShowSummaryAndConfirmAsync(
-        ConfigurationSettings settings,
+        Features.Setup.Models.SetupSummary summary,
         CancellationToken cancellationToken)
     {
         var table = new Table()
@@ -256,21 +264,16 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             .AddColumn("Setting")
             .AddColumn("Value");
 
-        // Show SSH key display name, or fall back to key path, or "Not set"
-        var sshKeyDisplay = settings.Ssh.KeyDisplayName 
-            ?? settings.Ssh.KeyPath 
-            ?? SetupConstants.DisplayStrings.NotSet;
-        
-        table.AddRow("SSH Key", sshKeyDisplay.EscapeMarkup());
-        table.AddRow("LLM Provider", settings.Llm.Provider.ToString());
-        table.AddRow("API Key", MaskApiKey(settings.Llm.ApiKey));
-        table.AddRow("Memory Directory", settings.RootDirectory);
-        table.AddRow("Log Level", settings.Optional.LogLevel.ToString());
-        
+        table.AddRow("SSH Key", summary.SshKeyDisplay.EscapeMarkup());
+        table.AddRow("LLM Provider", summary.LlmProvider);
+        table.AddRow("API Key", MaskApiKey(summary.ApiKey));
+        table.AddRow("Memory Directory", summary.RootDirectory);
+        table.AddRow("Log Level", summary.LogLevel);
+
         // Display retention: -1 or 0 means unlimited, otherwise show days
-        var retentionDisplay = settings.Optional.RetentionDays <= 0 
-            ? SetupConstants.RetentionKeywords.UnlimitedDisplay 
-            : $"{settings.Optional.RetentionDays} {SetupConstants.DisplayStrings.Days}";
+        var retentionDisplay = summary.RetentionDays <= 0
+            ? SetupConstants.RetentionKeywords.UnlimitedDisplay
+            : $"{summary.RetentionDays} {SetupConstants.DisplayStrings.Days}";
         table.AddRow("Retention Days", retentionDisplay);
 
         _console.Write(new Rule("[yellow]Configuration Summary[/]"));
@@ -386,27 +389,43 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         return Task.FromResult<int?>(null);
     }
 
-    public Task<string?> PromptForSttProviderAsync(
+    public async Task<string?> PromptForSttProviderAsync(
         string? currentProvider,
         CancellationToken cancellationToken)
     {
+        // Get provider info from Audio feature via CQRS query
+        var providerInfoResult = await _mediator.Send(new GetSttProviderInfo.Query(), cancellationToken);
+
+        if (!providerInfoResult.IsSuccess || providerInfoResult.Value.Count == 0)
+        {
+            ShowError("Failed to retrieve STT provider information.");
+            return null;
+        }
+
+        var providers = providerInfoResult.Value;
+
+        // Display provider options
         _console.MarkupLine("[grey]ℹ️  Speech-to-Text provider options:[/]");
-        _console.MarkupLine("[grey]   • whisper.cpp: Local, free, requires installation (Homebrew recommended)[/]");
-        _console.MarkupLine("[grey]   • OpenAI Whisper API: Cloud-based, requires API key, pay-per-use[/]");
+        foreach (var provider in providers)
+        {
+            var location = provider.IsCloud ? "Cloud-based" : "Local";
+            var keyRequirement = provider.RequiresApiKey ? "requires API key" : "free";
+            _console.MarkupLine($"[grey]   • {provider.ProviderId}: {location}, {keyRequirement}[/]");
+        }
         _console.WriteLine();
 
-        var choices = new Dictionary<string, string>
-        {
-            ["whisper.cpp (Local, free)"] = SttProviders.WhisperCpp,
-            ["OpenAI Whisper API (Cloud, requires key)"] = SttProviders.OpenAI
-        };
+        // Build choices dictionary from query results
+        var choices = providers.ToDictionary(
+            p => p.DisplayName,
+            p => p.ProviderId
+        );
 
         var prompt = new SelectionPrompt<string>()
             .Title("Select your speech-to-text provider:")
             .AddChoices(choices.Keys);
 
         var selected = _console.Prompt(prompt);
-        return Task.FromResult<string?>(choices[selected]);
+        return choices[selected];
     }
 
     public Task<string?> PromptForSttApiKeyAsync(
@@ -415,7 +434,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         CancellationToken cancellationToken)
     {
         // Prompt for API key
-        var providerName = provider == SttProviders.OpenAI ? "OpenAI" : provider;
+        var providerName = provider == "openai" ? "OpenAI" : provider;
         var prompt = new TextPrompt<string>($"Enter your {providerName} API key for STT:")
             .Secret();
 
@@ -448,25 +467,34 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         return Task.FromResult<bool?>(selected == "Enabled");
     }
 
-    public Task<string?> PromptForSttFallbackProviderAsync(
+    public async Task<string?> PromptForSttFallbackProviderAsync(
         string? currentProvider,
         CancellationToken cancellationToken)
     {
         _console.MarkupLine("[grey]ℹ️  Select fallback STT provider:[/]");
         _console.WriteLine();
 
-        // Currently only OpenAI is supported, but this is extensible
-        var choices = new Dictionary<string, string>
+        // Get provider info from Audio feature via CQRS query
+        var providerInfoResult = await _mediator.Send(new GetSttProviderInfo.Query(), cancellationToken);
+
+        if (!providerInfoResult.IsSuccess || providerInfoResult.Value.Count == 0)
         {
-            ["OpenAI Whisper API"] = SttProviders.OpenAI
-        };
+            ShowError("Failed to retrieve STT provider information.");
+            return null;
+        }
+
+        // Build choices dictionary from query results
+        var choices = providerInfoResult.Value.ToDictionary(
+            p => p.DisplayName,
+            p => p.ProviderId
+        );
 
         var prompt = new SelectionPrompt<string>()
             .Title("Fallback STT provider:")
             .AddChoices(choices.Keys);
 
         var selected = _console.Prompt(prompt);
-        return Task.FromResult<string?>(choices[selected]);
+        return choices[selected];
     }
 
     public Task<string?> PromptForRootDirectoryAsync(
@@ -597,5 +625,267 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             return new string('*', apiKey.Length);
 
         return apiKey[..^4].Select(_ => '*').Aggregate("", (a, b) => a + b) + apiKey[^4..];
+    }
+
+    public Task<string?> PromptForStringAsync(
+        string prompt,
+        string? defaultValue,
+        CancellationToken cancellationToken)
+    {
+        var promptObj = new TextPrompt<string>(prompt)
+            .AllowEmpty();
+
+        if (!string.IsNullOrEmpty(defaultValue))
+        {
+            promptObj.DefaultValue(defaultValue);
+        }
+
+        return Task.FromResult<string?>(AnsiConsole.Prompt(promptObj));
+    }
+
+    public Task<T?> PromptForSelectionAsync<T>(
+        string prompt,
+        IReadOnlyList<T> options,
+        Func<T, string> displaySelector,
+        CancellationToken cancellationToken)
+        where T : notnull
+    {
+        var selectionPrompt = new SelectionPrompt<T>()
+            .Title(prompt)
+            .PageSize(10)
+            .MoreChoicesText("[grey](Move up and down to reveal more options)[/]")
+            .UseConverter(displaySelector)
+            .AddChoices(options);
+
+        return Task.FromResult<T?>(AnsiConsole.Prompt(selectionPrompt));
+    }
+
+    public async Task<(string baseUrl, string modelName)?> PromptForLocalLlmConfigurationAsync(
+        string? currentBaseUrl,
+        string? currentModel,
+        IHttpClientFactory httpClientFactory,
+        CancellationToken cancellationToken)
+    {
+        _console.MarkupLine("[grey]ℹ️  Local LLM Configuration:[/]");
+        _console.MarkupLine("[grey]   Configure connection to your local OpenAI-compatible server.[/]");
+        _console.WriteLine();
+
+        // Step 1: Select server type to get default URL
+        var serverTypes = new[]
+        {
+            new { Name = "Ollama", Url = "http://127.0.0.1:11434/v1", SupportsApiTags = true },
+            new { Name = "LM Studio", Url = "http://127.0.0.1:1234/v1", SupportsApiTags = false },
+            new { Name = "llama.cpp / llama-server", Url = "http://127.0.0.1:8080/v1", SupportsApiTags = false },
+            new { Name = "LocalAI", Url = "http://127.0.0.1:8080/v1", SupportsApiTags = false },
+            new { Name = "Generic (Custom URL)", Url = "http://127.0.0.1:8080/v1", SupportsApiTags = false }
+        };
+
+        var selectedServer = await PromptForSelectionAsync(
+            "Select your local LLM server type:",
+            serverTypes,
+            x => x.Name,
+            cancellationToken);
+
+        if (selectedServer == null)
+        {
+            return null; // User cancelled
+        }
+
+        string defaultBaseUrl = selectedServer. Url;
+
+        // Override with current if exists
+        if (!string.IsNullOrWhiteSpace(currentBaseUrl))
+        {
+            defaultBaseUrl = currentBaseUrl;
+        }
+
+        // Step 2: Prompt for Base URL
+        var baseUrlPrompt = new TextPrompt<string>("Base URL:")
+            .DefaultValue(defaultBaseUrl)
+            .AllowEmpty();
+
+        var baseUrl = _console.Prompt(baseUrlPrompt);
+
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            _console.MarkupLine("[yellow]Base URL is required for local LLM configuration.[/]");
+            return null;
+        }
+
+        // Step 3: Verify connectivity and fetch available models
+        _console.WriteLine();
+        
+        var verificationResult = await _console.Status()
+            .StartAsync("Verifying connection to local LLM server...", async ctx =>
+            {
+                ctx.Spinner(Spinner.Known.Dots);
+                ctx.SpinnerStyle(Style.Parse("green"));
+
+                try
+                {
+                    using var client = httpClientFactory.CreateClient();
+                    client.Timeout = TimeSpan.FromSeconds(5);
+
+                    baseUrl = baseUrl.TrimEnd('/');
+
+                    // Try OpenAI-compatible /v1/models endpoint first
+                    string modelsUrl = baseUrl.EndsWith("/v1")
+                        ? $"{baseUrl}/models"
+                        : $"{baseUrl}/v1/models";
+
+                    var response = await client.GetAsync(modelsUrl, cancellationToken);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        ctx.Status("✓ Connected! Fetching available models...");
+
+                        var content = await response.Content.ReadAsStringAsync(cancellationToken);
+                        var models = ParseModelsFromResponse(content);
+
+                        if (models.Count > 0)
+                        {
+                            return (success: true, models: models, error: (string?)null);
+                        }
+                        else
+                        {
+                            return (success: false, models: new List<string>(), error: "Connected but couldn't fetch model list.");
+                        }
+                    }
+                    else
+                    {
+                        return (success: false, models: new List<string>(), error: $"Server responded with {response.StatusCode}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    return (success: false, models: new List<string>(), error: $"Could not connect: {ex.Message}");
+                }
+            });
+
+        // Now we're outside the Status block - safe to show prompts
+        if (verificationResult.success)
+        {
+            _console.MarkupLine("[green]✓ Successfully connected to local LLM[/]");
+            _console.MarkupLine($"[grey]  Found {verificationResult.models.Count} available model(s)[/]");
+
+            // Step 4: Prompt for model selection using SelectionPrompt
+            _console.WriteLine();
+            
+            // Add an option to enter custom model name
+            var modelChoices = new List<string>(verificationResult.models);
+            const string customOption = "⌨️  Enter custom model name...";
+            modelChoices.Add(customOption);
+
+            var selectionPrompt = new SelectionPrompt<string>()
+                .Title("Select model:")
+                .PageSize(10)
+                .MoreChoicesText("[grey](Move up and down to reveal more models)[/]");
+
+            // Set default to current model if it exists in the list
+            if (!string.IsNullOrWhiteSpace(currentModel))
+            {
+                // Try exact match or fuzzy match with tag
+                var matchingModel = modelChoices.FirstOrDefault(m =>
+                    m.Equals(currentModel, StringComparison.OrdinalIgnoreCase) ||
+                    m.StartsWith($"{currentModel}:", StringComparison.OrdinalIgnoreCase));
+
+                if (matchingModel != null)
+                {
+                    // Move matching model to top so it's selected by default
+                    modelChoices.Remove(matchingModel);
+                    modelChoices.Insert(0, matchingModel);
+                    
+                    // Also highlight it
+                    selectionPrompt.HighlightStyle(new Style(Color.Green));
+                }
+            }
+
+            selectionPrompt.AddChoices(modelChoices);
+
+            var selectedModel = _console.Prompt(selectionPrompt);
+
+            string modelName;
+            if (selectedModel == customOption)
+            {
+                // User wants to enter a custom model name
+                var customPrompt = new TextPrompt<string>("Enter model name:")
+                    .DefaultValue(currentModel ?? "local-model")
+                    .AllowEmpty();
+
+                modelName = _console.Prompt(customPrompt);
+                if (string.IsNullOrWhiteSpace(modelName))
+                {
+                    modelName = "local-model";
+                }
+
+                _console.MarkupLine("[yellow]⚠ Custom model name entered - ensure it exists on your server[/]");
+            }
+            else
+            {
+                modelName = selectedModel;
+            }
+
+            return (baseUrl, modelName);
+        }
+        else
+        {
+            // Verification failed - show error and ask if user wants to continue
+            _console.MarkupLine($"[yellow]⚠ {verificationResult.error}[/]");
+            _console.MarkupLine("[yellow]  Note: Connectivity verification failed.[/]");
+            _console.MarkupLine("[yellow]  Ensure your local server is running.[/]");
+            _console.WriteLine();
+            _console.MarkupLine("[yellow]Continue with configuration anyway? (y/n)[/]");
+
+            var continueResponse = Console.ReadLine();
+            if (continueResponse?.Equals("y", StringComparison.OrdinalIgnoreCase) ?? false)
+            {
+                var modelPrompt = new TextPrompt<string>("Model name:")
+                    .DefaultValue(currentModel ?? "local-model")
+                    .AllowEmpty();
+
+                var modelName = _console.Prompt(modelPrompt);
+                return (baseUrl, modelName ?? "local-model");
+            }
+
+            return null; // User chose not to continue
+        }
+    }
+
+    private static List<string> ParseModelsFromResponse(string jsonResponse)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(jsonResponse);
+            var models = new List<string>();
+
+            // Try OpenAI format: { "data": [ { "id": "model-name" } ] }
+            if (doc.RootElement.TryGetProperty("data", out var dataArray))
+            {
+                foreach (var item in dataArray.EnumerateArray())
+                {
+                    if (item.TryGetProperty("id", out var id))
+                    {
+                        models.Add(id.GetString() ?? "");
+                    }
+                }
+            }
+            // Try Ollama format: { "models": [ { "name": "model:tag" } ] }
+            else if (doc.RootElement.TryGetProperty("models", out var modelsArray))
+            {
+                foreach (var item in modelsArray.EnumerateArray())
+                {
+                    if (item.TryGetProperty("name", out var name))
+                    {
+                        models.Add(name.GetString() ?? "");
+                    }
+                }
+            }
+
+            return models.Where(m => !string.IsNullOrWhiteSpace(m)).ToList();
+        }
+        catch
+        {
+            return new List<string>();
+        }
     }
 }

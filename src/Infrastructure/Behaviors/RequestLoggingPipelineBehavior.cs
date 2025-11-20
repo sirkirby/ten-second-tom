@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Shared.Results;
@@ -45,6 +46,7 @@ public sealed class RequestLoggingPipelineBehavior<TRequest, TResponse> : IPipel
     /// <param name="next">The next handler in the pipeline.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result from the handler.</returns>
+    [SuppressMessage("Reliability", "CA2016:Forward the CancellationToken parameter", Justification = "MediatR RequestHandlerDelegate does not expose a CancellationToken parameter.")]
     public async Task<TResponse> Handle(
         TRequest request,
         RequestHandlerDelegate<TResponse> next,
@@ -61,9 +63,7 @@ public sealed class RequestLoggingPipelineBehavior<TRequest, TResponse> : IPipel
         try
         {
             // Execute the handler (and any inner pipeline behaviors)
-#pragma warning disable CA2016 // MediatR's next() delegate doesn't accept CancellationToken
             var response = await next().ConfigureAwait(false);
-#pragma warning restore CA2016
 
             stopwatch.Stop();
 

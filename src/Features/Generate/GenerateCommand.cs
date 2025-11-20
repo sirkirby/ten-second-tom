@@ -2,7 +2,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
-using TenSecondTom.Features.Templates;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Shared.Constants;
@@ -191,7 +190,10 @@ public static class GenerateCommand
 
             // Step 5: Get max input tokens from configuration
             var llmOptions = serviceProvider.GetRequiredService<IOptions<LlmOptions>>().Value;
-            int maxInputTokens = llmOptions.MaxInputTokens;
+            int maxInputTokens = llmOptions.MaxInputTokens
+                ?? (llmOptions.Provider == LlmProvider.Anthropic
+                    ? LlmConstants.DefaultMaxInputTokensAnthropic
+                    : LlmConstants.DefaultMaxInputTokensOpenAI);
 
             // Step 6: Generate output with LLM
             var generateHandler = serviceProvider.GetRequiredService<GenerateOutput.Handler>();

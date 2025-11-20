@@ -3,7 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TenSecondTom.Shared.Options;
-using TenSecondTom.Features.Setup.Models;
+using TenSecondTom.Shared.Models;
 
 namespace TenSecondTom.Infrastructure.Auth;
 

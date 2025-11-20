@@ -104,8 +104,12 @@ public sealed class TestServiceProviderBuilder
             var configBuilder = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["TenSecondTom:MemoryBasePath"] = _memoryBasePath,
-                    ["TenSecondTom:OpenAI:ApiKey"] = "test-key",
+                    ["TenSecondTom:Storage:RootDirectory"] = _memoryBasePath,
+                    ["TenSecondTom:Auth:KeySource"] = "FileSystem",
+                    ["TenSecondTom:Auth:KeyPath"] = "~/.ssh/id_ed25519",
+                    ["TenSecondTom:Llm:Provider"] = "OpenAI",
+                    ["TenSecondTom:Llm:ApiKey"] = "test-key",
+                    ["TenSecondTom:Llm:Model"] = "gpt-4",
                     ["TenSecondTom:DefaultProvider"] = "MockProvider",
                     ["DOTNET_ENVIRONMENT"] = "Development" // Set to development for MockAuthenticationService
                 });
@@ -123,12 +127,13 @@ public sealed class TestServiceProviderBuilder
 
         // Add infrastructure and feature services
         _services.AddInfrastructureServices();
+        _services.AddApplicationServices();  // Registers MediatR and FluentValidation
         _services.AddTodayFeature();
         _services.AddThisWeekFeature();
         _services.AddSearchFeature();
         _services.AddAuthFeature();
         _services.AddTemplatesFeature();
-        _services.AddSetupFeature();
+        _services.AddSetupFeature(_configuration);
         _services.AddShellFeature();
 
         // Override with mocked services if provided

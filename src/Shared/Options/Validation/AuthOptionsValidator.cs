@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Options;
-using TenSecondTom.Features.Setup.Models;
+using TenSecondTom.Shared.Models;
 
 namespace TenSecondTom.Shared.Options.Validation;
 
@@ -25,7 +25,14 @@ public sealed class AuthOptionsValidator : IValidateOptions<AuthOptions>
     /// </returns>
     public ValidateOptionsResult Validate(string? name, AuthOptions options)
     {
-        if (!Enum.IsDefined(options.KeySource))
+        // KeySource is now nullable - check if it has a value
+        if (!options.KeySource.HasValue)
+        {
+            // Allow null for unconfigured state - will be validated during setup
+            return ValidateOptionsResult.Success;
+        }
+
+        if (!Enum.IsDefined(options.KeySource.Value))
         {
             return ValidateOptionsResult.Fail(
                 $"Invalid SSH key source '{options.KeySource}'. Valid values are: {string.Join(", ", Enum.GetNames<SshKeySource>())}.");
@@ -37,7 +44,7 @@ public sealed class AuthOptionsValidator : IValidateOptions<AuthOptions>
             if (string.IsNullOrWhiteSpace(options.KeyPath))
             {
                 return ValidateOptionsResult.Fail(
-                    $"KeyPath is required when KeySource is '{options.KeySource}'. Set the 'TenSecondTom:Ssh:KeyPath' configuration value or the 'TenSecondTom__Ssh__KeyPath' environment variable.");
+                    $"KeyPath is required when KeySource is '{options.KeySource}'. Set the 'TenSecondTom:Auth:KeyPath' configuration value or the 'TenSecondTom__Auth__KeyPath' environment variable.");
             }
 
             // Basic path format validation
@@ -54,7 +61,7 @@ public sealed class AuthOptionsValidator : IValidateOptions<AuthOptions>
             if (string.IsNullOrWhiteSpace(options.AgentSocketPath))
             {
                 return ValidateOptionsResult.Fail(
-                    $"AgentSocketPath is required when KeySource is '{options.KeySource}'. Set the 'TenSecondTom:Ssh:AgentSocketPath' configuration value or use the SSH_AUTH_SOCK environment variable.");
+                    $"AgentSocketPath is required when KeySource is '{options.KeySource}'. Set the 'TenSecondTom:Auth:AgentSocketPath' configuration value or use the SSH_AUTH_SOCK environment variable.");
             }
         }
 

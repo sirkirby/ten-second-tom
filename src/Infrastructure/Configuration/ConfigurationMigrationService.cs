@@ -4,7 +4,7 @@ namespace TenSecondTom.Infrastructure.Configuration;
 
 /// <summary>
 /// Service for detecting and cleaning up legacy user secrets configuration.
-/// Helps users migrate from the old UserSecretsStorageService to the unified ConfigurationStorageService.
+/// Helps users migrate from the old UserSecretsStorageService to the new appsettings.json-based configuration.
 /// </summary>
 public sealed class ConfigurationMigrationService
 {

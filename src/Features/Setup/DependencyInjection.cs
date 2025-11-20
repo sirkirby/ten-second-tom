@@ -1,7 +1,9 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TenSecondTom.Features.Setup.Services;
-using TenSecondTom.Infrastructure.Auth.SshProviders;
-using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Shared.Abstractions.UI;
+using TenSecondTom.Shared.Abstractions.Validation;
 
 namespace TenSecondTom.Features.Setup;
 
@@ -14,41 +16,25 @@ public static class SetupFeatureExtensions
     /// Adds Setup feature services to the service collection.
     /// </summary>
     /// <param name="services">The service collection.</param>
+    /// <param name="configuration">The configuration to bind Setup options from.</param>
     /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddSetupFeature(this IServiceCollection services)
+    public static IServiceCollection AddSetupFeature(
+        this IServiceCollection services,
+        IConfiguration configuration)
     {
         // Command handlers (nested classes - auto-discovered by MediatR, but register for direct DI access)
         services.AddTransient<Setup.Handler>();
-        services.AddTransient<Config.Handler>();
-        
-        // Setup command factory (centralizes logic for creating SetupCommand with existing config)
-        services.AddTransient<SetupCommandFactory>();
-        
+
         // Application bootstrapper (coordinates startup/setup logic)
         services.AddTransient<ApplicationBootstrapper>();
-        
-        // SSH Key Detectors - registered as both concrete types and interface for factory injection
-        services.AddTransient<ISshKeyDetector, SystemSshAgentDetector>();
-        services.AddTransient<ISshKeyDetector, OnePasswordSshAgentDetector>();
-        services.AddTransient<ISshKeyDetector, SecretiveSshAgentDetector>();
-        services.AddTransient<ISshKeyDetector, FileSystemSshKeyDetector>();
-        services.AddSingleton<ISshKeyDetectorFactory, SshKeyDetectorFactory>();
-        
-        // API Key Validators
+
+        // API Key Validators (Setup feature-specific services)
         services.AddTransient<IApiKeyValidator, OpenAIApiKeyValidator>();
         services.AddTransient<IApiKeyValidator, AnthropicApiKeyValidator>();
-        
-        // Configuration Storage - Unified service manages all configuration in appsettings.json
-        services.AddSingleton<ConfigurationStorageService>();
-        services.AddSingleton<IConfigurationStorageService>(sp => sp.GetRequiredService<ConfigurationStorageService>());
-        services.AddSingleton<IAppSettingsStorageService>(sp => sp.GetRequiredService<ConfigurationStorageService>());
-
-        // Configuration Migration - Detects and cleans up legacy user secrets
-        services.AddSingleton<ConfigurationMigrationService>();
 
         // Setup Wizard UI
         services.AddTransient<ISetupWizardUI, SpectreConsoleSetupWizard>();
-        
+
         return services;
     }
 }

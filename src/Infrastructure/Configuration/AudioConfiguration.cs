@@ -1,4 +1,3 @@
-using TenSecondTom.Features.Audio.Constants;
 using TenSecondTom.Shared.Constants;
 
 namespace TenSecondTom.Infrastructure.Configuration;
@@ -7,18 +6,23 @@ namespace TenSecondTom.Infrastructure.Configuration;
 /// Root configuration for audio recording and transcription features.
 /// Supports both local (whisper.cpp) and remote (OpenAI) speech-to-text engines.
 /// </summary>
+/// <remarks>
+/// DEPRECATED: This class is obsolete and will be removed in a future version.
+/// Use <see cref="TenSecondTom.Shared.Options.AudioOptions"/> instead.
+/// Access audio configuration through CQRS queries: <see cref="TenSecondTom.Features.Audio.GetAudioConfiguration"/>.
+/// </remarks>
 public sealed class AudioConfiguration
 {
     /// <summary>
     /// Gets or sets the speech-to-text provider.
-    /// Valid values: <see cref="SttProviders.WhisperCpp"/>, <see cref="SttProviders.OpenAI"/>.
-    /// Default: <see cref="SttProviders.WhisperCpp"/> (local, free).
+    /// Valid values: "whisper-cpp" (local, free), "openai" (cloud, requires API key).
+    /// Default: "whisper-cpp" (local, free).
     /// </summary>
-    public string SttProvider { get; init; } = SttProviders.WhisperCpp;
+    public string SttProvider { get; init; } = "whisper-cpp";
 
     /// <summary>
     /// Gets or sets the API key for the STT provider.
-    /// Required for <see cref="SttProviders.OpenAI"/>, optional for <see cref="SttProviders.WhisperCpp"/> (fallback only).
+    /// Required for "openai", optional for "whisper-cpp" (fallback only).
     /// Default: null (no API key).
     /// </summary>
     public string? SttApiKey { get; init; }
@@ -31,7 +35,7 @@ public sealed class AudioConfiguration
     public bool SttFallbackEnabled { get; init; }
 
     /// <summary>
-    /// Gets or sets the fallback STT provider (e.g., <see cref="SttProviders.OpenAI"/>).
+    /// Gets or sets the fallback STT provider (e.g., "openai").
     /// Only used when <see cref="SttFallbackEnabled"/> is true.
     /// Default: null (no fallback provider configured).
     /// </summary>
@@ -47,17 +51,17 @@ public sealed class AudioConfiguration
     /// <summary>
     /// Gets or sets the binary path for the primary STT provider.
     /// Only used for local providers (e.g., whisper-cpp).
-    /// Default: <see cref="AudioConstants.WhisperCliBinaryName"/> ("whisper-cli").
+    /// Default: "whisper-cli" (Homebrew installs whisper-cpp package as 'whisper-cli' binary).
     /// </summary>
-    public string SttBinaryPath { get; init; } = AudioConstants.WhisperCliBinaryName;
+    public string SttBinaryPath { get; init; } = "whisper-cli";
 
     /// <summary>
     /// Gets or sets the model for the primary STT provider.
     /// For local providers: path to model file (e.g., "~/.cache/whisper/ggml-base.en.bin").
     /// For cloud providers: model name (e.g., "whisper-1").
-    /// Default: <see cref="AudioConstants.DefaultWhisperModelPath"/>.
+    /// Default: "~/.cache/whisper/ggml-base.en.bin" (Base.en model: English-only, 142 MB, balanced speed/accuracy).
     /// </summary>
-    public string SttModel { get; init; } = AudioConstants.DefaultWhisperModelPath;
+    public string SttModel { get; init; } = "~/.cache/whisper/ggml-base.en.bin";
 
     /// <summary>
     /// Gets or sets the binary path for the fallback STT provider.
@@ -113,9 +117,9 @@ public sealed class RecorderConfiguration
 {
     /// <summary>
     /// Gets or sets the path to ffmpeg binary.
-    /// Default: <see cref="AudioConstants.FfmpegBinaryName"/> (assumes ffmpeg is on PATH).
+    /// Default: "ffmpeg" (assumes ffmpeg is available on the system PATH).
     /// </summary>
-    public string FfmpegPath { get; init; } = AudioConstants.FfmpegBinaryName;
+    public string FfmpegPath { get; init; } = "ffmpeg";
 
     /// <summary>
     /// Gets or sets the input volume multiplier (0.0 to 2.0).

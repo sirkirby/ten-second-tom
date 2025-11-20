@@ -1,6 +1,7 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
-using TenSecondTom.Features.Shell.Models;
+using TenSecondTom.Shared.Models;
 using ShellCommandResult = TenSecondTom.Features.Shell.Models.CommandResult;
 
 namespace TenSecondTom.Features.Shell.Services;
@@ -23,7 +24,7 @@ public interface IReplLoop
 /// </summary>
 public sealed class ReplLoop : IReplLoop
 {
-    private readonly ICommandRouter _router;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ISessionManager _sessionManager;
     private readonly IAutocompleteEngine _autocompleteEngine;
     private readonly IOutputPaginator _paginator;
@@ -31,13 +32,13 @@ public sealed class ReplLoop : IReplLoop
     private readonly CommandAutoCompleteSource _autoCompleteSource;
 
     public ReplLoop(
-        ICommandRouter router,
+        IServiceScopeFactory scopeFactory,
         ISessionManager sessionManager,
         IAutocompleteEngine autocompleteEngine,
         IOutputPaginator paginator,
         ILogger<ReplLoop> logger)
     {
-        _router = router;
+        _scopeFactory = scopeFactory;
         _sessionManager = sessionManager;
         _autocompleteEngine = autocompleteEngine;
         _paginator = paginator;
@@ -82,18 +83,25 @@ public sealed class ReplLoop : IReplLoop
                         continue;
                     }
 
-                    // Route and execute command
-                    var result = await _router.RouteAsync(input, cancellationToken).ConfigureAwait(false);
+                    // Create a new scope for each command execution
+                    // This ensures that scoped services (like IOptionsSnapshot) get fresh instances
+                    using (var scope = _scopeFactory.CreateScope())
+                    {
+                        var router = scope.ServiceProvider.GetRequiredService<ICommandRouter>();
 
-                    // Add to history
-                    _sessionManager.AddToHistory(
-                        input,
-                        result.IsSuccess,
-                        result.Message == "(interrupted)",
-                        result.Message);
+                        // Route and execute command
+                        var result = await router.RouteAsync(input, cancellationToken).ConfigureAwait(false);
 
-                    // Display result feedback
-                    DisplayResult(result);
+                        // Add to history
+                        _sessionManager.AddToHistory(
+                            input,
+                            result.IsSuccess,
+                            result.Message == "(interrupted)",
+                            result.Message);
+
+                        // Display result feedback
+                        DisplayResult(result);
+                    }
                     
                     // Add visual spacing between commands
                     AnsiConsole.WriteLine();

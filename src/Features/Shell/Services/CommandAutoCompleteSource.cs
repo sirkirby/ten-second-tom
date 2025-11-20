@@ -1,4 +1,4 @@
-using TenSecondTom.Features.Shell.Models;
+using TenSecondTom.Shared.Models;
 
 namespace TenSecondTom.Features.Shell.Services;
 

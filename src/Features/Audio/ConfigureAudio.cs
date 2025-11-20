@@ -2,10 +2,12 @@ using TenSecondTom.Features.Audio.Constants;
 using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.Logging;
-using TenSecondTom.Features.Setup.Services;
-using TenSecondTom.Infrastructure.Configuration;
+using Microsoft.Extensions.Options;
+using TenSecondTom.Shared.Abstractions.UI;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Features.Audio.Models;
 using static TenSecondTom.Features.Audio.Constants.SttProviders;
 
 namespace TenSecondTom.Features.Audio;
@@ -20,7 +22,7 @@ public static class ConfigureAudio
     /// Command to configure audio settings.
     /// Supports both interactive prompts and direct value assignment via arguments.
     /// </summary>
-    public sealed record Command : IRequest<Result<AudioConfiguration>>
+    public sealed record Command : IRequest<Result<AudioOptions>>
     {
         /// <summary>
         /// Gets the timeout in seconds for 'today --voice' recording.
@@ -82,26 +84,24 @@ public static class ConfigureAudio
     /// Orchestrates interactive audio configuration with optional command-line overrides.
     /// </summary>
     public sealed class Handler(
-        IAppSettingsStorageService appSettingsStorage,
+        IMediator mediator,
+        IOptions<AudioOptions> currentAudioOptions,
         ISetupWizardUI setupWizard,
         ILogger<Handler> logger)
-        : IRequestHandler<Command, Result<AudioConfiguration>>
+        : IRequestHandler<Command, Result<AudioOptions>>
     {
-        public async Task<Result<AudioConfiguration>> Handle(
+        public async Task<Result<AudioOptions>> Handle(
             Command request,
             CancellationToken cancellationToken)
         {
             logger.LogInformation("Starting audio configuration");
 
-            // Load current audio configuration from appsettings.json
-            var loadResult = await appSettingsStorage.LoadAudioConfigurationAsync(cancellationToken);
+            var currentAudio = currentAudioOptions.Value;
 
-            if (!loadResult.IsSuccess)
+            if (HasCommandLineOverrides(request))
             {
-                setupWizard.ShowWarning("Could not load current audio configuration. Using defaults.");
+                return await ApplyCommandLineOverridesAsync(request, currentAudio, cancellationToken);
             }
-
-            var currentAudio = loadResult.IsSuccess ? loadResult.Value! : new AudioConfiguration();
 
             const int totalSteps = 9;
 
@@ -122,7 +122,7 @@ public static class ConfigureAudio
 
                 if (!inputVolume.HasValue)
                 {
-                    return Result<AudioConfiguration>.Failure("Audio configuration cancelled. No changes were made.");
+                    return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
                 }
             }
 
@@ -144,7 +144,7 @@ public static class ConfigureAudio
 
                 if (!noiseReduction.HasValue)
                 {
-                    return Result<AudioConfiguration>.Failure("Audio configuration cancelled. No changes were made.");
+                    return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
                 }
             }
 
@@ -166,7 +166,7 @@ public static class ConfigureAudio
 
                 if (!frequencyFilters.HasValue)
                 {
-                    return Result<AudioConfiguration>.Failure("Audio configuration cancelled. No changes were made.");
+                    return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
                 }
             }
 
@@ -179,7 +179,7 @@ public static class ConfigureAudio
 
             if (!removeSilence.HasValue)
             {
-                return Result<AudioConfiguration>.Failure("Audio configuration cancelled. No changes were made.");
+                return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
             }
 
             // Step 5: Silence Threshold (only if silence removal enabled)
@@ -196,7 +196,7 @@ public static class ConfigureAudio
 
                 if (!threshold.HasValue)
                 {
-                    return Result<AudioConfiguration>.Failure("Audio configuration cancelled. No changes were made.");
+                    return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
                 }
                 silenceThresholdDb = threshold.Value;
             }
@@ -220,7 +220,7 @@ public static class ConfigureAudio
 
                 if (!duration.HasValue)
                 {
-                    return Result<AudioConfiguration>.Failure("Audio configuration cancelled. No changes were made.");
+                    return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
                 }
                 minSilenceDurationMs = duration.Value;
             }
@@ -238,7 +238,7 @@ public static class ConfigureAudio
 
             if (sttProvider == null)
             {
-                return Result<AudioConfiguration>.Failure("Audio configuration cancelled. No changes were made.");
+                return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
             }
 
             // Step 7a: STT API Key (if provider requires it)
@@ -252,7 +252,7 @@ public static class ConfigureAudio
 
                 if (sttApiKey == null)
                 {
-                    return Result<AudioConfiguration>.Failure("Audio configuration cancelled. No changes were made.");
+                    return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
                 }
             }
 
@@ -269,7 +269,7 @@ public static class ConfigureAudio
 
                 if (!fallback.HasValue)
                 {
-                    return Result<AudioConfiguration>.Failure("Audio configuration cancelled. No changes were made.");
+                    return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
                 }
 
                 sttFallbackEnabled = fallback.Value;
@@ -284,7 +284,7 @@ public static class ConfigureAudio
 
                     if (fallbackProvider == null)
                     {
-                        return Result<AudioConfiguration>.Failure("Audio configuration cancelled. No changes were made.");
+                        return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
                     }
 
                     sttFallbackProvider = fallbackProvider;
@@ -299,7 +299,7 @@ public static class ConfigureAudio
 
                     if (fallbackApiKey == null)
                     {
-                        return Result<AudioConfiguration>.Failure("Audio configuration cancelled. No changes were made.");
+                        return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
                     }
 
                     sttFallbackApiKey = fallbackApiKey;
@@ -333,7 +333,7 @@ public static class ConfigureAudio
 
                 if (!todayTimeout.HasValue)
                 {
-                    return Result<AudioConfiguration>.Failure("Audio configuration cancelled. No changes were made.");
+                    return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
                 }
             }
 
@@ -358,49 +358,49 @@ public static class ConfigureAudio
 
                 if (!recordTimeout.HasValue)
                 {
-                    return Result<AudioConfiguration>.Failure("Audio configuration cancelled. No changes were made.");
+                    return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
                 }
             }
 
-            // Build updated audio configuration
-            var updatedAudio = new AudioConfiguration
+            // Build updated audio configuration using AudioOptions
+            var updatedAudio = new AudioOptions
             {
                 SttProvider = sttProvider,
                 SttApiKey = sttApiKey,
                 SttFallbackEnabled = sttFallbackEnabled,
                 SttFallbackProvider = sttFallbackProvider,
-                SttFallbackBinaryPath = currentAudio.SttFallbackBinaryPath, // Not modified interactively
-                SttFallbackModel = currentAudio.SttFallbackModel, // Not modified interactively
                 SttFallbackApiKey = sttFallbackApiKey,
-                KeepFiles = currentAudio.KeepFiles, // Not modified interactively
-                Recorder = new RecorderConfiguration
+                SttBinaryPath = currentAudio.SttBinaryPath,
+                SttModel = currentAudio.SttModel,
+                SttFallbackBinaryPath = currentAudio.SttFallbackBinaryPath,
+                SttFallbackModel = currentAudio.SttFallbackModel,
+                KeepFiles = currentAudio.KeepFiles,
+                Recorder = new RecorderOptions
                 {
-                    FfmpegPath = currentAudio.Recorder.FfmpegPath, // Not modified interactively
+                    FfmpegPath = currentAudio.Recorder.FfmpegPath,
                     InputVolume = inputVolume!.Value,
                     EnableNoiseReduction = noiseReduction!.Value,
                     EnableFrequencyFilters = frequencyFilters!.Value
                 },
-                SttBinaryPath = currentAudio.SttBinaryPath, // Not modified interactively
-                SttModel = currentAudio.SttModel, // Not modified interactively
-                Preprocessing = new PreprocessingConfiguration
+                Preprocessing = new PreprocessingOptions
                 {
                     RemoveSilence = removeSilence.Value,
                     SilenceThresholdDb = silenceThresholdDb,
                     MinimumSilenceDurationMs = minSilenceDurationMs
                 },
-                Timeouts = new RecordingTimeoutsConfiguration
+                Timeouts = new RecordingTimeoutsOptions
                 {
                     TodaySeconds = todayTimeout.Value,
                     RecordSeconds = recordTimeout.Value
                 }
             };
 
-            // Save to appsettings.json
-            var saveResult = await appSettingsStorage.SaveAudioConfigurationAsync(updatedAudio, cancellationToken);
+            // Save using CQRS command
+            var saveResult = await mediator.Send(new UpdateAudioConfiguration.Command(updatedAudio), cancellationToken);
 
             if (!saveResult.IsSuccess)
             {
-                return Result<AudioConfiguration>.Failure($"Failed to save audio configuration: {saveResult.Error}. Changes were not applied.");
+                return Result<AudioOptions>.Failure($"Failed to save audio configuration: {saveResult.Error}. Changes were not applied.");
             }
 
             logger.LogInformation("Audio configuration updated successfully");
@@ -425,7 +425,101 @@ public static class ConfigureAudio
             setupWizard.ShowStatus($"  • Today timeout: {todayTimeout.Value}s");
             setupWizard.ShowStatus($"  • Record timeout: {recordTimeout.Value}s");
 
-            return Result<AudioConfiguration>.Success(updatedAudio);
+            return Result<AudioOptions>.Success(updatedAudio);
+        }
+
+        private static bool HasCommandLineOverrides(Command request)
+        {
+            return request.TodayTimeoutSeconds.HasValue ||
+                   request.RecordTimeoutSeconds.HasValue ||
+                   request.InputVolume.HasValue ||
+                   request.EnableNoiseReduction.HasValue ||
+                   request.EnableFrequencyFilters.HasValue;
+        }
+
+        private async Task<Result<AudioOptions>> ApplyCommandLineOverridesAsync(
+            Command request,
+            AudioOptions currentAudio,
+            CancellationToken cancellationToken)
+        {
+            var updatedAudio = BuildOverriddenAudioOptions(currentAudio, request);
+
+            var saveResult = await mediator.Send(new UpdateAudioConfiguration.Command(updatedAudio), cancellationToken);
+
+            if (!saveResult.IsSuccess)
+            {
+                return Result<AudioOptions>.Failure($"Failed to save audio configuration: {saveResult.Error}. Changes were not applied.");
+            }
+
+            logger.LogInformation("Audio configuration updated via CLI arguments");
+            ShowOverrideSummary(request);
+
+            return Result<AudioOptions>.Success(updatedAudio);
+        }
+
+        private static AudioOptions BuildOverriddenAudioOptions(AudioOptions currentAudio, Command request)
+        {
+            return new AudioOptions
+            {
+                SttProvider = currentAudio.SttProvider,
+                SttApiKey = currentAudio.SttApiKey,
+                SttFallbackEnabled = currentAudio.SttFallbackEnabled,
+                SttFallbackProvider = currentAudio.SttFallbackProvider,
+                SttFallbackApiKey = currentAudio.SttFallbackApiKey,
+                SttBinaryPath = currentAudio.SttBinaryPath,
+                SttModel = currentAudio.SttModel,
+                SttFallbackBinaryPath = currentAudio.SttFallbackBinaryPath,
+                SttFallbackModel = currentAudio.SttFallbackModel,
+                KeepFiles = currentAudio.KeepFiles,
+                Recorder = new RecorderOptions
+                {
+                    FfmpegPath = currentAudio.Recorder.FfmpegPath,
+                    InputVolume = request.InputVolume ?? currentAudio.Recorder.InputVolume,
+                    EnableNoiseReduction = request.EnableNoiseReduction ?? currentAudio.Recorder.EnableNoiseReduction,
+                    EnableFrequencyFilters = request.EnableFrequencyFilters ?? currentAudio.Recorder.EnableFrequencyFilters
+                },
+                Preprocessing = new PreprocessingOptions
+                {
+                    RemoveSilence = currentAudio.Preprocessing.RemoveSilence,
+                    SilenceThresholdDb = currentAudio.Preprocessing.SilenceThresholdDb,
+                    MinimumSilenceDurationMs = currentAudio.Preprocessing.MinimumSilenceDurationMs
+                },
+                Timeouts = new RecordingTimeoutsOptions
+                {
+                    TodaySeconds = request.TodayTimeoutSeconds ?? currentAudio.Timeouts.TodaySeconds,
+                    RecordSeconds = request.RecordTimeoutSeconds ?? currentAudio.Timeouts.RecordSeconds
+                }
+            };
+        }
+
+        private void ShowOverrideSummary(Command request)
+        {
+            setupWizard.ShowSuccess("✓ Audio configuration saved successfully");
+
+            if (request.InputVolume.HasValue)
+            {
+                setupWizard.ShowStatus($"  • Input volume: {request.InputVolume.Value:F1}");
+            }
+
+            if (request.EnableNoiseReduction.HasValue)
+            {
+                setupWizard.ShowStatus($"  • Noise reduction: {(request.EnableNoiseReduction.Value ? "Enabled" : "Disabled")}");
+            }
+
+            if (request.EnableFrequencyFilters.HasValue)
+            {
+                setupWizard.ShowStatus($"  • Frequency filters: {(request.EnableFrequencyFilters.Value ? "Enabled" : "Disabled")}");
+            }
+
+            if (request.TodayTimeoutSeconds.HasValue)
+            {
+                setupWizard.ShowStatus($"  • Today timeout: {request.TodayTimeoutSeconds.Value}s");
+            }
+
+            if (request.RecordTimeoutSeconds.HasValue)
+            {
+                setupWizard.ShowStatus($"  • Record timeout: {request.RecordTimeoutSeconds.Value}s");
+            }
         }
     }
 }

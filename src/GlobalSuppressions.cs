@@ -17,11 +17,11 @@ using System.Runtime.CompilerServices;
 [assembly: SuppressMessage("Design", "CA1040:Avoid empty interfaces", Scope = "type", Target = "~T:TenSecondTom.Features.ThisWeek.Commands.IRequest`1", Justification = "Marker interface for CQRS pattern")]
 [assembly: SuppressMessage("Design", "CA1040:Avoid empty interfaces", Scope = "namespaceanddescendants", Target = "~N:TenSecondTom.Features", Justification = "CQRS command/query marker interfaces are empty by design")]
 
-// Shell feature - array properties intentional for collection initializers
-[assembly: SuppressMessage("Performance", "CA1819:Properties should not return arrays", Scope = "member", Target = "~P:TenSecondTom.Features.Shell.Models.CommandMetadata.Aliases", Justification = "Array is intentional for collection initializers in static catalog")]
+// Shared models - array properties intentional for collection initializers
+[assembly: SuppressMessage("Performance", "CA1819:Properties should not return arrays", Scope = "member", Target = "~P:TenSecondTom.Shared.Models.CommandMetadata.Aliases", Justification = "Array is intentional for collection initializers in static catalog")]
 
 // Setup Feature - explicit false initialization for clarity in configuration
-[assembly: SuppressMessage("Design", "CA1805:Do not initialize unnecessarily", Scope = "member", Target = "~P:TenSecondTom.Features.Setup.Models.OptionalConfiguration.EnableTelemetry", Justification = "Explicit false initialization for clarity")]
+[assembly: SuppressMessage("Design", "CA1805:Do not initialize unnecessarily", Scope = "member", Target = "~P:TenSecondTom.Shared.Models.OptionalConfiguration.EnableTelemetry", Justification = "Explicit false initialization for clarity")]
 
 // Shell/Setup features - instance methods for consistency and future extensibility
 [assembly: SuppressMessage("Performance", "CA1822:Mark members as static", Scope = "member", Target = "~M:TenSecondTom.Features.Shell.Services.ReplLoop.DisplayBanner", Justification = "Instance method for consistency with other display methods")]

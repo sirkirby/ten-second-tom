@@ -1,3 +1,5 @@
+using TenSecondTom.Shared.Models;
+
 namespace TenSecondTom.Features.Setup.Models;
 
 /// <summary>
@@ -101,20 +103,4 @@ public sealed record LlmProviderInfo
     {
         LastValidated = DateTime.UtcNow
     };
-}
-
-/// <summary>
-/// Supported LLM providers
-/// </summary>
-public enum LlmProvider
-{
-    /// <summary>
-    /// OpenAI (GPT models)
-    /// </summary>
-    OpenAI,
-
-    /// <summary>
-    /// Anthropic (Claude models)
-    /// </summary>
-    Anthropic
 }

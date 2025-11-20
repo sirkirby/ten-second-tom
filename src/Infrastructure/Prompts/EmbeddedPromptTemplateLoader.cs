@@ -63,9 +63,7 @@ public sealed class EmbeddedPromptTemplateLoader : IPromptTemplateLoader
         {
             throw;
         }
-#pragma warning disable CA1031 // Do not catch general exception types - we want to handle all exceptions gracefully
         catch (Exception ex)
-#pragma warning restore CA1031
         {
             return Result<PromptTemplate>.Failure(
                 $"Failed to load template '{templateId}': {ex.Message}");
@@ -115,9 +113,7 @@ public sealed class EmbeddedPromptTemplateLoader : IPromptTemplateLoader
 
             return Result<PromptTemplate>.Success(template);
         }
-#pragma warning disable CA1031 // Do not catch general exception types - intentional fallback behavior
         catch (Exception)
-#pragma warning restore CA1031
         {
             // If user override fails to load, fall back to embedded resource
             return null;
@@ -258,9 +254,7 @@ public sealed class EmbeddedPromptTemplateLoader : IPromptTemplateLoader
         {
             throw;
         }
-#pragma warning disable CA1031 // Do not catch general exception types - we want to handle all exceptions gracefully
         catch (Exception ex)
-#pragma warning restore CA1031
         {
             return Result<List<PromptTemplate>>.Failure(
                 $"Failed to load embedded templates: {ex.Message}");
@@ -299,9 +293,7 @@ public sealed class EmbeddedPromptTemplateLoader : IPromptTemplateLoader
         {
             throw;
         }
-#pragma warning disable CA1031 // Do not catch general exception types - we want to handle all exceptions gracefully
         catch (Exception ex)
-#pragma warning restore CA1031
         {
             return Result<string>.Failure(
                 $"Failed to load raw template content for '{templateId}': {ex.Message}");
@@ -340,9 +332,7 @@ public sealed class EmbeddedPromptTemplateLoader : IPromptTemplateLoader
 
             return Result<string>.Success(rawContent);
         }
-#pragma warning disable CA1031 // Do not catch general exception types - intentional fallback behavior
         catch (Exception)
-#pragma warning restore CA1031
         {
             // If user override fails to load, fall back to embedded resource
             return null;
@@ -393,9 +383,7 @@ public sealed class EmbeddedPromptTemplateLoader : IPromptTemplateLoader
     /// </returns>
     private static TemplateType DetermineTemplateType(string templateId)
     {
-#pragma warning disable CA1308 // Normalize strings to uppercase - template IDs are conventionally lowercase
         return templateId.ToLowerInvariant() switch
-#pragma warning restore CA1308
         {
             "daily-summary" => TemplateType.Daily,
             "weekly-review" => TemplateType.Weekly,

@@ -2,10 +2,11 @@ using System.CommandLine;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
-using TenSecondTom.Features.Setup;
-using TenSecondTom.Features.Setup.Models;
-using TenSecondTom.Features.Setup.Services;
+using TenSecondTom.Features.Llm;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Abstractions.Configuration;
+using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Abstractions.UI;
 
 namespace TenSecondTom.Infrastructure.Cli;
 
@@ -33,18 +34,16 @@ internal static class ConfigCommandBuilder
             bool showSecrets = parseResult.GetValue(showSecretsOption);
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
 
-            var handler = serviceProvider.GetRequiredService<Config.Handler>();
-            var storageService = serviceProvider.GetRequiredService<IConfigurationStorageService>();
+            var operations = serviceProvider.GetRequiredService<IConfigOperationService>();
+            var sectionStore = serviceProvider.GetRequiredService<IConfigurationSectionStore>();
 
-            var command = new Config.Command
-            {
-                Action = ConfigAction.Show,
-                SettingName = null,
-                SettingValue = null,
-                ShowSecrets = showSecrets
-            };
-
-            var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
+            var result = await operations.ExecuteAsync(
+                    ConfigAction.Show,
+                    settingName: null,
+                    settingValue: null,
+                    showSecrets,
+                    CancellationToken.None)
+                .ConfigureAwait(false);
 
             if (result.IsSuccess)
             {
@@ -54,7 +53,7 @@ internal static class ConfigCommandBuilder
                 }
                 else
                 {
-                    var configPath = storageService.GetStorageLocation();
+                    var configPath = sectionStore.GetConfigPath();
                     DisplayConfiguration(result.Value!, showSecrets, configPath);
                 }
                 return 0;
@@ -109,17 +108,15 @@ internal static class ConfigCommandBuilder
                 return 1;
             }
 
-            var handler = serviceProvider.GetRequiredService<Config.Handler>();
+            var operations = serviceProvider.GetRequiredService<IConfigOperationService>();
 
-            var command = new Config.Command
-            {
-                Action = ConfigAction.Set,
-                SettingName = settingName,
-                SettingValue = settingValue,
-                ShowSecrets = false
-            };
-
-            var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
+            var result = await operations.ExecuteAsync(
+                    ConfigAction.Set,
+                    settingName,
+                    settingValue,
+                    showSecrets: false,
+                    CancellationToken.None)
+                .ConfigureAwait(false);
 
             if (result.IsSuccess)
             {
@@ -155,17 +152,15 @@ internal static class ConfigCommandBuilder
         {
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
 
-            var handler = serviceProvider.GetRequiredService<Config.Handler>();
+            var operations = serviceProvider.GetRequiredService<IConfigOperationService>();
 
-            var command = new Config.Command
-            {
-                Action = ConfigAction.Validate,
-                SettingName = null,
-                SettingValue = null,
-                ShowSecrets = false
-            };
-
-            var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
+            var result = await operations.ExecuteAsync(
+                    ConfigAction.Validate,
+                    settingName: null,
+                    settingValue: null,
+                    showSecrets: false,
+                    CancellationToken.None)
+                .ConfigureAwait(false);
 
             if (result.IsSuccess)
             {
@@ -239,7 +234,7 @@ internal static class ConfigCommandBuilder
         }
     }
 
-    private static void DisplayConfiguration(ConfigurationSettings config, bool showSecrets, string configFilePath)
+    private static void DisplayConfiguration(ConfigDisplay config, bool showSecrets, string configFilePath)
     {
         var table = new Spectre.Console.Table()
             .Border(TableBorder.Rounded)

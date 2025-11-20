@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenAI;
 using OpenAI.Chat;
-using TenSecondTom.Features.Setup.Models;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Auth.SshProviders;
 using TenSecondTom.Infrastructure.Behaviors;
@@ -18,6 +18,8 @@ using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
+using TenSecondTom.Infrastructure.Templates;
+using TenSecondTom.Shared.Abstractions.Templates;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Options.Validation;
@@ -41,51 +43,33 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // Register ConfigurationSettings (complete settings model used by /config show)
-        // Structure aligned: RootDirectory is at root level (TenSecondTom:RootDirectory), not nested under Storage
-        services.Configure<ConfigurationSettings>(configuration.GetSection("TenSecondTom"));
-
         // Register LlmOptions with validation
-        var llmSection = configuration.GetSection(LlmOptions.SectionName);
-        services.Configure<LlmOptions>(llmSection);
-        services.PostConfigure<LlmOptions>(options =>
-        {
-            options.ApiKey ??= llmSection.GetValue<string>(nameof(LlmOptions.ApiKey))!;
-            options.Model ??= llmSection.GetValue<string>(nameof(LlmOptions.Model))!;
-        });
+        // NOTE: Don't use ValidateOnStart() - allow unconfigured state during first-time setup
+        services.Configure<LlmOptions>(configuration.GetSection(LlmOptions.SectionName));
         services.AddSingleton<IValidateOptions<LlmOptions>, LlmOptionsValidator>();
 
         // Register AuthOptions with validation
-        var authSection = configuration.GetSection(AuthOptions.SectionName);
-        services.Configure<AuthOptions>(authSection);
-        services.PostConfigure<AuthOptions>(options =>
-        {
-            options.KeyPath ??= authSection.GetValue<string>(nameof(AuthOptions.KeyPath));
-            options.AgentSocketPath ??= authSection.GetValue<string>(nameof(AuthOptions.AgentSocketPath));
-        });
+        // NOTE: Don't use ValidateOnStart() - allow unconfigured state during first-time setup
+        services.Configure<AuthOptions>(configuration.GetSection(AuthOptions.SectionName));
         services.AddSingleton<IValidateOptions<AuthOptions>, AuthOptionsValidator>();
 
         // Register StorageOptions with custom binding (RootDirectory is at root, other properties in Storage section)
         services.Configure<StorageOptions>(options =>
         {
             // Root directory is at root level: TenSecondTom:RootDirectory (or legacy MemoryDirectory)
-#pragma warning disable CS0618 // Type or member is obsolete
             options.RootDirectory = configuration[ConfigurationKeys.RootDirectoryKey]
                 ?? configuration[ConfigurationKeys.MemoryDirectoryKey]  // Legacy fallback
                 ?? Path.Combine(".", DirectoryNames.ApplicationRoot);
-#pragma warning restore CS0618
 
             // Other properties are in Storage section: TenSecondTom:Storage
             var storageSection = configuration.GetSection(StorageOptions.SectionName);
             storageSection.Bind(options);
 
             // Backward compatibility: if legacy MemoryDirectory was explicitly set, preserve it
-#pragma warning disable CS0618 // Type or member is obsolete
             if (configuration[ConfigurationKeys.MemoryDirectoryKey] != null)
             {
                 options.MemoryDirectory = configuration[ConfigurationKeys.MemoryDirectoryKey];
             }
-#pragma warning restore CS0618
         });
         services.AddSingleton<IValidateOptions<StorageOptions>, StorageOptionsValidator>();
 
@@ -110,6 +94,10 @@ public static class ServiceCollectionExtensions
     {
         // Options registration is now handled by AddTenSecondTomOptions()
         // Keeping AudioConfiguration here for backward compatibility during migration
+
+        // Register infrastructure subsystems
+        services.AddAuthenticationInfrastructure();
+        services.AddConfigurationInfrastructure();
 
         // Add HttpClient support for API validators
         services.AddHttpClient();
@@ -186,13 +174,11 @@ public static class ServiceCollectionExtensions
             // Structure: {root}/templates/, {root}/today/, {root}/thisweek/
             string? rootDirectory = storageOptions.Value.RootDirectory;
 
-#pragma warning disable CS0618 // Type or member is obsolete
             // Backward compatibility: fall back to MemoryDirectory
             if (string.IsNullOrWhiteSpace(rootDirectory))
             {
                 rootDirectory = storageOptions.Value.MemoryDirectory;
             }
-#pragma warning restore CS0618
 
             if (string.IsNullOrWhiteSpace(rootDirectory))
             {
@@ -230,13 +216,11 @@ public static class ServiceCollectionExtensions
 
             string? rootDirectory = storageOptions.Value.RootDirectory;
 
-#pragma warning disable CS0618 // Type or member is obsolete
             // Backward compatibility: fall back to MemoryDirectory
             if (string.IsNullOrWhiteSpace(rootDirectory))
             {
                 rootDirectory = storageOptions.Value.MemoryDirectory;
             }
-#pragma warning restore CS0618
 
             if (string.IsNullOrWhiteSpace(rootDirectory))
             {
@@ -247,6 +231,8 @@ public static class ServiceCollectionExtensions
                 baseDirectory: rootDirectory,
                 yamlParser: yamlParser);
         });
+
+        services.AddSingleton<ITemplateInstaller, TemplateInstaller>();
 
         // Register template provider abstraction
         // This decouples features from Templates feature by providing infrastructure-level template access
@@ -335,8 +321,7 @@ public static class ServiceCollectionExtensions
             string? configuredModel = llmOptions.Value.Model;
             string model = !string.IsNullOrWhiteSpace(configuredModel)
                 ? configuredModel
-                : TenSecondTom.Features.Setup.Models.ModelRegistry.GetDefault(
-                    TenSecondTom.Features.Setup.Models.LlmProvider.OpenAI).Id;
+                : ModelRegistry.GetDefault(LlmProvider.OpenAI).Id;
 
             return new OpenAILlmProvider(chatClient, logger, model);
         });
@@ -352,10 +337,33 @@ public static class ServiceCollectionExtensions
             string? configuredModel = llmOptions.Value.Model;
             string model = !string.IsNullOrWhiteSpace(configuredModel)
                 ? configuredModel
-                : TenSecondTom.Features.Setup.Models.ModelRegistry.GetDefault(
-                    TenSecondTom.Features.Setup.Models.LlmProvider.Anthropic).Id;
+                : ModelRegistry.GetDefault(LlmProvider.Anthropic).Id;
 
             return new AnthropicLlmProvider(client, logger, model);
+        });
+
+        services.AddTransient<LocalOpenAiCompatibleLlmProvider>(serviceProvider =>
+        {
+            var llmOptions = serviceProvider.GetRequiredService<IOptions<LlmOptions>>();
+            var httpClient = serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient();
+            var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
+                .CreateLogger<LocalOpenAiCompatibleLlmProvider>();
+
+            // Get configured model or use default
+            string? configuredModel = llmOptions.Value.Model;
+            string model = !string.IsNullOrWhiteSpace(configuredModel)
+                ? configuredModel
+                : "local-model"; // Default fallback
+
+            // Get configured base URL or use default
+            string baseUrl = "http://127.0.0.1:8080/v1"; // Default
+            if (llmOptions.Value.Providers.TryGetValue("LocalOpenAiCompatible", out var providerConfig) &&
+                providerConfig.TryGetValue("BaseUrl", out var configuredBaseUrl))
+            {
+                baseUrl = configuredBaseUrl;
+            }
+
+            return new LocalOpenAiCompatibleLlmProvider(httpClient, logger, model, baseUrl);
         });
 
         // Spectre.Console AnsiConsole for rich terminal UI
@@ -384,24 +392,20 @@ public static class ServiceCollectionExtensions
             if (useStreamBased)
             {
                 var streamLogger = logger.CreateLogger<StreamBasedTextEditor>();
-                #pragma warning disable CA1848 // Use LoggerMessage delegates for performance
                 var generalLogger = logger.CreateLogger("EditorSelection");
                 generalLogger.LogDebug(
                     "Using StreamBasedTextEditor directly (IsInputRedirected={IsRedirected}, TERM={Term})",
                     Console.IsInputRedirected,
                     Environment.GetEnvironmentVariable("TERM") ?? "not set"
                 );
-                #pragma warning restore CA1848
                 return new StreamBasedTextEditor(sanitizer, streamLogger);
             }
 
             // Use FallbackTextEditor wrapper - tries Terminal.Gui, falls back to StreamBased on failure
-            #pragma warning disable CA1848 // Use LoggerMessage delegates for performance
             var selectionLogger = logger.CreateLogger("EditorSelection");
             selectionLogger.LogDebug(
                 "Text editor initialized with Terminal.Gui (StreamBased fallback available if needed)"
             );
-            #pragma warning restore CA1848
             
             var primaryEditor = serviceProvider.GetRequiredService<TerminalGuiTextEditor>();
             var fallbackEditor = serviceProvider.GetRequiredService<StreamBasedTextEditor>();

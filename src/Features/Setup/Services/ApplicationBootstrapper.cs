@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Infrastructure.Bootstrapping;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Setup.Services;
@@ -18,7 +19,6 @@ public sealed class ApplicationBootstrapper
     private readonly IServiceProvider _serviceProvider;
     private readonly IConfiguration _configuration;
     private readonly ILogger<ApplicationBootstrapper> _logger;
-    private readonly SetupCommandFactory _setupCommandFactory;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ApplicationBootstrapper"/> class.
@@ -26,13 +26,11 @@ public sealed class ApplicationBootstrapper
     public ApplicationBootstrapper(
         IServiceProvider serviceProvider,
         IConfiguration configuration,
-        ILogger<ApplicationBootstrapper> logger,
-        SetupCommandFactory setupCommandFactory)
+        ILogger<ApplicationBootstrapper> logger)
     {
         _serviceProvider = serviceProvider;
         _configuration = configuration;
         _logger = logger;
-        _setupCommandFactory = setupCommandFactory ?? throw new ArgumentNullException(nameof(setupCommandFactory));
     }
 
     /// <summary>
@@ -50,14 +48,17 @@ public sealed class ApplicationBootstrapper
             return await HandleLegacyConfigurationAsync(configMigrationService, args, cancellationToken).ConfigureAwait(false);
         }
 
+        // IMPORTANT: Run feature migrations BEFORE checking if configured
+        // This allows migrations to transform old config structure into new structure
+        // Example: Migrating flat TenSecondTom:Ssh/Llm → nested TenSecondTom:Setup:Ssh/Llm
+        await RunFeatureMigrationsAsync(cancellationToken).ConfigureAwait(false);
+
         var configChecker = _serviceProvider.GetRequiredService<ConfigurationChecker>();
         bool isConfigured = configChecker.IsConfigured();
 
-        // Run feature migrations for existing users (discovered via assembly scanning)
+        // Perform self-healing for configured apps
         if (isConfigured)
         {
-            await RunFeatureMigrationsAsync(cancellationToken).ConfigureAwait(false);
-
             // Perform self-healing: check for missing templates directory and restore if needed
             var fileSystem = _serviceProvider.GetRequiredService<IFileSystem>();
             bool healingPerformed = await configChecker.PerformSelfHealingAsync(
@@ -238,12 +239,9 @@ public sealed class ApplicationBootstrapper
     /// <summary>
     /// Runs the setup command with the specified options.
     /// </summary>
-    private async Task<Result<Features.Setup.Models.ConfigurationSettings>> RunSetupAsync(bool force, CancellationToken cancellationToken)
+    private async Task<Result<Models.SetupResult>> RunSetupAsync(bool force, CancellationToken cancellationToken)
     {
-        // Use factory to create Setup.Command with existing config loaded (centralized logic)
-        var setupCommand = await _setupCommandFactory.CreateAsync(force, nonInteractive: false, cancellationToken)
-            .ConfigureAwait(false);
-        
+        var setupCommand = new Setup.Command { Force = force };
         var setupHandler = _serviceProvider.GetRequiredService<Setup.Handler>();
         return await setupHandler.Handle(setupCommand, cancellationToken).ConfigureAwait(false);
     }

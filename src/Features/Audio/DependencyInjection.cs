@@ -1,5 +1,7 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Features.Audio.Services;
 
 namespace TenSecondTom.Features.Audio;
@@ -14,9 +16,17 @@ public static class AudioFeatureExtensions
     /// Registers audio recording, transcription, and related services.
     /// </summary>
     /// <param name="services">The service collection.</param>
+    /// <param name="configuration">The configuration instance.</param>
     /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddAudioFeature(this IServiceCollection services)
+    public static IServiceCollection AddAudioFeature(
+        this IServiceCollection services,
+        IConfiguration configuration)
     {
+        // Register feature-owned configuration using Options Pattern
+        services.AddOptions<AudioOptions>()
+            .BindConfiguration(AudioOptions.SectionPath)
+            .ValidateOnStart();
+
         // Register audio configuration validator
         services.AddSingleton<IAudioConfigurationValidator, AudioConfigurationValidator>();
 
@@ -44,6 +54,8 @@ public static class AudioFeatureExtensions
         services.AddScoped<RecordAudio.Handler>();
         services.AddScoped<TranscribeAudio.Handler>();
         services.AddScoped<Record.Handler>();
+        services.AddScoped<GetAudioConfiguration.Handler>();
+        services.AddScoped<UpdateAudioConfiguration.Handler>();
 
         return services;
     }

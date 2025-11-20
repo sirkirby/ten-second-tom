@@ -1,24 +1,23 @@
-using TenSecondTom.Features.Setup.Models;
+using TenSecondTom.Shared.Models;
 
 namespace TenSecondTom.Shared.Options;
 
 /// <summary>
 /// Configuration options for authentication (currently SSH-based).
-/// Maps to the "TenSecondTom:Ssh" configuration section.
+/// Maps to the "TenSecondTom:Auth" configuration section (VSA-compliant flat structure).
 /// </summary>
 /// <remarks>
 /// This class follows the .NET Options Pattern for strongly-typed configuration.
 /// Use with IOptions&lt;AuthOptions&gt; or IOptionsSnapshot&lt;AuthOptions&gt; in services.
 ///
 /// Note: While named AuthOptions for future extensibility, all current properties
-/// are SSH-specific. The configuration section name remains "TenSecondTom:Ssh" to
-/// avoid breaking changes to existing configuration files.
+/// are SSH-specific.
 ///
-/// Configuration example (appsettings.json):
+/// Configuration example (config.json):
 /// <code>
 /// {
 ///   "TenSecondTom": {
-///     "Ssh": {
+///     "Auth": {
 ///       "KeyPath": "~/.ssh/id_ed25519",
 ///       "KeySource": "FileSystem",
 ///       "AgentSocketPath": "/run/user/1000/keyring/ssh",
@@ -29,21 +28,25 @@ namespace TenSecondTom.Shared.Options;
 /// </code>
 ///
 /// Environment variables:
-/// - TenSecondTom__Ssh__KeyPath
-/// - TenSecondTom__Ssh__KeySource
-/// - TenSecondTom__Ssh__AgentSocketPath
-/// - TenSecondTom__Ssh__KeyDisplayName
+/// - TenSecondTom__Auth__KeyPath
+/// - TenSecondTom__Auth__KeySource
+/// - TenSecondTom__Auth__AgentSocketPath
+/// - TenSecondTom__Auth__KeyDisplayName
 /// </remarks>
 public sealed class AuthOptions
 {
     /// <summary>
     /// The configuration section name for authentication settings.
-    /// Currently maps to SSH section for backward compatibility.
     /// </summary>
-    public const string SectionName = "TenSecondTom:Ssh";
+    public const string SectionName = "TenSecondTom:Auth";
 
     /// <summary>
-    /// Gets or sets the file path to the SSH key.
+    /// Configuration section path for Auth feature settings (alias for SectionName).
+    /// </summary>
+    public const string SectionPath = "TenSecondTom:Auth";
+
+    /// <summary>
+    /// Gets the path to the SSH key file (null for agent-based keys).
     /// </summary>
     /// <remarks>
     /// SSH-specific property.
@@ -55,7 +58,7 @@ public sealed class AuthOptions
     public string? KeyPath { get; set; }
 
     /// <summary>
-    /// Gets or sets the source where the SSH key is retrieved from.
+    /// Gets the source of the SSH key.
     /// </summary>
     /// <remarks>
     /// SSH-specific property.
@@ -64,12 +67,11 @@ public sealed class AuthOptions
     /// <see cref="SshKeySource.SecretiveAgent"/>,
     /// <see cref="SshKeySource.FileSystem"/>,
     /// <see cref="SshKeySource.ManualPath"/>.
-    /// This is a required configuration value.
     /// </remarks>
-    public SshKeySource KeySource { get; set; }
+    public SshKeySource? KeySource { get; set; }
 
     /// <summary>
-    /// Gets or sets the socket path for the SSH agent.
+    /// Gets the path to the SSH agent socket.
     /// </summary>
     /// <remarks>
     /// SSH-specific property.
@@ -82,7 +84,7 @@ public sealed class AuthOptions
     public string? AgentSocketPath { get; set; }
 
     /// <summary>
-    /// Gets or sets the display name for the SSH key.
+    /// Gets a human-readable identifier for the SSH key (e.g., "id_ed25519 (1Password)").
     /// </summary>
     /// <remarks>
     /// SSH-specific property.
@@ -90,5 +92,15 @@ public sealed class AuthOptions
     /// Useful for identifying which key is in use when multiple keys are available.
     /// Example: "Work Laptop ED25519" or "Personal GitHub Key".
     /// </remarks>
-    public string? KeyDisplayName { get; init; }
+    public string? KeyDisplayName { get; set; }
+
+    /// <summary>
+    /// Determines whether the SSH configuration is complete and valid.
+    /// </summary>
+    /// <returns>True if KeySource is configured; otherwise false.</returns>
+    public bool IsConfigured()
+    {
+        return KeySource.HasValue && KeySource.Value != SshKeySource.FileSystem
+            || !string.IsNullOrWhiteSpace(KeyPath);
+    }
 }

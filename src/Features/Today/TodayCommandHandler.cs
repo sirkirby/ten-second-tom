@@ -4,11 +4,9 @@ using Microsoft.Extensions.Options;
 using Spectre.Console;
 using TenSecondTom.Features.Audio;
 using TenSecondTom.Features.Audio.Constants;
-using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Features.Audio.Services;
 using TenSecondTom.Features.Today.Models;
 using TenSecondTom.Infrastructure.Auth;
-using TenSecondTom.Infrastructure.Configuration;
 using MediatR;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Constants;
@@ -58,7 +56,7 @@ public static class TodayCommandHandler
         var handler = serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
         var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
         var textEditor = serviceProvider.GetRequiredService<IInteractiveTextEditor>();
-        var audioConfig = serviceProvider.GetRequiredService<IOptions<AudioConfiguration>>().Value;
+        var mediator = serviceProvider.GetRequiredService<IMediator>();
         var logger = serviceProvider.GetRequiredService<ILogger<CreateVoiceNoteEntry.Handler>>();
 
         // Show warning if using mock authentication (only in non-JSON mode)
@@ -83,19 +81,63 @@ public static class TodayCommandHandler
         // Handle voice input mode
         if (useVoice)
         {
-            // Validate audio configuration before proceeding with voice input
-            var audioValidator = serviceProvider.GetRequiredService<IAudioConfigurationValidator>();
-            var audioConfigResult = AudioConfigurationHelper.EnsureAudioConfigured(
-                audioValidator,
-                audioConfig,
-                CommandNames.Today,
-                jsonOutput);
+            // Query audio configuration via CQRS (use interface type for VSA compliance)
+            IRequest<Result<AudioOptions>> audioConfigQuery = new GetAudioConfiguration.Query();
+            var audioConfigQueryResult = await mediator.Send(audioConfigQuery, CancellationToken.None).ConfigureAwait(false);
 
-            if (!audioConfigResult.IsSuccess)
+            if (!audioConfigQueryResult.IsSuccess)
             {
-                return; // Audio configuration incomplete
+                if (jsonOutput)
+                {
+                    string json = JsonOutputFormatter.FormatFailure(
+                        CommandNames.Today,
+                        "Failed to load audio configuration",
+                        DateTimeOffset.UtcNow);
+                    Console.WriteLine(json);
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine("[red]Error: Failed to load audio configuration[/]");
+                }
+                return;
             }
 
+            var audioOptions = audioConfigQueryResult.Value;
+
+            // Validate audio configuration before proceeding with voice input
+            // Validate audio configuration via CQRS (VSA compliance - no direct service dependency)
+            IRequest<Result<AudioValidationResult>> validateQuery = new ValidateAudioConfiguration.Query();
+            var validationResult = await mediator.Send(validateQuery, CancellationToken.None).ConfigureAwait(false);
+
+            if (!validationResult.IsSuccess || validationResult.Value is not { IsConfigured: true })
+            {
+                var validation = validationResult.Value;
+                var errorMessage = validation is not null
+                    ? $"Audio configuration incomplete. Missing:\n{string.Join("\n", validation.MissingItems.Select(item => $"  - {item}"))}"
+                    : "Failed to validate audio configuration";
+
+                if (jsonOutput)
+                {
+                    Console.WriteLine(JsonOutputFormatter.FormatFailure(CommandNames.Today, errorMessage, DateTimeOffset.UtcNow));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine("[yellow]⚠ Audio configuration incomplete[/]");
+                    AnsiConsole.MarkupLine($"The [cyan]{CommandNames.Today}[/] command requires audio settings.");
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.MarkupLine("[bold]Missing configuration:[/]");
+                    if (validation is not null)
+                    {
+                        foreach (var item in validation.MissingItems)
+                        {
+                            AnsiConsole.MarkupLine($"  • {item}");
+                        }
+                    }
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.MarkupLine("[dim]Configure with: [cyan]tom config audio[/][/]");
+                }
+                return; // Audio configuration incomplete
+            }
 
             await ExecuteVoiceInputAsync(
                 serviceProvider,
@@ -320,13 +362,30 @@ public static class TodayCommandHandler
         bool jsonOutput)
     {
         // Resolve required services
-        var recordHandler = serviceProvider.GetRequiredService<RecordAudio.Handler>();
-        var transcribeHandler = serviceProvider.GetRequiredService<TranscribeAudio.Handler>();
-        var audioPreprocessor = serviceProvider.GetRequiredService<IAudioPreprocessor>();
         var voiceNoteHandler = serviceProvider.GetRequiredService<IRequestHandler<CreateVoiceNoteEntry.Command, Result<VoiceNoteEntry>>>();
         var storageOptions = serviceProvider.GetRequiredService<IOptions<StorageOptions>>().Value;
-        var audioConfig = serviceProvider.GetRequiredService<IOptions<AudioConfiguration>>().Value;
+        var mediator = serviceProvider.GetRequiredService<IMediator>();
         var logger = serviceProvider.GetRequiredService<ILogger<CreateVoiceNoteEntry.Handler>>();
+
+        // Query audio configuration via CQRS (use interface type for VSA compliance)
+        IRequest<Result<AudioOptions>> audioConfigQuery = new GetAudioConfiguration.Query();
+        var audioConfigQueryResult = await mediator.Send(audioConfigQuery, CancellationToken.None).ConfigureAwait(false);
+
+        if (!audioConfigQueryResult.IsSuccess)
+        {
+            var error = "Failed to load audio configuration";
+            if (jsonOutput)
+            {
+                Console.WriteLine(JsonOutputFormatter.FormatFailure(CommandNames.Today, error, DateTimeOffset.UtcNow));
+            }
+            else
+            {
+                AnsiConsole.MarkupLine($"[red]Error:[/] {error}");
+            }
+            return;
+        }
+
+        var audioOptions = audioConfigQueryResult.Value;
 
         // Get the effective storage directory using extension method
         var storageBaseDir = storageOptions.GetEffectiveStorageDirectory();
@@ -361,12 +420,13 @@ public static class TodayCommandHandler
                 logger.LogInformation("Recording audio to {AudioFile}", audioFilePath);
             }
 
-            var recordCommand = new RecordAudio.Command
+            // Use interface type to avoid cross-feature type dependency (VSA compliance)
+            IRequest<Result<AudioRecording>> recordCommand = new RecordAudio.Command
             {
                 OutputPath = audioFilePath,
-                MaxDurationSeconds = audioConfig.Timeouts.TodaySeconds  // Use TodaySeconds for voice notes
+                MaxDurationSeconds = audioOptions.Timeouts.TodaySeconds  // Use TodaySeconds for voice notes
             };
-            var recordResult = await recordHandler.Handle(recordCommand, CancellationToken.None).ConfigureAwait(false);
+            var recordResult = await mediator.Send(recordCommand, CancellationToken.None).ConfigureAwait(false);
 
             if (!recordResult.IsSuccess)
             {
@@ -389,52 +449,11 @@ public static class TodayCommandHandler
                 AnsiConsole.MarkupLine($"[green]✓[/] Recording complete ({recording.Duration.TotalSeconds:F1}s)");
             }
 
-            // Step 1.5: Preprocess audio (remove silence if configured)
-            var preprocessResult = await audioPreprocessor.PreprocessAsync(
-                recording.FilePath,
-                replaceOriginal: true,
-                CancellationToken.None).ConfigureAwait(false);
+            // Note: RecordAudio.Command already handles preprocessing internally
+            // The recording returned is already preprocessed according to audio configuration
 
-            if (!preprocessResult.IsSuccess)
-            {
-                logger.LogWarning("Audio preprocessing failed: {Error}. Continuing with original audio.", preprocessResult.Error);
-                // Continue with original audio - preprocessing failure is not fatal
-            }
-            else
-            {
-                var preprocStats = preprocessResult.Value;
-                logger.LogInformation(
-                    "Audio preprocessing completed: OriginalDuration={OriginalDuration}s, ProcessedDuration={ProcessedDuration}s, " +
-                    "Reduction={Reduction:F1}%",
-                    preprocStats.OriginalDuration.TotalSeconds,
-                    preprocStats.ProcessedDuration.TotalSeconds,
-                    preprocStats.DurationReductionPercent);
-
-                if (!jsonOutput && preprocStats.DurationReductionPercent > 0)
-                {
-                    AnsiConsole.MarkupLine($"[dim]  Removed {preprocStats.DurationReductionPercent:F1}% silence ({preprocStats.ProcessedDuration.TotalSeconds:F1}s remaining)[/]");
-                }
-
-                // Update recording metadata with preprocessed values
-                recording = new AudioRecording
-                {
-                    Filename = recording.Filename,
-                    FilePath = recording.FilePath,
-                    Duration = preprocStats.ProcessedDuration,
-                    SampleRate = recording.SampleRate,
-                    Channels = recording.Channels,
-                    Format = recording.Format,
-                    Encoding = recording.Encoding,
-                    RecordedAt = recording.RecordedAt,
-                    FileSizeBytes = preprocStats.ProcessedSizeBytes
-                };
-            }
-
-            // Parse STT selection string to enum
-            var selection = ParseSttSelection(sttSelection);
-
-            // Convert CLI selection to AudioConfiguration
-            var transcribeConfig = ConvertSttSelectionToConfig(selection, audioConfig);
+            // Build transcription configuration based on CLI selection
+            var transcribeConfig = BuildTranscriptionConfig(sttSelection, audioOptions);
 
             // Step 2: Transcribe audio
             if (!jsonOutput)
@@ -449,7 +468,8 @@ public static class TodayCommandHandler
                     transcribeConfig.SttProvider, transcribeConfig.SttFallbackEnabled);
             }
 
-            var transcribeCommand = new TranscribeAudio.Command
+            // Use interface type to avoid closure capturing concrete Command type (VSA compliance)
+            IRequest<Result<TranscriptionResult>> transcribeCommand = new TranscribeAudio.Command
             {
                 AudioFilePath = audioFilePath,
                 AudioConfig = transcribeConfig
@@ -458,7 +478,7 @@ public static class TodayCommandHandler
             Result<TranscriptionResult> transcribeResult;
             if (jsonOutput)
             {
-                transcribeResult = await transcribeHandler.Handle(transcribeCommand, CancellationToken.None).ConfigureAwait(false);
+                transcribeResult = await mediator.Send(transcribeCommand, CancellationToken.None).ConfigureAwait(false);
             }
             else
             {
@@ -468,7 +488,7 @@ public static class TodayCommandHandler
                     .SpinnerStyle(Style.Parse("cyan"))
                     .StartAsync("[cyan]Transcribing...[/]", async ctx =>
                     {
-                        transcribeResult = await transcribeHandler.Handle(transcribeCommand, CancellationToken.None).ConfigureAwait(false);
+                        transcribeResult = await mediator.Send(transcribeCommand, CancellationToken.None).ConfigureAwait(false);
                     }).ConfigureAwait(false);
             }
 
@@ -562,7 +582,7 @@ public static class TodayCommandHandler
             }
 
             // Step 4: Clean up audio file if configured
-            if (!audioConfig.KeepFiles)
+            if (!audioOptions.KeepFiles)
             {
                 try
                 {
@@ -678,7 +698,7 @@ public static class TodayCommandHandler
                     AnsiConsole.MarkupLine($"[dim]Full entry:[/] [link]{fullPath.EscapeMarkup()}[/]");
                 }
 
-                if (audioConfig.KeepFiles)
+                if (audioOptions.KeepFiles)
                 {
                     AnsiConsole.WriteLine();
                     AnsiConsole.MarkupLine($"[dim]Audio saved: {entry.AudioFilename}[/]");
@@ -703,74 +723,116 @@ public static class TodayCommandHandler
     }
 
     /// <summary>
-    /// Parses STT selection string to enum.
-    /// </summary>
-    private static SttSelection ParseSttSelection(string? selection)
-    {
-        return selection?.ToLowerInvariant() switch
-        {
-            "local" => SttSelection.Local,
-            "openai" => SttSelection.OpenAI,
-            _ => SttSelection.Auto
-        };
-    }
-
-    /// <summary>
-    /// Converts CLI SttSelection intent to AudioConfiguration.
+    /// Builds transcription configuration based on CLI STT selection and AudioOptions.
     /// Maps user-friendly CLI options (auto/local/openai) to the proper configuration.
     /// </summary>
-    private static AudioConfiguration ConvertSttSelectionToConfig(SttSelection selection, AudioConfiguration baseConfig)
+    /// <remarks>
+    /// This is a Today-feature-specific adapter that converts AudioOptions to the AudioConfiguration
+    /// format required by TranscribeAudio.Command (internal migration type).
+    /// </remarks>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1859:Use concrete types when possible for improved performance", Justification = "Internal type conversion adapter")]
+    private static TenSecondTom.Infrastructure.Configuration.AudioConfiguration BuildTranscriptionConfig(
+        string? sttSelection,
+        TenSecondTom.Shared.Options.AudioOptions audioOptions)
     {
-        return selection switch
+        var normalizedSelection = sttSelection?.ToLowerInvariant();
+
+        return normalizedSelection switch
         {
-            // Auto: Try local provider first, fallback to OpenAI cloud if enabled
-            SttSelection.Auto => new AudioConfiguration
+            // "auto": Try local provider first, fallback to configured fallback if enabled
+            "auto" or null => new TenSecondTom.Infrastructure.Configuration.AudioConfiguration
             {
-                SttProvider = baseConfig.SttProvider,
-                SttBinaryPath = baseConfig.SttBinaryPath,
-                SttModel = baseConfig.SttModel,
-                SttApiKey = baseConfig.SttApiKey,
+                SttProvider = audioOptions.SttProvider,
+                SttBinaryPath = audioOptions.SttBinaryPath,
+                SttModel = audioOptions.SttModel,
+                SttApiKey = audioOptions.SttApiKey,
                 SttFallbackEnabled = true,
-                SttFallbackProvider = baseConfig.SttFallbackProvider,
-                SttFallbackBinaryPath = baseConfig.SttFallbackBinaryPath,
-                SttFallbackModel = baseConfig.SttFallbackModel,
-                SttFallbackApiKey = baseConfig.SttFallbackApiKey,
-                Recorder = baseConfig.Recorder,
-                KeepFiles = baseConfig.KeepFiles,
-                Preprocessing = baseConfig.Preprocessing,
-                Timeouts = baseConfig.Timeouts
+                SttFallbackProvider = audioOptions.SttFallbackProvider,
+                SttFallbackBinaryPath = audioOptions.SttFallbackBinaryPath,
+                SttFallbackModel = audioOptions.SttFallbackModel,
+                SttFallbackApiKey = audioOptions.SttFallbackApiKey,
+                Recorder = new TenSecondTom.Infrastructure.Configuration.RecorderConfiguration
+                {
+                    FfmpegPath = audioOptions.Recorder.FfmpegPath,
+                    InputVolume = audioOptions.Recorder.InputVolume,
+                    EnableNoiseReduction = audioOptions.Recorder.EnableNoiseReduction,
+                    EnableFrequencyFilters = audioOptions.Recorder.EnableFrequencyFilters
+                },
+                KeepFiles = audioOptions.KeepFiles,
+                Preprocessing = new TenSecondTom.Infrastructure.Configuration.PreprocessingConfiguration
+                {
+                    RemoveSilence = audioOptions.Preprocessing.RemoveSilence,
+                    SilenceThresholdDb = audioOptions.Preprocessing.SilenceThresholdDb,
+                    MinimumSilenceDurationMs = audioOptions.Preprocessing.MinimumSilenceDurationMs
+                },
+                Timeouts = new TenSecondTom.Infrastructure.Configuration.RecordingTimeoutsConfiguration
+                {
+                    TodaySeconds = audioOptions.Timeouts.TodaySeconds,
+                    RecordSeconds = audioOptions.Timeouts.RecordSeconds
+                }
             },
 
-            // Local: Use only the configured local provider (no fallback)
-            SttSelection.Local => new AudioConfiguration
+            // "local": Use only the configured local provider (no fallback)
+            "local" => new TenSecondTom.Infrastructure.Configuration.AudioConfiguration
             {
-                SttProvider = baseConfig.SttProvider,
-                SttBinaryPath = baseConfig.SttBinaryPath,
-                SttModel = baseConfig.SttModel,
-                SttApiKey = baseConfig.SttApiKey,
+                SttProvider = audioOptions.SttProvider,
+                SttBinaryPath = audioOptions.SttBinaryPath,
+                SttModel = audioOptions.SttModel,
+                SttApiKey = audioOptions.SttApiKey,
                 SttFallbackEnabled = false,
-                Recorder = baseConfig.Recorder,
-                KeepFiles = baseConfig.KeepFiles,
-                Preprocessing = baseConfig.Preprocessing,
-                Timeouts = baseConfig.Timeouts
+                Recorder = new TenSecondTom.Infrastructure.Configuration.RecorderConfiguration
+                {
+                    FfmpegPath = audioOptions.Recorder.FfmpegPath,
+                    InputVolume = audioOptions.Recorder.InputVolume,
+                    EnableNoiseReduction = audioOptions.Recorder.EnableNoiseReduction,
+                    EnableFrequencyFilters = audioOptions.Recorder.EnableFrequencyFilters
+                },
+                KeepFiles = audioOptions.KeepFiles,
+                Preprocessing = new TenSecondTom.Infrastructure.Configuration.PreprocessingConfiguration
+                {
+                    RemoveSilence = audioOptions.Preprocessing.RemoveSilence,
+                    SilenceThresholdDb = audioOptions.Preprocessing.SilenceThresholdDb,
+                    MinimumSilenceDurationMs = audioOptions.Preprocessing.MinimumSilenceDurationMs
+                },
+                Timeouts = new TenSecondTom.Infrastructure.Configuration.RecordingTimeoutsConfiguration
+                {
+                    TodaySeconds = audioOptions.Timeouts.TodaySeconds,
+                    RecordSeconds = audioOptions.Timeouts.RecordSeconds
+                }
             },
 
-            // OpenAI: Force OpenAI provider, no fallback
-            SttSelection.OpenAI => new AudioConfiguration
+            // "openai": Force OpenAI provider, no fallback
+            "openai" => new TenSecondTom.Infrastructure.Configuration.AudioConfiguration
             {
                 SttProvider = SttProviders.OpenAI,
-                SttBinaryPath = baseConfig.SttBinaryPath,
-                SttModel = baseConfig.SttModel,
-                SttApiKey = baseConfig.SttApiKey,
+                SttBinaryPath = audioOptions.SttBinaryPath,
+                SttModel = audioOptions.SttModel,
+                SttApiKey = audioOptions.SttApiKey,
                 SttFallbackEnabled = false,
-                Recorder = baseConfig.Recorder,
-                KeepFiles = baseConfig.KeepFiles,
-                Preprocessing = baseConfig.Preprocessing,
-                Timeouts = baseConfig.Timeouts
+                Recorder = new TenSecondTom.Infrastructure.Configuration.RecorderConfiguration
+                {
+                    FfmpegPath = audioOptions.Recorder.FfmpegPath,
+                    InputVolume = audioOptions.Recorder.InputVolume,
+                    EnableNoiseReduction = audioOptions.Recorder.EnableNoiseReduction,
+                    EnableFrequencyFilters = audioOptions.Recorder.EnableFrequencyFilters
+                },
+                KeepFiles = audioOptions.KeepFiles,
+                Preprocessing = new TenSecondTom.Infrastructure.Configuration.PreprocessingConfiguration
+                {
+                    RemoveSilence = audioOptions.Preprocessing.RemoveSilence,
+                    SilenceThresholdDb = audioOptions.Preprocessing.SilenceThresholdDb,
+                    MinimumSilenceDurationMs = audioOptions.Preprocessing.MinimumSilenceDurationMs
+                },
+                Timeouts = new TenSecondTom.Infrastructure.Configuration.RecordingTimeoutsConfiguration
+                {
+                    TodaySeconds = audioOptions.Timeouts.TodaySeconds,
+                    RecordSeconds = audioOptions.Timeouts.RecordSeconds
+                }
             },
 
-            _ => throw new ArgumentOutOfRangeException(nameof(selection), selection,
-                $"Unsupported STT selection: {selection}")
+            _ => throw new ArgumentException(
+                $"Invalid STT selection: '{sttSelection}'. Valid values: 'auto', 'local', 'openai'.",
+                nameof(sttSelection))
         };
     }
 }

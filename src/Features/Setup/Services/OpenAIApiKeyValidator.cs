@@ -3,7 +3,8 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using OpenAI;
 using OpenAI.Chat;
-using TenSecondTom.Features.Setup.Models;
+using TenSecondTom.Shared.Abstractions.Validation;
+using TenSecondTom.Shared.Models;
 
 namespace TenSecondTom.Features.Setup.Services;
 
@@ -33,11 +34,11 @@ public sealed partial class OpenAIApiKeyValidator : IApiKeyValidator
 
     public LlmProvider Provider => LlmProvider.OpenAI;
 
-    public Task<ApiValidationResult> ValidateFormatAsync(string apiKey)
+    public Task<global::TenSecondTom.Shared.Models.ApiValidationResult> ValidateFormatAsync(string apiKey)
     {
         if (string.IsNullOrWhiteSpace(apiKey))
         {
-            return Task.FromResult(ApiValidationResult.FormatFailure("API key cannot be empty"));
+            return Task.FromResult(global::TenSecondTom.Shared.Models.ApiValidationResult.FormatFailure("API key cannot be empty"));
         }
 
         var isValid = OpenAIKeyPattern().IsMatch(apiKey);
@@ -45,12 +46,12 @@ public sealed partial class OpenAIApiKeyValidator : IApiKeyValidator
         if (!isValid)
         {
             _logger.LogWarning("OpenAI API key format validation failed");
-            return Task.FromResult(ApiValidationResult.FormatFailure(
+            return Task.FromResult(global::TenSecondTom.Shared.Models.ApiValidationResult.FormatFailure(
                 "Invalid OpenAI API key format. Expected format: sk-[alphanumeric] or sk-proj-[alphanumeric/hyphen/underscore] or sk-svcacct-[alphanumeric/hyphen/underscore]"));
         }
 
         _logger.LogDebug("OpenAI API key format validation passed");
-        return Task.FromResult(new ApiValidationResult
+        return Task.FromResult(new global::TenSecondTom.Shared.Models.ApiValidationResult
         {
             IsValid = true,
             FormatValid = true,
@@ -59,7 +60,7 @@ public sealed partial class OpenAIApiKeyValidator : IApiKeyValidator
         });
     }
 
-    public async Task<ApiValidationResult> ValidateNetworkAsync(
+    public async Task<global::TenSecondTom.Shared.Models.ApiValidationResult> ValidateNetworkAsync(
         string apiKey,
         int maxRetries,
         CancellationToken cancellationToken)
@@ -75,7 +76,7 @@ public sealed partial class OpenAIApiKeyValidator : IApiKeyValidator
             {
                 _logger.LogWarning("OpenAI API key validation cancelled");
                 stopwatch.Stop();
-                return ApiValidationResult.NetworkFailure(
+                return global::TenSecondTom.Shared.Models.ApiValidationResult.NetworkFailure(
                     "Validation was cancelled",
                     stopwatch.Elapsed,
                     retryCount);
@@ -83,13 +84,13 @@ public sealed partial class OpenAIApiKeyValidator : IApiKeyValidator
 
             try
             {
-                _logger.LogDebug("OpenAI API key validation attempt {Attempt} of {MaxAttempts}", 
+                _logger.LogDebug("OpenAI API key validation attempt {Attempt} of {MaxAttempts}",
                     attempt + 1, maxRetries + 1);
 
                 // Create ChatClient and test with a minimal request
                 var apiKeyCredential = new System.ClientModel.ApiKeyCredential(apiKey);
                 var client = new ChatClient("gpt-3.5-turbo", apiKeyCredential);
-                
+
                 // Make a minimal request to validate the key
                 var messages = new[]
                 {
@@ -97,7 +98,7 @@ public sealed partial class OpenAIApiKeyValidator : IApiKeyValidator
                 };
 
                 var completion = await client.CompleteChatAsync(
-                    messages, 
+                    messages,
                     new ChatCompletionOptions { MaxOutputTokenCount = 1 },
                     cancellationToken).ConfigureAwait(false);
 
@@ -105,7 +106,7 @@ public sealed partial class OpenAIApiKeyValidator : IApiKeyValidator
                 {
                     stopwatch.Stop();
                     _logger.LogInformation("OpenAI API key validation successful after {Attempts} attempts", attempt + 1);
-                    return ApiValidationResult.Success(stopwatch.Elapsed, retryCount);
+                    return global::TenSecondTom.Shared.Models.ApiValidationResult.Success(stopwatch.Elapsed, retryCount);
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -118,7 +119,7 @@ public sealed partial class OpenAIApiKeyValidator : IApiKeyValidator
                     // Exponential backoff: 1s, 2s, 4s, 8s...
                     var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
                     _logger.LogDebug("Waiting {Delay}s before retry", delay.TotalSeconds);
-                    
+
                     try
                     {
                         await Task.Delay(delay, cancellationToken);
@@ -126,7 +127,7 @@ public sealed partial class OpenAIApiKeyValidator : IApiKeyValidator
                     catch (OperationCanceledException)
                     {
                         stopwatch.Stop();
-                        return ApiValidationResult.NetworkFailure(
+                        return global::TenSecondTom.Shared.Models.ApiValidationResult.NetworkFailure(
                             "Validation was cancelled during retry delay",
                             stopwatch.Elapsed,
                             retryCount);
@@ -135,7 +136,7 @@ public sealed partial class OpenAIApiKeyValidator : IApiKeyValidator
                 else
                 {
                     stopwatch.Stop();
-                    return ApiValidationResult.NetworkFailure(
+                    return global::TenSecondTom.Shared.Models.ApiValidationResult.NetworkFailure(
                         $"OpenAI API key validation failed after {maxRetries + 1} attempts: {ex.Message}",
                         stopwatch.Elapsed,
                         retryCount);
@@ -144,7 +145,7 @@ public sealed partial class OpenAIApiKeyValidator : IApiKeyValidator
         }
 
         stopwatch.Stop();
-        return ApiValidationResult.NetworkFailure(
+        return global::TenSecondTom.Shared.Models.ApiValidationResult.NetworkFailure(
             "OpenAI API key validation failed: Unknown error",
             stopwatch.Elapsed,
             retryCount);

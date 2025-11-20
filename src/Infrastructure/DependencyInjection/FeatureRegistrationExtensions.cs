@@ -1,7 +1,10 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TenSecondTom.Features.Audio;
 using TenSecondTom.Features.Auth;
+using TenSecondTom.Features.Config;
 using TenSecondTom.Features.Generate;
+using TenSecondTom.Features.Llm;
 using TenSecondTom.Features.Search;
 using TenSecondTom.Features.Setup;
 using TenSecondTom.Features.Shell;
@@ -21,8 +24,11 @@ public static class FeatureRegistrationExtensions
     /// Features are grouped logically for clarity and maintainability.
     /// </summary>
     /// <param name="services">The service collection.</param>
+    /// <param name="configuration">The configuration instance.</param>
     /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddAllFeatures(this IServiceCollection services)
+    public static IServiceCollection AddAllFeatures(
+        this IServiceCollection services,
+        IConfiguration configuration)
     {
         // Core features (memory operations)
         services.AddTodayFeature();
@@ -30,14 +36,18 @@ public static class FeatureRegistrationExtensions
         services.AddSearchFeature();
 
         // Audio & Voice features
-        services.AddAudioFeature();
+        services.AddAudioFeature(configuration);
         services.AddGenerateFeature();
 
         // Authentication & Security
         services.AddAuthFeature();
 
+        // LLM & AI features
+        services.AddLlmFeature();
+
         // Configuration & Setup
-        services.AddSetupFeature();
+        services.AddConfigFeature();
+        services.AddSetupFeature(configuration);
         services.AddTemplatesFeature();
 
         // Interactive Shell
