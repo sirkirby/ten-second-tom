@@ -6,7 +6,7 @@ using Moq;
 using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Features.Audio.Services;
-using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Constants;
 
 
@@ -42,7 +42,7 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(true);
 
         var factory = CreateFactory();
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.WhisperCpp,
             SttFallbackEnabled = true
@@ -70,7 +70,7 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(true);
 
         var factory = CreateFactory();
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.WhisperCpp,
             SttFallbackEnabled = true
@@ -99,7 +99,7 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(false);
 
         var factory = CreateFactory();
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.WhisperCpp,
             SttFallbackEnabled = true
@@ -123,7 +123,7 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(true);
 
         var factory = CreateFactory();
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.WhisperCpp,
             SttFallbackEnabled = false
@@ -148,7 +148,7 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(false);
 
         var factory = CreateFactory();
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.WhisperCpp,
             SttFallbackEnabled = false
@@ -173,7 +173,7 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(true);
 
         var factory = CreateFactory();
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.OpenAI,
             SttFallbackEnabled = false
@@ -199,7 +199,7 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(true);
 
         var factory = CreateFactory();
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.WhisperCpp,
             SttFallbackEnabled = true
@@ -226,7 +226,7 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(true);
 
         var factory = CreateFactory();
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.WhisperCpp,
             SttFallbackEnabled = true
@@ -281,7 +281,7 @@ public sealed class SttProviderFactoryTests
             .ThrowsAsync(new OperationCanceledException());
 
         var factory = CreateFactory();
-        var config = new AudioConfiguration
+        var config = new AudioOptions
         {
             SttProvider = SttProviders.WhisperCpp,
             SttFallbackEnabled = true

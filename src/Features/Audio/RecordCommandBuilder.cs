@@ -65,18 +65,15 @@ public sealed class RecordCommandBuilder : ICommandBuilder
 
             var audioOptions = audioOptionsResult.Value;
 
-            // Convert to AudioConfiguration for backward compatibility (temporary during migration)
-            var audioConfig = ConvertToAudioConfiguration(audioOptions);
-
             // Parse STT selection - use configured default or fall back to Auto
             var sttSelection = SttSelection.Auto;
 
             // If no --stt flag provided, use configuration default
             if (string.IsNullOrWhiteSpace(stt))
             {
-                if (audioConfig.SttProvider is not null)
+                if (audioOptions.SttProvider is not null)
                 {
-                    if (!Enum.TryParse<SttSelection>(audioConfig.SttProvider, ignoreCase: true, out sttSelection))
+                    if (!Enum.TryParse<SttSelection>(audioOptions.SttProvider, ignoreCase: true, out sttSelection))
                     {
                         // Invalid config value, fall back to Auto
                         sttSelection = SttSelection.Auto;
@@ -126,7 +123,7 @@ public sealed class RecordCommandBuilder : ICommandBuilder
             var audioValidator = serviceProvider.GetRequiredService<TenSecondTom.Features.Audio.Services.IAudioConfigurationValidator>();
             var audioConfigResult = TenSecondTom.Features.Audio.AudioConfigurationHelper.EnsureAudioConfigured(
                 audioValidator,
-                audioConfig,
+                audioOptions,
                 CommandNames.Record,
                 jsonOutput);
 
@@ -168,8 +165,8 @@ public sealed class RecordCommandBuilder : ICommandBuilder
             // Execute command with configured timeout
             var command = new Record.Command
             {
-                AudioConfig = ConvertSttSelectionToConfig(sttSelection, audioConfig),
-                MaxDurationSeconds = audioConfig.Timeouts.RecordSeconds  // Use configured timeout
+                AudioConfig = ConvertSttSelectionToAudioOptions(sttSelection, audioOptions),
+                MaxDurationSeconds = audioOptions.Timeouts.RecordSeconds  // Use configured timeout
             };
 
             var result = await handler.Handle(command, CancellationToken.None);
@@ -229,103 +226,64 @@ public sealed class RecordCommandBuilder : ICommandBuilder
     }
 
     /// <summary>
-    /// Converts CLI SttSelection intent to AudioConfiguration.
+    /// Converts CLI SttSelection intent to AudioOptions with appropriate fallback settings.
     /// Maps user-friendly CLI options (auto/local/openai) to the proper configuration.
     /// </summary>
     /// <param name="selection">The STT selection from CLI (auto, local, or openai)</param>
-    /// <param name="baseConfig">The base audio configuration from appsettings</param>
-    /// <returns>AudioConfiguration with appropriate provider and fallback settings</returns>
-    private static AudioConfiguration ConvertSttSelectionToConfig(SttSelection selection, AudioConfiguration baseConfig)
+    /// <param name="baseOptions">The base audio options from configuration</param>
+    /// <returns>AudioOptions with appropriate provider and fallback settings</returns>
+    private static AudioOptions ConvertSttSelectionToAudioOptions(SttSelection selection, AudioOptions baseOptions)
     {
         return selection switch
         {
-            // Auto: Try local provider first, fallback to OpenAI cloud if enabled
-            SttSelection.Auto => new AudioConfiguration
+            // Auto: Try local provider first, fallback to configured fallback if enabled
+            SttSelection.Auto => new AudioOptions
             {
-                SttProvider = baseConfig.SttProvider,
-                SttBinaryPath = baseConfig.SttBinaryPath,
-                SttModel = baseConfig.SttModel,
-                SttApiKey = baseConfig.SttApiKey,
+                SttProvider = baseOptions.SttProvider,
+                SttApiKey = baseOptions.SttApiKey,
                 SttFallbackEnabled = true,
-                SttFallbackProvider = baseConfig.SttFallbackProvider,
-                SttFallbackBinaryPath = baseConfig.SttFallbackBinaryPath,
-                SttFallbackModel = baseConfig.SttFallbackModel,
-                SttFallbackApiKey = baseConfig.SttFallbackApiKey,
-                Recorder = baseConfig.Recorder,
-                KeepFiles = baseConfig.KeepFiles,
-                Preprocessing = baseConfig.Preprocessing,
-                Timeouts = baseConfig.Timeouts
+                SttFallbackProvider = baseOptions.SttFallbackProvider,
+                SttFallbackApiKey = baseOptions.SttFallbackApiKey,
+                SttBinaryPath = baseOptions.SttBinaryPath,
+                SttModel = baseOptions.SttModel,
+                SttFallbackBinaryPath = baseOptions.SttFallbackBinaryPath,
+                SttFallbackModel = baseOptions.SttFallbackModel,
+                KeepFiles = baseOptions.KeepFiles,
+                Recorder = baseOptions.Recorder,
+                Preprocessing = baseOptions.Preprocessing,
+                Timeouts = baseOptions.Timeouts
             },
 
             // Local: Use only the configured local provider (whisper.cpp, ollama, etc.) - no fallback
-            SttSelection.Local => new AudioConfiguration
+            SttSelection.Local => new AudioOptions
             {
-                SttProvider = baseConfig.SttProvider,
-                SttBinaryPath = baseConfig.SttBinaryPath,
-                SttModel = baseConfig.SttModel,
-                SttApiKey = baseConfig.SttApiKey,
+                SttProvider = baseOptions.SttProvider,
+                SttApiKey = baseOptions.SttApiKey,
                 SttFallbackEnabled = false,
-                Recorder = baseConfig.Recorder,
-                KeepFiles = baseConfig.KeepFiles,
-                Preprocessing = baseConfig.Preprocessing,
-                Timeouts = baseConfig.Timeouts
+                SttBinaryPath = baseOptions.SttBinaryPath,
+                SttModel = baseOptions.SttModel,
+                KeepFiles = baseOptions.KeepFiles,
+                Recorder = baseOptions.Recorder,
+                Preprocessing = baseOptions.Preprocessing,
+                Timeouts = baseOptions.Timeouts
             },
 
             // OpenAI: Force OpenAI provider, no fallback
-            SttSelection.OpenAI => new AudioConfiguration
+            SttSelection.OpenAI => new AudioOptions
             {
                 SttProvider = SttProviders.OpenAI,
-                SttBinaryPath = baseConfig.SttBinaryPath,
-                SttModel = baseConfig.SttModel,
-                SttApiKey = baseConfig.SttApiKey,
+                SttApiKey = baseOptions.SttApiKey,
                 SttFallbackEnabled = false,
-                Recorder = baseConfig.Recorder,
-                KeepFiles = baseConfig.KeepFiles,
-                Preprocessing = baseConfig.Preprocessing,
-                Timeouts = baseConfig.Timeouts
+                SttBinaryPath = baseOptions.SttBinaryPath,
+                SttModel = baseOptions.SttModel,
+                KeepFiles = baseOptions.KeepFiles,
+                Recorder = baseOptions.Recorder,
+                Preprocessing = baseOptions.Preprocessing,
+                Timeouts = baseOptions.Timeouts
             },
 
             _ => throw new ArgumentOutOfRangeException(nameof(selection), selection,
                 $"Unsupported STT selection: {selection}")
-        };
-    }
-
-    /// <summary>
-    /// Converts AudioOptions to AudioConfiguration.
-    /// Temporary helper during migration period.
-    /// </summary>
-    private static AudioConfiguration ConvertToAudioConfiguration(AudioOptions options)
-    {
-        return new AudioConfiguration
-        {
-            SttProvider = options.SttProvider,
-            SttApiKey = options.SttApiKey,
-            SttFallbackEnabled = options.SttFallbackEnabled,
-            SttFallbackProvider = options.SttFallbackProvider,
-            SttFallbackApiKey = options.SttFallbackApiKey,
-            SttBinaryPath = options.SttBinaryPath,
-            SttModel = options.SttModel,
-            SttFallbackBinaryPath = options.SttFallbackBinaryPath,
-            SttFallbackModel = options.SttFallbackModel,
-            KeepFiles = options.KeepFiles,
-            Recorder = new RecorderConfiguration
-            {
-                FfmpegPath = options.Recorder.FfmpegPath,
-                InputVolume = options.Recorder.InputVolume,
-                EnableNoiseReduction = options.Recorder.EnableNoiseReduction,
-                EnableFrequencyFilters = options.Recorder.EnableFrequencyFilters
-            },
-            Preprocessing = new PreprocessingConfiguration
-            {
-                RemoveSilence = options.Preprocessing.RemoveSilence,
-                SilenceThresholdDb = options.Preprocessing.SilenceThresholdDb,
-                MinimumSilenceDurationMs = options.Preprocessing.MinimumSilenceDurationMs
-            },
-            Timeouts = new RecordingTimeoutsConfiguration
-            {
-                TodaySeconds = options.Timeouts.TodaySeconds,
-                RecordSeconds = options.Timeouts.RecordSeconds
-            }
         };
     }
 }

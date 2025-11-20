@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Configuration.Commands;
 using TenSecondTom.Infrastructure.DependencyInjection;

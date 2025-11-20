@@ -76,10 +76,8 @@ public static class ServiceCollectionExtensions
         // Register AppOptions (no validation needed - all have defaults)
         services.Configure<AppOptions>(configuration.GetSection(AppOptions.SectionName));
 
-        // Register AudioConfiguration (existing - keep as-is)
-        services.AddOptions<Configuration.AudioConfiguration>()
-            .BindConfiguration(ConfigurationKeys.AudioSectionKey)
-            .ValidateOnStart();
+        // Register AudioOptions with Options Pattern
+        services.Configure<AudioOptions>(configuration.GetSection(AudioOptions.SectionPath));
 
         return services;
     }

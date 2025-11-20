@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Infrastructure.Configuration;
 using Xunit;
 

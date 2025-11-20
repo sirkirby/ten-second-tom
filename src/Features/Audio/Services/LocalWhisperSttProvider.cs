@@ -1,8 +1,8 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Audio.Services;
@@ -13,7 +13,7 @@ namespace TenSecondTom.Features.Audio.Services;
 /// </summary>
 public sealed class LocalWhisperSttProvider : ISttProvider
 {
-    private readonly AudioConfiguration _config;
+    private readonly AudioOptions _config;
     private readonly ILogger<LocalWhisperSttProvider> _logger;
 
     /// <summary>
@@ -22,7 +22,7 @@ public sealed class LocalWhisperSttProvider : ISttProvider
     /// <param name="config">Audio configuration options.</param>
     /// <param name="logger">Logger instance.</param>
     public LocalWhisperSttProvider(
-        IOptions<AudioConfiguration> config,
+        IOptions<AudioOptions> config,
         ILogger<LocalWhisperSttProvider> logger)
     {
         _config = config?.Value ?? throw new ArgumentNullException(nameof(config));

@@ -2,8 +2,8 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Audio.Services;
@@ -15,7 +15,7 @@ namespace TenSecondTom.Features.Audio.Services;
 /// </summary>
 public sealed class FfmpegAudioRecorder : IAudioRecorder
 {
-    private readonly AudioConfiguration _config;
+    private readonly AudioOptions _config;
     private readonly ILogger<FfmpegAudioRecorder> _logger;
 
     /// <summary>
@@ -24,7 +24,7 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
     /// <param name="config">Audio configuration options.</param>
     /// <param name="logger">Logger instance.</param>
     public FfmpegAudioRecorder(
-        IOptions<AudioConfiguration> config,
+        IOptions<AudioOptions> config,
         ILogger<FfmpegAudioRecorder> logger)
     {
         _config = config?.Value ?? throw new ArgumentNullException(nameof(config));

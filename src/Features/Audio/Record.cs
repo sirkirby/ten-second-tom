@@ -4,7 +4,6 @@ using Microsoft.Extensions.Options;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Features.Audio.Services;
-using TenSecondTom.Infrastructure.Configuration;
 using MediatR;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Extensions;
@@ -29,7 +28,7 @@ public static class Record
         /// Gets the audio configuration for STT provider selection.
         /// This includes the STT provider, API key, and fallback settings.
         /// </summary>
-        public required AudioConfiguration AudioConfig { get; init; }
+        public required AudioOptions AudioConfig { get; init; }
 
         /// <summary>
         /// Gets the maximum recording duration in seconds.

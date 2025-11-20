@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TenSecondTom.Features.Audio.Services;
-using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Options;
 using MediatR;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
@@ -27,7 +27,7 @@ public static class TranscribeAudio
         /// Gets the audio configuration for STT provider selection.
         /// This includes the STT provider, API key, and fallback settings.
         /// </summary>
-        public required AudioConfiguration AudioConfig { get; init; }
+        public required AudioOptions AudioConfig { get; init; }
     }
 
     /// <summary>
@@ -36,10 +36,10 @@ public static class TranscribeAudio
     /// </summary>
     public sealed class Handler(
         ISttProviderFactory providerFactory,
-        IOptions<AudioConfiguration> audioConfig,
+        IOptions<AudioOptions> audioConfig,
         ILogger<Handler> logger) : IRequestHandler<Command, Result<TranscriptionResult>>
     {
-        private readonly AudioConfiguration _audioConfig = audioConfig.Value;
+        private readonly AudioOptions _audioConfig = audioConfig.Value;
 
         /// <summary>
         /// Handles the TranscribeAudio command to transcribe an audio file.

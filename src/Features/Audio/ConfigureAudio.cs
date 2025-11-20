@@ -2,9 +2,8 @@ using TenSecondTom.Features.Audio.Constants;
 using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Abstractions.UI;
-using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 using TenSecondTom.Features.Audio.Models;
@@ -84,8 +83,7 @@ public static class ConfigureAudio
     /// Orchestrates interactive audio configuration with optional command-line overrides.
     /// </summary>
     public sealed class Handler(
-        IMediator mediator,
-        IOptions<AudioOptions> currentAudioOptions,
+        IConfigurationSectionStore sectionStore,
         ISetupWizardUI setupWizard,
         ILogger<Handler> logger)
         : IRequestHandler<Command, Result<AudioOptions>>
@@ -96,7 +94,18 @@ public static class ConfigureAudio
         {
             logger.LogInformation("Starting audio configuration");
 
-            var currentAudio = currentAudioOptions.Value;
+            // Read current audio configuration directly from config.json to get the latest saved values
+            // Cannot use IOptions/IOptionsSnapshot as they read from appsettings.json, not the user's config.json
+            var currentConfigResult = await sectionStore.ReadSectionAsync<AudioOptions>(
+                AudioOptions.SectionPath,
+                cancellationToken);
+
+            if (!currentConfigResult.IsSuccess)
+            {
+                return Result<AudioOptions>.Failure($"Failed to load current audio configuration: {currentConfigResult.Error}");
+            }
+
+            var currentAudio = currentConfigResult.Value;
 
             if (HasCommandLineOverrides(request))
             {
@@ -395,8 +404,11 @@ public static class ConfigureAudio
                 }
             };
 
-            // Save using CQRS command
-            var saveResult = await mediator.Send(new UpdateAudioConfiguration.Command(updatedAudio), cancellationToken);
+            // Save configuration directly to config.json
+            var saveResult = await sectionStore.WriteSectionAsync(
+                AudioOptions.SectionPath,
+                updatedAudio,
+                cancellationToken);
 
             if (!saveResult.IsSuccess)
             {
@@ -444,7 +456,10 @@ public static class ConfigureAudio
         {
             var updatedAudio = BuildOverriddenAudioOptions(currentAudio, request);
 
-            var saveResult = await mediator.Send(new UpdateAudioConfiguration.Command(updatedAudio), cancellationToken);
+            var saveResult = await sectionStore.WriteSectionAsync(
+                AudioOptions.SectionPath,
+                updatedAudio,
+                cancellationToken);
 
             if (!saveResult.IsSuccess)
             {

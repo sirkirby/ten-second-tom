@@ -1,6 +1,6 @@
 using TenSecondTom.Features.Audio.Constants;
-using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Options;
 
 namespace TenSecondTom.Features.Audio.Services;
 
@@ -10,13 +10,13 @@ namespace TenSecondTom.Features.Audio.Services;
 public sealed class AudioConfigurationValidator : IAudioConfigurationValidator
 {
     /// <inheritdoc/>
-    public bool IsAudioConfigured(AudioConfiguration configuration)
+    public bool IsAudioConfigured(AudioOptions configuration)
     {
         return GetMissingConfiguration(configuration).Count == 0;
     }
 
     /// <inheritdoc/>
-    public IReadOnlyList<string> GetMissingConfiguration(AudioConfiguration configuration)
+    public IReadOnlyList<string> GetMissingConfiguration(AudioOptions configuration)
     {
         var missing = new List<string>();
 

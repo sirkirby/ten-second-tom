@@ -4,12 +4,12 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Templates;
+using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
-using TenSecondTom.Shared.Options;
 
 
 

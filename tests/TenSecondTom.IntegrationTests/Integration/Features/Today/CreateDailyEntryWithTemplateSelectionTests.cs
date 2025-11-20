@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Cli;
-using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;

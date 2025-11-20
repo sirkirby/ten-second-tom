@@ -5,11 +5,11 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using TenSecondTom.Features.Llm;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Abstractions.UI;
 using TenSecondTom.Shared.Abstractions.Validation;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
-using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Tests.Features.Llm;
