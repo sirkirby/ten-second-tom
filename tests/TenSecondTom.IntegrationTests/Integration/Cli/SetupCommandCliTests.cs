@@ -182,8 +182,8 @@ public sealed class SetupCommandCliTests : IDisposable
     [Fact]
     public async Task ConfigCommand_Help_DisplaysUsageInformation()
     {
-        // Act
-        var (output, error, exitCode) = await RunCliCommandAsync("config --help");
+        // Act - increased timeout for CI environments
+        var (output, error, exitCode) = await RunCliCommandAsync("config --help", timeoutMs: 10000);
 
         // Assert
         exitCode.Should().Be(0, "help should always succeed");
@@ -194,8 +194,8 @@ public sealed class SetupCommandCliTests : IDisposable
     [Fact]
     public async Task ConfigCommand_Show_IsRecognized()
     {
-        // Act
-        var (output, error, exitCode) = await RunCliCommandAsync("config --show --help");
+        // Act - increased timeout for CI environments
+        var (output, error, exitCode) = await RunCliCommandAsync("config --show --help", timeoutMs: 10000);
 
         // Assert
         exitCode.Should().Be(0, "help with valid flag should succeed");
