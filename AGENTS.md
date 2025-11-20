@@ -1,431 +1,150 @@
 # Ten Second Tom - AI Agent Instructions
 
+> **⚠️ IMPORTANT**: This is a quick reference guide for AI agents. The **authoritative source of truth** is [`.specify/memory/constitution.md`](./.specify/memory/constitution.md). On any conflict, the constitution wins.
+
+## Quick Links
+
+- **Constitution (READ FIRST)**: [`.specify/memory/constitution.md`](./.specify/memory/constitution.md)
+- **Architecture Tests**: [`tests/TenSecondTom.Tests/Architecture/VsaComplianceTests.cs`](./tests/TenSecondTom.Tests/Architecture/VsaComplianceTests.cs)
+
 ## Project Overview
 
-Ten Second Tom is a modern CLI application built with C# and .NET 9, designed for simplicity, testability, and cross-platform distribution. This project follows strict architectural principles to ensure code quality, maintainability, and excellent developer experience.
+Ten Second Tom is a modern CLI application built with **C# and .NET 9**, following **Vertical Slice Architecture (VSA)** with the **Co-location Pattern**. All architectural principles are defined in the constitution.
 
-## Core Development Rules
-
-### Language & Framework (NON-NEGOTIABLE)
-
-- Use **C# with .NET 9** exclusively
-- Follow modern C# idioms: nullable reference types, pattern matching, records, init-only properties
-- Use async/await patterns for I/O-bound operations
-- Leverage .NET 9 performance features (frozen collections, source generators, etc.)
-- Follow Microsoft C# coding conventions
-
-### Architecture Patterns
-
-When suggesting code, apply these patterns:
-
-- **Vertical Slice Architecture (VSA) with Co-location Pattern**: Organize features as self-contained vertical slices with all related code co-located in a single file per use case
-  - Use case files: `CreateUser.cs`, `ListItems.cs`, `GenerateOutput.cs`
-  - Static class container: `public static class [UseCase]` with nested Command/Query, Validator, Handler
-  - Example: `CreateUser.cs` contains `CreateUser.Command`, `CreateUser.Validator`, `CreateUser.Handler`
-- **CQRS**: Separate commands (mutations) from queries (reads)
-  - Nested Command: `public sealed record Command(...) : IRequest<Result<T>>`
-  - Nested Query: `public sealed record Query(...) : IRequest<Result<T>>`
-  - Nested Handler: `public sealed class Handler(...) : IRequestHandler<Command, Result<T>>`
-  - Assembly scanning auto-discovers all nested handlers and validators
-- **Options Pattern**: All configuration MUST use strongly-typed options classes
-  - Options: `StorageOptions`, `LlmOptions`, `AuthOptions` (in `Shared/Options/`)
-  - Validators: `StorageOptionsValidator`, `LlmOptionsValidator` (in `Shared/Options/Validation/`)
-  - Inject: `IOptions<T>`, `IOptionsSnapshot<T>`, or `IOptionsMonitor<T>` (NOT `IConfiguration`)
-- **Factory Pattern**: Use for complex object construction
-- **Dependency Injection**: Always use .NET's built-in DI container
-
-### Testing (MANDATORY)
-
-- **Test-First Development**: Generate test code before implementation code
-- **xUnit Framework**: Use xUnit exclusively for all tests
-- **80% Coverage Minimum**: Ensure comprehensive test coverage
-- **Test Structure**:
-  - Unit tests: `tests/Unit/Features/[Feature]/[Class]Tests.cs`
-  - Integration tests: `tests/Integration/Features/[Feature]/[Scenario]Tests.cs`
-  - CLI tests: `tests/Integration/Cli/[Command]Tests.cs`
-- **Use FluentAssertions** for readable assertions
-- **Use Moq or NSubstitute** for mocking dependencies
-- Tests must be fast, isolated, and deterministic
-
-### Code Quality Standards
-
-- **DRY Principle**: Never duplicate logic; extract to reusable methods/classes
-- **No Compiler Warnings**: Code must compile without warnings
-- **XML Documentation**: Add XML comments to all public APIs
-- **Naming Conventions** (Co-location Pattern since v1.7.0):
-  - Use case files: `[Verb][Noun].cs` (e.g., `CreateUser.cs`, `ListTemplates.cs`)
-  - Nested Command: `public sealed record Command(...) : IRequest<Result<T>>`
-  - Nested Query: `public sealed record Query(...) : IRequest<Result<T>>`
-  - Nested Validator: `public sealed class Validator : AbstractValidator<Command>`
-  - Nested Handler: `public sealed class Handler(...) : IRequestHandler<Command, Result<T>>`
-  - Test files: `[UseCase]Tests.cs` (e.g., `CreateUserTests.cs`, `ListTemplatesTests.cs`)
-  - Interfaces: `I*`
-- **Error Handling**:
-  - Use exceptions only for exceptional cases
-  - Return `Result<T>` types for expected failures
-  - Provide clear, actionable error messages
-  - Always log errors with context
-
-## Project Structure
-
-**NOTE**: The canonical project structure is defined in `.specify/memory/constitution.md` (Project Structure Standards v1.7.0). The structure below is a summary for quick reference.
-
-**Co-location Pattern** (since v1.7.0): All code for a single use case co-located in one file.
+## Core Technology Stack
 
 ```text
-src/
-├── Features/          # Vertical slices (self-contained feature modules)
-│   └── [FeatureName]/
-│       ├── [UseCase].cs   # Co-located Command/Query, Validator, Handler
-│       ├── Migrations/    # Feature bootstrap migrations [if needed]
-│       ├── Services/      # Feature-specific domain services [if needed]
-│       └── DependencyInjection.cs  # Feature-specific DI registration
-├── Infrastructure/    # Cross-cutting concerns (DI, config, logging, behaviors)
-│   ├── Behaviors/         # MediatR pipeline behaviors
-│   ├── Configuration/
-│   ├── Logging/
-│   └── DependencyInjection/
-├── Shared/            # Shared domain models, abstractions, utilities
-│   ├── Models/
-│   ├── Options/           # Configuration options classes (*Options.cs)
-│   │   └── Validation/    # Options validators (*OptionsValidator.cs)
-│   ├── Constants/         # Centralized constants
-│   ├── Abstractions/
-│   └── Extensions/
-└── Program.cs         # Entry point
-
-tests/
-├── TenSecondTom.Tests/         # Unit tests (fast, isolated)
-│   └── Features/
-│       └── [FeatureName]/
-│           └── [UseCase]Tests.cs  # Tests mirror use case files
-└── TenSecondTom.IntegrationTests/  # Integration tests
-    ├── Features/
-    │   └── [FeatureName]/
-    └── Cli/
+Language:     C# 12+ with .NET 9
+CLI:          System.CommandLine 2.0-rc
+UI:           Spectre.Console 0.51.1
+CQRS:         MediatR 13.1.0
+Validation:   FluentValidation 12.0.0
+Logging:      Serilog 4.3.0
+Testing:      xUnit 2.9+ + FluentAssertions 8.7+
+Platforms:    macOS, Windows, (Linux future)
 ```
 
-**Co-location Pattern Structure** (one file per use case):
+## Development Workflow
+
+### Before Making Changes
+
+1. ✅ Read the constitution at `.specify/memory/constitution.md`
+2. ✅ Check existing tests and understand current behavior
+3. ✅ Locate the feature slice - all related code should be nearby
+4. ✅ Look for duplication - refactor rather than duplicate
+
+### TDD Cycle (Red-Green-Refactor)
+
+1. **Write Test** - Create test showing expected behavior
+2. **Verify Red** - Confirm test fails with clear error
+3. **Minimal Implementation** - Write just enough code to pass
+4. **Verify Green** - Confirm test passes
+5. **Refactor** - Clean up code while keeping tests green
+
+## Code Organization (Co-location Pattern)
+
+**One use case = One file** with nested Command/Query, Validator, Handler:
 
 ```csharp
+// src/Features/[FeatureName]/[UseCase].cs
 namespace TenSecondTom.Features.[FeatureName];
 
-/// <summary>
-/// [Brief description of what this use case does]
-/// </summary>
+/// <summary>Brief description of use case</summary>
 public static class [UseCase]
 {
     public sealed record Command(...) : IRequest<Result<T>>;
 
     public sealed class Validator : AbstractValidator<Command>
     {
-        public Validator() { /* validation rules */ }
+        public Validator()
+        {
+            // Validation rules (auto-discovered)
+        }
     }
 
     public sealed class Handler(...) : IRequestHandler<Command, Result<T>>
     {
         public async Task<Result<T>> Handle(Command request, CancellationToken ct)
         {
-            // Business logic (input is pre-validated, execution is pre-logged)
+            // Business logic (validation/logging already done by pipeline)
         }
     }
 }
 ```
 
-**See `.specify/memory/constitution.md` v1.7.0 for detailed rules on:**
-- Co-location pattern requirements
-- Feature organization rules
-- Naming conventions for vertical slices
-- Cross-feature dependency restrictions
-- Test structure mirroring
-- Assembly scanning for auto-discovery
+**File naming**: `[Verb][Noun].cs` (e.g., `CreateUser.cs`, `ListTemplates.cs`, `GenerateOutput.cs`)
 
 ## Configuration Management (REQUIRED)
 
-**All configuration MUST use the .NET Options Pattern. Direct `IConfiguration` access with string keys is PROHIBITED.**
-
-### Options Pattern Requirements
-
-1. **Create Options class** in `src/Shared/Options/`:
-   ```csharp
-   public sealed class MyServiceOptions
-   {
-       public const string SectionName = "TenSecondTom:MyService";
-       public required string ApiKey { get; init; }
-       public int Timeout { get; init; } = 30;
-   }
-   ```
-
-2. **Create Validator** in `src/Shared/Options/Validation/`:
-   ```csharp
-   public sealed class MyServiceOptionsValidator : IValidateOptions<MyServiceOptions>
-   {
-       public ValidateOptionsResult Validate(string? name, MyServiceOptions options)
-       {
-           if (string.IsNullOrWhiteSpace(options.ApiKey))
-               return ValidateOptionsResult.Fail("ApiKey is required");
-           return ValidateOptionsResult.Success;
-       }
-   }
-   ```
-
-3. **Register in DI** (ServiceCollectionExtensions.cs):
-   ```csharp
-   services.Configure<MyServiceOptions>(configuration.GetSection(MyServiceOptions.SectionName));
-   services.AddSingleton<IValidateOptions<MyServiceOptions>, MyServiceOptionsValidator>();
-   ```
-
-4. **Inject and use**:
-   ```csharp
-   public sealed class MyService(IOptions<MyServiceOptions> options)
-   {
-       private readonly MyServiceOptions _options = options.Value;
-
-       public void DoWork()
-       {
-           var apiKey = _options.ApiKey; // Type-safe!
-       }
-   }
-   ```
-
-### Options Interfaces
-
-- `IOptions<T>`: Singleton - use for static configuration (most CLI scenarios)
-- `IOptionsSnapshot<T>`: Scoped - use when config may change per scope
-- `IOptionsMonitor<T>`: Singleton with change notifications - use for hot-reload
-
-## CLI Design Guidelines
-
-- Use `System.CommandLine` for CLI implementation
-- Commands should be intuitive and follow Unix conventions
-- Support both interactive and scripted usage
-- Provide helpful error messages and usage examples
-- Output formats:
-  - Human-readable text by default
-  - Optional JSON output with `--json` flag
-- Exit codes:
-  - `0` for success
-  - Non-zero for errors (with meaningful codes)
-
-## Code Generation Guidelines
-
-### When Generating New Features
-
-1. **Start with tests**: Create test file first showing expected behavior
-2. **Create vertical slice structure**:
-   - Command/Query class with validation
-   - Handler class with business logic
-   - Required DTOs or models
-   - Registration in DI container
-3. **Add CLI command** if user-facing
-4. **Update documentation** if adding public API
-
-### When Modifying Existing Code
-
-1. **Check for existing tests** and update them first
-2. **Maintain DRY principle**: Refactor if creating duplication
-3. **Preserve error handling patterns**
-4. **Update XML documentation** for public API changes
-
-### Code Style Preferences
-
-- **Prefer explicit types** over `var` for public APIs
-- **Use file-scoped namespaces** (C# 10+)
-- **Use primary constructors** (C# 12) for simple classes
-- **Use collection expressions** `[item1, item2]` (C# 12)
-- **Prefer `required` properties** over constructor parameters where appropriate
-- **Use `readonly` liberally** for immutability
-- **Avoid `null`**: Use nullable reference types and guard clauses
-- **No magic strings**: Use constants from `Shared/Constants/` for config keys, command names, paths, and shared identifiers (logging/diagnostic strings are exceptions)
-
-## Security & Secrets
-
-- **Never hardcode secrets** in source files
-- Use environment variables or .NET User Secrets for development
-- Reference Azure Key Vault or similar for production
-- Always validate and sanitize user input
-- Log security events (auth, access, errors)
-
-## Performance Considerations
-
-- Use `Span<T>` and `Memory<T>` for performance-critical code
-- Prefer `ValueTask<T>` over `Task<T>` for frequently synchronous paths
-- Use frozen collections for static data
-- Cache expensive operations appropriately
-- Profile before optimizing
-
-## Dependencies Management
-
-- **Minimize dependencies**: Only add packages with clear justification
-- **Prefer Microsoft packages** for core functionality
-- **Pin versions** in `.csproj` for reproducibility
-- **Common packages**:
-  - `System.CommandLine` for CLI
-  - `FluentValidation` for validation
-  - `Serilog` for logging
-  - `FluentAssertions` for tests
-  - `Moq` or `NSubstitute` for mocking
-
-## Version Control & Releases
-
-- **Semantic Versioning**: MAJOR.MINOR.PATCH
-  - Breaking changes → MAJOR
-  - New features → MINOR
-  - Bug fixes → PATCH
-- **Conventional Commits**: Use semantic commit messages
-  - `feat:` for new features
-  - `fix:` for bug fixes
-  - `docs:` for documentation
-  - `test:` for tests
-  - `refactor:` for refactoring
-- **Automated releases** via GitHub Actions on merge to `main`
-
-## What NOT to Do
-
-❌ Don't suggest web or GUI frameworks (ASP.NET Core, Blazor, WPF, etc.)
-❌ Don't use test frameworks other than xUnit
-❌ Don't ignore test coverage requirements
-❌ Don't duplicate code instead of extracting reusable components
-❌ Don't hardcode configuration or secrets
-❌ Don't use direct `IConfiguration` access with string keys (use Options Pattern)
-❌ Don't swallow exceptions without logging
-❌ Don't use outdated C# patterns (pre-C# 9)
-❌ Don't create anemic domain models (models without behavior)
-❌ Don't violate DRY, SOLID, or KISS principles
-❌ Don't use magic strings for config keys, command names, paths, or shared identifiers
-
-## Documentation
-
-- Keep README.md up to date with setup instructions
-- Use XML documentation comments for public APIs
-- Create ADRs (Architecture Decision Records) for significant architectural choices
-- Include inline comments only for non-obvious "why" explanations, not "what"
-
-## Examples
-
-### Options Pattern vs Direct Configuration
+**Never access `IConfiguration` directly. Always use the Options Pattern:**
 
 ```csharp
-// ❌ BAD - Direct IConfiguration access with string keys
-public class MyService
+// ❌ PROHIBITED
+var apiKey = _configuration["TenSecondTom:ApiKey"];
+
+// ✅ REQUIRED
+// 1. Options class in Shared/Options/
+public sealed class MyFeatureOptions
 {
-    private readonly IConfiguration _configuration;
-
-    public MyService(IConfiguration configuration)
-    {
-        _configuration = configuration;
-    }
-
-    public void DoWork()
-    {
-        var apiKey = _configuration["MyApp:ApiKey"]; // NO! Magic string, no type safety
-        var timeout = int.Parse(_configuration["MyApp:Timeout"]); // NO! Runtime errors
-    }
-}
-
-// ✅ GOOD - Options Pattern
-// Options class in Shared/Options/
-public sealed class MyServiceOptions
-{
-    public const string SectionName = "TenSecondTom:MyService";
+    public const string SectionName = "TenSecondTom:MyFeature";
     public required string ApiKey { get; init; }
-    public int Timeout { get; init; } = 30;
 }
 
-// Service using options
-public sealed class MyService(IOptions<MyServiceOptions> options)
+// 2. Validator in Shared/Options/Validation/
+public sealed class MyFeatureOptionsValidator : IValidateOptions<MyFeatureOptions>
 {
-    private readonly MyServiceOptions _options = options.Value;
-
-    public void DoWork()
+    public ValidateOptionsResult Validate(string? name, MyFeatureOptions options)
     {
-        var apiKey = _options.ApiKey; // ✅ Type-safe, IntelliSense support
-        var timeout = _options.Timeout; // ✅ No parsing, validated on startup
+        if (string.IsNullOrWhiteSpace(options.ApiKey))
+            return ValidateOptionsResult.Fail("ApiKey is required");
+        return ValidateOptionsResult.Success;
     }
 }
+
+// 3. Register in ServiceCollectionExtensions.cs
+services.Configure<MyFeatureOptions>(configuration.GetSection(MyFeatureOptions.SectionName));
+services.AddSingleton<IValidateOptions<MyFeatureOptions>, MyFeatureOptionsValidator>();
+
+// 4. Inject IOptions<T>
+public sealed class MyService(IOptions<MyFeatureOptions> options)
+{
+    private readonly MyFeatureOptions _options = options.Value;
+}
 ```
 
-### Constants vs Magic Strings
+## Modern C# Features (Required)
 
 ```csharp
-// ❌ BAD - Magic strings
-var memoryDir = configuration["TenSecondTom:MemoryDirectory"];
-if (commandName == "today") { /* ... */ }
-var logsPath = Path.Combine(baseDir, "logs");
-
-// ✅ GOOD - Use constants from Shared/Constants/
-var memoryDir = configuration[ConfigurationKeys.MemoryDirectory];
-if (commandName == CommandNames.Today) { /* ... */ }
-var logsPath = Path.Combine(baseDir, DirectoryNames.Logs);
-
-// ✅ ALLOWED - Logging and diagnostics
-_logger.LogInformation("Processing voice entry for user {UserId}", userId);
-Console.WriteLine("Setup complete! Run 'tom today' to get started.");
-```
-
-### Good Use Case Structure (Co-location Pattern)
-
-```csharp
+// ✅ File-scoped namespaces
 namespace TenSecondTom.Features.Users;
 
-/// <summary>
-/// Creates a new user with the specified username and email.
-/// </summary>
-public static class CreateUser
+// ✅ Primary constructors
+public sealed class UserService(IUserRepository repo, ILogger<UserService> logger)
 {
-    /// <summary>
-    /// Command to create a new user.
-    /// </summary>
-    public sealed record Command(
-        string Username,
-        string Email) : IRequest<Result<Guid>>;
-
-    /// <summary>
-    /// Validator for CreateUser command (auto-discovered by FluentValidation).
-    /// </summary>
-    public sealed class Validator : AbstractValidator<Command>
-    {
-        public Validator()
-        {
-            RuleFor(x => x.Username).NotEmpty().WithMessage("Username is required");
-            RuleFor(x => x.Email).NotEmpty().EmailAddress().WithMessage("Valid email is required");
-        }
-    }
-
-    /// <summary>
-    /// Handler for CreateUser command (auto-discovered by MediatR).
-    /// </summary>
-    public sealed class Handler(
-        IUserRepository repository,
-        ILogger<Handler> logger)
-        : IRequestHandler<Command, Result<Guid>>
-    {
-        public async Task<Result<Guid>> Handle(
-            Command request,
-            CancellationToken cancellationToken)
-        {
-            logger.LogInformation("Creating user {Username}", request.Username);
-
-            try
-            {
-                var userId = await repository.AddAsync(request.Username, request.Email, cancellationToken);
-                return Result<Guid>.Success(userId);
-            }
-            catch (DuplicateUserException ex)
-            {
-                logger.LogWarning(ex, "Duplicate user: {Username}", request.Username);
-                return Result<Guid>.Failure($"User {request.Username} already exists");
-            }
-        }
-    }
+    // Use dependencies directly
 }
+
+// ✅ Records for DTOs
+public sealed record UserDto(Guid Id, string Username, string Email);
+
+// ✅ Required properties
+public sealed class Config
+{
+    public required string ApiKey { get; init; }
+}
+
+// ✅ Collection expressions
+var items = [item1, item2, item3];
+
+// ✅ Constants (NO magic strings!)
+var dir = configuration[ConfigurationKeys.RootDirectory];
+if (command == CommandNames.Today) { }
 ```
 
-### Good Test Structure (Co-location Pattern)
+## Testing Requirements (80% Coverage Minimum)
 
 ```csharp
-namespace TenSecondTom.Tests.Features.Users;
-
+// Test structure: Arrange-Act-Assert
 public sealed class CreateUserTests
 {
     [Fact]
@@ -433,16 +152,9 @@ public sealed class CreateUserTests
     {
         // Arrange
         var repository = new Mock<IUserRepository>();
-        repository.Setup(r => r.AddAsync(
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Guid.NewGuid());
-
         var handler = new CreateUser.Handler(
             repository.Object,
             Mock.Of<ILogger<CreateUser.Handler>>());
-
         var command = new CreateUser.Command("john", "john@example.com");
 
         // Act
@@ -451,45 +163,146 @@ public sealed class CreateUserTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeEmpty();
-        repository.Verify(r => r.AddAsync(
-            "john",
-            "john@example.com",
-            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Theory]
     [InlineData("", "test@example.com")]
     [InlineData("john", "")]
-    public async Task Handle_WithInvalidInput_ReturnsFailure(string username, string email)
+    public async Task Validator_WithInvalidInput_Fails(string username, string email)
     {
         // Arrange
-        var handler = new CreateUser.Handler(
-            Mock.Of<IUserRepository>(),
-            Mock.Of<ILogger<CreateUser.Handler>>());
-
+        var validator = new CreateUser.Validator();
         var command = new CreateUser.Command(username, email);
 
-        // Note: In practice, ValidationPipelineBehavior would catch this before the handler runs
-        // This test demonstrates what the validator enforces
+        // Act
+        var result = await validator.ValidateAsync(command);
 
-        // Act & Assert
-        var validator = new CreateUser.Validator();
-        var validationResult = await validator.ValidateAsync(command);
-        validationResult.IsValid.Should().BeFalse();
+        // Assert
+        result.IsValid.Should().BeFalse();
     }
 }
 ```
 
+## VSA Compliance
+
+### ✅ Allowed
+```csharp
+// Cross-feature communication via MediatR
+var audioConfig = await _mediator.Send(new GetAudioConfiguration.Query());
+
+// Shared code in Shared/ directory
+var logsDir = Path.Combine(baseDir, DirectoryNames.Logs);
+```
+
+### ❌ Prohibited
+```csharp
+// Direct feature reference
+var audioService = new AudioService(); // NO! Cross-feature coupling
+
+// Magic strings
+var key = config["TenSecondTom:ApiKey"]; // NO! Use Options Pattern
+if (command == "today") { } // NO! Use CommandNames.Today
+
+// God Objects
+public class ConfigurationSettings { /* all app config */ } // NO! Violates VSA
+
+// Obsolete code
+[Obsolete] public void OldMethod() { } // NO! Delete it instead
+```
+
+## Result Pattern (Error Handling)
+
+```csharp
+public async Task<Result<User>> CreateUserAsync(string username)
+{
+    if (string.IsNullOrWhiteSpace(username))
+        return Result<User>.Failure("Username is required");
+
+    try
+    {
+        var user = await _repository.CreateAsync(username);
+        return Result<User>.Success(user);
+    }
+    catch (DuplicateUserException ex)
+    {
+        _logger.LogWarning(ex, "Duplicate user: {Username}", username);
+        return Result<User>.Failure($"User {username} already exists");
+    }
+}
+```
+
+## Naming Conventions
+
+| Type | Convention | Example |
+|------|-----------|---------|
+| Use Case Files | `[Verb][Noun].cs` | `CreateUser.cs`, `GenerateOutput.cs` |
+| Nested Types | `Command`, `Query`, `Validator`, `Handler` | No prefixes |
+| Options Classes | `[Feature]Options` | `AudioOptions`, `LlmOptions` |
+| Options Validators | `[Options]Validator` | `AudioOptionsValidator` |
+| Constants | `[Domain]Keys/Names/Constants` | `ConfigurationKeys`, `CommandNames` |
+| DI Methods | `Add[Feature]Feature` | `AddAuthFeature()`, `AddTemplatesFeature()` |
+| Test Files | `[UseCase]Tests.cs` | `CreateUserTests.cs` |
+
+## CLI Command Structure
+
+```csharp
+// Use System.CommandLine
+var createCommand = new Command("create", "Create a new user");
+
+var usernameOption = new Option<string>("--username") { IsRequired = true };
+createCommand.AddOption(usernameOption);
+
+createCommand.SetHandler(async (string username) =>
+{
+    var result = await _mediator.Send(new CreateUser.Command(username, email));
+
+    if (result.IsSuccess)
+    {
+        Console.WriteLine($"User created: {result.Value}");
+        return 0; // Success
+    }
+
+    Console.Error.WriteLine($"Error: {result.Error}");
+    return 1; // Failure
+}, usernameOption);
+```
+
 ## Priority Order for Suggestions
 
-1. **Correctness**: Code must work correctly and handle edge cases
-2. **Tests**: Always include or update tests
-3. **Maintainability**: Clear, readable, DRY code
-4. **Performance**: Optimize when necessary, but readability first
-5. **Documentation**: Update docs for public API changes
+1. **Correctness** - Code must work correctly and handle edge cases
+2. **Tests** - TDD with 80% coverage (non-negotiable)
+3. **Maintainability** - DRY, clear, well-organized code
+4. **Performance** - Optimize when justified
+5. **Documentation** - XML comments on public APIs
+
+## What NOT to Do
+
+❌ Web frameworks (ASP.NET Core, Blazor)
+❌ GUI frameworks (WPF, WinForms)
+❌ Direct `IConfiguration` access with strings
+❌ Magic strings for config keys, commands, paths
+❌ Cross-feature coupling (direct references)
+❌ God Objects (monolithic classes)
+❌ `[Obsolete]` attributes (delete old code)
+❌ Code without tests
+❌ Test frameworks other than xUnit
+❌ Ignoring 80% coverage requirement
+
+## When in Doubt
+
+1. Check [`.specify/memory/constitution.md`](./.specify/memory/constitution.md) first
+2. Look for similar patterns in the codebase
+3. Run architecture tests to verify VSA compliance: `tests/TenSecondTom.Tests/Architecture/VsaComplianceTests.cs`
+4. Ask the user for clarification
 
 ---
 
-**Constitution Version**: 1.7.0 | **Last Updated**: 2025-10-28
+**Constitution Version**: 1.8.0 | **Last Updated**: 2025-01-19
 
-For questions about architectural decisions or edge cases, consult `.specify/memory/constitution.md`.
+**Recent Changes**:
+- ConfigurationSettings God Object removed (aggressive refactor complete)
+- IConfigurationSectionStore is now the standard for config storage
+- Force parameter pattern for independent configuration commands
+- All `[Obsolete]` code removed from production
+
+For detailed architectural principles, design patterns, and governance, consult [`.specify/memory/constitution.md`](./.specify/memory/constitution.md).

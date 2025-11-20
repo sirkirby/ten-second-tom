@@ -2,6 +2,7 @@ using FluentValidation;
 using FluentValidation.Results;
 using MediatR;
 using TenSecondTom.Shared.Results;
+using System.Diagnostics.CodeAnalysis;
 
 namespace TenSecondTom.Infrastructure.Behaviors;
 
@@ -44,6 +45,7 @@ public sealed class ValidationPipelineBehavior<TRequest, TResponse> : IPipelineB
     /// <param name="next">The next handler in the pipeline.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Result of handler execution or validation failure.</returns>
+    [SuppressMessage("Reliability", "CA2016:Forward the CancellationToken parameter", Justification = "MediatR RequestHandlerDelegate does not expose a CancellationToken parameter.")]
     public async Task<TResponse> Handle(
         TRequest request,
         RequestHandlerDelegate<TResponse> next,
@@ -52,9 +54,7 @@ public sealed class ValidationPipelineBehavior<TRequest, TResponse> : IPipelineB
         // If no validators registered for this request type, skip validation
         if (!_validators.Any())
         {
-#pragma warning disable CA2016 // MediatR's next() delegate doesn't accept CancellationToken
             return await next().ConfigureAwait(false);
-#pragma warning restore CA2016
         }
 
         // Run all validators
@@ -63,9 +63,7 @@ public sealed class ValidationPipelineBehavior<TRequest, TResponse> : IPipelineB
         // If validation passed, continue to handler
         if (validationFailures.Length == 0)
         {
-#pragma warning disable CA2016 // MediatR's next() delegate doesn't accept CancellationToken
             return await next().ConfigureAwait(false);
-#pragma warning restore CA2016
         }
 
         // Validation failed - create appropriate Result failure response

@@ -177,13 +177,11 @@ public sealed class ObsidianStorageProvider : IStorageProvider
             vaultRoot = options.RootDirectory;
         }
 
-#pragma warning disable CS0618 // Type or member is obsolete
         // Fall back to legacy MemoryDirectory for even older configurations
         if (string.IsNullOrWhiteSpace(vaultRoot))
         {
             vaultRoot = options.MemoryDirectory;
         }
-#pragma warning restore CS0618
 
         if (string.IsNullOrWhiteSpace(vaultRoot))
         {

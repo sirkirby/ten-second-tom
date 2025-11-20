@@ -2,19 +2,11 @@ using System.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
-using TenSecondTom.Features.Audio;
-using TenSecondTom.Features.Search;
-using TenSecondTom.Features.Setup;
-using TenSecondTom.Features.Setup.Services;
-using TenSecondTom.Features.Shell.Models;
-using TenSecondTom.Features.Shell.Services;
-using TenSecondTom.Features.ThisWeek;
-using TenSecondTom.Features.Today;
 using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.OutputFormatters;
-using AuthLoginHandler = TenSecondTom.Features.Auth.Login.Handler;
-using AuthLogoutHandler = TenSecondTom.Features.Auth.Logout.Handler;
+using TenSecondTom.Shared.Abstractions.UI;
 
 namespace TenSecondTom.Infrastructure.Cli;
 
@@ -53,19 +45,54 @@ public static class CommandRegistry
             return 0;
         });
         
-        rootCommand.Subcommands.Add(BuildTodayCommand(serviceProvider, jsonOutputOption));
-        rootCommand.Subcommands.Add(BuildThisWeekCommand(serviceProvider, jsonOutputOption));
-        rootCommand.Subcommands.Add(BuildSearchCommand(serviceProvider, jsonOutputOption));
-        rootCommand.Subcommands.Add(BuildRecordCommand(serviceProvider, jsonOutputOption));
-        rootCommand.Subcommands.Add(BuildGenerateCommand(serviceProvider, jsonOutputOption));
-        rootCommand.Subcommands.Add(BuildLoginCommand(serviceProvider, jsonOutputOption));
-        rootCommand.Subcommands.Add(BuildLogoutCommand(serviceProvider, jsonOutputOption));
-        rootCommand.Subcommands.Add(BuildSetupCommand(serviceProvider, jsonOutputOption));
-        rootCommand.Subcommands.Add(BuildConfigCommand(serviceProvider, jsonOutputOption));
-        rootCommand.Subcommands.Add(BuildShellCommand(serviceProvider));
+        // Discover and register feature commands via assembly scanning (VSA pattern)
+        var commandBuilders = DiscoverCommandBuilders()
+            .OrderBy(b => b.Priority)
+            .ToList();
+
+        foreach (var builder in commandBuilders)
+        {
+            var command = builder.BuildCommand(serviceProvider, jsonOutputOption);
+            if (command != null)
+            {
+                rootCommand.Subcommands.Add(command);
+            }
+        }
+
+        // Add infrastructure and feature commands (temporarily keeping direct calls until migrated to ICommandBuilder)
+        // TODO: Migrate remaining commands to ICommandBuilder pattern
+        // Setup command is now auto-discovered via ICommandBuilder pattern
         rootCommand.Subcommands.Add(BuildHelpCommand(jsonOutputOption));
         rootCommand.Subcommands.Add(BuildVersionCommand(jsonOutputOption));
         return rootCommand;
+    }
+
+    /// <summary>
+    /// Discovers all ICommandBuilder implementations via assembly scanning.
+    /// Follows the same pattern as MediatR, FluentValidation, and IConfigSubcommandBuilder auto-discovery.
+    /// </summary>
+    /// <returns>Collection of discovered command builders.</returns>
+    private static IEnumerable<ICommandBuilder> DiscoverCommandBuilders()
+    {
+        // Scan the main application assembly (same assembly that contains all features)
+        // Use the same assembly reference as MediatR/FluentValidation for consistency
+        var assembly = typeof(TenSecondTom.Infrastructure.DependencyInjection.ServiceCollectionExtensions).Assembly;
+
+        var builderTypes = assembly.GetTypes()
+            .Where(t =>
+                typeof(ICommandBuilder).IsAssignableFrom(t) &&
+                !t.IsInterface &&
+                !t.IsAbstract)
+            .ToList();
+
+        foreach (var builderType in builderTypes)
+        {
+            // Create instance using parameterless constructor (builders are stateless)
+            if (Activator.CreateInstance(builderType) is ICommandBuilder builder)
+            {
+                yield return builder;
+            }
+        }
     }
 
     private static Command BuildVersionCommand(Option<bool> jsonOutputOption)
@@ -174,393 +201,8 @@ public static class CommandRegistry
         return helpCommand;
     }
 
-    private static Command BuildTodayCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
-    {
-        var todayCommand = new Command("today", "Capture today's reflection with 3-5 prompts");
+    // BuildRecordCommand removed - now using ICommandBuilder discovery pattern
+    // RecordCommandBuilder implements ICommandBuilder and is discovered via assembly scanning
 
-        // Add argument for notes
-        var notesArgument = new Argument<string?>("notes")
-        {
-            Description = "Notes for today. If omitted, opens interactive editor.",
-            Arity = ArgumentArity.ZeroOrOne
-        };
-
-        // Add options
-        var noEditOption = new Option<bool>("--no-edit")
-        {
-            Description = "Skip interactive editor and use notes from command line argument."
-        };
-
-        var useDefaultTemplateOption = new Option<bool>("--use-default-template")
-        {
-            Description = "Automatically use default template (no prompt)."
-        };
-
-        var templateOption = new Option<string?>("--template")
-        {
-            Description = "Use specific template by name (without .md extension)."
-        };
-
-        var providerOption = new Option<string?>("--provider")
-        {
-            Description = "LLM provider to use (OpenAI or Anthropic). Defaults to configured provider."
-        };
-
-        var voiceOption = new Option<bool>("--voice")
-        {
-            Description = "Capture notes using voice recording instead of text input."
-        };
-
-        var sttOption = new Option<string?>("--stt")
-        {
-            Description = "STT engine selection: auto (default), local, or openai. Only used with --voice."
-        };
-
-        // Add argument and options to command
-        todayCommand.Arguments.Add(notesArgument);
-        todayCommand.Options.Add(noEditOption);
-        todayCommand.Options.Add(useDefaultTemplateOption);
-        todayCommand.Options.Add(templateOption);
-        todayCommand.Options.Add(providerOption);
-        todayCommand.Options.Add(voiceOption);
-        todayCommand.Options.Add(sttOption);
-        todayCommand.Options.Add(jsonOutputOption);
-
-        // Set action
-        todayCommand.SetAction(async (parseResult) =>
-        {
-            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
-            string? provider = parseResult.GetValue(providerOption);
-            string? notes = parseResult.GetValue(notesArgument);
-            bool noEdit = parseResult.GetValue(noEditOption);
-            bool useDefaultTemplate = parseResult.GetValue(useDefaultTemplateOption);
-            string? templateName = parseResult.GetValue(templateOption);
-            bool useVoice = parseResult.GetValue(voiceOption);
-            string? stt = parseResult.GetValue(sttOption);
-
-            await TodayCommandHandler.ExecuteAsync(
-                serviceProvider,
-                notes,
-                noEdit,
-                useDefaultTemplate,
-                templateName,
-                provider,
-                useVoice,
-                stt,
-                jsonOutput).ConfigureAwait(false);
-        });
-
-        return todayCommand;
-    }
-
-    private static Command BuildThisWeekCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
-    {
-        var thisWeekCommand = new Command("thisweek", "Generate a weekly review from recent daily entries");
-
-        // Add options for custom date range
-        var fromDateOption = new Option<DateTimeOffset?>("--from-date")
-        {
-            Description = "Start date for custom range (yyyy-MM-dd). Must be used with --to-date."
-        };
-
-        var toDateOption = new Option<DateTimeOffset?>("--to-date")
-        {
-            Description = "End date for custom range (yyyy-MM-dd). Must be used with --from-date."
-        };
-
-        // Add option for LLM provider override
-        var providerOption = new Option<string?>("--provider")
-        {
-            Description = "LLM provider to use (OpenAI or Anthropic). Defaults to configured provider."
-        };
-
-        thisWeekCommand.Options.Add(fromDateOption);
-        thisWeekCommand.Options.Add(toDateOption);
-        thisWeekCommand.Options.Add(providerOption);
-        thisWeekCommand.Options.Add(jsonOutputOption);
-
-        // Set action
-        thisWeekCommand.SetAction(async (parseResult) =>
-        {
-            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
-            DateTimeOffset? fromDate = parseResult.GetValue(fromDateOption);
-            DateTimeOffset? toDate = parseResult.GetValue(toDateOption);
-            string? provider = parseResult.GetValue(providerOption);
-
-            var handler = serviceProvider.GetRequiredService<CreateWeeklyReview.Handler>();
-            var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
-            await ThisWeekCommandHandler.ExecuteAsync(serviceProvider, handler, authService, fromDate, toDate, provider, jsonOutput).ConfigureAwait(false);
-        });
-
-        return thisWeekCommand;
-    }
-
-    private static Command BuildSearchCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
-    {
-        var searchCommand = new Command("search", "Search memory entries by text query");
-
-        // Add options for date range filters FIRST (before arguments)
-        var fromDateOption = new Option<DateTime?>("--from-date")
-        {
-            Description = "Start date filter (yyyy-MM-dd). Optional."
-        };
-
-        var toDateOption = new Option<DateTime?>("--to-date")
-        {
-            Description = "End date filter (yyyy-MM-dd). Optional."
-        };
-
-        searchCommand.Options.Add(fromDateOption);
-        searchCommand.Options.Add(toDateOption);
-        searchCommand.Options.Add(jsonOutputOption);
-
-        // Add required query argument AFTER options - allow multiple words without quotes
-        // Using ZeroOrMore to allow options to be recognized, then require at least one word in handler
-        var queryArgument = new Argument<string[]>("query")
-        {
-            Description = "The text to search for in memory entries",
-            Arity = ArgumentArity.ZeroOrMore
-        };
-
-        searchCommand.Arguments.Add(queryArgument);
-
-        // Set action (void) - use Environment.ExitCode to communicate failure
-        searchCommand.SetAction((parseResult) =>
-        {
-            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
-            string[] queryWords = parseResult.GetValue(queryArgument) ?? [];
-            
-            // Validate that at least one query word was provided
-            if (queryWords.Length == 0)
-            {
-                if (jsonOutput)
-                {
-                    Console.WriteLine(JsonOutputFormatter.FormatFailure("search",
-                        "Query is required. Usage: search <query> [options]",
-                        DateTimeOffset.UtcNow));
-                }
-                else
-                {
-                    AnsiConsole.MarkupLine("[red]Error:[/] Query is required.");
-                    AnsiConsole.MarkupLine("[dim]Usage: search <query> [[--from-date YYYY-MM-DD]] [[--to-date YYYY-MM-DD]] [[--output-json]][/]");
-                }
-                Environment.ExitCode = 1; // failure exit code
-                return;
-            }
-
-            // Treat any token starting with '--' (that wasn't parsed as an option) as invalid argument usage
-            if (queryWords.Any(w => w.StartsWith("--", StringComparison.Ordinal)))
-            {
-                string invalidToken = queryWords.First(w => w.StartsWith("--", StringComparison.Ordinal));
-                if (jsonOutput)
-                {
-                    Console.WriteLine(JsonOutputFormatter.FormatFailure("search",
-                        $"Invalid search query token '{invalidToken}'. Options must precede the query.",
-                        DateTimeOffset.UtcNow));
-                }
-                else
-                {
-                    AnsiConsole.MarkupLine($"[red]Invalid argument:[/] '{invalidToken.EscapeMarkup()}' cannot appear in query text. Specify options before the query.");
-                    AnsiConsole.MarkupLine("[dim]Usage: search [[--from-date YYYY-MM-DD]] [[--to-date YYYY-MM-DD]] <query words>[/]");
-                }
-                Environment.ExitCode = 1; // failure exit code
-                return;
-            }
-            
-            string query = string.Join(" ", queryWords); // Join multiple words into single query
-            DateTime? fromDate = parseResult.GetValue(fromDateOption);
-            DateTime? toDate = parseResult.GetValue(toDateOption);
-
-            // Resolve required services. If not registered (e.g., minimal custom test host) fail gracefully.
-            var handler = serviceProvider.GetService<SearchMemories.Handler>();
-            if (handler is null)
-            {
-                if (jsonOutput)
-                {
-                    Console.WriteLine(JsonOutputFormatter.FormatFailure("search",
-                        "Search functionality is unavailable - handler not registered in DI container.",
-                        DateTimeOffset.UtcNow));
-                }
-                else
-                {
-                    AnsiConsole.MarkupLine("[red]Search unavailable:[/] handler not registered. Ensure AddTenSecondTomServices() was called.");
-                }
-                return;
-            }
-
-            var authService = serviceProvider.GetService<IAuthenticationService>();
-            if (authService is null)
-            {
-                if (jsonOutput)
-                {
-                    Console.WriteLine(JsonOutputFormatter.FormatFailure("search",
-                        "Authentication service not registered - cannot verify session.",
-                        DateTimeOffset.UtcNow));
-                }
-                else
-                {
-                    AnsiConsole.MarkupLine("[red]Authentication unavailable:[/] service not registered. Ensure AddTenSecondTomServices() was called.");
-                }
-                return;
-            }
-
-            var storageOptions = serviceProvider.GetService<IOptions<StorageOptions>>();
-            if (storageOptions is null)
-            {
-                if (jsonOutput)
-                {
-                    Console.WriteLine(JsonOutputFormatter.FormatFailure("search",
-                        "Storage options not registered - cannot resolve file paths.",
-                        DateTimeOffset.UtcNow));
-                }
-                else
-                {
-                    AnsiConsole.MarkupLine("[red]Storage options unavailable:[/] service not registered.");
-                }
-                return;
-            }
-
-            SearchCommandHandler.ExecuteAsync(handler, authService, storageOptions.Value, query, fromDate, toDate, jsonOutput)
-                .GetAwaiter().GetResult();
-            Environment.ExitCode = 0; // success
-        });
-
-        return searchCommand;
-    }
-
-    private static Command BuildRecordCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
-    {
-        return RecordCommandBuilder.BuildRecordCommand(serviceProvider, jsonOutputOption);
-    }
-
-    private static Command BuildGenerateCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
-    {
-        var generateCommand = new Command("generate", "Generate output from a recording using a prompt template");
-
-        // T041: Add --template option with -t alias for non-interactive template selection
-        var templateOption = new Option<string?>("--template", "-t")
-        {
-            Description = "Template name for non-interactive execution. Automatically selects most recent recording."
-        };
-
-        generateCommand.Options.Add(templateOption);
-        generateCommand.Options.Add(jsonOutputOption);
-
-        generateCommand.SetAction(async (parseResult) =>
-        {
-            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
-            string? templateName = parseResult.GetValue(templateOption);
-
-            var exitCode = await TenSecondTom.Features.Generate.GenerateCommand.ExecuteAsync(
-                serviceProvider,
-                jsonOutput,
-                templateName);
-
-            return exitCode;
-        });
-
-        return generateCommand;
-    }
-
-    private static Command BuildLoginCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
-    {
-        var loginCommand = new Command("login", "Authenticate with SSH key and create a session");
-
-        // Add the global JSON output option to this command
-        loginCommand.Options.Add(jsonOutputOption);
-
-        // Set action
-        loginCommand.SetAction(async (parseResult) =>
-        {
-            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
-            var handler = serviceProvider.GetRequiredService<AuthLoginHandler>();
-            await LoginCommandHandler.ExecuteAsync(handler, jsonOutput).ConfigureAwait(false);
-        });
-
-        return loginCommand;
-    }
-
-    private static Command BuildLogoutCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
-    {
-        var logoutCommand = new Command("logout", "Log out and invalidate the current session");
-
-        // Add the global JSON output option to this command
-        logoutCommand.Options.Add(jsonOutputOption);
-
-        // Set action
-        logoutCommand.SetAction(async (parseResult) =>
-        {
-            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
-            var handler = serviceProvider.GetRequiredService<AuthLogoutHandler>();
-            await LogoutCommandHandler.ExecuteAsync(handler, jsonOutput).ConfigureAwait(false);
-        });
-
-        return logoutCommand;
-    }
-
-    private static Command BuildShellCommand(IServiceProvider serviceProvider)
-    {
-        var shellCommand = new Command("shell", "Start interactive shell mode");
-
-        shellCommand.SetAction(async (parseResult) =>
-        {
-            var replLoop = serviceProvider.GetRequiredService<IReplLoop>();
-            var exitCode = await replLoop.RunAsync(CancellationToken.None).ConfigureAwait(false);
-            return exitCode;
-        });
-
-        return shellCommand;
-    }
-
-    private static Command BuildSetupCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
-    {
-        var setupCommand = new Command("setup", "Run the guided setup wizard to configure Ten Second Tom");
-
-        // Options
-        var forceOption = new Option<bool>("--force")
-        {
-            Description = "Force setup to run even if configuration exists"
-        };
-        var nonInteractiveOption = new Option<bool>("--non-interactive")
-        {
-            Description = "Run setup in non-interactive mode (requires existing configuration)"
-        };
-
-        setupCommand.Options.Add(forceOption);
-        setupCommand.Options.Add(nonInteractiveOption);
-        setupCommand.Options.Add(jsonOutputOption);
-
-        setupCommand.SetAction(async (parseResult) =>
-        {
-            bool force = parseResult.GetValue(forceOption);
-            bool nonInteractive = parseResult.GetValue(nonInteractiveOption);
-            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
-
-            // Use factory to create Setup.Command with existing config loaded (centralized logic)
-            var factory = serviceProvider.GetRequiredService<SetupCommandFactory>();
-            var command = await factory.CreateAsync(force, nonInteractive, CancellationToken.None).ConfigureAwait(false);
-
-            var handler = serviceProvider.GetRequiredService<Setup.Handler>();
-            var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);
-
-            if (result.IsSuccess)
-            {
-                CommandOutputFormatter.WriteSuccess("Setup completed successfully!", jsonOutput);
-                return 0;
-            }
-            else
-            {
-                CommandOutputFormatter.WriteError($"Setup failed: {result.Error}", jsonOutput);
-                return 1;
-            }
-        });
-
-        return setupCommand;
-    }
-
-    private static Command BuildConfigCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
-    {
-        return ConfigCommandBuilder.BuildConfigCommand(serviceProvider, jsonOutputOption);
-    }
 }
 

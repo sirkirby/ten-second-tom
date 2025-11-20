@@ -3,6 +3,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Setup.Services;
+using TenSecondTom.Infrastructure.Auth;
+using TenSecondTom.Shared.Abstractions.UI;
 using TenSecondTom.Features.Shell.Services;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Configuration;
@@ -104,7 +106,7 @@ internal static class Program
             services.AddApplicationServices();
 
             // Feature slices (vertical slice architecture)
-            services.AddAllFeatures();
+            services.AddAllFeatures(configuration);
             
             using var serviceProvider = services.BuildServiceProvider();
             

@@ -29,12 +29,10 @@ public sealed class StorageOptionsValidator : IValidateOptions<StorageOptions>
         string? rootDirectory = options.RootDirectory;
 
         // Backward compatibility: fall back to MemoryDirectory if RootDirectory not set
-#pragma warning disable CS0618 // Type or member is obsolete
         if (string.IsNullOrWhiteSpace(rootDirectory) && !string.IsNullOrWhiteSpace(options.MemoryDirectory))
         {
             rootDirectory = options.MemoryDirectory;
         }
-#pragma warning restore CS0618
 
         if (string.IsNullOrWhiteSpace(rootDirectory))
         {

@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.CommandLine;
 using System.CommandLine.Parsing;
-using TenSecondTom.Features.Shell.Models;
+using TenSecondTom.Shared.Models;
 using ShellCommandResult = TenSecondTom.Features.Shell.Models.CommandResult;
 
 namespace TenSecondTom.Features.Shell.Services;

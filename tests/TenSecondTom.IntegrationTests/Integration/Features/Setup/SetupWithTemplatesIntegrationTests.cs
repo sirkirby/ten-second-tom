@@ -3,10 +3,11 @@ using System.IO.Abstractions.TestingHelpers;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using static TenSecondTom.Features.Templates.InstallDefaultTemplates;
 using TenSecondTom.Features.Templates;
 using TenSecondTom.Infrastructure.Prompts;
+using TenSecondTom.Infrastructure.Templates;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Shared.Models;
 using Xunit;
 using TenSecondTom.Features.Setup;
 
@@ -38,10 +39,7 @@ public sealed class SetupWithTemplatesIntegrationTests
     public async Task InstallTemplates_EndToEnd_CreatesAllTemplateFiles()
     {
         // Arrange
-        var handler = new InstallDefaultTemplates.Handler(
-            _fileSystem,
-            _embeddedLoader,
-            _handlerLogger.Object);
+        var handler = CreateHandler();
 
         var command = new InstallDefaultTemplates.Command
         {
@@ -50,7 +48,7 @@ public sealed class SetupWithTemplatesIntegrationTests
         };
 
         // Act
-        Result<InstallDefaultTemplates.CommandResult> result = await handler.Handle(
+        Result<TemplateInstallationResult> result = await handler.Handle(
             command,
             CancellationToken.None);
 
@@ -87,10 +85,7 @@ public sealed class SetupWithTemplatesIntegrationTests
     public async Task InstallTemplates_WhenAlreadyInstalled_SkipsExistingFiles()
     {
         // Arrange
-        var handler = new InstallDefaultTemplates.Handler(
-            _fileSystem,
-            _embeddedLoader,
-            _handlerLogger.Object);
+        var handler = CreateHandler();
 
         var command = new InstallDefaultTemplates.Command
         {
@@ -102,7 +97,7 @@ public sealed class SetupWithTemplatesIntegrationTests
         await handler.Handle(command, CancellationToken.None);
 
         // Act - Second installation
-        Result<InstallDefaultTemplates.CommandResult> result = await handler.Handle(
+        Result<TemplateInstallationResult> result = await handler.Handle(
             command,
             CancellationToken.None);
 
@@ -117,10 +112,7 @@ public sealed class SetupWithTemplatesIntegrationTests
     public async Task InstallTemplates_WithOverwrite_ReplacesExistingFiles()
     {
         // Arrange
-        var handler = new InstallDefaultTemplates.Handler(
-            _fileSystem,
-            _embeddedLoader,
-            _handlerLogger.Object);
+        var handler = CreateHandler();
 
         // Pre-create a modified file
         _fileSystem.AddDirectory(_testDirectory);
@@ -134,7 +126,7 @@ public sealed class SetupWithTemplatesIntegrationTests
         };
 
         // Act
-        Result<InstallDefaultTemplates.CommandResult> result = await handler.Handle(
+        Result<TemplateInstallationResult> result = await handler.Handle(
             command,
             CancellationToken.None);
 
@@ -182,5 +174,18 @@ public sealed class SetupWithTemplatesIntegrationTests
         businessMeetingTemplate.Metadata.Should().NotBeNull();
         businessMeetingTemplate.Metadata!.TemplateType.Should().Be(TenSecondTom.Shared.Models.TemplateType.BusinessMeeting);
         businessMeetingTemplate.Source.Should().Be(TenSecondTom.Shared.Models.TemplateSource.Embedded);
+    }
+
+    private InstallDefaultTemplates.Handler CreateHandler()
+    {
+        var installerLogger = new Mock<ILogger<TemplateInstaller>>();
+        var templateInstaller = new TemplateInstaller(
+            _fileSystem,
+            _embeddedLoader,
+            installerLogger.Object);
+
+        return new InstallDefaultTemplates.Handler(
+            templateInstaller,
+            _handlerLogger.Object);
     }
 }

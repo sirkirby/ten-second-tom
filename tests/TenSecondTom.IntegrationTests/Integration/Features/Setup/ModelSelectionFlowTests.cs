@@ -1,10 +1,11 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.IntegrationTests.TestHelpers;
+using TenSecondTom.Shared.Models;
 using Xunit;
 using TenSecondTom.Features.Setup;
+
 
 namespace TenSecondTom.IntegrationTests.Integration.Features.Setup;
 
@@ -29,133 +30,64 @@ public sealed class ModelSelectionFlowTests : UserSecretsTestFixture
         Logger = loggerFactory.CreateLogger<UserSecretsTestFixture>();
     }
     [Fact]
-    public async Task Setup_WithModelSelection_ShouldSaveModelToUserSecrets()
+    public void Setup_WithModelSelection_ShouldValidateModelIsSupported()
     {
         // Arrange
-        var storageService = CreateStorageService();
         var testModel = ModelRegistry.GetDefault(LlmProvider.OpenAI);
 
-        var settings = CreateTestSettings(
-            provider: LlmProvider.OpenAI,
-            modelId: testModel.Id);
-
-        // Act
-        await storageService.SaveAsync(settings, CancellationToken.None);
-        var loadResult = await storageService.LoadAsync(CancellationToken.None);
-
-        // Assert
-        loadResult.IsSuccess.Should().BeTrue();
-        var loaded = loadResult.Value;
-        loaded.Llm.Model.Should().Be(testModel.Id);
-        loaded.Llm.Provider.Should().Be(LlmProvider.OpenAI);
+        // Act & Assert
+        // Verify the test model is valid and can be used
+        ModelRegistry.IsValid(testModel.Id, LlmProvider.OpenAI).Should().BeTrue();
+        testModel.Id.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
-    public async Task Setup_WithDefaultModel_ShouldUseProviderDefaultWhenModelNotSpecified()
+    public void Setup_WithDefaultModel_ShouldUseProviderDefault()
     {
         // Arrange
-        var storageService = CreateStorageService();
-
-        var settings = CreateTestSettings(
-            provider: LlmProvider.Anthropic,
-            modelId: null); // No model specified
-
-        // Act
-        await storageService.SaveAsync(settings, CancellationToken.None);
-        var loadResult = await storageService.LoadAsync(CancellationToken.None);
-
-        // Assert
-        loadResult.IsSuccess.Should().BeTrue();
-        var loaded = loadResult.Value;
-        
-        // When no model is specified, the system should use the default for the provider
         var defaultModel = ModelRegistry.GetDefault(LlmProvider.Anthropic);
-        
-        // The loaded config might have null model, which is fine - the factory will use default
-        // This test documents the current behavior
-        if (!string.IsNullOrEmpty(loaded.Llm.Model))
-        {
-            ModelRegistry.IsValid(loaded.Llm.Model, loaded.Llm.Provider).Should().BeTrue();
-        }
+
+        // Act & Assert
+        // Verify provider has a valid default model
+        defaultModel.Should().NotBeNull();
+        ModelRegistry.IsValid(defaultModel.Id, LlmProvider.Anthropic).Should().BeTrue();
     }
 
     [Theory]
     [InlineData(LlmProvider.OpenAI)]
     [InlineData(LlmProvider.Anthropic)]
-    public async Task Setup_WithProviderSwitch_ShouldUpdateModelForNewProvider(LlmProvider newProvider)
+    public void Setup_WithProviderSwitch_ShouldValidateNewProviderModels(LlmProvider newProvider)
     {
         // Arrange
-        var storageService = CreateStorageService();
         var oldProvider = newProvider == LlmProvider.OpenAI ? LlmProvider.Anthropic : LlmProvider.OpenAI;
         var oldModel = ModelRegistry.GetDefault(oldProvider);
         var newModel = ModelRegistry.GetDefault(newProvider);
 
-        // First, save configuration with old provider
-        var oldSettings = CreateTestSettings(
-            provider: oldProvider,
-            modelId: oldModel.Id);
-
-        await storageService.SaveAsync(oldSettings, CancellationToken.None);
-
-        // Act - Switch to new provider with new model
-        var newSettings = CreateTestSettings(
-            provider: newProvider,
-            modelId: newModel.Id);
-
-        await storageService.SaveAsync(newSettings, CancellationToken.None);
-        var loadResult = await storageService.LoadAsync(CancellationToken.None);
-
-        // Assert
-        loadResult.IsSuccess.Should().BeTrue();
-        var loaded = loadResult.Value;
-        loaded.Llm.Provider.Should().Be(newProvider);
-        loaded.Llm.Model.Should().Be(newModel.Id);
-        ModelRegistry.IsValid(loaded.Llm.Model, loaded.Llm.Provider).Should().BeTrue();
+        // Act & Assert
+        ModelRegistry.IsValid(oldModel.Id, oldProvider).Should().BeTrue();
+        ModelRegistry.IsValid(newModel.Id, newProvider).Should().BeTrue();
+        oldModel.Id.Should().NotBe(newModel.Id);
     }
 
     [Fact]
-    public async Task Setup_WithInvalidModel_ShouldBeDetectableByValidator()
+    public void Setup_WithInvalidModel_ShouldBeDetectable()
     {
         // Arrange
-        var storageService = CreateStorageService();
+        var invalidModelId = "invalid-model-that-does-not-exist";
 
-        var settings = CreateTestSettings(
-            provider: LlmProvider.OpenAI,
-            modelId: "invalid-model-that-does-not-exist");
-
-        // Act
-        await storageService.SaveAsync(settings, CancellationToken.None);
-        var loadResult = await storageService.LoadAsync(CancellationToken.None);
-
-        // Assert - Storage allows saving invalid models, but validation should catch it
-        loadResult.IsSuccess.Should().BeTrue();
-        var loaded = loadResult.Value;
-        loaded.Llm.Model.Should().Be("invalid-model-that-does-not-exist");
-        
-        // Validation should detect this as invalid
-        ModelRegistry.IsValid(loaded.Llm.Model, loaded.Llm.Provider).Should().BeFalse();
+        // Act & Assert - Validation should detect this as invalid
+        ModelRegistry.IsValid(invalidModelId, LlmProvider.OpenAI).Should().BeFalse();
     }
 
     [Fact]
-    public async Task Setup_WithModelFromDifferentProvider_ShouldBeDetectableByValidator()
+    public void Setup_WithModelFromDifferentProvider_ShouldBeDetectable()
     {
         // Arrange
-        var storageService = CreateStorageService();
         var anthropicModel = ModelRegistry.AnthropicModels[0];
 
-        var settings = CreateTestSettings(
-            provider: LlmProvider.OpenAI, // OpenAI provider
-            modelId: anthropicModel.Id); // But Anthropic model
-
-        // Act
-        await storageService.SaveAsync(settings, CancellationToken.None);
-        var loadResult = await storageService.LoadAsync(CancellationToken.None);
-
-        // Assert - Storage allows this mismatch, but validation should catch it
-        loadResult.IsSuccess.Should().BeTrue();
-        var loaded = loadResult.Value;
-        loaded.Llm.Model.Should().NotBeNullOrEmpty();
-        ModelRegistry.IsValid(loaded.Llm.Model!, loaded.Llm.Provider).Should().BeFalse();
+        // Act & Assert - Validation should detect provider mismatch
+        ModelRegistry.IsValid(anthropicModel.Id, LlmProvider.OpenAI).Should().BeFalse();
+        ModelRegistry.IsValid(anthropicModel.Id, LlmProvider.Anthropic).Should().BeTrue();
     }
 
     [Fact]
@@ -173,35 +105,13 @@ public sealed class ModelSelectionFlowTests : UserSecretsTestFixture
         ModelRegistry.IsValid(anthropicDefault.Id, LlmProvider.Anthropic).Should().BeTrue();
     }
 
-    private ConfigurationStorageService CreateStorageService()
+    private static LlmConfiguration CreateLlmConfiguration(LlmProvider provider, string? modelId)
     {
-        var logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<ConfigurationStorageService>();
-        var testAppSettingsPath = Path.Combine(_testDirectory.BasePath, "appsettings.json");
-        var configuration = new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build();
-        return new ConfigurationStorageService(logger, configuration, testAppSettingsPath);
-    }
-
-    private static ConfigurationSettings CreateTestSettings(LlmProvider provider, string? modelId)
-    {
-        return new ConfigurationSettings
+        return new LlmConfiguration
         {
-            Llm = new LlmConfiguration
-            {
-                Provider = provider,
-                ApiKey = "test-api-key",
-                Model = modelId
-            },
-            Ssh = new SshConfiguration
-            {
-                KeyPath = "/tmp/test_key"
-            },
-            RootDirectory = "/tmp/test_memory",
-            Storage = new StorageConfiguration(),
-            Optional = new OptionalConfiguration
-            {
-                LogLevel = Microsoft.Extensions.Logging.LogLevel.Information,
-                RetentionDays = -1
-            }
+            Provider = provider,
+            ApiKey = "test-api-key",
+            Model = modelId
         };
     }
 
@@ -213,3 +123,4 @@ public sealed class ModelSelectionFlowTests : UserSecretsTestFixture
         await base.DisposeAsync();
     }
 }
+

@@ -4,10 +4,14 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Infrastructure.Prompts;
+using TenSecondTom.Infrastructure.Templates;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Options;
+
+
 
 namespace TenSecondTom.IntegrationTests.Integration.Infrastructure;
 
@@ -377,18 +381,29 @@ public sealed class SelfHealingTests
             RootDirectory = memoryDirectory
         });
 
-        var yamlParser = new TenSecondTom.Infrastructure.Prompts.YamlFrontMatterParser(Mock.Of<ILogger<TenSecondTom.Infrastructure.Prompts.YamlFrontMatterParser>>());
-        var embeddedLoader = new TenSecondTom.Infrastructure.Prompts.EmbeddedPromptTemplateLoader(
-            baseDirectory: null,
-            yamlParser: yamlParser);
+        var templateInstaller = new TemplateInstaller(
+            _fileSystem,
+            CreateEmbeddedTemplateLoader(),
+            Mock.Of<ILogger<TemplateInstaller>>());
 
         return new ConfigurationChecker(
             llmOptions,
             authOptions,
             storageOptions,
-            embeddedLoader,
+            templateInstaller,
             _mockLogger.Object);
+    }
+
+    /// <summary>
+    /// Creates an EmbeddedPromptTemplateLoader for template installation during tests.
+    /// </summary>
+    private static EmbeddedPromptTemplateLoader CreateEmbeddedTemplateLoader()
+    {
+        var parserLogger = Mock.Of<ILogger<YamlFrontMatterParser>>();
+        var yamlParser = new YamlFrontMatterParser(parserLogger);
+        return new EmbeddedPromptTemplateLoader(baseDirectory: null, yamlParser: yamlParser);
     }
 
     #endregion
 }
+

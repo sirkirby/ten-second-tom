@@ -112,7 +112,7 @@ public sealed record TemplateMetadata
         if (Author?.Length > 100)
             errors.Add("Author must be 100 characters or less");
 
-        if (Tags?.Length > 20)
+        if (Tags is { Count: > 20 })
             errors.Add("Maximum 20 tags allowed");
 
         if (Tags?.Any(tag => tag.Length > 50) == true)

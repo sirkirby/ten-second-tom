@@ -1,21 +1,23 @@
 namespace TenSecondTom.Shared.Constants;
 
 /// <summary>
-/// Provides strongly-typed configuration key constants for both:
-/// 1. Reading from <see cref="Microsoft.Extensions.Configuration.IConfiguration"/> (full paths like "TenSecondTom:Llm:Provider")
-/// 2. JSON serialization property names (individual names like nested classes: Llm.Provider = "Provider")
-/// 
+/// Provides strongly-typed configuration key constants.
+///
 /// USAGE EXAMPLES:
-/// - IConfiguration: config[ConfigurationKeys.LlmProviderKey] → "TenSecondTom:Llm:Provider"
-/// - JSON Parsing: element.TryGetProperty(ConfigurationKeys.Llm.Section, ...) → "Llm"
-/// - JSON Parsing: element.TryGetProperty(ConfigurationKeys.Llm.Provider, ...) → "Provider"
+/// - IConfiguration: config["TenSecondTom:Audio:Recorder:InputVolume"]
+/// - Or use: config[ConfigurationKeys.AudioRecorderInputVolumeKey]
+/// - Root directory: config[ConfigurationKeys.RootDirectoryKey]
+///
+/// NOTE: For LLM and Auth configuration, use the Options Pattern instead:
+/// - Inject IOptions&lt;LlmOptions&gt; instead of accessing "TenSecondTom:Llm:*" keys
+/// - Inject IOptions&lt;AuthOptions&gt; instead of accessing "TenSecondTom:Auth:*" keys
 /// </summary>
 public static class ConfigurationKeys
 {
     // ═══════════════════════════════════════════════════════════════
     // ROOT LEVEL (for IConfiguration access)
     // ═══════════════════════════════════════════════════════════════
-    
+
     /// <summary>
     /// Configuration section root for TenSecondTom specific settings.
     /// </summary>
@@ -36,47 +38,9 @@ public static class ConfigurationKeys
     [Obsolete("Use RootDirectoryKey instead. This constant is for backward compatibility only.", false)]
     public const string MemoryDirectoryKey = "TenSecondTom:MemoryDirectory";
 
-    /// <summary>
-    /// Configuration key for the LLM provider (OpenAI, Anthropic).
-    /// Environment variable: TenSecondTom__Llm__Provider
-    /// </summary>
-    public const string LlmProviderKey = "TenSecondTom:Llm:Provider";
-
-    /// <summary>
-    /// Configuration key for the LLM API key.
-    /// Environment variable: TenSecondTom__Llm__ApiKey
-    /// </summary>
-    public const string LlmApiKeyKey = "TenSecondTom:Llm:ApiKey";
-
-    /// <summary>
-    /// Configuration key for the LLM model selection.
-    /// Environment variable: TenSecondTom__Llm__Model
-    /// </summary>
-    public const string LlmModelKey = "TenSecondTom:Llm:Model";
-
-    /// <summary>
-    /// Configuration key for maximum input tokens for LLM processing.
-    /// Environment variable: TenSecondTom__Llm__MaxInputTokens
-    /// </summary>
-    public const string LlmMaxInputTokensKey = "TenSecondTom:Llm:MaxInputTokens";
-
-    /// <summary>
-    /// Configuration key for SSH key file path.
-    /// Environment variable: TenSecondTom__Ssh__KeyPath
-    /// </summary>
-    public const string SshKeyPathKey = "TenSecondTom:Ssh:KeyPath";
-
-    /// <summary>
-    /// Configuration key for SSH key source (ManualPath, SshAgent, etc.).
-    /// Environment variable: TenSecondTom__Ssh__KeySource
-    /// </summary>
-    public const string SshKeySourceKey = "TenSecondTom:Ssh:KeySource";
-
-    /// <summary>
-    /// Configuration key for SSH agent socket path.
-    /// Environment variable: TenSecondTom__Ssh__AgentSocketPath
-    /// </summary>
-    public const string SshAgentSocketPathKey = "TenSecondTom:Ssh:AgentSocketPath";
+    // ═══════════════════════════════════════════════════════════════
+    // AUDIO FEATURE
+    // ═══════════════════════════════════════════════════════════════
 
     /// <summary>
     /// Configuration section for audio recording and transcription settings.

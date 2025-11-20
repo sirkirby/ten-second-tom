@@ -4,10 +4,9 @@ using Microsoft.Extensions.Options;
 using Moq;
 using TenSecondTom.Features.Generate.Models;
 using TenSecondTom.Features.Generate.Services;
-using TenSecondTom.Features.Setup.Models;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
-using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 using TenSecondTom.Features.Generate;
@@ -26,7 +25,7 @@ public sealed class GenerateOutputCommandHandlerTests
     private readonly Mock<ITranscriptProcessor> _mockTranscriptProcessor;
     private readonly Mock<ILlmProvider> _mockLlmProvider;
     private readonly Mock<ILlmProviderFactory> _mockLlmProviderFactory;
-    private readonly Mock<IOptions<LlmOptions>> _mockLlmOptions;
+    private readonly Mock<IOptionsSnapshot<LlmOptions>> _mockLlmOptions;
     private readonly Mock<IOutputStorageService> _mockOutputStorageService;
     private readonly Mock<ILogger<GenerateOutput.Handler>> _mockLogger;
 
@@ -37,7 +36,7 @@ public sealed class GenerateOutputCommandHandlerTests
         _mockTranscriptProcessor = new Mock<ITranscriptProcessor>();
         _mockLlmProvider = new Mock<ILlmProvider>();
         _mockLlmProviderFactory = new Mock<ILlmProviderFactory>();
-        _mockLlmOptions = new Mock<IOptions<LlmOptions>>();
+        _mockLlmOptions = new Mock<IOptionsSnapshot<LlmOptions>>();
         _mockOutputStorageService = new Mock<IOutputStorageService>();
         _mockLogger = new Mock<ILogger<GenerateOutput.Handler>>();
 

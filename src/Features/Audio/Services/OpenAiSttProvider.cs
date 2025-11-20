@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenAI;
 using OpenAI.Audio;
-using TenSecondTom.Features.Setup.Models;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
@@ -19,22 +18,18 @@ namespace TenSecondTom.Features.Audio.Services;
 public sealed class OpenAiSttProvider : ISttProvider
 {
     private readonly AudioConfiguration _audioConfig;
-    private readonly ConfigurationSettings _configSettings;
     private readonly ILogger<OpenAiSttProvider> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="OpenAiSttProvider"/> class.
     /// </summary>
     /// <param name="audioConfig">Audio configuration (for STT provider and API key).</param>
-    /// <param name="configSettings">User configuration settings (for STT model).</param>
     /// <param name="logger">Logger instance.</param>
     public OpenAiSttProvider(
         IOptions<AudioConfiguration> audioConfig,
-        IOptions<ConfigurationSettings> configSettings,
         ILogger<OpenAiSttProvider> logger)
     {
         _audioConfig = audioConfig?.Value ?? throw new ArgumentNullException(nameof(audioConfig));
-        _configSettings = configSettings?.Value ?? throw new ArgumentNullException(nameof(configSettings));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 

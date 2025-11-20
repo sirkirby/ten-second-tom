@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Features.Audio.Constants;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;

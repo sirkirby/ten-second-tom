@@ -1,11 +1,11 @@
 using System.IO.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using TenSecondTom.Features.Setup.Models;
-using static TenSecondTom.Features.Templates.InstallDefaultTemplates;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Options;
+using TenSecondTom.Shared.Abstractions.Templates;
 
 namespace TenSecondTom.Infrastructure.Configuration;
 
@@ -18,8 +18,8 @@ public sealed class ConfigurationChecker
     private readonly LlmOptions? _llmOptions;
     private readonly AuthOptions? _authOptions;
     private readonly StorageOptions? _storageOptions;
+    private readonly ITemplateInstaller _templateInstaller;
     private readonly ILogger<ConfigurationChecker> _logger;
-    private readonly EmbeddedPromptTemplateLoader _embeddedTemplateLoader;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ConfigurationChecker"/> class.
@@ -27,17 +27,17 @@ public sealed class ConfigurationChecker
     /// <param name="llmOptions">LLM configuration options.</param>
     /// <param name="authOptions">Authentication configuration options.</param>
     /// <param name="storageOptions">Storage configuration options.</param>
-    /// <param name="embeddedTemplateLoader">Embedded template loader for restoring templates.</param>
+    /// <param name="templateInstaller">Installer used to restore bundled templates.</param>
     /// <param name="logger">Logger for diagnostics.</param>
     public ConfigurationChecker(
         IOptions<LlmOptions>? llmOptions,
         IOptions<AuthOptions>? authOptions,
         IOptions<StorageOptions>? storageOptions,
-        EmbeddedPromptTemplateLoader embeddedTemplateLoader,
+        ITemplateInstaller templateInstaller,
         ILogger<ConfigurationChecker> logger)
     {
+        _templateInstaller = templateInstaller ?? throw new ArgumentNullException(nameof(templateInstaller));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _embeddedTemplateLoader = embeddedTemplateLoader ?? throw new ArgumentNullException(nameof(embeddedTemplateLoader));
 
         // Options may be null during initial setup, so we handle this gracefully
         try
@@ -133,6 +133,13 @@ public sealed class ConfigurationChecker
             return true;
         }
 
+        // Skip validation for LocalOpenAiCompatible - models are user-defined
+        if (provider.Value == LlmProvider.LocalOpenAiCompatible)
+        {
+            _logger.LogDebug("LocalOpenAiCompatible provider uses custom models, validation skipped");
+            return true;
+        }
+
         // Validate model against registry
         bool isValid = ModelRegistry.IsValid(model, provider.Value);
 
@@ -171,6 +178,12 @@ public sealed class ConfigurationChecker
         if (provider == null)
         {
             return null;
+        }
+
+        // Skip validation for LocalOpenAiCompatible - models are user-defined
+        if (provider.Value == LlmProvider.LocalOpenAiCompatible)
+        {
+            return null; // No validation error for custom models
         }
 
         // Validate model against registry
@@ -242,9 +255,7 @@ public sealed class ConfigurationChecker
                     _logger.LogWarning("Self-healing partial: Templates directory created but template restoration encountered issues");
                 }
             }
-#pragma warning disable CA1031 // Do not catch general exception types - self-healing should be resilient
             catch (Exception ex)
-#pragma warning restore CA1031
             {
                 _logger.LogError(ex, "Self-healing failed: Unable to recreate templates directory at {TemplatesDirectory}", templatesDirectory);
                 // Don't throw - allow app to continue with embedded templates as fallback
@@ -290,19 +301,11 @@ public sealed class ConfigurationChecker
     {
         try
         {
-            // Create a temporary logger for the handler that logs through the main logger
-            using var loggerFactory = LoggerFactory.Create(builder => { });
-            var handlerLogger = loggerFactory.CreateLogger<Handler>();
-
-            var handler = new Handler(fileSystem, _embeddedTemplateLoader, handlerLogger);
-
-            var command = new Command
-            {
-                TargetDirectory = templatesDirectory,
-                OverwriteExisting = false // Don't overwrite any existing customizations
-            };
-
-            var result = await handler.Handle(command, cancellationToken).ConfigureAwait(false);
+            // Use MediatR to delegate template installation to the Templates feature
+            var result = await _templateInstaller.InstallDefaultsAsync(
+                templatesDirectory,
+                overwriteExisting: false,
+                cancellationToken).ConfigureAwait(false);
 
             if (result.IsSuccess)
             {
@@ -318,9 +321,7 @@ public sealed class ConfigurationChecker
                 result.Error);
             return false;
         }
-#pragma warning disable CA1031 // Do not catch general exception types - self-healing should be resilient
         catch (Exception ex)
-#pragma warning restore CA1031
         {
             _logger.LogError(ex, "Exception during template restoration");
             return false;

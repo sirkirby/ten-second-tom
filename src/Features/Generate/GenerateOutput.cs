@@ -63,7 +63,7 @@ public static class GenerateOutput
         IPromptTemplateLoader templateLoader,
         ITranscriptProcessor transcriptProcessor,
         ILlmProviderFactory llmProviderFactory,
-        IOptions<LlmOptions> llmOptions,
+        IOptionsSnapshot<LlmOptions> llmOptions,
         IOutputStorageService outputStorageService,
         ILogger<Handler> logger)
         : IRequestHandler<Command, Result<GeneratedOutput>>

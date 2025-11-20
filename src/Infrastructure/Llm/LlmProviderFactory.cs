@@ -19,18 +19,19 @@ public interface ILlmProviderFactory
 
 /// <summary>
 /// Factory for creating appropriate ILlmProvider instances based on configuration.
+/// Uses IServiceScopeFactory to ensure scoped services (like IOptionsSnapshot) work correctly.
 /// </summary>
 public sealed class LlmProviderFactory : ILlmProviderFactory
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LlmProviderFactory"/> class.
     /// </summary>
-    /// <param name="serviceProvider">The service provider for dependency injection.</param>
-    public LlmProviderFactory(IServiceProvider serviceProvider)
+    /// <param name="scopeFactory">The service scope factory for creating scoped service providers.</param>
+    public LlmProviderFactory(IServiceScopeFactory scopeFactory)
     {
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
     }
 
     /// <summary>
@@ -50,7 +51,8 @@ public sealed class LlmProviderFactory : ILlmProviderFactory
         {
             "OPENAI" => GetProvider<OpenAILlmProvider>(),
             "ANTHROPIC" => GetProvider<AnthropicLlmProvider>(),
-            _ => throw new ArgumentException($"Unsupported LLM provider: {providerName}. Supported providers are: OpenAI, Anthropic", nameof(providerName))
+            "LOCALOPENAICOMPATIBLE" => GetProvider<LocalOpenAiCompatibleLlmProvider>(),
+            _ => throw new ArgumentException($"Unsupported LLM provider: {providerName}. Supported providers are: OpenAI, Anthropic, LocalOpenAiCompatible", nameof(providerName))
         };
     }
 
@@ -58,8 +60,11 @@ public sealed class LlmProviderFactory : ILlmProviderFactory
     {
         try
         {
-            T? provider = _serviceProvider.GetService<T>();
-            
+            // Create a scope to ensure IOptionsSnapshot gets fresh configuration
+            // This is critical for shell mode where configuration can change between commands
+            using var scope = _scopeFactory.CreateScope();
+            T? provider = scope.ServiceProvider.GetService<T>();
+
             if (provider == null)
             {
                 throw new InvalidOperationException($"{typeof(T).Name} is not registered in the service container");

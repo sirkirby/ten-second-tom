@@ -63,13 +63,15 @@ public static class CreateDailyEntry
         IMemoryStorageProvider storage,
         ILlmProviderFactory llmFactory,
         IPromptTemplateLoader promptLoader,
-        IOptions<LlmOptions> llmOptions,
+        IOptionsSnapshot<LlmOptions> llmOptions,
         IAuthenticationService authService,
         ILogger<Handler> logger,
         ITemplateProvider templateProvider,
         ITemplateSelectionUI templateSelectionUI) : IRequestHandler<Command, Result<DailyEntry>>
     {
-        private readonly LlmOptions _llmOptions = llmOptions.Value;
+        // Use IOptionsSnapshot to reload configuration per request (important for shell mode)
+        // Don't cache the value - access llmOptions.Value when needed to get fresh config
+        private readonly IOptionsSnapshot<LlmOptions> _llmOptions = llmOptions;
 
         /// <summary>
         /// Handles the CreateDailyEntryCommand to create a new daily entry.
@@ -202,7 +204,8 @@ public static class CreateDailyEntry
             else
             {
                 // Use strongly-typed configuration from LlmOptions
-                provider = _llmOptions.Provider.ToString();
+                // Access .Value to get fresh config (IOptionsSnapshot reloads per request)
+                provider = _llmOptions.Value.Provider.ToString();
                 logger.LogDebug("Using LLM provider from configuration: {Provider}", provider);
             }
 

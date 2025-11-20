@@ -100,13 +100,9 @@ public sealed class YamlFrontMatterParser(ILogger<YamlFrontMatterParser> logger)
                     var yamlData = deserializer.Deserialize<Dictionary<string, object>>(yamlContent);
                     metadata = MapToTemplateMetadata(yamlData);
                 }
-#pragma warning disable CA1031 // Do not catch general exception types - intentional graceful handling
                 catch (Exception ex)
-#pragma warning restore CA1031
                 {
-#pragma warning disable CA1848 // Use LoggerMessage delegates - low-frequency parsing operation
                     _logger.LogWarning(ex, "Failed to parse YAML front matter");
-#pragma warning restore CA1848
                     return Result<ParsedTemplate>.Failure($"Invalid YAML front matter: {ex.Message}");
                 }
             }
@@ -117,13 +113,9 @@ public sealed class YamlFrontMatterParser(ILogger<YamlFrontMatterParser> logger)
                 Content = templateContent
             });
         }
-#pragma warning disable CA1031 // Do not catch general exception types - intentional graceful handling
         catch (Exception ex)
-#pragma warning restore CA1031
         {
-#pragma warning disable CA1848 // Use LoggerMessage delegates - low-frequency parsing operation
             _logger.LogError(ex, "Unexpected error parsing template");
-#pragma warning restore CA1848
             return Result<ParsedTemplate>.Failure($"Failed to parse template: {ex.Message}");
         }
     }
@@ -149,9 +141,7 @@ public sealed class YamlFrontMatterParser(ILogger<YamlFrontMatterParser> logger)
         if (value == null)
             return TemplateType.Daily; // Default
 
-#pragma warning disable CA1308 // Normalize strings to uppercase - YAML keys are conventionally lowercase
         string? strValue = value.ToString()?.ToLowerInvariant();
-#pragma warning restore CA1308
         return strValue switch
         {
             "daily" => TemplateType.Daily,

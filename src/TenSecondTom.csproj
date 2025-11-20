@@ -17,6 +17,9 @@
     <NoWarn>$(NoWarn);IL2026;IL2067;IL2070;IL2075;IL2077;IL3050</NoWarn>
     <!-- Suppress code analysis warnings for reusable shared components -->
     <NoWarn>$(NoWarn);CA1515;CA1716</NoWarn>
+    <!-- Suppress obsolete warnings for backward compatibility deprecated items -->
+    <!-- These are separate from ConfigurationSettings which has been completely removed -->
+    <NoWarn>$(NoWarn);CS0618</NoWarn>
   </PropertyGroup>
 
   <!-- Preserve assemblies that are loaded via reflection (e.g., Serilog sinks, MediatR handlers) -->

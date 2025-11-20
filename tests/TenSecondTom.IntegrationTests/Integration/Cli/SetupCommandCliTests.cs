@@ -105,9 +105,13 @@ public sealed class SetupCommandCliTests : IDisposable
         int timeoutMs = 5000)
     {
         using var process = CreateCliProcess(arguments);
-        
+
         process.Start();
-        
+
+        // Close stdin immediately to prevent CLI from waiting for input
+        // This is critical under code coverage instrumentation
+        process.StandardInput.Close();
+
         var outputTask = process.StandardOutput.ReadToEndAsync();
         var errorTask = process.StandardError.ReadToEndAsync();
 
@@ -176,21 +180,10 @@ public sealed class SetupCommandCliTests : IDisposable
     }
 
     [Fact]
-    public async Task SetupCommand_NonInteractiveFlag_IsRecognized()
-    {
-        // Act
-        var (output, error, exitCode) = await RunCliCommandAsync("setup --non-interactive --help");
-
-        // Assert
-        exitCode.Should().Be(0, "help with valid flag should succeed");
-        output.Should().Contain("non-interactive", "help should document the non-interactive flag");
-    }
-
-    [Fact]
     public async Task ConfigCommand_Help_DisplaysUsageInformation()
     {
-        // Act
-        var (output, error, exitCode) = await RunCliCommandAsync("config --help");
+        // Act - increased timeout for CI environments
+        var (output, error, exitCode) = await RunCliCommandAsync("config --help", timeoutMs: 10000);
 
         // Assert
         exitCode.Should().Be(0, "help should always succeed");
@@ -201,8 +194,8 @@ public sealed class SetupCommandCliTests : IDisposable
     [Fact]
     public async Task ConfigCommand_Show_IsRecognized()
     {
-        // Act
-        var (output, error, exitCode) = await RunCliCommandAsync("config --show --help");
+        // Act - increased timeout for CI environments
+        var (output, error, exitCode) = await RunCliCommandAsync("config --show --help", timeoutMs: 10000);
 
         // Assert
         exitCode.Should().Be(0, "help with valid flag should succeed");

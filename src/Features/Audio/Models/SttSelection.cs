@@ -5,7 +5,7 @@ namespace TenSecondTom.Features.Audio.Models;
 /// <summary>
 /// Represents STT engine selection strategy for audio transcription.
 /// This enum provides the CLI interface for STT provider selection and maps to the underlying
-/// AudioConfiguration.SttProvider and AudioConfiguration.SttFallbackEnabled settings.
+/// AudioOptions.SttProvider and AudioOptions.SttFallbackEnabled settings.
 /// </summary>
 /// <remarks>
 /// Mapping to configuration:

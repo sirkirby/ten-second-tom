@@ -49,9 +49,7 @@ public static class AuthenticationHelper
 
             return Result<bool>.Success(true);
         }
-#pragma warning disable CA1031 // Do not catch general exception types - top-level handler for user-facing error display
         catch (Exception ex)
-#pragma warning restore CA1031
         {
             HandleAuthenticationError(ex.Message, commandName, jsonOutput);
             return Result<bool>.Failure($"Authentication error: {ex.Message}");

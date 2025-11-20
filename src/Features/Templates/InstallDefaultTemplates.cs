@@ -1,7 +1,7 @@
-using System.IO.Abstractions;
 using MediatR;
 using Microsoft.Extensions.Logging;
-using TenSecondTom.Infrastructure.Prompts;
+using TenSecondTom.Shared.Abstractions.Templates;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Templates;
@@ -24,7 +24,7 @@ public static class InstallDefaultTemplates
     /// This command is idempotent - can be run multiple times safely.
     /// Existing templates are NOT overwritten to preserve user customizations.
     /// </remarks>
-    public sealed record Command : IRequest<Result<CommandResult>>
+    public sealed record Command : IRequest<Result<TemplateInstallationResult>>
     {
         /// <summary>
         /// The directory where templates should be installed.
@@ -43,8 +43,10 @@ public static class InstallDefaultTemplates
     }
 
     /// <summary>
-    /// Result of installing default templates.
+    /// Deprecated: Use TemplateInstallationResult from TenSecondTom.Shared.Models instead.
+    /// This nested type is kept for backward compatibility only.
     /// </summary>
+    [Obsolete("Use TenSecondTom.Shared.Models.TemplateInstallationResult instead", false)]
     public sealed record CommandResult
     {
         /// <summary>
@@ -83,11 +85,13 @@ public static class InstallDefaultTemplates
     /// - Logs detailed information about the installation process
     /// </remarks>
     public sealed class Handler(
-        IFileSystem fileSystem,
-        EmbeddedPromptTemplateLoader embeddedTemplateLoader,
+        ITemplateInstaller templateInstaller,
         ILogger<Handler> logger)
-        : IRequestHandler<Command, Result<CommandResult>>
+        : IRequestHandler<Command, Result<TemplateInstallationResult>>
     {
+        private readonly ITemplateInstaller _templateInstaller = templateInstaller ?? throw new ArgumentNullException(nameof(templateInstaller));
+        private readonly ILogger<Handler> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
         /// <summary>
         /// Handles the installation of default templates to the filesystem.
         /// Creates the target directory if needed and copies embedded templates.
@@ -100,167 +104,43 @@ public static class InstallDefaultTemplates
         /// </returns>
         /// <exception cref="ArgumentNullException">Thrown when request is null.</exception>
         /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled.</exception>
-        public async Task<Result<CommandResult>> Handle(
+        public async Task<Result<TemplateInstallationResult>> Handle(
             Command request,
             CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(request);
 
-            // Validate input
             if (string.IsNullOrWhiteSpace(request.TargetDirectory))
             {
-                return Result<CommandResult>.Failure(
-                    "Target directory cannot be null or empty");
+                return Result<TemplateInstallationResult>.Failure("Target directory cannot be null or empty");
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
-
-#pragma warning disable CA1848 // Use LoggerMessage delegates for performance - startup/migration code, not hot path
-            logger.LogInformation(
+            _logger.LogInformation(
                 "Installing default templates to {TargetDirectory} (OverwriteExisting={OverwriteExisting})",
                 request.TargetDirectory,
                 request.OverwriteExisting);
-#pragma warning restore CA1848
 
-            // Create target directory if it doesn't exist
-            try
+            var result = await _templateInstaller.InstallDefaultsAsync(
+                request.TargetDirectory,
+                request.OverwriteExisting,
+                cancellationToken).ConfigureAwait(false);
+
+            if (!result.IsSuccess)
             {
-                if (!fileSystem.Directory.Exists(request.TargetDirectory))
-                {
-                    fileSystem.Directory.CreateDirectory(request.TargetDirectory);
-#pragma warning disable CA1848 // Use LoggerMessage delegates for performance
-                    logger.LogDebug("Created templates directory: {Directory}", request.TargetDirectory);
-#pragma warning restore CA1848
-                }
-            }
-#pragma warning disable CA1031 // Do not catch general exception types - need to handle all exceptions during migration
-            catch (Exception ex)
-#pragma warning restore CA1031
-            {
-#pragma warning disable CA1848 // Use LoggerMessage delegates for performance
-                logger.LogError(ex, "Failed to create templates directory: {Directory}", request.TargetDirectory);
-#pragma warning restore CA1848
-                return Result<CommandResult>.Failure(
-                    $"Failed to create templates directory: {ex.Message}");
+                _logger.LogWarning(
+                    "Template installation failed for {Directory}: {Error}",
+                    request.TargetDirectory,
+                    result.Error);
+                return result;
             }
 
-            // Discover all embedded templates using the template loader
-            // This ensures we use the same discovery mechanism as runtime template loading
-            var allTemplatesResult = await embeddedTemplateLoader.LoadAllTemplatesAsync(cancellationToken);
-
-            if (!allTemplatesResult.IsSuccess)
-            {
-#pragma warning disable CA1848 // Use LoggerMessage delegates for performance
-                logger.LogWarning("Failed to discover embedded templates: {Error}", allTemplatesResult.Error);
-#pragma warning restore CA1848
-                return Result<CommandResult>.Failure(
-                    $"Failed to discover embedded templates: {allTemplatesResult.Error}");
-            }
-
-            var templates = allTemplatesResult.Value;
-
-            if (templates.Count == 0)
-            {
-#pragma warning disable CA1848 // Use LoggerMessage delegates for performance
-                logger.LogWarning("No embedded templates found to install");
-#pragma warning restore CA1848
-                return Result<CommandResult>.Success(new CommandResult
-                {
-                    TemplatesInstalled = 0,
-                    TemplatesSkipped = 0,
-                    TemplatesFailed = 0,
-                    InstalledTemplateIds = Array.Empty<string>()
-                });
-            }
-
-            // Install each template
-            int installed = 0;
-            int skipped = 0;
-            int failed = 0;
-            var installedIds = new List<string>();
-
-            foreach (var template in templates)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                string templateId = template.TemplateId;
-                string fileName = $"{templateId}.md";
-                string filePath = fileSystem.Path.Combine(request.TargetDirectory, fileName);
-
-                try
-                {
-                    // Check if file already exists
-                    bool fileExists = fileSystem.File.Exists(filePath);
-
-                    if (fileExists && !request.OverwriteExisting)
-                    {
-#pragma warning disable CA1848 // Use LoggerMessage delegates for performance
-                        logger.LogDebug("Skipping existing template: {TemplateId}", templateId);
-#pragma warning restore CA1848
-                        skipped++;
-                        continue;
-                    }
-
-                    // Load raw content using the template loader (with YAML front matter intact)
-                    var rawContentResult = await embeddedTemplateLoader.LoadRawTemplateContentAsync(
-                        templateId,
-                        cancellationToken);
-
-                    if (!rawContentResult.IsSuccess)
-                    {
-#pragma warning disable CA1848 // Use LoggerMessage delegates for performance
-                        logger.LogWarning(
-                            "Failed to load raw content for template {TemplateId}: {Error}",
-                            templateId,
-                            rawContentResult.Error);
-#pragma warning restore CA1848
-                        failed++;
-                        continue;
-                    }
-
-                    string rawContent = rawContentResult.Value;
-
-                    // Write raw template content to file (includes YAML front matter)
-                    await fileSystem.File.WriteAllTextAsync(filePath, rawContent, cancellationToken)
-                        .ConfigureAwait(false);
-
-#pragma warning disable CA1848 // Use LoggerMessage delegates for performance
-                    logger.LogDebug(
-                        "Installed template: {TemplateId} to {FilePath} (Overwritten={Overwritten})",
-                        templateId,
-                        filePath,
-                        fileExists);
-#pragma warning restore CA1848
-
-                    installed++;
-                    installedIds.Add(templateId);
-                }
-#pragma warning disable CA1031 // Do not catch general exception types - need to handle all file system errors
-                catch (Exception ex)
-#pragma warning restore CA1031
-                {
-#pragma warning disable CA1848 // Use LoggerMessage delegates for performance
-                    logger.LogError(ex, "Failed to install template: {TemplateId}", templateId);
-#pragma warning restore CA1848
-                    failed++;
-                }
-            }
-
-#pragma warning disable CA1848 // Use LoggerMessage delegates for performance
-            logger.LogInformation(
+            _logger.LogInformation(
                 "Template installation complete: {Installed} installed, {Skipped} skipped, {Failed} failed",
-                installed,
-                skipped,
-                failed);
-#pragma warning restore CA1848
+                result.Value.TemplatesInstalled,
+                result.Value.TemplatesSkipped,
+                result.Value.TemplatesFailed);
 
-            return Result<CommandResult>.Success(new CommandResult
-            {
-                TemplatesInstalled = installed,
-                TemplatesSkipped = skipped,
-                TemplatesFailed = failed,
-                InstalledTemplateIds = installedIds.AsReadOnly()
-            });
+            return result;
         }
     }
 }

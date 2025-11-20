@@ -365,8 +365,8 @@ title: Another Template
 
         // Mock configuration
         var mockConfiguration = new Mock<IConfiguration>();
-        mockConfiguration.Setup(c => c[ConfigurationKeys.LlmProviderKey]).Returns("OpenAI");
-        mockConfiguration.Setup(c => c["Llm:Model"]).Returns("gpt-4o");
+        mockConfiguration.Setup(c => c["TenSecondTom:Llm:Provider"]).Returns("OpenAI");
+        mockConfiguration.Setup(c => c["TenSecondTom:Llm:Model"]).Returns("gpt-4o");
         services.AddSingleton(mockConfiguration.Object);
 
         // Mock storage

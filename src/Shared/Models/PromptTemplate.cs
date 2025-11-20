@@ -136,9 +136,7 @@ public sealed class TemplateMetadata
     /// <summary>
     /// Gets or sets optional tags for categorizing templates.
     /// </summary>
-#pragma warning disable CA1819 // Properties should not return arrays - part of public contract
-    public string[]? Tags { get; init; }
-#pragma warning restore CA1819
+    public IReadOnlyList<string>? Tags { get; init; }
 
     /// <summary>
     /// Validates the metadata structure and returns validation errors.
@@ -166,7 +164,7 @@ public sealed class TemplateMetadata
         if (Author?.Length > TemplateConstants.MaxAuthorLength)
             errors.Add($"Author must be {TemplateConstants.MaxAuthorLength} characters or less");
 
-        if (Tags?.Length > TemplateConstants.MaxTagsCount)
+        if (Tags is { Count: > TemplateConstants.MaxTagsCount })
             errors.Add($"Maximum {TemplateConstants.MaxTagsCount} tags allowed");
 
         if (Tags?.Any(tag => tag.Length > TemplateConstants.MaxTagLength) == true)

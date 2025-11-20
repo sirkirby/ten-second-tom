@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Features.Audio.Services;
 using TenSecondTom.Infrastructure.Configuration;
@@ -8,7 +9,6 @@ using MediatR;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Extensions;
 using TenSecondTom.Shared.Models;
-using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Audio;
@@ -56,11 +56,11 @@ public static class Record
         TranscribeAudio.Handler transcribeHandler,
         IAudioPreprocessor audioPreprocessor,
         IOptions<StorageOptions> storageOptions,
-        IOptions<AudioConfiguration> audioOptions,
+        IOptionsMonitor<AudioOptions> audioOptions,
         ILogger<Handler> logger) : IRequestHandler<Command, Result<StoredRecording>>
     {
         private readonly StorageOptions _storageOptions = storageOptions.Value;
-        private readonly AudioConfiguration _audioOptions = audioOptions.Value;
+        private readonly IOptionsMonitor<AudioOptions> _audioOptionsMonitor = audioOptions;
 
         /// <inheritdoc/>
         public async Task<Result<StoredRecording>> Handle(Command request, CancellationToken cancellationToken)
@@ -94,7 +94,8 @@ public static class Record
             }
 
             // Determine timeout: use command-specific value or fall back to config default
-            int? maxDurationSeconds = request.MaxDurationSeconds ?? _audioOptions.Timeouts.RecordSeconds;
+            var currentAudioOptions = _audioOptionsMonitor.CurrentValue;
+            int? maxDurationSeconds = request.MaxDurationSeconds ?? currentAudioOptions.Timeouts.RecordSeconds;
 
             logger.LogInformation("Starting record command with STT provider: {Provider}, Target directory: {RecordingDir}, Max duration: {MaxDuration}s",
                 request.AudioConfig.SttProvider, recordingDir, maxDurationSeconds);

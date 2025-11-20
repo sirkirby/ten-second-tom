@@ -77,7 +77,7 @@ public sealed partial class RecordingService : IRecordingService
                 var filename = fileInfo.Name;
                 var baseName = Path.GetFileNameWithoutExtension(filename);
 
-                // Parse timestamp from filename
+                // Parse timestamp from filename to validate format
                 var timestampResult = ParseRecordingTimestamp(filename);
                 if (!timestampResult.IsSuccess)
                 {
@@ -111,8 +111,9 @@ public sealed partial class RecordingService : IRecordingService
 
                 var wordCount = CountWords(content);
 
-                // Create recording list item
-                var recordedAt = timestampResult.Value;
+                // Use file's LastWriteTime for the actual recording timestamp
+                // (filename only contains date, not time)
+                var recordedAt = new DateTimeOffset(fileInfo.LastWriteTime);
                 recordings.Add(new RecordingListItem
                 {
                     RecordingBaseName = baseName,

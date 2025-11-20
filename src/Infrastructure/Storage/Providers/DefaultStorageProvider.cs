@@ -169,12 +169,10 @@ public sealed class DefaultStorageProvider : IStorageProvider
             baseDirectory = options.RootDirectory;
         }
 
-#pragma warning disable CS0618 // Type or member is obsolete
         if (string.IsNullOrWhiteSpace(baseDirectory))
         {
             baseDirectory = options.MemoryDirectory;
         }
-#pragma warning restore CS0618
 
         if (string.IsNullOrWhiteSpace(baseDirectory))
         {

@@ -25,9 +25,7 @@ public sealed class MockAuthenticationService : IAuthenticationService
     /// <inheritdoc/>
     public Task<Result<UserSession>> AuthenticateAsync(CancellationToken cancellationToken = default)
     {
-#pragma warning disable CA1848 // Use the LoggerMessage delegates - Simple warning message for development mode
         _logger.LogWarning("Using MockAuthenticationService - authentication bypassed for development");
-#pragma warning restore CA1848
         
         _session = new UserSession
         {
@@ -57,9 +55,7 @@ public sealed class MockAuthenticationService : IAuthenticationService
         }
 
         _session = null;
-#pragma warning disable CA1848 // Use the LoggerMessage delegates - Simple log message for development mode
         _logger.LogInformation("Mock session logged out");
-#pragma warning restore CA1848
         return Task.FromResult(Result<bool>.Success(true));
     }
 }

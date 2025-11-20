@@ -1,9 +1,10 @@
 using TenSecondTom.Features.Audio.Constants;
-using System.CommandLine;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Spectre.Console;
 using TenSecondTom.Features.Audio.Models;
+using System.CommandLine;
+using MediatR;
+using Microsoft.Extensions.DependencyInjection;
+using Spectre.Console;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Configuration;
@@ -13,9 +14,9 @@ namespace TenSecondTom.Features.Audio;
 
 /// <summary>
 /// Builds the record command for audio recording with transcription.
-/// Separated from CommandRegistry to improve maintainability.
+/// Implements ICommandBuilder for automatic discovery via assembly scanning.
 /// </summary>
-internal static class RecordCommandBuilder
+public sealed class RecordCommandBuilder : ICommandBuilder
 {
     private static readonly System.Text.Json.JsonSerializerOptions SnakeCaseJsonOptions = new()
     {
@@ -23,7 +24,15 @@ internal static class RecordCommandBuilder
         WriteIndented = true
     };
 
-    public static Command BuildRecordCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
+    /// <summary>
+    /// Priority for command ordering. Primary command (record audio).
+    /// </summary>
+    public int Priority => 20;
+
+    /// <summary>
+    /// Builds the record command for automatic discovery.
+    /// </summary>
+    public Command? BuildCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
     {
         var recordCommand = new Command("record", "Record audio with transcription and save to recording/ directory");
 
@@ -42,9 +51,22 @@ internal static class RecordCommandBuilder
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
             string? stt = parseResult.GetValue(sttOption);
 
-            // Get AudioConfiguration to read default SttProvider and timeout
-            var audioConfig = serviceProvider.GetService<IOptions<AudioConfiguration>>()?.Value
-                ?? new AudioConfiguration();
+            var mediator = serviceProvider.GetRequiredService<IMediator>();
+            var audioOptionsResult = await mediator.Send(new GetAudioConfiguration.Query(), CancellationToken.None)
+                .ConfigureAwait(false);
+
+            if (!audioOptionsResult.IsSuccess || audioOptionsResult.Value is null)
+            {
+                CommandOutputFormatter.WriteError(
+                    audioOptionsResult.Error ?? "Audio configuration is unavailable.",
+                    jsonOutput);
+                return 1;
+            }
+
+            var audioOptions = audioOptionsResult.Value;
+
+            // Convert to AudioConfiguration for backward compatibility (temporary during migration)
+            var audioConfig = ConvertToAudioConfiguration(audioOptions);
 
             // Parse STT selection - use configured default or fall back to Auto
             var sttSelection = SttSelection.Auto;
@@ -265,6 +287,45 @@ internal static class RecordCommandBuilder
 
             _ => throw new ArgumentOutOfRangeException(nameof(selection), selection,
                 $"Unsupported STT selection: {selection}")
+        };
+    }
+
+    /// <summary>
+    /// Converts AudioOptions to AudioConfiguration.
+    /// Temporary helper during migration period.
+    /// </summary>
+    private static AudioConfiguration ConvertToAudioConfiguration(AudioOptions options)
+    {
+        return new AudioConfiguration
+        {
+            SttProvider = options.SttProvider,
+            SttApiKey = options.SttApiKey,
+            SttFallbackEnabled = options.SttFallbackEnabled,
+            SttFallbackProvider = options.SttFallbackProvider,
+            SttFallbackApiKey = options.SttFallbackApiKey,
+            SttBinaryPath = options.SttBinaryPath,
+            SttModel = options.SttModel,
+            SttFallbackBinaryPath = options.SttFallbackBinaryPath,
+            SttFallbackModel = options.SttFallbackModel,
+            KeepFiles = options.KeepFiles,
+            Recorder = new RecorderConfiguration
+            {
+                FfmpegPath = options.Recorder.FfmpegPath,
+                InputVolume = options.Recorder.InputVolume,
+                EnableNoiseReduction = options.Recorder.EnableNoiseReduction,
+                EnableFrequencyFilters = options.Recorder.EnableFrequencyFilters
+            },
+            Preprocessing = new PreprocessingConfiguration
+            {
+                RemoveSilence = options.Preprocessing.RemoveSilence,
+                SilenceThresholdDb = options.Preprocessing.SilenceThresholdDb,
+                MinimumSilenceDurationMs = options.Preprocessing.MinimumSilenceDurationMs
+            },
+            Timeouts = new RecordingTimeoutsConfiguration
+            {
+                TodaySeconds = options.Timeouts.TodaySeconds,
+                RecordSeconds = options.Timeouts.RecordSeconds
+            }
         };
     }
 }
