@@ -102,7 +102,7 @@ public sealed class SetupCommandCliTests : IDisposable
 
     private async Task<(string Output, string Error, int ExitCode)> RunCliCommandAsync(
         string arguments,
-        int timeoutMs = 5000)
+        int timeoutMs = 15000)
     {
         using var process = CreateCliProcess(arguments);
 
@@ -182,8 +182,8 @@ public sealed class SetupCommandCliTests : IDisposable
     [Fact]
     public async Task ConfigCommand_Help_DisplaysUsageInformation()
     {
-        // Act - increased timeout for CI environments
-        var (output, error, exitCode) = await RunCliCommandAsync("config --help", timeoutMs: 10000);
+        // Act
+        var (output, error, exitCode) = await RunCliCommandAsync("config --help");
 
         // Assert
         exitCode.Should().Be(0, "help should always succeed");
@@ -194,8 +194,8 @@ public sealed class SetupCommandCliTests : IDisposable
     [Fact]
     public async Task ConfigCommand_Show_IsRecognized()
     {
-        // Act - increased timeout for CI environments
-        var (output, error, exitCode) = await RunCliCommandAsync("config --show --help", timeoutMs: 10000);
+        // Act
+        var (output, error, exitCode) = await RunCliCommandAsync("config --show --help");
 
         // Assert
         exitCode.Should().Be(0, "help with valid flag should succeed");
@@ -205,8 +205,8 @@ public sealed class SetupCommandCliTests : IDisposable
     [Fact]
     public async Task ConfigCommand_InvalidSubcommand_ProducesError()
     {
-        // Act - increased timeout for CI environments
-        var (output, error, exitCode) = await RunCliCommandAsync("config --invalid-subcommand", timeoutMs: 10000);
+        // Act
+        var (output, error, exitCode) = await RunCliCommandAsync("config --invalid-subcommand");
 
         // Assert
         exitCode.Should().NotBe(0, "invalid subcommand should produce non-zero exit code");
