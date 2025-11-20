@@ -46,7 +46,7 @@ public static class CreateWeeklyReview
         ILlmProviderFactory llmFactory,
         IPromptTemplateLoader promptLoader,
         IAuthenticationService authService,
-        IOptions<LlmOptions> llmOptions,
+        IOptionsSnapshot<LlmOptions> llmOptions,
         ILogger<Handler> logger,
         ITemplateProvider templateProvider,
         ITemplateSelectionUI templateSelectionUI) : IRequestHandler<Command, Result<WeeklyEntry>>
@@ -55,7 +55,9 @@ public static class CreateWeeklyReview
         private readonly ILlmProviderFactory _llmFactory = llmFactory;
         private readonly IPromptTemplateLoader _promptLoader = promptLoader;
         private readonly IAuthenticationService _authService = authService;
-        private readonly LlmOptions _llmOptions = llmOptions.Value;
+        // Use IOptionsSnapshot to reload configuration per request (important for shell mode)
+        // Don't cache the value - access llmOptions.Value when needed to get fresh config
+        private readonly IOptionsSnapshot<LlmOptions> _llmOptions = llmOptions;
         private readonly ILogger<Handler> _logger = logger;
         private readonly ITemplateProvider _templateProvider = templateProvider;
         private readonly ITemplateSelectionUI _templateSelectionUI = templateSelectionUI;
@@ -177,7 +179,8 @@ public static class CreateWeeklyReview
             else
             {
                 // Use strongly-typed LlmOptions from configuration
-                provider = _llmOptions.Provider.ToString();
+                // Access .Value to get fresh config (IOptionsSnapshot reloads per request)
+                provider = _llmOptions.Value.Provider.ToString();
                 _logger.LogDebug("Using LLM provider from configuration: {Provider}", provider);
             }
 

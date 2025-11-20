@@ -189,7 +189,8 @@ public static class GenerateCommand
             }
 
             // Step 5: Get max input tokens from configuration
-            var llmOptions = serviceProvider.GetRequiredService<IOptions<LlmOptions>>().Value;
+            // Uses IOptionsSnapshot to reload configuration per command execution (important for shell mode)
+            var llmOptions = serviceProvider.GetRequiredService<IOptionsSnapshot<LlmOptions>>().Value;
             int maxInputTokens = llmOptions.MaxInputTokens
                 ?? (llmOptions.Provider == LlmProvider.Anthropic
                     ? LlmConstants.DefaultMaxInputTokensAnthropic

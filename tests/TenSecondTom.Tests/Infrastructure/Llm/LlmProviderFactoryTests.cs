@@ -20,26 +20,27 @@ public sealed class LlmProviderFactoryTests : IDisposable
     public LlmProviderFactoryTests()
     {
         var services = new ServiceCollection();
-        
+
         // Register mock OpenAI provider
         var mockOpenAILogger = new Mock<ILogger<OpenAILlmProvider>>();
         var mockChatClient = new Mock<OpenAI.Chat.ChatClient>();
-        services.AddTransient<OpenAILlmProvider>(_ => 
+        services.AddTransient<OpenAILlmProvider>(_ =>
             new OpenAILlmProvider(
                 mockChatClient.Object,
                 mockOpenAILogger.Object,
                 "gpt-4"));
-        
+
         // Register mock Anthropic provider
         // Note: AnthropicClient is sealed, so we create a real instance with a dummy API key for testing
         var mockAnthropicLogger = new Mock<ILogger<AnthropicLlmProvider>>();
         _anthropicClient = new AnthropicClient("test-api-key-for-factory-tests");
-        services.AddTransient<AnthropicLlmProvider>(_ => 
+        services.AddTransient<AnthropicLlmProvider>(_ =>
             new AnthropicLlmProvider(
                 _anthropicClient,
                 mockAnthropicLogger.Object,
                 "claude-3-sonnet-20240229"));
-        
+
+        // Register IServiceScopeFactory (required by LlmProviderFactory)
         _serviceProvider = services.BuildServiceProvider();
     }
 
@@ -53,7 +54,8 @@ public sealed class LlmProviderFactoryTests : IDisposable
     public void CreateProvider_WithOpenAI_ReturnsOpenAIProvider()
     {
         // Arrange
-        var factory = new LlmProviderFactory(_serviceProvider);
+        var scopeFactory = _serviceProvider.GetRequiredService<IServiceScopeFactory>();
+        var factory = new LlmProviderFactory(scopeFactory);
 
         // Act
         ILlmProvider provider = factory.CreateProvider("OpenAI");
@@ -67,7 +69,8 @@ public sealed class LlmProviderFactoryTests : IDisposable
     public void CreateProvider_WithAnthropic_ReturnsAnthropicProvider()
     {
         // Arrange
-        var factory = new LlmProviderFactory(_serviceProvider);
+        var scopeFactory = _serviceProvider.GetRequiredService<IServiceScopeFactory>();
+        var factory = new LlmProviderFactory(scopeFactory);
 
         // Act
         ILlmProvider provider = factory.CreateProvider("Anthropic");
@@ -81,7 +84,8 @@ public sealed class LlmProviderFactoryTests : IDisposable
     public void CreateProvider_WithInvalidProvider_ThrowsArgumentException()
     {
         // Arrange
-        var factory = new LlmProviderFactory(_serviceProvider);
+        var scopeFactory = _serviceProvider.GetRequiredService<IServiceScopeFactory>();
+        var factory = new LlmProviderFactory(scopeFactory);
 
         // Act
         Action act = () => factory.CreateProvider("InvalidProvider");
@@ -98,7 +102,8 @@ public sealed class LlmProviderFactoryTests : IDisposable
     public void CreateProvider_WithCaseInsensitiveOpenAI_ReturnsOpenAIProvider(string providerName)
     {
         // Arrange
-        var factory = new LlmProviderFactory(_serviceProvider);
+        var scopeFactory = _serviceProvider.GetRequiredService<IServiceScopeFactory>();
+        var factory = new LlmProviderFactory(scopeFactory);
 
         // Act
         ILlmProvider provider = factory.CreateProvider(providerName);
@@ -114,7 +119,8 @@ public sealed class LlmProviderFactoryTests : IDisposable
     public void CreateProvider_WithCaseInsensitiveAnthropic_ReturnsAnthropicProvider(string providerName)
     {
         // Arrange
-        var factory = new LlmProviderFactory(_serviceProvider);
+        var scopeFactory = _serviceProvider.GetRequiredService<IServiceScopeFactory>();
+        var factory = new LlmProviderFactory(scopeFactory);
 
         // Act
         ILlmProvider provider = factory.CreateProvider(providerName);
@@ -127,7 +133,8 @@ public sealed class LlmProviderFactoryTests : IDisposable
     public void CreateProvider_WithNullProvider_ThrowsArgumentException()
     {
         // Arrange
-        var factory = new LlmProviderFactory(_serviceProvider);
+        var scopeFactory = _serviceProvider.GetRequiredService<IServiceScopeFactory>();
+        var factory = new LlmProviderFactory(scopeFactory);
 
         // Act
         Action act = () => factory.CreateProvider(null!);
@@ -141,7 +148,8 @@ public sealed class LlmProviderFactoryTests : IDisposable
     public void CreateProvider_WithEmptyProvider_ThrowsArgumentException()
     {
         // Arrange
-        var factory = new LlmProviderFactory(_serviceProvider);
+        var scopeFactory = _serviceProvider.GetRequiredService<IServiceScopeFactory>();
+        var factory = new LlmProviderFactory(scopeFactory);
 
         // Act
         Action act = () => factory.CreateProvider(string.Empty);
@@ -167,7 +175,8 @@ public sealed class LlmProviderFactoryTests : IDisposable
                 "gpt-3.5-turbo-0301")); // Old deprecated model
         
         var serviceProvider = services.BuildServiceProvider();
-        var factory = new LlmProviderFactory(serviceProvider);
+        var scopeFactory = serviceProvider.GetRequiredService<IServiceScopeFactory>();
+        var factory = new LlmProviderFactory(scopeFactory);
 
         // Act
         Action act = () => factory.CreateProvider("OpenAI");
@@ -193,7 +202,8 @@ public sealed class LlmProviderFactoryTests : IDisposable
                 "gpt-4o-mini")); // Use default model
         
         var serviceProvider = services.BuildServiceProvider();
-        var factory = new LlmProviderFactory(serviceProvider);
+        var scopeFactory = serviceProvider.GetRequiredService<IServiceScopeFactory>();
+        var factory = new LlmProviderFactory(scopeFactory);
 
         // Act
         ILlmProvider provider = factory.CreateProvider("OpenAI");

@@ -27,7 +27,7 @@ public sealed class CreateDailyEntryHandlerTests
     private readonly Mock<ILlmProvider> _mockLlmProvider;
     private readonly Mock<IPromptTemplateLoader> _mockPromptLoader;
     private readonly Mock<IAuthenticationService> _mockAuthService;
-    private readonly Mock<IOptions<LlmOptions>> _mockLlmOptions;
+    private readonly Mock<IOptionsSnapshot<LlmOptions>> _mockLlmOptions;
     private readonly Mock<ILogger<CreateDailyEntry.Handler>> _mockLogger;
     private readonly Mock<ITemplateProvider> _mockTemplateProvider;
     private readonly Mock<ITemplateSelectionUI> _mockTemplateSelectionUI;
@@ -40,7 +40,7 @@ public sealed class CreateDailyEntryHandlerTests
         _mockLlmProvider = new Mock<ILlmProvider>();
         _mockPromptLoader = new Mock<IPromptTemplateLoader>();
         _mockAuthService = new Mock<IAuthenticationService>();
-        _mockLlmOptions = new Mock<IOptions<LlmOptions>>();
+        _mockLlmOptions = new Mock<IOptionsSnapshot<LlmOptions>>();
         _mockLogger = new Mock<ILogger<CreateDailyEntry.Handler>>();
         _mockTemplateProvider = new Mock<ITemplateProvider>();
         _mockTemplateSelectionUI = new Mock<ITemplateSelectionUI>();

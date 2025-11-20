@@ -74,12 +74,14 @@ public static class CreateVoiceNoteEntry
         ILlmProviderFactory llmFactory,
         IPromptTemplateLoader promptLoader,
         IAuthenticationService authService,
-        IOptions<LlmOptions> llmOptions,
+        IOptionsSnapshot<LlmOptions> llmOptions,
         ILogger<Handler> logger,
         ITemplateProvider templateProvider,
         ITemplateSelectionUI templateSelectionUI) : IRequestHandler<Command, Result<VoiceNoteEntry>>
     {
-        private readonly LlmOptions _llmOptions = llmOptions.Value;
+        // Use IOptionsSnapshot to reload configuration per request (important for shell mode)
+        // Don't cache the value - access llmOptions.Value when needed to get fresh config
+        private readonly IOptionsSnapshot<LlmOptions> _llmOptions = llmOptions;
 
         /// <summary>
         /// Handles the CreateVoiceNoteEntryCommand to create a voice note entry with AI summary.
@@ -217,7 +219,8 @@ public static class CreateVoiceNoteEntry
             else
             {
                 // Use strongly-typed configuration from LlmOptions
-                provider = _llmOptions.Provider.ToString();
+                // Access .Value to get fresh config (IOptionsSnapshot reloads per request)
+                provider = _llmOptions.Value.Provider.ToString();
                 logger.LogDebug("Using LLM provider from configuration: {Provider}", provider);
             }
 

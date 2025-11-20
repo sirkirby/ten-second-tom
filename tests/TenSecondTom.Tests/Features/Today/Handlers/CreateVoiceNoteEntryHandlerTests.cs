@@ -27,7 +27,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
     private readonly Mock<ILlmProviderFactory> _mockLlmFactory;
     private readonly Mock<IPromptTemplateLoader> _mockPromptLoader;
     private readonly Mock<IAuthenticationService> _mockAuthService;
-    private readonly Mock<IOptions<LlmOptions>> _mockLlmOptions;
+    private readonly Mock<IOptionsSnapshot<LlmOptions>> _mockLlmOptions;
     private readonly Mock<ILogger<CreateVoiceNoteEntry.Handler>> _mockLogger;
     private readonly Mock<ITemplateSelectionUI> _mockTemplateSelectionUI;
     private readonly Mock<ILlmProvider> _mockLlmProvider;
@@ -38,7 +38,7 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         _mockLlmFactory = new Mock<ILlmProviderFactory>();
         _mockPromptLoader = new Mock<IPromptTemplateLoader>();
         _mockAuthService = new Mock<IAuthenticationService>();
-        _mockLlmOptions = new Mock<IOptions<LlmOptions>>();
+        _mockLlmOptions = new Mock<IOptionsSnapshot<LlmOptions>>();
         _mockLogger = new Mock<ILogger<CreateVoiceNoteEntry.Handler>>();
         _mockTemplateSelectionUI = new Mock<ITemplateSelectionUI>();
         _mockLlmProvider = new Mock<ILlmProvider>();

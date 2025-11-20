@@ -247,12 +247,25 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
         services.AddLogging();
         AddAllServices(services, minimalConfiguration);
 
-        // Act
+        // Act & Assert
+        // IOptionsSnapshot validation happens lazily when .Value is accessed during Handle()
+        // We need to create a scope, resolve the handler, and call Handle() to trigger validation
         using var serviceProvider = services.BuildServiceProvider();
-        var resolveHandler = () => serviceProvider.GetRequiredService<CreateDailyEntry.Handler>();
 
-        // Assert - Should throw because required LlmOptions configuration is missing
-        resolveHandler.Should().Throw<OptionsValidationException>()
+        // Create a scope (IOptionsSnapshot is scoped)
+        using var scope = serviceProvider.CreateScope();
+        var handler = scope.ServiceProvider.GetRequiredService<CreateDailyEntry.Handler>();
+
+        // Call Handle() to trigger validation when _llmOptions.Value is accessed
+        var handleMethod = async () => await handler.Handle(
+            new CreateDailyEntry.Command
+            {
+                Content = "Test daily reflection"
+            },
+            CancellationToken.None);
+
+        // Should throw OptionsValidationException because required LlmOptions configuration is missing
+        handleMethod.Should().ThrowAsync<OptionsValidationException>()
             .WithMessage("*API key*");
     }
 

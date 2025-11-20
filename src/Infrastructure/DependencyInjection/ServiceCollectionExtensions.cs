@@ -274,9 +274,10 @@ public static class ServiceCollectionExtensions
         });
 
         // Register OpenAI ChatClient (lazy - only instantiated when OpenAI provider is actually used)
+        // Uses IOptionsSnapshot to reload configuration per command execution (important for shell mode)
         services.AddTransient<ChatClient>(serviceProvider =>
         {
-            var llmOptions = serviceProvider.GetRequiredService<IOptions<LlmOptions>>();
+            var llmOptions = serviceProvider.GetRequiredService<IOptionsSnapshot<LlmOptions>>();
 
             string? apiKey = llmOptions.Value.ApiKey;
 
@@ -293,9 +294,10 @@ public static class ServiceCollectionExtensions
         });
 
         // Register Anthropic AnthropicClient (lazy - only instantiated when Anthropic provider is actually used)
+        // Uses IOptionsSnapshot to reload configuration per command execution (important for shell mode)
         services.AddTransient<AnthropicClient>(serviceProvider =>
         {
-            var llmOptions = serviceProvider.GetRequiredService<IOptions<LlmOptions>>();
+            var llmOptions = serviceProvider.GetRequiredService<IOptionsSnapshot<LlmOptions>>();
 
             string? apiKey = llmOptions.Value.ApiKey;
 
@@ -310,9 +312,10 @@ public static class ServiceCollectionExtensions
         });
 
         // LLM providers (now with dependencies)
+        // Uses IOptionsSnapshot to reload configuration per command execution (important for shell mode)
         services.AddTransient<OpenAILlmProvider>(serviceProvider =>
         {
-            var llmOptions = serviceProvider.GetRequiredService<IOptions<LlmOptions>>();
+            var llmOptions = serviceProvider.GetRequiredService<IOptionsSnapshot<LlmOptions>>();
             var chatClient = serviceProvider.GetRequiredService<ChatClient>();
             var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger<OpenAILlmProvider>();
@@ -328,7 +331,7 @@ public static class ServiceCollectionExtensions
 
         services.AddTransient<AnthropicLlmProvider>(serviceProvider =>
         {
-            var llmOptions = serviceProvider.GetRequiredService<IOptions<LlmOptions>>();
+            var llmOptions = serviceProvider.GetRequiredService<IOptionsSnapshot<LlmOptions>>();
             var client = serviceProvider.GetRequiredService<AnthropicClient>();
             var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger<AnthropicLlmProvider>();
@@ -344,7 +347,7 @@ public static class ServiceCollectionExtensions
 
         services.AddTransient<LocalOpenAiCompatibleLlmProvider>(serviceProvider =>
         {
-            var llmOptions = serviceProvider.GetRequiredService<IOptions<LlmOptions>>();
+            var llmOptions = serviceProvider.GetRequiredService<IOptionsSnapshot<LlmOptions>>();
             var httpClient = serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient();
             var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger<LocalOpenAiCompatibleLlmProvider>();

@@ -389,7 +389,8 @@ public static class ConfigureLlm
                 Provider = provider,
                 Model = model,
                 ApiKey = apiKey,
-                MaxInputTokens = maxTokens
+                MaxInputTokens = maxTokens,
+                Providers = currentConfig.Providers ?? new Dictionary<string, Dictionary<string, string>>()
             };
 
             var saveResult = await sectionStore.WriteSectionAsync(
