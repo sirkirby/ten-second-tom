@@ -30,7 +30,7 @@ public sealed class ModelSelectionFlowTests : UserSecretsTestFixture
         Logger = loggerFactory.CreateLogger<UserSecretsTestFixture>();
     }
     [Fact]
-    public async Task Setup_WithModelSelection_ShouldValidateModelIsSupported()
+    public void Setup_WithModelSelection_ShouldValidateModelIsSupported()
     {
         // Arrange
         var testModel = ModelRegistry.GetDefault(LlmProvider.OpenAI);
@@ -42,7 +42,7 @@ public sealed class ModelSelectionFlowTests : UserSecretsTestFixture
     }
 
     [Fact]
-    public async Task Setup_WithDefaultModel_ShouldUseProviderDefault()
+    public void Setup_WithDefaultModel_ShouldUseProviderDefault()
     {
         // Arrange
         var defaultModel = ModelRegistry.GetDefault(LlmProvider.Anthropic);
@@ -56,7 +56,7 @@ public sealed class ModelSelectionFlowTests : UserSecretsTestFixture
     [Theory]
     [InlineData(LlmProvider.OpenAI)]
     [InlineData(LlmProvider.Anthropic)]
-    public async Task Setup_WithProviderSwitch_ShouldValidateNewProviderModels(LlmProvider newProvider)
+    public void Setup_WithProviderSwitch_ShouldValidateNewProviderModels(LlmProvider newProvider)
     {
         // Arrange
         var oldProvider = newProvider == LlmProvider.OpenAI ? LlmProvider.Anthropic : LlmProvider.OpenAI;
@@ -70,7 +70,7 @@ public sealed class ModelSelectionFlowTests : UserSecretsTestFixture
     }
 
     [Fact]
-    public async Task Setup_WithInvalidModel_ShouldBeDetectable()
+    public void Setup_WithInvalidModel_ShouldBeDetectable()
     {
         // Arrange
         var invalidModelId = "invalid-model-that-does-not-exist";
@@ -80,7 +80,7 @@ public sealed class ModelSelectionFlowTests : UserSecretsTestFixture
     }
 
     [Fact]
-    public async Task Setup_WithModelFromDifferentProvider_ShouldBeDetectable()
+    public void Setup_WithModelFromDifferentProvider_ShouldBeDetectable()
     {
         // Arrange
         var anthropicModel = ModelRegistry.AnthropicModels[0];

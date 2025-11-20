@@ -203,7 +203,7 @@ public sealed class ConfigurationSectionStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task GetConfigPath_ReturnsCorrectPath()
+    public void GetConfigPath_ReturnsCorrectPath()
     {
         // Act
         var path = _sut.GetConfigPath();
