@@ -349,6 +349,10 @@ public static class ServiceCollectionExtensions
             var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger<LocalOpenAiCompatibleLlmProvider>();
 
+            // Configure extended timeout for local LLMs (they can take 10+ minutes for long recordings)
+            // Default HttpClient timeout is 100 seconds, which is insufficient
+            httpClient.Timeout = TimeSpan.FromMinutes(15);
+
             // Get configured model or use default
             string? configuredModel = llmOptions.Value.Model;
             string model = !string.IsNullOrWhiteSpace(configuredModel)

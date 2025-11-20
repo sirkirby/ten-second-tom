@@ -365,7 +365,35 @@ public sealed class RecordingServiceTests
         string content)
     {
         var filePath = $"{directory}/{filename}";
-        fileSystem.AddFile(filePath, new MockFileData(content));
+
+        // Parse date from filename (M-D-Y_Increment.txt format)
+        // and set LastWriteTime to match, so sorting by LastWriteTime works correctly
+        var dateMatch = System.Text.RegularExpressions.Regex.Match(
+            filename,
+            @"^(\d{1,2})-(\d{1,2})-(\d{4})_(\d+)\.txt$");
+
+        DateTime lastWriteTime;
+        if (dateMatch.Success)
+        {
+            var month = int.Parse(dateMatch.Groups[1].Value);
+            var day = int.Parse(dateMatch.Groups[2].Value);
+            var year = int.Parse(dateMatch.Groups[3].Value);
+            var increment = int.Parse(dateMatch.Groups[4].Value);
+
+            // Use increment as hour to differentiate recordings on same day
+            lastWriteTime = new DateTime(year, month, day, increment, 0, 0);
+        }
+        else
+        {
+            lastWriteTime = DateTime.UtcNow;
+        }
+
+        var mockFileData = new MockFileData(content)
+        {
+            LastWriteTime = lastWriteTime
+        };
+
+        fileSystem.AddFile(filePath, mockFileData);
     }
 
     #endregion
