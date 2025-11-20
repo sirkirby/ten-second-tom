@@ -105,9 +105,13 @@ public sealed class SetupCommandCliTests : IDisposable
         int timeoutMs = 5000)
     {
         using var process = CreateCliProcess(arguments);
-        
+
         process.Start();
-        
+
+        // Close stdin immediately to prevent CLI from waiting for input
+        // This is critical under code coverage instrumentation
+        process.StandardInput.Close();
+
         var outputTask = process.StandardOutput.ReadToEndAsync();
         var errorTask = process.StandardError.ReadToEndAsync();
 
