@@ -405,24 +405,34 @@ public sealed partial class RecordingService : IRecordingService
 
             var frontMatter = deserializer.Deserialize<Dictionary<string, object>>(yamlContent);
 
-            // Look for the 'date' field
-            if (frontMatter != null && frontMatter.TryGetValue("date", out var dateValue))
+            // Look for either 'timestamp' or 'date' field (recordings use 'timestamp', notes use 'date')
+            object? dateValue = null;
+            if (frontMatter != null)
             {
-                // Try to parse the date string (format: yyyy-MM-dd HH:mm:ss)
+                if (!frontMatter.TryGetValue("timestamp", out dateValue))
+                {
+                    frontMatter.TryGetValue("date", out dateValue);
+                }
+            }
+
+            if (dateValue != null)
+            {
+                // Try to parse the date string
                 if (dateValue is string dateStr)
                 {
+                    // Try ISO 8601 format first (used by recordings: 2025-10-27T17:39:44.5350960+00:00)
+                    if (DateTimeOffset.TryParse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.None, out date))
+                    {
+                        return true;
+                    }
+
+                    // Try yyyy-MM-dd HH:mm:ss format (legacy/notes format)
                     if (DateTimeOffset.TryParseExact(
                         dateStr,
                         "yyyy-MM-dd HH:mm:ss",
                         CultureInfo.InvariantCulture,
                         DateTimeStyles.AssumeLocal,
                         out date))
-                    {
-                        return true;
-                    }
-
-                    // Try general parsing as fallback
-                    if (DateTimeOffset.TryParse(dateStr, out date))
                     {
                         return true;
                     }
