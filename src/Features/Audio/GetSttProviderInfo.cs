@@ -1,5 +1,5 @@
 using MediatR;
-using TenSecondTom.Features.Audio.Constants;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 

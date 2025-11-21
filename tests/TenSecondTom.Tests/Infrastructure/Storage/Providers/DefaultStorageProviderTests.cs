@@ -165,58 +165,6 @@ public sealed class DefaultStorageProviderTests : IDisposable
     }
 
     [Fact]
-    public async Task BackwardCompatibility_WithLegacyMemoryDirectory_ShouldWork()
-    {
-        // Arrange - simulate legacy configuration with MemoryDirectory only
-        var options = Options.Create(new StorageOptions
-        {
-            RootDirectory = null, // Not set (new property)
-            MemoryDirectory = _testDirectory, // Legacy property set
-            ProviderId = StorageProviderIds.Default
-        });
-
-        // Act
-        var provider = new DefaultStorageProvider(options, Mock.Of<ILogger<DefaultStorageProvider>>(), _loggerFactory);
-        var initResult = await provider.InitializeAsync(CancellationToken.None);
-
-        // Assert
-        initResult.IsSuccess.Should().BeTrue("provider should work with legacy MemoryDirectory");
-        Directory.Exists(_testDirectory).Should().BeTrue("directory should be created using legacy property");
-    }
-
-    [Fact]
-    public async Task RootDirectory_TakesPrecedenceOver_LegacyMemoryDirectory()
-    {
-        // Arrange - both properties set, RootDirectory should win
-        var rootDir = Path.Combine(Path.GetTempPath(), $"root-{Guid.NewGuid()}");
-        var legacyDir = Path.Combine(Path.GetTempPath(), $"legacy-{Guid.NewGuid()}");
-
-        var options = Options.Create(new StorageOptions
-        {
-            RootDirectory = rootDir,
-            MemoryDirectory = legacyDir,
-            ProviderId = StorageProviderIds.Default
-        });
-
-        try
-        {
-            // Act
-            var provider = new DefaultStorageProvider(options, Mock.Of<ILogger<DefaultStorageProvider>>(), _loggerFactory);
-            var initResult = await provider.InitializeAsync(CancellationToken.None);
-
-            // Assert
-            initResult.IsSuccess.Should().BeTrue();
-            Directory.Exists(rootDir).Should().BeTrue("RootDirectory should be used");
-            Directory.Exists(legacyDir).Should().BeFalse("legacy MemoryDirectory should be ignored");
-        }
-        finally
-        {
-            // Cleanup
-            if (Directory.Exists(rootDir)) Directory.Delete(rootDir, true);
-        }
-    }
-
-    [Fact]
     public async Task WithMemorySubdirectory_ShouldCreateBaseDirectory()
     {
         // Arrange

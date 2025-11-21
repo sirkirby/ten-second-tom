@@ -59,7 +59,7 @@ public sealed class FileSystemStorageProviderTests : IDisposable
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        string expectedPath = Path.Combine(_testDirectory, "today", "10-02-2025_1.md");
+        string expectedPath = Path.Combine(_testDirectory, "note", "10-02-2025_1_generated.md");
         File.Exists(expectedPath).Should().BeTrue();
 
         string content = await File.ReadAllTextAsync(expectedPath);
@@ -83,7 +83,7 @@ public sealed class FileSystemStorageProviderTests : IDisposable
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        string expectedPath = Path.Combine(_testDirectory, "today", "10-02-2025_1.md");
+        string expectedPath = Path.Combine(_testDirectory, "note", "10-02-2025_1_generated.md");
         File.Exists(expectedPath).Should().BeTrue();
     }
 
@@ -102,8 +102,8 @@ public sealed class FileSystemStorageProviderTests : IDisposable
         await provider.SaveAsync(entry2, CancellationToken.None);
 
         // Assert
-        File.Exists(Path.Combine(_testDirectory, "today", "10-02-2025_1.md")).Should().BeTrue();
-        File.Exists(Path.Combine(_testDirectory, "today", "10-02-2025_2.md")).Should().BeTrue();
+        File.Exists(Path.Combine(_testDirectory, "note", "10-02-2025_1_generated.md")).Should().BeTrue();
+        File.Exists(Path.Combine(_testDirectory, "note", "10-02-2025_2_generated.md")).Should().BeTrue();
     }
 
     [Fact]
@@ -114,9 +114,9 @@ public sealed class FileSystemStorageProviderTests : IDisposable
         var entry = CreateTestDailyEntry("today-10-02-2025-1", 1, new DateTimeOffset(2025, 10, 2, 14, 0, 0, TimeSpan.Zero));
         await provider.SaveAsync(entry, CancellationToken.None);
 
-        // Act
+        // Act - Get entries using "note" command since today entries are now saved in note/ directory
         Result<IReadOnlyList<MemoryEntry>> result = await provider.GetEntriesAsync(
-            "today",
+            "note",
             new DateTime(2025, 10, 1),
             new DateTime(2025, 10, 3),
             CancellationToken.None);
@@ -141,8 +141,8 @@ public sealed class FileSystemStorageProviderTests : IDisposable
         await provider.SaveAsync(entry1, CancellationToken.None);
         await provider.SaveAsync(entry2, CancellationToken.None);
 
-        // Act
-        Result<int> result = await provider.CountEntriesAsync("today", date, CancellationToken.None);
+        // Act - Count using "note" command since today entries are now saved in note/ directory
+        Result<int> result = await provider.CountEntriesAsync("note", date, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -217,8 +217,8 @@ public sealed class FileSystemStorageProviderTests : IDisposable
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().Be(1);
-        File.Exists(Path.Combine(_testDirectory, "today", "10-02-2025_1.md")).Should().BeFalse();
-        File.Exists(Path.Combine(_testDirectory, "today", "10-03-2025_1.md")).Should().BeTrue();
+        File.Exists(Path.Combine(_testDirectory, "note", "10-02-2025_1_generated.md")).Should().BeFalse();
+        File.Exists(Path.Combine(_testDirectory, "note", "10-03-2025_1_generated.md")).Should().BeTrue();
     }
 
     [Fact]
@@ -273,7 +273,7 @@ public sealed class FileSystemStorageProviderTests : IDisposable
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        Directory.Exists(Path.Combine(_testDirectory, "today")).Should().BeTrue();
+        Directory.Exists(Path.Combine(_testDirectory, "note")).Should().BeTrue();
     }
 
     [Fact]

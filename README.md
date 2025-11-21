@@ -25,6 +25,7 @@
 ## ✨ Features
 
 - 🧠 **Simplified Daily Reflections**: Single free-form text entry to capture your thoughts
+- 📝 **Quick Capture**: Save notes instantly without AI processing for raw thoughts and meeting notes
 - 🎤 **Voice Entry**: Record audio notes with local-first speech-to-text transcription
 - 📊 **Weekly Reviews**: AI-generated summaries of your week with themes and patterns
 - 🔍 **Searchable Archive**: Full-text search across all your memories (including voice transcripts)
@@ -80,7 +81,43 @@ Perfect for sensitive work, offline environments, or privacy-conscious users.
 
 ## 📋 Command Reference
 
+### note Command
+
+Capture quick notes without AI processing. Perfect for raw thoughts, meeting notes, or anything you want to save immediately without LLM summarization.
+
+```
+tom note [content] [options]
+
+Arguments:
+  content                      Note content (optional). If omitted, opens interactive editor.
+
+Options:
+  --voice                      Record voice note (wav) with automatic speech-to-text transcription
+  --stt <engine>              STT engine: auto (default), local, or openai (only used with --voice)
+  --no-edit                    Skip interactive editor, use content from command line
+  --output-json                Output results in JSON format
+
+Examples:
+  tom note                                            # Interactive mode (opens editor)
+  tom note --voice                                    # Voice note with auto STT
+  tom note --voice --stt local                        # Voice note with local whisper.cpp
+  tom note --voice --stt openai                       # Voice note with OpenAI Whisper API
+  tom note "Quick thought" --no-edit                  # Quick capture mode
+```
+
+**Storage**: Notes are saved to `<memory-dir>/note/` directory with filename `MM-DD-YYYY_N.md` where N is an incremental counter for that day.
+
+**Use Cases**:
+- Quick capture without waiting for AI processing
+- Meeting notes that don't need summarization
+- Raw thoughts you want to preserve exactly as written
+- Voice notes with transcription (no AI summary)
+
+**Difference from `/today`**: The `/note` command saves your input immediately without AI processing, while `/today` also generates an AI-powered summary using prompt templates.
+
 ### today Command
+
+Capture daily reflections with AI-powered summarization. Opens an interactive editor, then processes your input using a prompt template to generate structured summaries.
 
 ```
 tom today [notes] [options]
@@ -89,6 +126,8 @@ Arguments:
   notes                        Notes for today (optional). If omitted, opens interactive editor.
 
 Options:
+  --voice                      Record voice note (wav) with automatic speech-to-text transcription
+  --stt <engine>              STT engine: auto (default), local, or openai (only used with --voice)
   --no-edit                    Skip interactive editor, use notes from command line
   --use-default-template       Automatically use default template (no prompt)
   --template <name>            Use specific template by name (without .md)
@@ -96,29 +135,50 @@ Options:
   --output-json                Output results in JSON format
 
 Examples:
-  tom today                                              # Interactive mode (opens editor)
-  tom today "Quick note" --no-edit                      # Quick entry mode
-  tom today "Note" --no-edit --use-default-template     # Fastest mode (< 3 seconds)
+  tom today                                             # Interactive mode with AI processing
+  tom today --voice                                     # Voice entry with auto STT + AI summary
+  tom today --voice --stt local                         # Voice with local whisper.cpp + AI summary
+  tom today "Quick note" --no-edit                      # Quick entry with AI summary
+  tom today "Note" --no-edit --use-default-template     # Fastest AI mode (< 3 seconds)
   tom today "Note" --no-edit --template "standup"       # Use specific template
 ```
 
-### Voice Entry (NEW)
+**Storage**: Creates two files in `<memory-dir>/note/`:
+- `MM-DD-YYYY_N.md` - Your raw input (same format as `/note` command)
+- `MM-DD-YYYY_N_generated.md` - AI-generated summary using selected template
 
-Capture daily reflections using voice instead of typing:
+**Available Templates**:
+- `daily-summary` - Retrospective reflection (Key Events, Themes, To-Do Items)
+- `daily-standup` - Forward-looking planning (Priorities, Blockers, Success Criteria)
+- `journal` - Emotional reflection and insights
+- `organize` - Task extraction and action items
+- `weekly-review` - Weekly retrospective
+- `business-meeting` - Meeting summaries
 
+### Voice Entry
+
+Both `/note` and `/today` commands support voice recording with automatic speech-to-text transcription:
+
+```bash
+# Voice note (no AI processing)
+tom note --voice                          # Auto STT selection
+tom note --voice --stt local             # Force local whisper.cpp
+tom note --voice --stt openai            # Force OpenAI Whisper API
+
+# Voice + AI summary
+tom today --voice                         # Auto STT + AI processing
+tom today --voice --stt local            # Force local + AI summary
+tom today --voice --stt openai           # Force OpenAI + AI summary
 ```
-tom today --voice [options]
 
-Options:
-  --voice                      Record audio and transcribe to text
-  --stt <engine>              STT engine: auto (default), local, or openai
-  --output-json               Output results in JSON format
+**STT Engine Selection:**
+- `auto` (default): Tries local whisper.cpp first, falls back to OpenAI if enabled
+- `local`: Forces local whisper.cpp (privacy-focused, no API calls)
+- `openai`: Forces OpenAI Whisper API (cloud-based, higher accuracy)
 
-Examples:
-  tom today --voice                          # Record voice note (auto STT)
-  tom today --voice --stt local             # Force local whisper.cpp
-  tom today --voice --stt openai            # Force OpenAI Whisper API
-```
+**Key Difference:**
+- `/note --voice`: Saves transcript directly (no LLM processing)
+- `/today --voice`: Transcript + AI-generated summary
 
 **Prerequisites:**
 - **FFmpeg** for audio recording ([Download](https://ffmpeg.org/))
@@ -473,7 +533,7 @@ Ten Second Tom supports **multiple storage providers** to fit your workflow. Cho
 
 **Default File System** (Recommended for new users)
 - TST-native hierarchical structure optimized for organization
-- Stores entries in: `today/`, `thisweek/`, `templates/`, `config/`
+- Stores entries in: `note/`, `thisweek/`, `templates/`, `config/`
 - Perfect for standalone use
 
 **Obsidian Vault Integration**
@@ -524,7 +584,7 @@ By default, memories and configuration are stored in `~/ten-second-tom/` in your
 ├── config/
 │   └── config.json        # Your configuration (from setup wizard)
 ├── templates/              # Prompt templates
-├── today/                  # Daily entries (Default provider)
+├── note/                   # Quick notes and daily entries (Default provider)
 ├── thisweek/              # Weekly reviews (Default provider)
 └── recording/             # Voice recordings
 ```
@@ -638,7 +698,7 @@ $ tom today
 - [ ] Finalize architecture design
 - [ ] Start implementation tomorrow
 
-✅ Daily entry saved: ~/ten-second-tom/today/10-03-2025_1.md
+✅ Daily entry saved: ~/ten-second-tom/note/10-03-2025_1_generated.md
 ```
 
 ### Quick Entry Mode
@@ -756,7 +816,8 @@ All commands in shell mode use a slash prefix:
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `/today` | Capture today's reflection (single prompt) | `/today` |
+| `/note` | Capture quick note without AI processing | `/note` |
+| `/today` | Capture today's reflection with AI summary | `/today` |
 | `/thisweek` | Generate weekly review | `/thisweek` |
 | `/search` | Search memory entries | `/search meeting` |
 | `/login` | Authenticate with SSH key | `/login` |
@@ -817,18 +878,20 @@ Your memories are stored as plain markdown files in your configured memory direc
 │   ├── daily-summary.md   # Default daily template
 │   ├── weekly-review.md   # Default weekly template
 │   └── my-custom.md       # Your custom templates
-├── today/
-│   ├── 10-01-2025_1.md
-│   ├── 10-01-2025_2.md    # Multiple entries per day supported
-│   ├── 10-02-2025_1.md
-│   └── 10-03-2025_1.md
+├── note/
+│   ├── 10-01-2025_1.md           # Quick note (no AI processing)
+│   ├── 10-01-2025_2.md           # Raw input from /today command
+│   ├── 10-01-2025_2_generated.md # AI-processed from /today command
+│   ├── 10-02-2025_1.md           # Quick note
+│   └── 10-03-2025_1_generated.md # AI-processed daily entry
 ├── thisweek/
-│   ├── 2025-40-Mon-1.md    # Week 40 of 2025, Monday, entry 1
-│   └── 2025-41-Fri-1.md    # Week 41 of 2025, Friday, entry 1
-└── recording/              # Voice recordings (if using --voice or record)
-    ├── 10-21-2025_1.wav   # Audio file
-    ├── 10-21-2025_1.txt   # Transcription with metadata
-    └── 10-21-2025_2.wav   # Multiple recordings per day supported
+│   ├── 2025-40-Mon-1.md          # Week 40 of 2025, Monday, entry 1
+│   └── 2025-41-Fri-1.md          # Week 41 of 2025, Friday, entry 1
+└── recording/                     # Voice recordings (if using --voice or record)
+    ├── 10-21-2025_1.wav          # Audio file
+    ├── 10-21-2025_1.txt          # Transcription with metadata
+    ├── 10-21-2025_1_generated.md # AI-processed from /generate command
+    └── 10-21-2025_2.wav          # Multiple recordings per day supported
 ```
 
 **File Format:**

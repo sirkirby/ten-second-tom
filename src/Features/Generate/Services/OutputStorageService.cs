@@ -116,9 +116,17 @@ public sealed class OutputStorageService : IOutputStorageService
         return Task.FromResult(_fileSystem.File.Exists(outputPath));
     }
 
+    /// <summary>
+    /// Builds the output file path for a generated output.
+    /// Format: {recordingBaseName}_generated.md
+    /// Template information is stored in the file's YAML front matter.
+    /// </summary>
+    /// <param name="recordingBaseName">Base name of the recording (e.g., "01-21-2025_1")</param>
+    /// <param name="templateId">Template ID (currently unused in filename, kept for interface compatibility)</param>
+    /// <returns>Full path to the output file in the recording directory</returns>
     public string BuildOutputFilePath(string recordingBaseName, string templateId)
     {
-        var fileName = $"{recordingBaseName}_{templateId}.md";
+        var fileName = $"{recordingBaseName}_generated.md";
         return Path.Combine(_recordingDirectory, fileName);
     }
 }

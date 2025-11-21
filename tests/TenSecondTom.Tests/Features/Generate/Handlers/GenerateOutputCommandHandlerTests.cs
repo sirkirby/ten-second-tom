@@ -87,7 +87,7 @@ public sealed class GenerateOutputCommandHandlerTests
     {
         // Arrange
         var command = CreateTestCommand();
-        var expectedOutputPath = "/test/output/10-21-2025_1_daily-summary.md";
+        var expectedOutputPath = "/test/output/10-21-2025_1_generated.md";
         SetupSuccessfulGeneration(outputPath: expectedOutputPath);
 
         var handler = CreateHandler();

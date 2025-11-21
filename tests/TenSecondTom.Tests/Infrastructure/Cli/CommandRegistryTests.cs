@@ -70,14 +70,14 @@ public sealed class CommandRegistryTests : IDisposable
     }
 
     [Fact]
-    public void BuildRootCommand_ShouldHaveExactlyTwelveCommands()
+    public void BuildRootCommand_ShouldHaveExactlyThirteenCommands()
     {
         // Arrange & Act
         var rootCommand = CommandRegistry.BuildRootCommand(_serviceProvider);
 
         // Assert
-        rootCommand.Subcommands.Should().HaveCount(12,
-            "root command should have exactly 12 subcommands: today, thisweek, search, record, generate, login, logout, setup, config, shell, help, version");
+        rootCommand.Subcommands.Should().HaveCount(13,
+            "root command should have exactly 13 subcommands: today, note, thisweek, search, record, generate, login, logout, setup, config, shell, help, version");
     }
 
     [Fact]

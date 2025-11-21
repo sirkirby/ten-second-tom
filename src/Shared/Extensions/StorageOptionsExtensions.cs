@@ -9,19 +9,19 @@ namespace TenSecondTom.Shared.Extensions;
 public static class StorageOptionsExtensions
 {
     /// <summary>
-    /// Resolves the effective storage directory path based on provider configuration.
+    /// Resolves the effective storage directory path based on configuration.
     /// </summary>
     /// <param name="options">Storage options containing provider configuration.</param>
     /// <returns>The resolved storage directory path.</returns>
     /// <remarks>
     /// Resolution priority:
-    /// 1. ProviderPath (if set) - for Obsidian or other external storage providers
-    /// 2. RootDirectory (if set) - for default provider
+    /// 1. ProviderPath - for Obsidian or other external storage providers
+    /// 2. RootDirectory - for default storage location
     /// 3. Fallback to "./ten-second-tom"
     ///
     /// Additional processing:
     /// - Tilde (~) is expanded to user's home directory
-    /// - MemorySubdirectory (if specified) is appended to the resolved path
+    /// - MemorySubdirectory (if specified) is appended to the resolved path for isolation
     ///
     /// Examples:
     /// - Default provider: ~/ten-second-tom → /Users/chris/ten-second-tom
@@ -31,7 +31,7 @@ public static class StorageOptionsExtensions
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        // Priority: ProviderPath (Obsidian) > RootDirectory (Default) > fallback
+        // Priority: ProviderPath > RootDirectory > fallback
         string? baseDirectory = options.ProviderPath;
 
         if (string.IsNullOrWhiteSpace(baseDirectory))
@@ -40,11 +40,11 @@ public static class StorageOptionsExtensions
                 ?? Path.Combine(".", DirectoryNames.ApplicationRoot);
         }
 
-        // Expand home directory if needed
+        // Expand tilde to home directory
         baseDirectory = baseDirectory.Replace("~",
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
-        // If MemorySubdirectory is specified (e.g., for Obsidian isolation), append it
+        // Append isolation subdirectory if specified
         if (!string.IsNullOrWhiteSpace(options.MemorySubdirectory))
         {
             baseDirectory = Path.Combine(baseDirectory, options.MemorySubdirectory);

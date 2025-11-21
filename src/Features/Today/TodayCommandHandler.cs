@@ -2,20 +2,19 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
-using TenSecondTom.Features.Audio;
-using TenSecondTom.Features.Audio.Constants;
-using TenSecondTom.Features.Audio.Services;
+using TenSecondTom.Features.Audio;  // Only for CQRS commands/queries
 using TenSecondTom.Features.Today.Models;
 using TenSecondTom.Infrastructure.Auth;
 using MediatR;
-using TenSecondTom.Shared.Models;
-using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Models;  // For shared types like AudioValidationResult, AudioRecording, TranscriptionResult
+using TenSecondTom.Shared.Constants;  // For CommandNames, SttProviders, DirectoryNames
 using TenSecondTom.Shared.Extensions;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.OutputFormatters;
 using TenSecondTom.Shared.Results;
 using TenSecondTom.Shared.TextEditing.Services;
 using TenSecondTom.Shared.TextEditing.Models;
+using TenSecondTom.Features.Note;  // For CreateNote command
 
 namespace TenSecondTom.Features.Today;
 
@@ -240,6 +239,42 @@ public static class TodayCommandHandler
             {
                 AnsiConsole.MarkupLine("\n[green]✓[/] Content saved\n");
             }
+        }
+
+        // Save raw note first (orchestration pattern)
+        if (!jsonOutput)
+        {
+            AnsiConsole.MarkupLine("[blue]→[/] Saving note...");
+        }
+
+        IRequest<Result<Shared.Models.Note>> createNoteCommand = new CreateNote.Command
+        {
+            Content = content,
+            IsVoiceNote = false,
+            AudioFilePath = null
+        };
+
+        var noteResult = await mediator.Send(createNoteCommand, CancellationToken.None).ConfigureAwait(false);
+        if (!noteResult.IsSuccess)
+        {
+            if (jsonOutput)
+            {
+                string json = JsonOutputFormatter.FormatFailure(
+                    CommandNames.Today,
+                    $"Failed to save note: {noteResult.Error}",
+                    DateTimeOffset.UtcNow);
+                Console.WriteLine(json);
+            }
+            else
+            {
+                AnsiConsole.MarkupLine($"[red]Error:[/] Failed to save note: {noteResult.Error.EscapeMarkup()}");
+            }
+            return;
+        }
+
+        if (!jsonOutput)
+        {
+            AnsiConsole.MarkupLine("[green]✓[/] Note saved");
         }
 
         // Create command
@@ -515,6 +550,39 @@ public static class TodayCommandHandler
                 AnsiConsole.MarkupLine("[bold]Transcript:[/]");
                 AnsiConsole.MarkupLine($"[dim]{Markup.Escape(transcription.TranscriptText.Trim())}[/]");
                 AnsiConsole.WriteLine();
+            }
+
+            // Save raw note with transcript (orchestration pattern)
+            if (!jsonOutput)
+            {
+                AnsiConsole.MarkupLine("[blue]→[/] Saving note with transcript...");
+            }
+
+            IRequest<Result<Shared.Models.Note>> createNoteCommand = new CreateNote.Command
+            {
+                Content = transcription.TranscriptText,
+                IsVoiceNote = true,
+                AudioFilePath = audioFilePath
+            };
+
+            var noteResult = await mediator.Send(createNoteCommand, CancellationToken.None).ConfigureAwait(false);
+            if (!noteResult.IsSuccess)
+            {
+                var error = $"Failed to save note: {noteResult.Error}";
+                if (jsonOutput)
+                {
+                    Console.WriteLine(JsonOutputFormatter.FormatFailure(CommandNames.Today, error, DateTimeOffset.UtcNow));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]Error:[/] {error.EscapeMarkup()}");
+                }
+                return;
+            }
+
+            if (!jsonOutput)
+            {
+                AnsiConsole.MarkupLine("[green]✓[/] Note saved");
             }
 
             // Step 3: Create voice note entry with AI processing

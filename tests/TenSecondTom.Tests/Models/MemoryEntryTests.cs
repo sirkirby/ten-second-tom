@@ -131,7 +131,7 @@ public sealed class MemoryEntryTests
         string filePath = entry.FilePath;
 
         // Assert
-        filePath.Should().Be("today/10-01-2025_1.md");
+        filePath.Should().Be("note/10-01-2025_1_generated.md");
     }
 
     [Fact]

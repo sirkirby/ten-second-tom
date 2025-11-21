@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Extensions;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
@@ -42,7 +43,7 @@ public sealed class ObsidianStorageProvider : IStorageProvider
 
         // Delegate to FileSystemStorageProvider for actual storage operations
         var innerLogger = loggerFactory.CreateLogger<FileSystemStorageProvider>();
-        string baseDirectory = GetMemoryDirectory();
+        string baseDirectory = options.Value.GetEffectiveStorageDirectory();
         _innerProvider = new FileSystemStorageProvider(baseDirectory, innerLogger);
     }
 
@@ -60,8 +61,8 @@ public sealed class ObsidianStorageProvider : IStorageProvider
                 return Task.FromResult(Result.Failure($"Not a valid Obsidian vault: .obsidian directory not found at {vaultRoot}"));
             }
 
-            // Get memory directory (vault root or subdirectory)
-            string memoryDir = GetMemoryDirectory();
+            // Get effective storage directory (vault root or vault root + subdirectory)
+            string memoryDir = _options.Value.GetEffectiveStorageDirectory();
 
             // Create TST memory directory if it doesn't exist
             // Feature-specific subdirectories (today/, thisweek/, recording/) will be created
@@ -116,7 +117,7 @@ public sealed class ObsidianStorageProvider : IStorageProvider
                     $"Vault is not writable: {ex.Message}"));
             }
 
-            string memoryDir = GetMemoryDirectory();
+            string memoryDir = _options.Value.GetEffectiveStorageDirectory();
             string subdirInfo = string.IsNullOrWhiteSpace(_options.Value.MemorySubdirectory)
                 ? "(root level)"
                 : $"(subdirectory: {_options.Value.MemorySubdirectory})";
@@ -162,25 +163,19 @@ public sealed class ObsidianStorageProvider : IStorageProvider
         => _innerProvider.GetEntryByIdAsync(entryId, cancellationToken);
 
     /// <summary>
-    /// Gets the vault root directory from configuration.
+    /// Gets the vault root directory from configuration (without subdirectory).
+    /// Used for vault validation (checking .obsidian directory).
     /// </summary>
     private string GetVaultRoot()
     {
         var options = _options.Value;
 
-        // Use ProviderPath for vault location (preferred)
+        // Priority: ProviderPath > RootDirectory
         string? vaultRoot = options.ProviderPath;
 
-        // Fall back to RootDirectory for backward compatibility (pre-ProviderPath configurations)
         if (string.IsNullOrWhiteSpace(vaultRoot))
         {
             vaultRoot = options.RootDirectory;
-        }
-
-        // Fall back to legacy MemoryDirectory for even older configurations
-        if (string.IsNullOrWhiteSpace(vaultRoot))
-        {
-            vaultRoot = options.MemoryDirectory;
         }
 
         if (string.IsNullOrWhiteSpace(vaultRoot))
@@ -191,20 +186,6 @@ public sealed class ObsidianStorageProvider : IStorageProvider
         }
 
         return vaultRoot;
-    }
-
-    /// <summary>
-    /// Gets the directory where memory entries should be stored.
-    /// This may be the vault root or a subdirectory within the vault.
-    /// </summary>
-    private string GetMemoryDirectory()
-    {
-        string vaultRoot = GetVaultRoot();
-        string? subdirectory = _options.Value.MemorySubdirectory;
-
-        return string.IsNullOrWhiteSpace(subdirectory)
-            ? vaultRoot
-            : Path.Combine(vaultRoot, subdirectory);
     }
 
 }

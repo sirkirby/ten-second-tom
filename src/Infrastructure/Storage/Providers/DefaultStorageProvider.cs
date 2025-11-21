@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Extensions;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
@@ -10,7 +11,6 @@ namespace TenSecondTom.Infrastructure.Storage.Providers;
 /// <summary>
 /// Default file system storage provider.
 /// Stores memory entries in a hierarchical directory structure under the configured root directory.
-/// Maintains backward compatibility with existing Ten Second Tom installations.
 /// </summary>
 public sealed class DefaultStorageProvider : IStorageProvider
 {
@@ -153,38 +153,10 @@ public sealed class DefaultStorageProvider : IStorageProvider
         => _innerProvider.GetEntryByIdAsync(entryId, cancellationToken);
 
     /// <summary>
-    /// Gets the base directory for storage operations.
-    /// Handles backward compatibility with legacy MemoryDirectory configuration.
+    /// Gets the base directory for storage operations using the centralized resolution logic.
     /// </summary>
     private string GetBaseDirectory()
     {
-        var options = _options.Value;
-
-        // Priority: ProviderPath (if set) > RootDirectory > MemoryDirectory (legacy) > default
-        // For default provider, ProviderPath is typically null and we use RootDirectory
-        string? baseDirectory = options.ProviderPath;
-
-        if (string.IsNullOrWhiteSpace(baseDirectory))
-        {
-            baseDirectory = options.RootDirectory;
-        }
-
-        if (string.IsNullOrWhiteSpace(baseDirectory))
-        {
-            baseDirectory = options.MemoryDirectory;
-        }
-
-        if (string.IsNullOrWhiteSpace(baseDirectory))
-        {
-            baseDirectory = Path.Combine(".", DirectoryNames.ApplicationRoot);
-        }
-
-        // If MemorySubdirectory is specified, append it
-        if (!string.IsNullOrWhiteSpace(options.MemorySubdirectory))
-        {
-            baseDirectory = Path.Combine(baseDirectory, options.MemorySubdirectory);
-        }
-
-        return baseDirectory;
+        return _options.Value.GetEffectiveStorageDirectory();
     }
 }

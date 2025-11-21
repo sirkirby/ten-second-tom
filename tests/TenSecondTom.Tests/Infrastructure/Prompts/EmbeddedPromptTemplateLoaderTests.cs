@@ -253,11 +253,13 @@ public sealed class EmbeddedPromptTemplateLoaderTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeNull();
-        result.Value.Should().HaveCount(4); // daily-summary, daily-standup, weekly-review, and business-meeting
+        result.Value.Should().HaveCount(6); // daily-summary, daily-standup, weekly-review, business-meeting, journal, and organize
         result.Value.Should().Contain(t => t.TemplateId == "daily-summary");
         result.Value.Should().Contain(t => t.TemplateId == "daily-standup");
         result.Value.Should().Contain(t => t.TemplateId == "weekly-review");
         result.Value.Should().Contain(t => t.TemplateId == "business-meeting");
+        result.Value.Should().Contain(t => t.TemplateId == "journal");
+        result.Value.Should().Contain(t => t.TemplateId == "organize");
         result.Value.Should().OnlyContain(t => t.Source == TemplateSource.Embedded);
     }
 

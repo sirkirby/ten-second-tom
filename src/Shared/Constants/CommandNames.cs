@@ -43,6 +43,11 @@ public static class CommandNames
     public const string Record = "record";
 
     /// <summary>
+    /// Command name for capturing quick notes.
+    /// </summary>
+    public const string Note = "note";
+
+    /// <summary>
     /// Gets all valid command names.
     /// </summary>
     public static IReadOnlyList<string> All { get; } =
@@ -53,6 +58,7 @@ public static class CommandNames
         Login,
         Logout,
         Generate,
-        Record
+        Record,
+        Note
     ];
 }

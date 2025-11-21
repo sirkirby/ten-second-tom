@@ -1,7 +1,7 @@
-namespace TenSecondTom.Features.Audio.Constants;
+namespace TenSecondTom.Shared.Constants;
 
 /// <summary>
-/// Constants representing supported Speech-to-Text providers.
+/// Provides constants representing supported Speech-to-Text providers.
 /// </summary>
 public static class SttProviders
 {
@@ -24,4 +24,13 @@ public static class SttProviders
     /// OpenAI Speech-to-Text model to use.
     /// </summary>
     public const string OpenAIDefaultSTTModel = "whisper-1";
+
+    /// <summary>
+    /// All supported provider names (lowercase for normalization).
+    /// </summary>
+    public static IReadOnlyList<string> All { get; } =
+    [
+        WhisperCpp,
+        OpenAI
+    ];
 }

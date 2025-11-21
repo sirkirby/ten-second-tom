@@ -106,9 +106,13 @@ public sealed class TemplatesMigration : IFeatureMigration
             fileSystem.File.Exists(fileSystem.Path.Combine(templatesDirectory, "weekly-review.md"));
         bool businessMeetingExists = directoryExists &&
             fileSystem.File.Exists(fileSystem.Path.Combine(templatesDirectory, "business-meeting.md"));
+        bool journalExists = directoryExists &&
+            fileSystem.File.Exists(fileSystem.Path.Combine(templatesDirectory, "journal.md"));
+        bool organizeExists = directoryExists &&
+            fileSystem.File.Exists(fileSystem.Path.Combine(templatesDirectory, "organize.md"));
 
         // If all required templates exist, no migration needed
-        if (dailySummaryExists && dailyStandupExists && weeklyReviewExists && businessMeetingExists)
+        if (dailySummaryExists && dailyStandupExists && weeklyReviewExists && businessMeetingExists && journalExists && organizeExists)
         {
             logger.LogDebug("Templates already configured, no migration needed");
             return Result<bool>.Success(false);
@@ -124,11 +128,13 @@ public sealed class TemplatesMigration : IFeatureMigration
         else
         {
             logger.LogInformation(
-                "Default templates missing (DailySummary={DailySummary}, DailyStandup={DailyStandup}, WeeklyReview={WeeklyReview}, BusinessMeeting={BusinessMeeting}), installing",
+                "Default templates missing (DailySummary={DailySummary}, DailyStandup={DailyStandup}, WeeklyReview={WeeklyReview}, BusinessMeeting={BusinessMeeting}, Journal={Journal}, Organize={Organize}), installing",
                 dailySummaryExists,
                 dailyStandupExists,
                 weeklyReviewExists,
-                businessMeetingExists);
+                businessMeetingExists,
+                journalExists,
+                organizeExists);
         }
 
         // Install templates (OverwriteExisting=false to preserve user customizations)

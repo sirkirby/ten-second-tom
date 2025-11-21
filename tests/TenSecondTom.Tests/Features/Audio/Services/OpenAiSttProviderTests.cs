@@ -2,7 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using TenSecondTom.Features.Audio.Constants;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Features.Audio.Services;
 using TenSecondTom.Shared.Options;

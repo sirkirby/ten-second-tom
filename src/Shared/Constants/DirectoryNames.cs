@@ -35,4 +35,10 @@ public static class DirectoryNames
     /// Located at: {root}/recording/
     /// </summary>
     public const string Recording = "recording";
+
+    /// <summary>
+    /// Directory name for storing quick note entries.
+    /// Located at: {root}/note/
+    /// </summary>
+    public const string Note = "note";
 }

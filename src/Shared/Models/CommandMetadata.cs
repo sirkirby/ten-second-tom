@@ -42,6 +42,7 @@ public sealed record CommandMetadata
     /// </summary>
     public static readonly CommandMetadata[] CommandCatalog =
     [
+        new() { Name = "/note", HelpText = "Capture a quick note without AI processing", RequiresAuthentication = true },
         new() { Name = "/today", HelpText = "Capture today's reflection with 3-5 prompts", RequiresAuthentication = true },
         new() { Name = "/thisweek", HelpText = "Generate a weekly review from recent daily entries", RequiresAuthentication = true },
         new() { Name = "/search", HelpText = "Search memory entries by text query", RequiresAuthentication = true },

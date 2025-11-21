@@ -4,10 +4,11 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Abstractions.UI;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 using TenSecondTom.Features.Audio.Models;
-using static TenSecondTom.Features.Audio.Constants.SttProviders;
+using static TenSecondTom.Shared.Constants.SttProviders;
 
 namespace TenSecondTom.Features.Audio;
 
