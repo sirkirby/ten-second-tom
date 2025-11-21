@@ -1,14 +1,13 @@
-using TenSecondTom.Features.Audio.Constants;
-using TenSecondTom.Features.Audio.Models;
 using System.CommandLine;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
-using TenSecondTom.Shared.Options;
+using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Options;
 
 namespace TenSecondTom.Features.Audio;
 

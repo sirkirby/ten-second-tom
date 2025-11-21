@@ -25,6 +25,18 @@ public static class TemplateConstants
     public const string BusinessMeetingTemplateId = "business-meeting";
 
     /// <summary>
+    /// Identifier for the journal and reflection template.
+    /// Helps users unpack thoughts, identify emotions, and gain insights.
+    /// </summary>
+    public const string JournalTemplateId = "journal";
+
+    /// <summary>
+    /// Identifier for the organize and plan template.
+    /// Helps users extract action items, organize reminders, and identify priorities.
+    /// </summary>
+    public const string OrganizeTemplateId = "organize";
+
+    /// <summary>
     /// Maximum file size for template files (1MB).
     /// </summary>
     public const int MaxFileSizeBytes = 1_048_576;
@@ -78,6 +90,8 @@ public static class TemplateConstants
     {
         return templateId.Equals(DailySummaryTemplateId, StringComparison.OrdinalIgnoreCase) ||
                templateId.Equals(WeeklyReviewTemplateId, StringComparison.OrdinalIgnoreCase) ||
-               templateId.Equals(BusinessMeetingTemplateId, StringComparison.OrdinalIgnoreCase);
+               templateId.Equals(BusinessMeetingTemplateId, StringComparison.OrdinalIgnoreCase) ||
+               templateId.Equals(JournalTemplateId, StringComparison.OrdinalIgnoreCase) ||
+               templateId.Equals(OrganizeTemplateId, StringComparison.OrdinalIgnoreCase);
     }
 }

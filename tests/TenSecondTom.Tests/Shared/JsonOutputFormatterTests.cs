@@ -114,7 +114,7 @@ public sealed class JsonOutputFormatterTests
         var data = new
         {
             EntryId = "today-10-02-2025-1",
-            FilePath = ".memory/today/10-02-2025_1.md",
+            FilePath = ".memory/note/10-02-2025_1_generated.md",
             Summary = new
             {
                 KeyEvents = new[] { "Event 1", "Event 2" },
@@ -130,7 +130,7 @@ public sealed class JsonOutputFormatterTests
 
         // Assert
         json.Should().Contain("\"entryId\":\"today-10-02-2025-1\"");
-        json.Should().Contain("\"filePath\":\".memory/today/10-02-2025_1.md\"");
+        json.Should().Contain("\"filePath\":\".memory/note/10-02-2025_1_generated.md\"");
         json.Should().Contain("\"keyEvents\"");
         json.Should().Contain("\"Event 1\"");
     }

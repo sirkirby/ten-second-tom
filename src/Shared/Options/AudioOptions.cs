@@ -1,3 +1,5 @@
+using TenSecondTom.Shared.Constants;
+
 namespace TenSecondTom.Shared.Options;
 
 /// <summary>
@@ -58,7 +60,7 @@ public sealed class AudioOptions
     /// Valid values: "whisper-cpp" (local, free), "openai" (cloud, requires API key).
     /// Default: "whisper-cpp" (local, free).
     /// </summary>
-    public string SttProvider { get; init; } = "whisper-cpp";
+    public string SttProvider { get; init; } = SttProviders.WhisperCpp;
 
     /// <summary>
     /// Gets or sets the API key for the STT provider.

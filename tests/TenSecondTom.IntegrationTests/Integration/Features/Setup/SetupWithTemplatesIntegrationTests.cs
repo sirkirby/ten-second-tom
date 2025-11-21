@@ -55,7 +55,7 @@ public sealed class SetupWithTemplatesIntegrationTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeNull();
-        result.Value.TemplatesInstalled.Should().Be(4);
+        result.Value.TemplatesInstalled.Should().Be(6);
         result.Value.TemplatesSkipped.Should().Be(0);
         result.Value.TemplatesFailed.Should().Be(0);
         result.Value.InstalledTemplateIds.Should().Contain("daily-summary");
@@ -104,7 +104,7 @@ public sealed class SetupWithTemplatesIntegrationTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Value.TemplatesInstalled.Should().Be(0);
-        result.Value.TemplatesSkipped.Should().Be(4);
+        result.Value.TemplatesSkipped.Should().Be(6);
         result.Value.TemplatesFailed.Should().Be(0);
     }
 
@@ -132,7 +132,7 @@ public sealed class SetupWithTemplatesIntegrationTests
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.TemplatesInstalled.Should().Be(4);
+        result.Value.TemplatesInstalled.Should().Be(6);
         result.Value.TemplatesSkipped.Should().Be(0);
 
         // Verify content was replaced
@@ -156,7 +156,7 @@ public sealed class SetupWithTemplatesIntegrationTests
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().HaveCount(4);
+        result.Value.Should().HaveCount(6);
 
         var dailyTemplate = result.Value.First(t => t.TemplateId == "daily-summary");
         dailyTemplate.Metadata.Should().NotBeNull();

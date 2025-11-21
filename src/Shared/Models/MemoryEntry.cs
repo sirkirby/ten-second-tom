@@ -47,7 +47,8 @@ public record MemoryEntry
 
     /// <summary>
     /// Gets the file path where this entry should be stored (relative to storage root).
-    /// Daily entries: today/MM-DD-YYYY_N.md
+    /// Daily entries: note/MM-DD-YYYY_N_generated.md (LLM-processed)
+    /// Note entries: note/MM-DD-YYYY_N.md (user input)
     /// Weekly entries: thisweek/YYYY-WW-DayOfWeek-N.md
     /// Generate entries: Use the FilePath property set during creation (stored separately)
     /// </summary>
@@ -57,7 +58,8 @@ public record MemoryEntry
         {
             return Command switch
             {
-                CommandNames.Today => $"{CommandNames.Today}/{Timestamp:MM-dd-yyyy}_{EntryNumber}.md",
+                CommandNames.Today => $"{DirectoryNames.Note}/{Timestamp:MM-dd-yyyy}_{EntryNumber}_generated.md",
+                CommandNames.Note => $"{DirectoryNames.Note}/{Timestamp:MM-dd-yyyy}_{EntryNumber}.md",
                 CommandNames.ThisWeek => GetWeeklyPath(),
                 CommandNames.Generate => _filePath ?? throw new InvalidOperationException("FilePath not set for generate entry"),
                 _ => throw new InvalidOperationException($"Unknown command: {Command}")

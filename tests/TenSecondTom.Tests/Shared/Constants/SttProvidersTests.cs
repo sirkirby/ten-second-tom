@@ -1,8 +1,8 @@
 using FluentAssertions;
-using TenSecondTom.Features.Audio.Constants;
+using TenSecondTom.Shared.Constants;
 using Xunit;
 
-namespace TenSecondTom.Tests.Features.Audio;
+namespace TenSecondTom.Tests.Shared.Constants;
 
 /// <summary>
 /// Unit tests for SttProviders constants.

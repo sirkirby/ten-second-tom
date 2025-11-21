@@ -331,10 +331,10 @@ public sealed class CreateDailyEntryHandlerTests
             Content = "Afternoon coding session recap."
         };
 
-        // Setup storage to simulate existing entry
+        // Setup storage to simulate existing entry (now counts in note directory)
         var callCount = 0;
         _mockStorage.Setup(s => s.CountEntriesAsync(
-                It.Is<string>(cmd => cmd == "today"),
+                It.Is<string>(cmd => cmd == "note"),
                 It.IsAny<DateTime>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => Result<int>.Success(callCount++));
@@ -353,7 +353,7 @@ public sealed class CreateDailyEntryHandlerTests
         result2.Value.EntryId.Should().Contain("-2");
 
         _mockStorage.Verify(s => s.CountEntriesAsync(
-            It.Is<string>(cmd => cmd == "today"),
+            It.Is<string>(cmd => cmd == "note"),
             It.IsAny<DateTime>(),
             It.IsAny<CancellationToken>()), Times.Exactly(2));
     }

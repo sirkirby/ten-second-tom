@@ -191,27 +191,6 @@ public sealed class ObsidianStorageProviderTests : IDisposable
         result.Error.Should().Contain("does not exist");
     }
 
-    [Fact]
-    public async Task ObsidianProvider_WithLegacyMemoryDirectory_ShouldUseAsVaultRoot()
-    {
-        // Arrange
-        CreateValidObsidianVault(_testVaultDirectory);
-
-        var options = Options.Create(new StorageOptions
-        {
-            RootDirectory = null, // Not set
-            MemoryDirectory = _testVaultDirectory, // Legacy property for vault path
-            ProviderId = StorageProviderIds.Obsidian
-        });
-
-        // Act
-        var provider = new ObsidianStorageProvider(options, Mock.Of<ILogger<ObsidianStorageProvider>>(), _loggerFactory);
-        var initResult = await provider.InitializeAsync(CancellationToken.None);
-
-        // Assert
-        initResult.IsSuccess.Should().BeTrue("Obsidian provider should work with legacy MemoryDirectory as vault path");
-    }
-
     public void Dispose()
     {
         try

@@ -48,13 +48,13 @@ public sealed class OutputStorageServiceTests
         var result = service.BuildOutputFilePath(recordingBaseName, templateId);
 
         // Assert
-        var expectedFileName = "10-21-2025_1_daily-summary.md";
+        var expectedFileName = "10-21-2025_1_generated.md";
         var expectedPath = $"{_testMemoryDirectory}/{DirectoryNames.Recording}/{expectedFileName}";
         result.Should().Be(expectedPath);
     }
 
     [Fact]
-    public void BuildOutputFilePath_WithDifferentTemplate_ChangesFilename()
+    public void BuildOutputFilePath_WithDifferentRecordingDate_ChangesFilename()
     {
         // Arrange
         var fileSystem = new MockFileSystem();
@@ -66,7 +66,8 @@ public sealed class OutputStorageServiceTests
         var result = service.BuildOutputFilePath(recordingBaseName, templateId);
 
         // Assert
-        result.Should().Contain("10-21-2025_2_business-meeting.md");
+        // Note: templateId is no longer used in the filename, only recordingBaseName and _generated
+        result.Should().Contain("10-21-2025_2_generated.md");
     }
 
     [Fact]
@@ -97,7 +98,7 @@ public sealed class OutputStorageServiceTests
 
         var recordingBaseName = "10-21-2025_1";
         var templateId = "daily-summary";
-        var filePath = $"{recordingDir}/{recordingBaseName}_{templateId}.md";
+        var filePath = $"{recordingDir}/{recordingBaseName}_generated.md";
         fileSystem.AddFile(filePath, new MockFileData("existing content"));
 
         var service = CreateService(fileSystem);
@@ -151,6 +152,8 @@ public sealed class OutputStorageServiceTests
 
         var savedContent = fileSystem.File.ReadAllText(outputPath);
         savedContent.Should().Contain(output.Content);
+        // Verify file uses _generated naming
+        outputPath.Should().Contain("_generated.md");
         savedContent.Should().Contain("---");
         savedContent.Should().Contain("entry-id:");
         savedContent.Should().Contain("command: generate");
@@ -244,7 +247,7 @@ public sealed class OutputStorageServiceTests
         result.Value.Should().NotBeNullOrEmpty();
         result.Value.Should().EndWith(".md");
         result.Value.Should().Contain(output.RecordingBaseName);
-        result.Value.Should().Contain(output.TemplateId);
+        result.Value.Should().Contain("_generated");
     }
 
     [Fact]
@@ -268,6 +271,8 @@ public sealed class OutputStorageServiceTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         var savedContent = fileSystem.File.ReadAllText(result.Value);
+        // Verify filename uses _generated suffix
+        result.Value.Should().Contain("_generated.md");
         savedContent.Should().Contain("truncated: true");
         savedContent.Should().Contain("original-word-count: 500");
     }

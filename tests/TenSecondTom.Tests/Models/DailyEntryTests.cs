@@ -71,7 +71,7 @@ public sealed class DailyEntryTests
         string filePath = entry.FilePath;
 
         // Assert
-        filePath.Should().Be("today/10-20-2025_1.md");
+        filePath.Should().Be("note/10-20-2025_1_generated.md");
     }
 
     [Fact]
@@ -103,8 +103,8 @@ public sealed class DailyEntryTests
         };
 
         // Act & Assert
-        entry1.FilePath.Should().Be("today/10-20-2025_1.md");
-        entry2.FilePath.Should().Be("today/10-20-2025_2.md");
+        entry1.FilePath.Should().Be("note/10-20-2025_1_generated.md");
+        entry2.FilePath.Should().Be("note/10-20-2025_2_generated.md");
         entry1.FilePath.Should().NotBe(entry2.FilePath);
     }
 
