@@ -105,7 +105,7 @@ public sealed class GenerateOutputMigration : IFeatureMigration
     /// Example: '01-21-2025_1_business-meeting.md' becomes '01-21-2025_1_generated.md'
     /// </para>
     /// </remarks>
-    private static async Task<bool> MigrateGenerateFilesAsync(
+    private static Task<bool> MigrateGenerateFilesAsync(
         string recordingDirectory,
         IFileSystem fileSystem,
         ILogger logger,
@@ -122,7 +122,7 @@ public sealed class GenerateOutputMigration : IFeatureMigration
         if (allMarkdownFiles.Length == 0)
         {
             logger.LogDebug("No markdown files found in recording directory, no migration needed");
-            return false;
+            return Task.FromResult(false);
         }
 
         int migratedCount = 0;
@@ -215,7 +215,7 @@ public sealed class GenerateOutputMigration : IFeatureMigration
                 "Migrated {MigratedCount} generate output files to use _generated suffix (skipped {SkippedCount})",
                 migratedCount,
                 skippedCount);
-            return true;
+            return Task.FromResult(true);
         }
 
         if (skippedCount > 0)
@@ -229,6 +229,6 @@ public sealed class GenerateOutputMigration : IFeatureMigration
             logger.LogDebug("No generate output files found that need migration");
         }
 
-        return false;
+        return Task.FromResult(false);
     }
 }

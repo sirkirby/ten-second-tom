@@ -78,7 +78,7 @@ public sealed class NoteMigration : IFeatureMigration
     /// receive the '_generated' suffix to distinguish them from user-created notes (from /note command).
     /// Example: '01-21-2025_1.md' becomes '01-21-2025_1_generated.md'
     /// </remarks>
-    private static async Task<bool> MigrateNotesDirectoryAsync(
+    private static Task<bool> MigrateNotesDirectoryAsync(
         string rootDirectory,
         IFileSystem fileSystem,
         ILogger logger,
@@ -94,7 +94,7 @@ public sealed class NoteMigration : IFeatureMigration
         if (!fileSystem.Directory.Exists(legacyTodayDirectory))
         {
             logger.LogDebug("Legacy 'today/' directory does not exist at {Path}, no migration needed", legacyTodayDirectory);
-            return false;
+            return Task.FromResult(false);
         }
 
         // Get all files in legacy directory (both .md and .wav files)
@@ -104,7 +104,7 @@ public sealed class NoteMigration : IFeatureMigration
         {
             logger.LogInformation("Legacy 'today/' directory is empty, deleting it");
             fileSystem.Directory.Delete(legacyTodayDirectory, recursive: false);
-            return false;
+            return Task.FromResult(false);
         }
 
         // Migration is needed - ensure target directory exists
@@ -154,10 +154,10 @@ public sealed class NoteMigration : IFeatureMigration
             logger.LogInformation("Deleting empty legacy 'today/' directory");
             fileSystem.Directory.Delete(legacyTodayDirectory, recursive: false);
             logger.LogInformation("Migrated {Count} files from today/ to note/ (added _generated suffix to .md files)", filesMoved);
-            return true;
+            return Task.FromResult(true);
         }
 
         logger.LogWarning("No files were moved from today/ to note/, migration skipped");
-        return false;
+        return Task.FromResult(false);
     }
 }
