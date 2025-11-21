@@ -50,6 +50,7 @@ public sealed class TemplateEditingTests : IDisposable
         var templatePath = Path.Combine(_testDirectory, $"{templateId}.md");
         var originalContent = """
             ---
+            id: test-daily
             templateType: daily
             title: Test Daily Template
             description: Original version
@@ -72,6 +73,7 @@ public sealed class TemplateEditingTests : IDisposable
         // Arrange - Edit template content
         var editedContent = """
             ---
+            id: test-daily
             templateType: daily
             title: Test Daily Template
             description: Edited version
@@ -105,6 +107,7 @@ public sealed class TemplateEditingTests : IDisposable
         var templatePath = Path.Combine(_testDirectory, $"{templateId}.md");
         var dailyTemplate = """
             ---
+            id: test-template
             templateType: daily
             title: Test Template
             description: Initially a daily template
@@ -125,6 +128,7 @@ public sealed class TemplateEditingTests : IDisposable
         // Arrange - Change to Weekly type
         var weeklyTemplate = """
             ---
+            id: test-template
             templateType: weekly
             title: Test Template
             description: Now a weekly template
@@ -156,6 +160,7 @@ public sealed class TemplateEditingTests : IDisposable
         var templatePath = Path.Combine(_testDirectory, $"{templateId}.md");
         var originalTemplate = """
             ---
+            id: test-metadata
             templateType: daily
             title: Original Title
             description: Original description
@@ -183,6 +188,7 @@ public sealed class TemplateEditingTests : IDisposable
         // Arrange - Edit metadata
         var editedTemplate = """
             ---
+            id: test-metadata
             templateType: daily
             title: Updated Title
             description: Updated description with more details
@@ -220,6 +226,7 @@ public sealed class TemplateEditingTests : IDisposable
         var template1Path = Path.Combine(_testDirectory, "existing-template.md");
         var template1Content = """
             ---
+            id: existing-template
             templateType: daily
             title: Existing Template
             ---
@@ -241,6 +248,7 @@ public sealed class TemplateEditingTests : IDisposable
         var template2Path = Path.Combine(_testDirectory, "new-custom-template.md");
         var template2Content = """
             ---
+            id: new-custom-template
             templateType: daily
             title: New Custom Template
             description: This was just created
@@ -277,17 +285,28 @@ public sealed class TemplateEditingTests : IDisposable
         var template1Path = Path.Combine(_testDirectory, "template-1.md");
         var template2Path = Path.Combine(_testDirectory, "template-2.md");
 
-        var templateContent = """
+        var template1Content = """
             ---
+            id: template-1
             templateType: daily
-            title: Test Template
+            title: Test Template 1
             ---
 
             # Content
             """;
 
-        await File.WriteAllTextAsync(template1Path, templateContent);
-        await File.WriteAllTextAsync(template2Path, templateContent);
+        var template2Content = """
+            ---
+            id: template-2
+            templateType: daily
+            title: Test Template 2
+            ---
+
+            # Content
+            """;
+
+        await File.WriteAllTextAsync(template1Path, template1Content);
+        await File.WriteAllTextAsync(template2Path, template2Content);
 
         // Act 1 - Load all templates (should find 2)
         var result1 = await _templateLoader.LoadAllTemplatesAsync();
@@ -322,6 +341,7 @@ public sealed class TemplateEditingTests : IDisposable
 
         await File.WriteAllTextAsync(dailyPath, """
             ---
+            id: daily-template
             templateType: daily
             title: Daily Template
             ---
@@ -330,6 +350,7 @@ public sealed class TemplateEditingTests : IDisposable
 
         await File.WriteAllTextAsync(weeklyPath, """
             ---
+            id: weekly-template
             templateType: weekly
             title: Weekly Template
             ---
@@ -351,6 +372,7 @@ public sealed class TemplateEditingTests : IDisposable
         var dailyPath2 = Path.Combine(_testDirectory, "daily-template-2.md");
         await File.WriteAllTextAsync(dailyPath2, """
             ---
+            id: daily-template-2
             templateType: daily
             title: Daily Template 2
             ---

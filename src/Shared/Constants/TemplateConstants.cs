@@ -9,11 +9,13 @@ public static class TemplateConstants
     /// <summary>
     /// Identifier for the default daily summary template.
     /// </summary>
+    [Obsolete("Use template ID from front matter instead")]
     public const string DailySummaryTemplateId = "daily-summary";
 
     /// <summary>
     /// Identifier for the default weekly review template.
     /// </summary>
+    [Obsolete("Use template ID from front matter instead")]
     public const string WeeklyReviewTemplateId = "weekly-review";
 
     /// <summary>
@@ -22,6 +24,7 @@ public static class TemplateConstants
     /// not the template TYPE (TemplateType.BusinessMeeting enum value).
     /// Template selection and output filenames use the filename, not the type.
     /// </summary>
+    [Obsolete("Use template ID from front matter instead")]
     public const string BusinessMeetingTemplateId = "business-meeting";
 
     /// <summary>

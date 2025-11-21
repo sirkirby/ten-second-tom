@@ -219,7 +219,22 @@ public static class Record
                 transcriptWithMetadata.AppendLine();
                 transcriptWithMetadata.AppendLine(transcription.TranscriptText);
 
-                await File.WriteAllTextAsync(transcriptionFilePath, transcriptWithMetadata.ToString(), cancellationToken);
+                var fileContent = $"""
+                                   ---
+                                   recording-id: {Guid.NewGuid()}
+                                   date: {today:yyyy-MM-dd HH:mm:ss}
+                                   duration: {recording.Duration.TotalSeconds:F2}
+                                   file-size-bytes: {fileSizeBytes}
+                                   stt-engine: {transcription.SttEngine}
+                                   stt-model: {transcription.SttModel}
+                                   word-count: {transcription.WordCount}
+                                   processing-duration-seconds: {transcription.ProcessingDuration.TotalSeconds:F2}
+                                   {(string.IsNullOrEmpty(transcription.Language) ? "" : $"language: {transcription.Language}\n")}---
+
+                                   {transcription.TranscriptText}
+                                   """;
+
+                await File.WriteAllTextAsync(transcriptionFilePath, fileContent, cancellationToken);
                 logger.LogDebug("Saved transcription to {TranscriptionFilePath}", transcriptionFilePath);
 
                 // Create result

@@ -179,7 +179,7 @@ public static class [UseCase]
 6. **Document**: Add XML comments to public APIs
 
 ### Pull Request Requirements
-- All tests pass (including integration tests)
+- All tests pass (including integration tests) NO EXCEPTIONS, NO EXCUSES
 - 80% minimum code coverage maintained
 - No `[Obsolete]` warnings (clean up or remove deprecated code)
 - VSA compliance verified (architecture tests pass)

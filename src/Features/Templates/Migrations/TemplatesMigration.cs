@@ -111,10 +111,11 @@ public sealed class TemplatesMigration : IFeatureMigration
         bool organizeExists = directoryExists &&
             fileSystem.File.Exists(fileSystem.Path.Combine(templatesDirectory, "organize.md"));
 
-        // If all required templates exist, no migration needed
+        // If all required templates exist, check if they have IDs
         if (dailySummaryExists && dailyStandupExists && weeklyReviewExists && businessMeetingExists && journalExists && organizeExists)
         {
-            logger.LogDebug("Templates already configured, no migration needed");
+            logger.LogDebug("Templates already configured, checking for missing IDs");
+            await EnsureTemplateIdsAsync(templatesDirectory, fileSystem, logger, cancellationToken);
             return Result<bool>.Success(false);
         }
 
@@ -159,6 +160,69 @@ public sealed class TemplatesMigration : IFeatureMigration
             installResult.Value.TemplatesInstalled,
             string.Join(", ", installResult.Value.InstalledTemplateIds));
 
+        // Ensure IDs are present even after installation (just in case embedded templates were missing them)
+        await EnsureTemplateIdsAsync(templatesDirectory, fileSystem, logger, cancellationToken);
+
         return Result<bool>.Success(true); // Migration completed successfully
+    }
+
+    /// <summary>
+    /// Scans existing default templates and injects the 'id' field into front matter if missing.
+    /// </summary>
+    private static async Task EnsureTemplateIdsAsync(
+        string templatesDirectory,
+        IFileSystem fileSystem,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        var defaultTemplates = new Dictionary<string, string>
+        {
+            { "daily-summary.md", TemplateConstants.DailySummaryTemplateId },
+            { "daily-standup.md", "daily-standup" }, // No constant for this one yet?
+            { "weekly-review.md", TemplateConstants.WeeklyReviewTemplateId },
+            { "business-meeting.md", TemplateConstants.BusinessMeetingTemplateId },
+            { "journal.md", TemplateConstants.JournalTemplateId },
+            { "organize.md", TemplateConstants.OrganizeTemplateId }
+        };
+
+        foreach (var (filename, id) in defaultTemplates)
+        {
+            var filePath = fileSystem.Path.Combine(templatesDirectory, filename);
+            if (!fileSystem.File.Exists(filePath)) continue;
+
+            try
+            {
+                var content = await fileSystem.File.ReadAllTextAsync(filePath, cancellationToken);
+
+                // Check if ID is already present in front matter
+                if (content.Contains($"id: {id}") || content.Contains($"id: \"{id}\""))
+                {
+                    continue;
+                }
+
+                logger.LogInformation("Migrating template {Filename}: Adding id: {Id}", filename, id);
+
+                // Inject ID into front matter
+                // Assumes front matter starts with ---
+                if (content.StartsWith("---"))
+                {
+                    var lines = content.Split('\n').ToList();
+                    // Insert after the first ---
+                    lines.Insert(1, $"id: {id}");
+                    var newContent = string.Join('\n', lines);
+                    await fileSystem.File.WriteAllTextAsync(filePath, newContent, cancellationToken);
+                }
+                else
+                {
+                    // No front matter? Prepend it.
+                    var newContent = $"---\nid: {id}\n---\n\n{content}";
+                    await fileSystem.File.WriteAllTextAsync(filePath, newContent, cancellationToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to migrate template {Filename}", filename);
+            }
+        }
     }
 }

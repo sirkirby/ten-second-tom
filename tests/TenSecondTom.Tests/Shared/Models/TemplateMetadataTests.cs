@@ -17,6 +17,7 @@ public sealed class TemplateMetadataTests
         // Arrange
         var metadata = new TemplateMetadata
         {
+            Id = "test-template",
             TemplateType = TemplateType.Daily,
             Title = "Valid Title"
         };
@@ -34,6 +35,7 @@ public sealed class TemplateMetadataTests
         // Arrange
         var metadata = new TemplateMetadata
         {
+            Id = "complete-template",
             TemplateType = TemplateType.Weekly,
             Title = "Complete Template",
             Description = "A comprehensive template description",
@@ -59,6 +61,7 @@ public sealed class TemplateMetadataTests
         // Arrange
         var metadata = new TemplateMetadata
         {
+            Id = "test-template",
             TemplateType = TemplateType.Daily,
             Title = title!
         };
@@ -78,6 +81,7 @@ public sealed class TemplateMetadataTests
         var longTitle = new string('A', 201); // 201 characters
         var metadata = new TemplateMetadata
         {
+            Id = "test-template",
             TemplateType = TemplateType.Daily,
             Title = longTitle
         };
@@ -97,6 +101,7 @@ public sealed class TemplateMetadataTests
         var maxTitle = new string('A', 200); // Exactly 200 characters
         var metadata = new TemplateMetadata
         {
+            Id = "test-template",
             TemplateType = TemplateType.Daily,
             Title = maxTitle
         };
@@ -114,6 +119,7 @@ public sealed class TemplateMetadataTests
         // Arrange
         var metadata = new TemplateMetadata
         {
+            Id = "test-template",
             TemplateType = (TemplateType)999, // Invalid enum value
             Title = "Valid Title"
         };
@@ -133,6 +139,7 @@ public sealed class TemplateMetadataTests
         var longDescription = new string('A', 501); // 501 characters
         var metadata = new TemplateMetadata
         {
+            Id = "test-template",
             TemplateType = TemplateType.Daily,
             Title = "Valid Title",
             Description = longDescription
@@ -153,6 +160,7 @@ public sealed class TemplateMetadataTests
         var maxDescription = new string('A', 500); // Exactly 500 characters
         var metadata = new TemplateMetadata
         {
+            Id = "test-template",
             TemplateType = TemplateType.Daily,
             Title = "Valid Title",
             Description = maxDescription
@@ -172,6 +180,7 @@ public sealed class TemplateMetadataTests
         var longAuthor = new string('A', 101); // 101 characters
         var metadata = new TemplateMetadata
         {
+            Id = "test-template",
             TemplateType = TemplateType.Daily,
             Title = "Valid Title",
             Author = longAuthor
@@ -192,6 +201,7 @@ public sealed class TemplateMetadataTests
         var maxAuthor = new string('A', 100); // Exactly 100 characters
         var metadata = new TemplateMetadata
         {
+            Id = "test-template",
             TemplateType = TemplateType.Daily,
             Title = "Valid Title",
             Author = maxAuthor
@@ -211,6 +221,7 @@ public sealed class TemplateMetadataTests
         var tooManyTags = Enumerable.Range(1, 21).Select(i => $"tag{i}").ToArray(); // 21 tags
         var metadata = new TemplateMetadata
         {
+            Id = "test-template",
             TemplateType = TemplateType.Daily,
             Title = "Valid Title",
             Tags = tooManyTags
@@ -231,6 +242,7 @@ public sealed class TemplateMetadataTests
         var maxTags = Enumerable.Range(1, 20).Select(i => $"tag{i}").ToArray(); // Exactly 20 tags
         var metadata = new TemplateMetadata
         {
+            Id = "test-template",
             TemplateType = TemplateType.Daily,
             Title = "Valid Title",
             Tags = maxTags
@@ -250,6 +262,7 @@ public sealed class TemplateMetadataTests
         var longTag = new string('A', 51); // 51 characters
         var metadata = new TemplateMetadata
         {
+            Id = "test-template",
             TemplateType = TemplateType.Daily,
             Title = "Valid Title",
             Tags = new[] { "valid-tag", longTag }
@@ -270,6 +283,7 @@ public sealed class TemplateMetadataTests
         var maxTag = new string('A', 50); // Exactly 50 characters
         var metadata = new TemplateMetadata
         {
+            Id = "test-template",
             TemplateType = TemplateType.Daily,
             Title = "Valid Title",
             Tags = new[] { maxTag }
@@ -294,6 +308,7 @@ public sealed class TemplateMetadataTests
         // Arrange
         var metadata = new TemplateMetadata
         {
+            Id = "test-template",
             TemplateType = TemplateType.Daily,
             Title = "Valid Title",
             Version = version
@@ -313,6 +328,7 @@ public sealed class TemplateMetadataTests
         // Arrange
         var metadata = new TemplateMetadata
         {
+            Id = "test-template",
             TemplateType = (TemplateType)999, // Invalid enum
             Title = new string('A', 201), // Too long
             Description = new string('B', 501), // Too long
@@ -339,6 +355,7 @@ public sealed class TemplateMetadataTests
         // Arrange
         var metadata = new TemplateMetadata
         {
+            Id = "test-template",
             TemplateType = TemplateType.Daily,
             Title = "Valid Title",
             Description = null,
@@ -361,6 +378,7 @@ public sealed class TemplateMetadataTests
         // Arrange
         var metadata = new TemplateMetadata
         {
+            Id = "test-template",
             TemplateType = TemplateType.Daily,
             Title = "Valid Title",
             Tags = Array.Empty<string>()

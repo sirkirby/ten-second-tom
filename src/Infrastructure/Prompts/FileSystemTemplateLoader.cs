@@ -118,22 +118,31 @@ public sealed class FileSystemTemplateLoader : IPromptTemplateLoader
             if (validationErrors.Count > 0)
             {
                 var errorMessage = string.Join("; ", validationErrors);
-                _logger.LogWarning("Custom template {TemplateId} failed validation: {Errors}",
+                _logger.LogWarning("Template {TemplateId} failed validation: {Errors}",
                     templateId, errorMessage);
                 return Result<PromptTemplate>.Failure($"Invalid template metadata: {errorMessage}");
             }
         }
+        else
+        {
+            // Metadata is required for Id
+            _logger.LogWarning("Template {TemplateId} is missing metadata (YAML front matter)", templateId);
+            return Result<PromptTemplate>.Failure("Template is missing metadata (YAML front matter)");
+        }
+
+        // Use Id from metadata, not filename
+        var id = parsed.Metadata.Id!;
 
         // Determine if this is a custom template (not a default)
-        var isCustomTemplate = !TemplateConstants.IsDefaultTemplate(templateId);
+        var isCustomTemplate = !TemplateConstants.IsDefaultTemplate(id);
 
         // Create PromptTemplate
         var template = new PromptTemplate
         {
-            TemplateId = templateId,
+            TemplateId = id,
             Content = parsed.Content,
-            TemplateType = parsed.Metadata?.TemplateType ?? TemplateType.Daily,
-            Description = parsed.Metadata?.Description,
+            TemplateType = parsed.Metadata.TemplateType,
+            Description = parsed.Metadata.Description,
             Source = TemplateSource.FileSystem,
             Metadata = parsed.Metadata
         };

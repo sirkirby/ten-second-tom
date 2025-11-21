@@ -314,7 +314,7 @@ public sealed class ApplicationBootstrapper
             .Where(t => typeof(IFeatureMigration).IsAssignableFrom(t)
                      && t.IsClass
                      && !t.IsAbstract)
-            .Select(t => (IFeatureMigration)Activator.CreateInstance(t)!)
+            .Select(t => (IFeatureMigration)ActivatorUtilities.CreateInstance(_serviceProvider, t))
             .OrderBy(m => m.Priority)
             .ThenBy(m => m.FeatureName)
             .ToList();

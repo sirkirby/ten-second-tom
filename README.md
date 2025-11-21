@@ -95,6 +95,7 @@ Options:
   --voice                      Record voice note (wav) with automatic speech-to-text transcription
   --stt <engine>              STT engine: auto (default), local, or openai (only used with --voice)
   --no-edit                    Skip interactive editor, use content from command line
+  --list                       List all available notes and exit
   --output-json                Output results in JSON format
 
 Examples:
@@ -103,6 +104,8 @@ Examples:
   tom note --voice --stt local                        # Voice note with local whisper.cpp
   tom note --voice --stt openai                       # Voice note with OpenAI Whisper API
   tom note "Quick thought" --no-edit                  # Quick capture mode
+  tom note --list                                     # List all available notes
+  tom note --list --output-json                       # List notes in JSON format
 ```
 
 **Storage**: Notes are saved to `<memory-dir>/note/` directory with filename `MM-DD-YYYY_N.md` where N is an incremental counter for that day.
@@ -199,11 +202,18 @@ tom record [options]
 
 Options:
   --stt <engine>    STT engine: auto (default), local, or openai
+  --list            List all available recordings and exit
   --output-json     Output results in JSON format
+
+Examples:
+  tom record                    # Start recording with auto STT
+  tom record --stt local        # Record with local whisper.cpp
+  tom record --list             # List all recordings
+  tom record --list --output-json  # List recordings in JSON format
 
 Files saved to:
   <memory-dir>/recording/MM-dd-yyyy_N.wav
-  <memory-dir>/recording/MM-dd-yyyy_N.txt
+  <memory-dir>/recording/MM-dd-yyyy_N.md
 ```
 
 **Note:** The `record` command requires SSH authentication (like other commands that create data). Recordings are saved with metadata in YAML frontmatter including timestamp, duration, STT engine used, and word count.

@@ -17,6 +17,7 @@ public sealed class OutputStorageService : IOutputStorageService
 {
     private readonly IFileSystem _fileSystem;
     private readonly string _recordingDirectory;
+    private readonly string _noteDirectory;
     private readonly ILogger<OutputStorageService> _logger;
 
     public OutputStorageService(
@@ -33,6 +34,7 @@ public sealed class OutputStorageService : IOutputStorageService
         // Get the effective storage directory using extension method
         var storageBaseDir = options.GetEffectiveStorageDirectory();
         _recordingDirectory = Path.Combine(storageBaseDir, DirectoryNames.Recording);
+        _noteDirectory = Path.Combine(storageBaseDir, DirectoryNames.Note);
     }
 
     public async Task<Result<string>> SaveOutputAsync(
@@ -41,15 +43,20 @@ public sealed class OutputStorageService : IOutputStorageService
     {
         try
         {
+            // Determine target directory based on input type
+            var targetDirectory = output.InputType == "Recording"
+                ? _recordingDirectory
+                : _noteDirectory;
+
             // Validate directory exists
-            if (!_fileSystem.Directory.Exists(_recordingDirectory))
+            if (!_fileSystem.Directory.Exists(targetDirectory))
             {
                 return Result<string>.Failure(
-                    $"Recording directory not found: {_recordingDirectory}");
+                    $"{output.InputType} directory not found: {targetDirectory}");
             }
 
-            // Build file path
-            var outputPath = BuildOutputFilePath(output.RecordingBaseName, output.TemplateId);
+            // Build file path using the target directory
+            var outputPath = BuildOutputFilePath(output.InputName, output.TemplateId, targetDirectory);
 
             // Check if file already exists for logging
             var fileExists = _fileSystem.File.Exists(outputPath);
@@ -65,10 +72,10 @@ public sealed class OutputStorageService : IOutputStorageService
                 var actualSizeMb = outputSizeBytes / (1024.0 * 1024.0);
 
                 _logger.LogError(
-                    "Output file exceeds maximum size: {ActualSize:F2} MB > {MaxSize} MB for {Recording}/{Template}",
+                    "Output file exceeds maximum size: {ActualSize:F2} MB > {MaxSize} MB for {InputName}/{Template}",
                     actualSizeMb,
                     maxSizeMb,
-                    output.RecordingBaseName,
+                    output.InputName,
                     output.TemplateId);
 
                 return Result<string>.Failure(
@@ -99,8 +106,8 @@ public sealed class OutputStorageService : IOutputStorageService
         {
             _logger.LogError(
                 ex,
-                "Failed to save output for {Recording}/{Template}",
-                output.RecordingBaseName,
+                "Failed to save output for {InputName}/{Template}",
+                output.InputName,
                 output.TemplateId);
 
             return Result<string>.Failure($"Failed to save output: {ex.Message}");
@@ -112,21 +119,33 @@ public sealed class OutputStorageService : IOutputStorageService
         string templateId,
         CancellationToken cancellationToken = default)
     {
-        var outputPath = BuildOutputFilePath(recordingBaseName, templateId);
-        return Task.FromResult(_fileSystem.File.Exists(outputPath));
+        // For backward compatibility, check both directories
+        var recordingPath = BuildOutputFilePath(recordingBaseName, templateId, _recordingDirectory);
+        var notePath = BuildOutputFilePath(recordingBaseName, templateId, _noteDirectory);
+
+        return Task.FromResult(
+            _fileSystem.File.Exists(recordingPath) ||
+            _fileSystem.File.Exists(notePath));
     }
 
     /// <summary>
     /// Builds the output file path for a generated output.
-    /// Format: {recordingBaseName}_generated.md
+    /// Format: {inputBaseName}_generated.md
     /// Template information is stored in the file's YAML front matter.
     /// </summary>
-    /// <param name="recordingBaseName">Base name of the recording (e.g., "01-21-2025_1")</param>
+    /// <param name="inputBaseName">Base name of the input (e.g., "01-21-2025_1" or "MyNote")</param>
     /// <param name="templateId">Template ID (currently unused in filename, kept for interface compatibility)</param>
-    /// <returns>Full path to the output file in the recording directory</returns>
+    /// <param name="targetDirectory">Directory to save the output to</param>
+    /// <returns>Full path to the output file in the specified directory</returns>
+    private static string BuildOutputFilePath(string inputBaseName, string templateId, string targetDirectory)
+    {
+        var fileName = $"{inputBaseName}_generated.md";
+        return Path.Combine(targetDirectory, fileName);
+    }
+
+    // Legacy method for interface compatibility - uses recording directory by default
     public string BuildOutputFilePath(string recordingBaseName, string templateId)
     {
-        var fileName = $"{recordingBaseName}_generated.md";
-        return Path.Combine(_recordingDirectory, fileName);
+        return BuildOutputFilePath(recordingBaseName, templateId, _recordingDirectory);
     }
 }

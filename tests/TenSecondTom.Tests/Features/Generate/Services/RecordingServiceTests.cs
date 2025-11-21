@@ -6,6 +6,7 @@ using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using TenSecondTom.Features.Generate.Models;
 using TenSecondTom.Features.Generate.Services;
+using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Features.Generate;
@@ -20,12 +21,15 @@ public sealed class RecordingServiceTests
 {
     private readonly Mock<ILogger<RecordingService>> _mockLogger;
     private readonly Mock<IOptions<StorageOptions>> _mockStorageOptions;
+    private readonly YamlFrontMatterParser _yamlParser;
     private readonly string _testMemoryDirectory;
 
     public RecordingServiceTests()
     {
         _mockLogger = new Mock<ILogger<RecordingService>>();
         _mockStorageOptions = new Mock<IOptions<StorageOptions>>();
+        var yamlLogger = new Mock<ILogger<YamlFrontMatterParser>>();
+        _yamlParser = new YamlFrontMatterParser(yamlLogger.Object);
         _testMemoryDirectory = "/test/memory";
 
         // Setup storage options to return test root directory
@@ -62,9 +66,9 @@ public sealed class RecordingServiceTests
         fileSystem.AddDirectory(recordingDir);
 
         // Create recordings with different dates (newest should be first)
-        AddTestRecording(fileSystem, recordingDir, "10-21-2025_1.txt", "First recording content");
-        AddTestRecording(fileSystem, recordingDir, "10-24-2025_1.txt", "Newest recording content");
-        AddTestRecording(fileSystem, recordingDir, "10-20-2025_2.txt", "Oldest recording content");
+        AddTestRecording(fileSystem, recordingDir, "10-21-2025_1.md", "First recording content");
+        AddTestRecording(fileSystem, recordingDir, "10-24-2025_1.md", "Newest recording content");
+        AddTestRecording(fileSystem, recordingDir, "10-20-2025_2.md", "Oldest recording content");
 
         var service = CreateService(fileSystem);
 
@@ -91,8 +95,8 @@ public sealed class RecordingServiceTests
         fileSystem.AddDirectory(recordingDir);
 
         // Add valid and invalid recordings
-        AddTestRecording(fileSystem, recordingDir, "10-21-2025_1.txt", "Valid recording");
-        fileSystem.AddFile($"{recordingDir}/invalid-name.txt", new MockFileData("Invalid"));
+        AddTestRecording(fileSystem, recordingDir, "10-21-2025_1.md", "Valid recording");
+        fileSystem.AddFile($"{recordingDir}/invalid-name.md", new MockFileData("Invalid"));
         fileSystem.AddFile($"{recordingDir}/not-a-recording.md", new MockFileData("Not a recording"));
 
         var service = CreateService(fileSystem);
@@ -132,7 +136,7 @@ public sealed class RecordingServiceTests
         fileSystem.AddDirectory(recordingDir);
 
         var content = "This is a test recording with ten words total here";
-        AddTestRecording(fileSystem, recordingDir, "10-21-2025_1.txt", content);
+        AddTestRecording(fileSystem, recordingDir, "10-21-2025_1.md", content);
 
         var service = CreateService(fileSystem);
 
@@ -153,7 +157,7 @@ public sealed class RecordingServiceTests
         fileSystem.AddDirectory(recordingDir);
 
         var content = "Test content";
-        AddTestRecording(fileSystem, recordingDir, "10-21-2025_1.txt", content);
+        AddTestRecording(fileSystem, recordingDir, "10-21-2025_1.md", content);
 
         var service = CreateService(fileSystem);
 
@@ -178,7 +182,7 @@ public sealed class RecordingServiceTests
         fileSystem.AddDirectory(recordingDir);
 
         var expectedContent = "This is the transcript content.";
-        var filePath = $"{recordingDir}/10-21-2025_1.txt";
+        var filePath = $"{recordingDir}/10-21-2025_1.md";
         fileSystem.AddFile(filePath, new MockFileData(expectedContent));
 
         var service = CreateService(fileSystem);
@@ -197,7 +201,7 @@ public sealed class RecordingServiceTests
         // Arrange
         var fileSystem = new MockFileSystem();
         var service = CreateService(fileSystem);
-        var nonExistentPath = "/path/to/missing/file.txt";
+        var nonExistentPath = "/path/to/missing/file.md";
 
         // Act
         var result = await service.GetTranscriptContentAsync(nonExistentPath);
@@ -234,7 +238,7 @@ public sealed class RecordingServiceTests
         var recordingDir = $"{_testMemoryDirectory}/{DirectoryNames.Recording}";
         fileSystem.AddDirectory(recordingDir);
 
-        var filePath = $"{recordingDir}/10-21-2025_1.txt";
+        var filePath = $"{recordingDir}/10-21-2025_1.md";
         fileSystem.AddFile(filePath, new MockFileData("Content"));
 
         var service = CreateService(fileSystem);
@@ -254,7 +258,7 @@ public sealed class RecordingServiceTests
         var service = CreateService(fileSystem);
 
         // Act
-        var result = await service.ValidateTranscriptFileAsync("/missing/file.txt");
+        var result = await service.ValidateTranscriptFileAsync("/missing/file.md");
 
         // Assert
         result.IsSuccess.Should().BeFalse();
@@ -269,7 +273,7 @@ public sealed class RecordingServiceTests
         var recordingDir = $"{_testMemoryDirectory}/{DirectoryNames.Recording}";
         fileSystem.AddDirectory(recordingDir);
 
-        var filePath = $"{recordingDir}/10-21-2025_1.txt";
+        var filePath = $"{recordingDir}/10-21-2025_1.md";
         fileSystem.AddFile(filePath, new MockFileData(string.Empty));
 
         var service = CreateService(fileSystem);
@@ -287,9 +291,9 @@ public sealed class RecordingServiceTests
     #region ParseRecordingTimestamp Tests
 
     [Theory]
-    [InlineData("10-21-2025_1.txt", 2025, 10, 21)]
-    [InlineData("1-5-2025_2.txt", 2025, 1, 5)]
-    [InlineData("12-31-2024_10.txt", 2024, 12, 31)]
+    [InlineData("10-21-2025_1.md", 2025, 10, 21)]
+    [InlineData("1-5-2025_2.md", 2025, 1, 5)]
+    [InlineData("12-31-2024_10.md", 2024, 12, 31)]
     public void ParseRecordingTimestamp_WithValidFilename_ReturnsCorrectDate(
         string filename,
         int expectedYear,
@@ -311,11 +315,11 @@ public sealed class RecordingServiceTests
     }
 
     [Theory]
-    [InlineData("invalid-format.txt")]
-    [InlineData("not-a-date_1.txt")]
-    [InlineData("10-21-2025.txt")] // Missing increment
-    [InlineData("10-21-2025_.txt")] // Empty increment
-    [InlineData("recording-20251024-143022.txt")] // Old format
+    [InlineData("invalid-format.md")]
+    [InlineData("not-a-date_1.md")]
+    [InlineData("10-21-2025.md")] // Missing increment
+    [InlineData("10-21-2025_.md")] // Empty increment
+    [InlineData("recording-20251024-143022.md")] // Old format
     public void ParseRecordingTimestamp_WithInvalidFilename_ReturnsFailure(string filename)
     {
         // Arrange
@@ -338,7 +342,7 @@ public sealed class RecordingServiceTests
         var service = CreateService(fileSystem);
 
         // Act
-        var result = service.ParseRecordingTimestamp("10-21-2025_3.txt");
+        var result = service.ParseRecordingTimestamp("10-21-2025_3.md");
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -355,7 +359,8 @@ public sealed class RecordingServiceTests
         return new RecordingService(
             fileSystem ?? new MockFileSystem(),
             _mockStorageOptions.Object,
-            _mockLogger.Object);
+            _mockLogger.Object,
+            _yamlParser);
     }
 
     private static void AddTestRecording(
@@ -366,11 +371,11 @@ public sealed class RecordingServiceTests
     {
         var filePath = $"{directory}/{filename}";
 
-        // Parse date from filename (M-D-Y_Increment.txt format)
+        // Parse date from filename (M-D-Y_Increment.md format)
         // and set LastWriteTime to match, so sorting by LastWriteTime works correctly
         var dateMatch = System.Text.RegularExpressions.Regex.Match(
             filename,
-            @"^(\d{1,2})-(\d{1,2})-(\d{4})_(\d+)\.txt$");
+            @"^(\d{1,2})-(\d{1,2})-(\d{4})_(\d+)\.md$");
 
         DateTime lastWriteTime;
         if (dateMatch.Success)

@@ -48,6 +48,7 @@ public sealed class TemplateWorkflowTests : IDisposable
     {
         // Arrange - Create multiple custom template files to trigger selection UI (T055)
         var customTemplateContent = @"---
+id: my-custom-daily
 templateType: daily
 title: My Custom Daily Template
 description: A custom template for daily reflections
@@ -70,6 +71,7 @@ What will you tackle next?
 
         // Create a second template to ensure SelectTemplateAsync is called
         var secondTemplateContent = @"---
+id: alternative-daily
 templateType: daily
 title: Alternative Daily Template
 description: Another daily template
@@ -127,6 +129,7 @@ version: 1.0
     {
         // Arrange - Create custom template
         var customTemplateContent = @"---
+id: custom-weekly
 templateType: weekly
 title: Custom Weekly Review
 description: My personalized weekly review template
@@ -161,6 +164,7 @@ Weekly reflection content here.
     {
         // Arrange - Create multiple custom templates (T055)
         var template1 = @"---
+id: morning-reflection
 templateType: daily
 title: Morning Reflection
 ---
@@ -169,6 +173,7 @@ Start your day right.
 ";
 
         var template2 = @"---
+id: evening-review
 templateType: daily
 title: Evening Review
 ---
@@ -177,6 +182,7 @@ End your day with reflection.
 ";
 
         var template3 = @"---
+id: quick-checkin
 templateType: daily
 title: Quick Check-in
 ---
@@ -224,6 +230,7 @@ A brief daily check-in.
     {
         // Arrange - Create two valid and one invalid custom template (T055)
         var validTemplate = @"---
+id: valid-custom
 templateType: daily
 title: Valid Custom Template
 ---
@@ -233,6 +240,7 @@ This template is valid.
 ";
 
         var validTemplate2 = @"---
+id: valid-custom-2
 templateType: daily
 title: Another Valid Template
 ---
@@ -288,6 +296,7 @@ invalid: {unclosed
     {
         // Arrange - Create multiple templates to trigger selection UI
         var customTemplateContent = @"---
+id: marker-template
 templateType: daily
 title: Test Marker Template
 ---
@@ -304,6 +313,7 @@ This is custom template content.
 
         // Create a second template to ensure SelectTemplateAsync is called
         var secondTemplateContent = @"---
+id: another-template
 templateType: daily
 title: Another Template
 ---
@@ -331,8 +341,8 @@ title: Another Template
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
             .Callback<string, CancellationToken, int?, double?>((prompt, _, _, _) => capturedPrompt = prompt)
-            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse 
-            { 
+            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse
+            {
                 Content = "## Generated Summary",
                 InputTokens = 10,
                 OutputTokens = 20
@@ -382,8 +392,8 @@ title: Another Template
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
-            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse 
-            { 
+            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse
+            {
                 Content = "## Summary\nGenerated summary",
                 InputTokens = 10,
                 OutputTokens = 20

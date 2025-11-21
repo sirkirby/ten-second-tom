@@ -28,6 +28,7 @@ public static class GenerateFeatureExtensions
         // IRequestHandler interfaces are auto-registered by MediatR assembly scanning
         services.AddTransient<GenerateOutput.Handler>();
         services.AddTransient<ListRecordings.Handler>();
+        services.AddTransient<ListNotes.Handler>();
         services.AddTransient<GetRecordingTranscript.Handler>();
 
         return services;

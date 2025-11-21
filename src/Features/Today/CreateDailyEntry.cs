@@ -92,7 +92,7 @@ public static class CreateDailyEntry
                 return validationResult;
             }
 
-                    // 2. Check authentication
+            // 2. Check authentication
             bool isAuthenticated = await authService.IsAuthenticatedAsync(cancellationToken).ConfigureAwait(false);
             if (!isAuthenticated)
             {
@@ -101,7 +101,7 @@ public static class CreateDailyEntry
 
             // 3. Determine entry number for today (using note directory for shared numbering)
             DateTime today = DateTime.UtcNow.Date;
-        Result<int> countResult = await storage.CountEntriesAsync(CommandNames.Note, today, cancellationToken).ConfigureAwait(false);
+            Result<int> countResult = await storage.CountEntriesAsync(CommandNames.Note, today, cancellationToken).ConfigureAwait(false);
             if (!countResult.IsSuccess)
             {
                 return Result<DailyEntry>.Failure($"Failed to determine entry number: {countResult.Error}");

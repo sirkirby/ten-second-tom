@@ -3,9 +3,10 @@ using System.IO.Abstractions;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using TenSecondTom.Features.Generate.Models;
+using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Extensions;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
@@ -20,21 +21,24 @@ public sealed partial class RecordingService : IRecordingService
     private readonly IFileSystem _fileSystem;
     private readonly string _recordingDirectory;
     private readonly ILogger<RecordingService> _logger;
+    private readonly YamlFrontMatterParser _yamlParser;
 
     /// <summary>
-    /// Regex pattern for M-D-Y_Increment filename format (e.g., "10-21-2025_1.txt").
+    /// Regex pattern for M-D-Y_Increment filename format (e.g., "10-21-2025_1.md").
     /// Groups: Month, Day, Year, Increment
     /// </summary>
-    [GeneratedRegex(@"^(\d{1,2})-(\d{1,2})-(\d{4})_(\d+)\.txt$", RegexOptions.Compiled)]
+    [GeneratedRegex(@"^(\d{1,2})-(\d{1,2})-(\d{4})_(\d+)\.md$", RegexOptions.Compiled)]
     private static partial Regex RecordingFilenamePattern();
 
     public RecordingService(
         IFileSystem fileSystem,
         IOptions<StorageOptions> storageOptions,
-        ILogger<RecordingService> logger)
+        ILogger<RecordingService> logger,
+        YamlFrontMatterParser yamlParser)
     {
         _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _yamlParser = yamlParser ?? throw new ArgumentNullException(nameof(yamlParser));
 
         ArgumentNullException.ThrowIfNull(storageOptions);
         var options = storageOptions.Value;
@@ -58,7 +62,7 @@ public sealed partial class RecordingService : IRecordingService
 
         var files = _fileSystem.Directory.GetFiles(
             _recordingDirectory,
-            "*.txt",
+            "*.md",
             SearchOption.TopDirectoryOnly);
 
         if (files.Length == 0)
@@ -75,6 +79,13 @@ public sealed partial class RecordingService : IRecordingService
             {
                 var fileInfo = _fileSystem.FileInfo.New(filePath);
                 var filename = fileInfo.Name;
+
+                // Skip generated files (output of generate command)
+                if (filename.EndsWith("_generated.md", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
                 var baseName = Path.GetFileNameWithoutExtension(filename);
 
                 // Parse timestamp from filename to validate format
@@ -97,7 +108,7 @@ public sealed partial class RecordingService : IRecordingService
                     continue;
                 }
 
-                // Load content to count words (may throw for corrupted files)
+                // Load content to count words and parse date from front matter
                 var content = await _fileSystem.File.ReadAllTextAsync(filePath, cancellationToken);
 
                 // Skip empty files
@@ -109,11 +120,24 @@ public sealed partial class RecordingService : IRecordingService
                     continue;
                 }
 
-                var wordCount = CountWords(content);
+                // Try to parse date from YAML front matter, fall back to file LastWriteTime
+                DateTimeOffset recordedAt;
+                if (TryParseDateFromFrontMatter(content, out var parsedDate))
+                {
+                    recordedAt = parsedDate;
+                }
+                else
+                {
+                    _logger.LogDebug(
+                        "Could not parse date from YAML front matter for {Filename}, using file LastWriteTime",
+                        filename);
+                    recordedAt = new DateTimeOffset(fileInfo.LastWriteTime);
+                }
 
-                // Use file's LastWriteTime for the actual recording timestamp
-                // (filename only contains date, not time)
-                var recordedAt = new DateTimeOffset(fileInfo.LastWriteTime);
+                // Strip front matter for word count
+                var contentWithoutFrontMatter = StripFrontMatter(content);
+                var wordCount = CountWords(contentWithoutFrontMatter);
+
                 recordings.Add(new RecordingListItem
                 {
                     RecordingBaseName = baseName,
@@ -150,7 +174,7 @@ public sealed partial class RecordingService : IRecordingService
         if (recordings.Count == 0)
         {
             return Result<IReadOnlyList<RecordingListItem>>.Failure(
-                "No valid recordings found. Recordings must follow M-D-Y_Increment.txt naming pattern.");
+                "No valid recordings found. Recordings must follow M-D-Y_Increment.md naming pattern.");
         }
 
         // Sort by date descending (newest first)
@@ -190,12 +214,14 @@ public sealed partial class RecordingService : IRecordingService
                 return Result<string>.Failure($"Transcript file is empty: {transcriptFilePath}");
             }
 
+            var contentWithoutFrontMatter = StripFrontMatter(content);
+
             _logger.LogDebug(
                 "Loaded transcript from {Path}: {Length} characters",
                 transcriptFilePath,
-                content.Length);
+                contentWithoutFrontMatter.Length);
 
-            return Result<string>.Success(content);
+            return Result<string>.Success(contentWithoutFrontMatter);
         }
         catch (Exception ex)
         {
@@ -265,7 +291,7 @@ public sealed partial class RecordingService : IRecordingService
         if (!match.Success)
         {
             return Result<DateTimeOffset>.Failure(
-                $"Invalid filename format. Expected M-D-Y_Increment.txt, got: {filename}");
+                $"Invalid filename format. Expected M-D-Y_Increment.md, got: {filename}");
         }
 
         try
@@ -295,5 +321,125 @@ public sealed partial class RecordingService : IRecordingService
         }
 
         return text.Split([' ', '\t', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries).Length;
+    }
+
+    private static string StripFrontMatter(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return content;
+
+        // Simple check for front matter delimiters
+        if (!content.StartsWith("---")) return content;
+
+        var parts = content.Split("---", StringSplitOptions.RemoveEmptyEntries);
+        // If we have at least 2 parts, the first one was the front matter (empty string before first --- is removed),
+        // so the second part is the content.
+        // Wait, Split with RemoveEmptyEntries might be tricky if front matter is the first thing.
+        // content = "---\nkey: value\n---\nreal content"
+        // Split("---") -> ["\nkey: value\n", "\nreal content"]
+
+        if (parts.Length >= 2)
+        {
+            // Return everything after the second delimiter (which is the start of the second part in the array)
+            // Actually, let's be more robust.
+            // Regex is safer.
+            var match = Regex.Match(content, @"^---\s*[\s\S]*?---\s*", RegexOptions.Multiline);
+            if (match.Success)
+            {
+                return content.Substring(match.Length).Trim();
+            }
+        }
+
+        return content;
+    }
+
+    /// <summary>
+    /// Tries to parse the date from the YAML front matter of a recording file.
+    /// </summary>
+    /// <param name="content">The file content with YAML front matter.</param>
+    /// <param name="date">The parsed date if successful.</param>
+    /// <returns>True if the date was successfully parsed, false otherwise.</returns>
+    private bool TryParseDateFromFrontMatter(string content, out DateTimeOffset date)
+    {
+        date = default;
+
+        try
+        {
+            // Check if content starts with front matter
+            if (!content.TrimStart().StartsWith("---", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            // Split to extract front matter block
+            var lines = content.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
+
+            // Find first and second --- delimiters
+            int firstDelim = -1, secondDelim = -1;
+            for (int i = 0; i < lines.Length; i++)
+            {
+                if (lines[i].Trim() == "---")
+                {
+                    if (firstDelim == -1)
+                        firstDelim = i;
+                    else if (secondDelim == -1)
+                    {
+                        secondDelim = i;
+                        break;
+                    }
+                }
+            }
+
+            if (firstDelim == -1 || secondDelim == -1)
+            {
+                return false;
+            }
+
+            // Extract YAML content between delimiters
+            var yamlLines = lines.Skip(firstDelim + 1).Take(secondDelim - firstDelim - 1);
+            var yamlContent = string.Join("\n", yamlLines);
+
+            // Use YamlDotNet to deserialize the front matter
+            var deserializer = new YamlDotNet.Serialization.DeserializerBuilder()
+                .WithNamingConvention(YamlDotNet.Serialization.NamingConventions.HyphenatedNamingConvention.Instance)
+                .Build();
+
+            var frontMatter = deserializer.Deserialize<Dictionary<string, object>>(yamlContent);
+
+            // Look for the 'date' field
+            if (frontMatter != null && frontMatter.TryGetValue("date", out var dateValue))
+            {
+                // Try to parse the date string (format: yyyy-MM-dd HH:mm:ss)
+                if (dateValue is string dateStr)
+                {
+                    if (DateTimeOffset.TryParseExact(
+                        dateStr,
+                        "yyyy-MM-dd HH:mm:ss",
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.AssumeLocal,
+                        out date))
+                    {
+                        return true;
+                    }
+
+                    // Try general parsing as fallback
+                    if (DateTimeOffset.TryParse(dateStr, out date))
+                    {
+                        return true;
+                    }
+                }
+                else if (dateValue is DateTime dateTime)
+                {
+                    date = new DateTimeOffset(dateTime);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to parse date from YAML front matter");
+            return false;
+        }
     }
 }

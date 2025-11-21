@@ -35,14 +35,15 @@ public sealed class GenerateCommandIntegrationTests
         methodInfo.Should().NotBeNull("GenerateCommand.ExecuteAsync should exist");
 
         var parameters = methodInfo!.GetParameters();
-        parameters.Should().HaveCount(3, "new signature has 3 parameters: serviceProvider, jsonOutput, templateName");
+        parameters.Should().HaveCount(6, "new signature has 6 parameters");
         parameters[0].Name.Should().Be("serviceProvider");
         parameters[1].Name.Should().Be("jsonOutput");
-        parameters[2].Name.Should().Be("templateName", "T041 adds templateName parameter");
-        parameters[2].IsOptional.Should().BeTrue("templateName should be optional");
-        parameters[2].DefaultValue.Should().BeNull("templateName default should be null");
+        parameters[2].Name.Should().Be("templateId");
+        parameters[3].Name.Should().Be("noteName");
+        parameters[4].Name.Should().Be("recordingName");
+        parameters[5].Name.Should().Be("listTemplates");
 
-        _output.WriteLine("✓ Updated signature verified: ExecuteAsync(IServiceProvider, bool, string? = null)");
+        _output.WriteLine("✓ Updated signature verified: ExecuteAsync(IServiceProvider, bool, string?, string?, string?, bool)");
         _output.WriteLine("✓ T041 implementation confirmed");
 
         await Task.CompletedTask;
