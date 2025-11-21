@@ -109,6 +109,11 @@ public sealed class TemplateMetadata
     public TemplateType TemplateType { get; init; }
 
     /// <summary>
+    /// Gets or sets the unique identifier for the template.
+    /// </summary>
+    public string? Id { get; init; }
+
+    /// <summary>
     /// Gets or sets the display title of the template.
     /// </summary>
     public string? Title { get; init; }
@@ -149,6 +154,9 @@ public sealed class TemplateMetadata
         List<string> errors = [];
 
         // Required field validation
+        if (string.IsNullOrWhiteSpace(Id))
+            errors.Add("Id is required");
+
         if (string.IsNullOrWhiteSpace(Title))
             errors.Add("Title is required");
         else if (Title.Length > TemplateConstants.MaxTitleLength)

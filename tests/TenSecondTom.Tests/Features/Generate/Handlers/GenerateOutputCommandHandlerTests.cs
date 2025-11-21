@@ -78,7 +78,7 @@ public sealed class GenerateOutputCommandHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeNull();
         result.Value.Content.Should().NotBeNullOrEmpty();
-        result.Value.RecordingBaseName.Should().Be(command.RecordingBaseName);
+        result.Value.InputName.Should().Be(command.InputName);
         result.Value.TemplateId.Should().Be(command.TemplateId);
     }
 
@@ -321,7 +321,7 @@ public sealed class GenerateOutputCommandHandlerTests
         _mockOutputStorageService.Verify(
             s => s.SaveOutputAsync(
                 It.Is<GeneratedOutput>(o =>
-                    o.RecordingBaseName == command.RecordingBaseName &&
+                    o.InputName == command.InputName &&
                     o.TemplateId == command.TemplateId),
                 It.IsAny<CancellationToken>()),
             Times.Once);
@@ -438,7 +438,8 @@ public sealed class GenerateOutputCommandHandlerTests
         return new GenerateOutput.Command
         {
             TranscriptFilePath = "/test/recording/10-21-2025_1.txt",
-            RecordingBaseName = "10-21-2025_1",
+            InputName = "10-21-2025_1",
+            InputType = "Recording",
             TemplateId = "daily-summary",
             MaxInputTokens = 8000
         };

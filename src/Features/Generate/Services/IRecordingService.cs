@@ -1,4 +1,4 @@
-using TenSecondTom.Features.Generate.Models;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Generate.Services;

@@ -1,7 +1,10 @@
+using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
+using System.Linq;
+using TenSecondTom.Features.Generate.Models;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Shared.Constants;
@@ -29,21 +32,30 @@ public static class GenerateCommand
     /// </summary>
     /// <param name="serviceProvider">Service provider for dependency resolution.</param>
     /// <param name="jsonOutput">Whether to output JSON format.</param>
-    /// <param name="templateName">Optional template name for non-interactive execution. When provided, automatically selects most recent recording.</param>
+    /// <param name="templateId">Optional template ID for non-interactive execution.</param>
+    /// <param name="noteName">Optional note filename (without extension).</param>
+    /// <param name="recordingName">Optional recording filename (without extension).</param>
+    /// <param name="listTemplates">Whether to list available templates and exit.</param>
     /// <returns>Exit code (0 for success, non-zero for errors).</returns>
     public static async Task<int> ExecuteAsync(
         IServiceProvider serviceProvider,
         bool jsonOutput,
-        string? templateName = null)
+        string? templateId = null,
+        string? noteName = null,
+        string? recordingName = null,
+        bool listTemplates = false)
     {
-        var logger = serviceProvider.GetRequiredService<ILogger<GenerateOutput.Handler>>();
+        var logger = serviceProvider.GetRequiredService<ILogger<GenerateOutput.Handler>>(); // Using Handler logger as GenerateCommand is static
         var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
+        var mediator = serviceProvider.GetRequiredService<IMediator>();
+        var templateLoader = serviceProvider.GetRequiredService<IPromptTemplateLoader>();
+        var console = serviceProvider.GetRequiredService<IAnsiConsole>();
 
         // Show warning if using mock authentication (only in non-JSON mode)
         if (!jsonOutput && authService is MockAuthenticationService)
         {
-            AnsiConsole.MarkupLine("[yellow]⚠ Development Mode: Authentication bypassed[/]");
-            AnsiConsole.WriteLine();
+            console.MarkupLine("[yellow]⚠ Development Mode: Authentication bypassed[/]");
+            console.WriteLine();
         }
 
         // Authenticate first (generate command requires LLM API access)
@@ -60,148 +72,234 @@ public static class GenerateCommand
 
         try
         {
-            // T045: Validate templateName if provided
-            if (templateName is not null && string.IsNullOrWhiteSpace(templateName))
+            // Step 1: List Templates if requested
+            if (listTemplates)
             {
-                return HandleError(jsonOutput, "Template name cannot be empty or whitespace.");
-            }
-
-            // Step 1: List available recordings
-            var listRecordingsHandler = serviceProvider.GetRequiredService<ListRecordings.Handler>();
-            var recordingsQuery = new ListRecordings.Query { CancellationToken = CancellationToken.None };
-            var recordingsResult = await listRecordingsHandler.Handle(recordingsQuery, CancellationToken.None);
-
-            if (!recordingsResult.IsSuccess)
-            {
-                return HandleError(jsonOutput, $"Failed to list recordings: {recordingsResult.Error}");
-            }
-
-            if (recordingsResult.Value.Count == 0)
-            {
-                return HandleError(jsonOutput, "No recordings found. Use 'record' command to create a recording first.");
-            }
-
-            // Step 2: Recording selection (interactive or automatic)
-            var recordings = recordingsResult.Value;
-
-            Models.RecordingListItem selectedRecording;
-
-            // T043: If --template provided, automatically select most recent recording (non-interactive)
-            if (templateName is not null)
-            {
-                selectedRecording = recordings[0]; // Most recent (recordings are sorted newest first)
-
-                if (!jsonOutput)
+                var listTemplatesResult = await templateLoader.LoadAllTemplatesAsync();
+                if (!listTemplatesResult.IsSuccess)
                 {
-                    AnsiConsole.MarkupLine($"[dim]Auto-selected most recent recording: {selectedRecording.RecordingBaseName.EscapeMarkup()}[/]");
+                    return HandleError(jsonOutput, $"Failed to load templates: {listTemplatesResult.Error}");
                 }
+
+                var templates = listTemplatesResult.Value;
+
+                if (jsonOutput)
+                {
+                    var json = System.Text.Json.JsonSerializer.Serialize(templates, JsonOptions);
+                    console.WriteLine(json);
+                }
+                else
+                {
+                    var table = new Table().AddColumn("ID").AddColumn("Title").AddColumn("Description");
+                    foreach (var t in templates)
+                    {
+                        table.AddRow(
+                            t.TemplateId.EscapeMarkup(),
+                            (t.Metadata?.Title ?? "Untitled").EscapeMarkup(),
+                            (t.Metadata?.Description ?? "").EscapeMarkup());
+                    }
+                    console.Write(table);
+                }
+                return 0;
             }
-            else if (jsonOutput)
+
+            // Step 2: Determine Input (Note or Recording)
+            string inputFilePath;
+            string inputType; // "Note" or "Recording"
+            string inputBaseName;
+
+            if (!string.IsNullOrWhiteSpace(noteName))
             {
-                // Non-interactive mode without --template: select most recent recording
-                selectedRecording = recordings[0];
+                // Direct Note selection
+                inputType = "Note";
+                inputBaseName = noteName;
+                var notesResult = await mediator.Send(new ListNotes.Query());
+                if (!notesResult.IsSuccess)
+                {
+                    return HandleError(jsonOutput, $"Failed to list notes: {notesResult.Error}");
+                }
+                var note = notesResult.Value.FirstOrDefault(n => n.FileName.Equals(noteName, StringComparison.OrdinalIgnoreCase));
+                if (note == null)
+                {
+                    return HandleError(jsonOutput, $"Note '{noteName}' not found.");
+                }
+                inputFilePath = note.FilePath;
+            }
+            else if (!string.IsNullOrWhiteSpace(recordingName))
+            {
+                // Direct Recording selection
+                inputType = "Recording";
+                inputBaseName = recordingName;
+                var recordingsResult = await mediator.Send(new ListRecordings.Query());
+                if (!recordingsResult.IsSuccess)
+                {
+                    return HandleError(jsonOutput, $"Failed to list recordings: {recordingsResult.Error}");
+                }
+                var recording = recordingsResult.Value.FirstOrDefault(r => r.RecordingBaseName.Equals(recordingName, StringComparison.OrdinalIgnoreCase));
+                if (recording == null)
+                {
+                    return HandleError(jsonOutput, $"Recording '{recordingName}' not found.");
+                }
+                inputFilePath = recording.TranscriptFilePath;
             }
             else
             {
-                // Interactive: show selection prompt
-                var selectionPrompt = new SelectionPrompt<Models.RecordingListItem>()
-                    .Title("[cyan]Select a recording to process:[/]")
-                    .PageSize(10)
-                    .AddChoices(recordings)
-                    .UseConverter(r => r.DisplayLabel);
-
-                selectedRecording = AnsiConsole.Prompt(selectionPrompt);
-                AnsiConsole.MarkupLine($"[dim]Selected: {selectedRecording.RecordingBaseName.EscapeMarkup()}[/]");
-                AnsiConsole.WriteLine();
-            }
-
-            // Step 3: List available templates
-            var templateProvider = serviceProvider.GetRequiredService<ITemplateProvider>();
-            var templatesResult = await templateProvider.ListTemplatesAsync(
-                filterByType: null,
-                includeInvalid: false,
-                CancellationToken.None);
-
-            if (!templatesResult.IsSuccess)
-            {
-                return HandleError(jsonOutput, $"Failed to list templates: {templatesResult.Error}");
-            }
-
-            if (templatesResult.Value.Count == 0)
-            {
-                return HandleError(jsonOutput, "No prompt templates found. Please configure templates using 'setup' command.");
-            }
-
-            // Step 4: Template selection (interactive, automatic, or by name)
-            // Only include templates compatible with single recording processing
-            // (Daily and BusinessMeeting types use {{USER_INPUT}} and {{DATE}} placeholders)
-            var compatibleTypes = new[] { TemplateType.Daily, TemplateType.BusinessMeeting };
-            var templates = templatesResult.Value
-                .Where(t => compatibleTypes.Contains(t.TemplateType))
-                .ToList();
-
-            if (templates.Count == 0)
-            {
-                return HandleError(jsonOutput, "No compatible templates found for generate command.");
-            }
-
-            TemplateInfo selectedTemplate;
-
-            // T042: If --template provided, resolve template name case-insensitively
-            if (templateName is not null)
-            {
-                // Match against TemplateId or Title (case-insensitive)
-                selectedTemplate = templates.FirstOrDefault(t =>
-                    string.Equals(t.TemplateId, templateName, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(t.Title, templateName, StringComparison.OrdinalIgnoreCase))!;
-
-                // T044: Error handling for template not found with list of available templates
-                if (selectedTemplate is null)
+                // No direct input specified
+                if (!string.IsNullOrWhiteSpace(templateId))
                 {
-                    var availableTemplates = string.Join(", ", templates.Select(t => $"'{t.TemplateId}'"));
-                    return HandleError(jsonOutput,
-                        $"Template '{templateName}' not found. Available templates: {availableTemplates}");
+                    // Non-interactive default: Latest Recording
+                    inputType = "Recording";
+                    var recordingsResult = await mediator.Send(new ListRecordings.Query());
+                    if (!recordingsResult.IsSuccess)
+                    {
+                        return HandleError(jsonOutput, $"Failed to list recordings: {recordingsResult.Error}");
+                    }
+                    if (recordingsResult.Value.Count == 0)
+                    {
+                        return HandleError(jsonOutput, "No recordings found.");
+                    }
+                    var latest = recordingsResult.Value[0];
+                    inputFilePath = latest.TranscriptFilePath;
+                    inputBaseName = latest.RecordingBaseName;
+
+                    if (!jsonOutput)
+                    {
+                        console.MarkupLine($"[dim]Auto-selected most recent recording: {inputBaseName.EscapeMarkup()}[/]");
+                    }
+                }
+                else
+                {
+                    // Interactive Mode
+                    if (jsonOutput)
+                    {
+                        // In JSON mode, we can't prompt, so default to latest recording
+                        var recordingsResult = await mediator.Send(new ListRecordings.Query());
+                        if (!recordingsResult.IsSuccess || recordingsResult.Value.Count == 0)
+                        {
+                            return HandleError(jsonOutput, "No recordings found.");
+                        }
+                        var latest = recordingsResult.Value[0];
+                        inputFilePath = latest.TranscriptFilePath;
+                        inputBaseName = latest.RecordingBaseName;
+                        inputType = "Recording";
+                    }
+                    else
+                    {
+                        var selection = console.Prompt(
+                            new SelectionPrompt<string>()
+                                .Title("Select input type:")
+                                .AddChoices("Recording", "Note"));
+
+                        inputType = selection;
+
+                        if (selection == "Note")
+                        {
+                            var notesResult = await mediator.Send(new ListNotes.Query());
+                            if (!notesResult.IsSuccess)
+                            {
+                                return HandleError(jsonOutput, $"Failed to list notes: {notesResult.Error}");
+                            }
+                            if (notesResult.Value.Count == 0)
+                            {
+                                return HandleError(jsonOutput, "No notes found.");
+                            }
+
+                            var selectedNote = console.Prompt(
+                                new SelectionPrompt<NoteListItem>()
+                                    .Title("Select a note:")
+                                    .PageSize(10)
+                                    .AddChoices(notesResult.Value)
+                                    .UseConverter(n => $"{n.FileName} ({n.LastModified:g})"));
+
+                            inputFilePath = selectedNote.FilePath;
+                            inputBaseName = selectedNote.FileName;
+                        }
+                        else // Recording
+                        {
+                            var recordingsResult = await mediator.Send(new ListRecordings.Query());
+                            if (!recordingsResult.IsSuccess)
+                            {
+                                return HandleError(jsonOutput, $"Failed to list recordings: {recordingsResult.Error}");
+                            }
+                            if (recordingsResult.Value.Count == 0)
+                            {
+                                return HandleError(jsonOutput, "No recordings found.");
+                            }
+
+                            var selectedRecording = console.Prompt(
+                                new SelectionPrompt<RecordingListItem>()
+                                    .Title("Select a recording:")
+                                    .PageSize(10)
+                                    .AddChoices(recordingsResult.Value)
+                                    .UseConverter(r => $"{r.FormattedDate} ({r.WordCount} words)"));
+
+                            inputFilePath = selectedRecording.TranscriptFilePath;
+                            inputBaseName = selectedRecording.RecordingBaseName;
+                        }
+                    }
+                }
+            }
+
+            // Step 3: Select Template
+            PromptTemplate selectedTemplate;
+            var allTemplatesResult = await templateLoader.LoadAllTemplatesAsync();
+
+            if (!allTemplatesResult.IsSuccess)
+            {
+                return HandleError(jsonOutput, $"Failed to load templates: {allTemplatesResult.Error}");
+            }
+
+            var allTemplates = allTemplatesResult.Value;
+
+            if (!string.IsNullOrWhiteSpace(templateId))
+            {
+                selectedTemplate = allTemplates.FirstOrDefault(t => t.TemplateId.Equals(templateId, StringComparison.OrdinalIgnoreCase))!;
+                if (selectedTemplate == null)
+                {
+                    var availableTemplates = string.Join(", ", allTemplates.Select(t => $"'{t.TemplateId}'"));
+                    return HandleError(jsonOutput, $"Template '{templateId}' not found. Available templates: {availableTemplates}");
                 }
 
                 if (!jsonOutput)
                 {
-                    AnsiConsole.MarkupLine($"[dim]Using template: {selectedTemplate.Title.EscapeMarkup()} ({selectedTemplate.TemplateId.EscapeMarkup()})[/]");
-                    AnsiConsole.WriteLine();
+                    console.MarkupLine($"[dim]Using template: {(selectedTemplate.Metadata?.Title ?? "Untitled").EscapeMarkup()} ({selectedTemplate.TemplateId.EscapeMarkup()})[/]");
                 }
-            }
-            else if (jsonOutput)
-            {
-                // Non-interactive mode without --template: select first template (typically default template)
-                selectedTemplate = templates[0];
             }
             else
             {
-                // Interactive: show selection prompt
-                var templatePrompt = new SelectionPrompt<TemplateInfo>()
-                    .Title("[cyan]Select a template:[/]")
-                    .PageSize(10)
-                    .AddChoices(templates)
-                    .UseConverter(t => $"{t.Title} - {t.Description}");
-
-                selectedTemplate = AnsiConsole.Prompt(templatePrompt);
-                AnsiConsole.MarkupLine($"[dim]Selected: {selectedTemplate.Title.EscapeMarkup()}[/]");
-                AnsiConsole.WriteLine();
+                if (jsonOutput)
+                {
+                    // Default to first template if not specified in JSON mode (or error?)
+                    // Let's error to be safe, or default. CLI usually defaults.
+                    if (allTemplates.Count == 0) return HandleError(jsonOutput, "No templates found.");
+                    selectedTemplate = allTemplates[0];
+                }
+                else
+                {
+                    // Interactive Template Selection
+                    selectedTemplate = console.Prompt(
+                        new SelectionPrompt<PromptTemplate>()
+                            .Title("Select a template:")
+                            .PageSize(10)
+                            .AddChoices(allTemplates)
+                            .UseConverter(t => $"{t.Metadata?.Title ?? "Untitled"} ({t.TemplateId})"));
+                }
             }
 
-            // Step 5: Get max input tokens from configuration
-            // Uses IOptionsSnapshot to reload configuration per command execution (important for shell mode)
+            // Step 4: Get max input tokens
             var llmOptions = serviceProvider.GetRequiredService<IOptionsSnapshot<LlmOptions>>().Value;
             int maxInputTokens = llmOptions.MaxInputTokens
                 ?? (llmOptions.Provider == LlmProvider.Anthropic
                     ? LlmConstants.DefaultMaxInputTokensAnthropic
                     : LlmConstants.DefaultMaxInputTokensOpenAI);
 
-            // Step 6: Generate output with LLM
+            // Step 5: Generate Output
             var generateHandler = serviceProvider.GetRequiredService<GenerateOutput.Handler>();
             var generateCommand = new GenerateOutput.Command
             {
-                TranscriptFilePath = selectedRecording.TranscriptFilePath,
-                RecordingBaseName = selectedRecording.RecordingBaseName,
+                TranscriptFilePath = inputFilePath,
+                InputName = inputBaseName,
+                InputType = inputType,
                 TemplateId = selectedTemplate.TemplateId,
                 MaxInputTokens = maxInputTokens,
                 CancellationToken = CancellationToken.None
@@ -211,58 +309,42 @@ public static class GenerateCommand
 
             if (jsonOutput)
             {
-                // Non-interactive: execute without status display
                 var generateResult = await generateHandler.Handle(generateCommand, CancellationToken.None);
-
                 if (!generateResult.IsSuccess)
                 {
                     return HandleError(jsonOutput, $"Generation failed: {generateResult.Error}");
                 }
-
-                output = generateResult.Value;
+                output = generateResult.Value!;
             }
             else
             {
-                // Interactive: show loading indicator
-                output = await AnsiConsole.Status()
+                output = await console.Status()
                     .Spinner(Spinner.Known.Dots)
-                    .StartAsync("[yellow]Generating output with LLM...[/]", async ctx =>
+                    .StartAsync($"Generating {selectedTemplate.Metadata?.Title ?? "Untitled"}...", async ctx =>
                     {
                         var generateResult = await generateHandler.Handle(generateCommand, CancellationToken.None);
-
                         if (!generateResult.IsSuccess)
                         {
-                            AnsiConsole.MarkupLine($"[red]✗[/] Generation failed: {generateResult.Error.EscapeMarkup()}");
+                            console.MarkupLine($"[red]✗[/] Generation failed: {generateResult.Error.EscapeMarkup()}");
                             return null;
                         }
-
                         return generateResult.Value;
                     });
 
-                if (output is null)
-                {
-                    return 1; // Error already displayed
-                }
+                if (output == null) return 1;
 
-                AnsiConsole.MarkupLine("[green]✓[/] Generation complete!");
-                AnsiConsole.WriteLine();
+                console.MarkupLine("[green]✓[/] Generation complete!");
+                console.WriteLine();
             }
 
-            // Step 7: Display truncation warning if applicable
-            if (output.WasTruncated && !jsonOutput)
-            {
-                AnsiConsole.MarkupLine($"[yellow]⚠  Transcript truncated from {output.OriginalWordCount} to fit within token limit[/]");
-                AnsiConsole.WriteLine();
-            }
-
-            // Step 8: Display generated output and save location
+            // Step 6: Display Output
             if (jsonOutput)
             {
-                // JSON output format
                 var jsonResult = new
                 {
                     success = true,
-                    recording_base_name = output.RecordingBaseName,
+                    input_name = output.InputName,
+                    input_type = output.InputType,
                     template_id = output.TemplateId,
                     template_title = output.TemplateTitle,
                     output_file_path = output.OutputFilePath,
@@ -276,18 +358,16 @@ public static class GenerateCommand
                     original_word_count = output.OriginalWordCount,
                     content = output.Content
                 };
-
                 Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(jsonResult, JsonOptions));
             }
             else
             {
-                // Human-readable output format
-                DisplayGeneratedOutput(output);
+                DisplayGeneratedOutput(output, console);
             }
 
             logger.LogInformation(
-                "Generated output for recording {RecordingBaseName} using template {TemplateId} ({InputTokens} input tokens, {OutputTokens} output tokens)",
-                output.RecordingBaseName,
+                "Generated output for {InputBaseName} using template {TemplateId} ({InputTokens} input tokens, {OutputTokens} output tokens)",
+                inputBaseName,
                 output.TemplateId,
                 output.InputTokens,
                 output.OutputTokens);
@@ -301,15 +381,15 @@ public static class GenerateCommand
         }
     }
 
-    private static void DisplayGeneratedOutput(Models.GeneratedOutput output)
+    private static void DisplayGeneratedOutput(Models.GeneratedOutput output, IAnsiConsole console)
     {
-        // Display metadata
         var metadataTable = new Table()
             .Border(TableBorder.Rounded)
             .AddColumn("[bold]Property[/]")
             .AddColumn("[bold]Value[/]");
 
-        metadataTable.AddRow("Recording", output.RecordingBaseName.EscapeMarkup());
+        metadataTable.AddRow("Input", output.InputName.EscapeMarkup());
+        metadataTable.AddRow("Type", output.InputType.EscapeMarkup());
         metadataTable.AddRow("Template", $"{output.TemplateTitle.EscapeMarkup()} ({output.TemplateId.EscapeMarkup()})");
         metadataTable.AddRow("Provider", $"{output.ProviderName.EscapeMarkup()} ({output.ModelName.EscapeMarkup()})");
         metadataTable.AddRow("Tokens", $"{output.InputTokens:N0} input + {output.OutputTokens:N0} output = {output.TotalTokens:N0} total");
@@ -319,12 +399,11 @@ public static class GenerateCommand
             metadataTable.AddRow("Saved to", output.OutputFilePath.EscapeMarkup());
         }
 
-        AnsiConsole.Write(metadataTable);
-        AnsiConsole.WriteLine();
+        console.Write(metadataTable);
+        console.WriteLine();
 
-        // Display content (truncated for terminal display)
-        AnsiConsole.MarkupLine("[bold cyan]Generated Output:[/]");
-        AnsiConsole.WriteLine();
+        console.MarkupLine("[bold cyan]Generated Output:[/]");
+        console.WriteLine();
 
         var displayContent = output.Content.Length > MaxDisplayContentLength
             ? output.Content[..MaxDisplayContentLength] + $"\n\n[... truncated {output.Content.Length - MaxDisplayContentLength} characters for display ...]"
@@ -334,12 +413,12 @@ public static class GenerateCommand
             .Border(BoxBorder.Rounded)
             .BorderColor(Color.Grey);
 
-        AnsiConsole.Write(panel);
-        AnsiConsole.WriteLine();
+        console.Write(panel);
+        console.WriteLine();
 
         if (output.Content.Length > MaxDisplayContentLength)
         {
-            AnsiConsole.MarkupLine($"[dim]Full content saved to: {output.OutputFilePath?.EscapeMarkup() ?? "file"}[/]");
+            console.MarkupLine($"[dim]Full content saved to: {output.OutputFilePath?.EscapeMarkup() ?? "file"}[/]");
         }
     }
 
@@ -352,14 +431,12 @@ public static class GenerateCommand
                 success = false,
                 error = errorMessage
             };
-
             Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(errorResult, JsonOptions));
         }
         else
         {
             AnsiConsole.MarkupLine($"[red]✗[/] {errorMessage.EscapeMarkup()}");
         }
-
         return 1;
     }
 }

@@ -189,6 +189,7 @@ public sealed class ListTemplatesQueryHandlerTests
                 Source = TemplateSource.FileSystem,
                 Metadata = new TemplateMetadata
                 {
+                    Id = "invalid-no-title",
                     TemplateType = TemplateType.Daily,
                     Title = null // Invalid: missing title
                 }
@@ -480,6 +481,7 @@ public sealed class ListTemplatesQueryHandlerTests
             Source = source,
             Metadata = new TemplateMetadata
             {
+                Id = templateId,
                 TemplateType = templateType,
                 Title = title,
                 Description = description

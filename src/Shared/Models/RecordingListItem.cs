@@ -1,4 +1,4 @@
-namespace TenSecondTom.Features.Generate.Models;
+namespace TenSecondTom.Shared.Models;
 
 /// <summary>
 /// Lightweight display model for recording selection UI.

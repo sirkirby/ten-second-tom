@@ -399,7 +399,7 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
                 Content = "Default daily template. User input:\n{{USER_INPUT}}",
                 TemplateType = TemplateType.Daily,
                 Source = TemplateSource.Embedded,
-                Metadata = new TemplateMetadata { Title = "Daily Summary", TemplateType = TemplateType.Daily }
+                Metadata = new TemplateMetadata { Id = "daily-summary", Title = "Daily Summary", TemplateType = TemplateType.Daily }
             }
         };
 
@@ -422,7 +422,7 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
                 Content = "Default daily template. User input:\n{{USER_INPUT}}",
                 TemplateType = TemplateType.Daily,
                 Source = TemplateSource.Embedded,
-                Metadata = new TemplateMetadata { Title = "Daily Summary", TemplateType = TemplateType.Daily }
+                Metadata = new TemplateMetadata { Id = "daily-summary", Title = "Daily Summary", TemplateType = TemplateType.Daily }
             },
             new PromptTemplate
             {
@@ -430,7 +430,7 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
                 Content = "Daily standup template. User input:\n{{USER_INPUT}}",
                 TemplateType = TemplateType.Daily,
                 Source = TemplateSource.FileSystem,
-                Metadata = new TemplateMetadata { Title = "Daily Standup", TemplateType = TemplateType.Daily }
+                Metadata = new TemplateMetadata { Id = "daily-standup", Title = "Daily Standup", TemplateType = TemplateType.Daily }
             }
         };
 

@@ -157,6 +157,26 @@ public sealed class GenerateOutputMigration : IFeatureMigration
                 continue;
             }
 
+            // Extract the suffix (what comes after the last underscore, before .md)
+            string suffixWithExtension = fileName.Substring(lastUnderscoreIndex + 1);
+            string suffix = suffixWithExtension.Replace(".md", "", StringComparison.OrdinalIgnoreCase);
+
+            // Skip if the suffix is just a number (e.g., "1", "2", "3")
+            // These are recording increment numbers, not template names
+            if (int.TryParse(suffix, out _))
+            {
+                logger.LogTrace("Skipping {File}, appears to be a raw recording file (numeric suffix)", fileName);
+                continue;
+            }
+
+            // Skip if the suffix looks like "generated" or "generated_N" (already processed or conflict-renamed)
+            if (suffix.StartsWith("generated", StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogTrace("Skipping {File}, already in generated format", fileName);
+                continue;
+            }
+
+            // At this point, we have a file with a template-like suffix (e.g., "business-meeting", "daily-summary")
             // Extract base name
             string baseName = fileName.Substring(0, lastUnderscoreIndex);
 

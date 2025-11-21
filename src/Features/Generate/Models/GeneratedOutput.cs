@@ -14,9 +14,14 @@ public sealed record GeneratedOutput
     public required string Content { get; init; }
 
     /// <summary>
-    /// Gets the base name of the source recording.
+    /// Gets the base name of the source input (recording or note).
     /// </summary>
-    public required string RecordingBaseName { get; init; }
+    public required string InputName { get; init; }
+
+    /// <summary>
+    /// Gets the type of input (Recording or Note).
+    /// </summary>
+    public required string InputType { get; init; }
 
     /// <summary>
     /// Gets the template ID used for generation.
@@ -82,9 +87,10 @@ public sealed record GeneratedOutput
     {
         var frontmatter = new Dictionary<string, object>
         {
-            ["entry-id"] = MarkdownFormatter.CreateGenerateEntryId(RecordingBaseName, TemplateId),
+            ["entry-id"] = MarkdownFormatter.CreateGenerateEntryId(InputName, TemplateId),
             ["command"] = "generate",
-            ["recording"] = RecordingBaseName,
+            ["input-name"] = InputName,
+            ["input-type"] = InputType,
             ["template-id"] = TemplateId,
             ["template-title"] = TemplateTitle,
             ["timestamp"] = MarkdownFormatter.FormatTimestamp(GeneratedAt),

@@ -308,7 +308,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
                 Content = "Default daily template {{USER_INPUT}}",
                 TemplateType = TemplateType.Daily,
                 Source = TemplateSource.Embedded,
-                Metadata = new TemplateMetadata { Title = "Daily Summary", TemplateType = TemplateType.Daily }
+                Metadata = new TemplateMetadata { Id = "daily-summary", Title = "Daily Summary", TemplateType = TemplateType.Daily }
             },
             new PromptTemplate
             {
@@ -316,7 +316,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
                 Content = "Custom daily template {{USER_INPUT}}",
                 TemplateType = TemplateType.Daily,
                 Source = TemplateSource.FileSystem,
-                Metadata = new TemplateMetadata { Title = "Custom Daily", TemplateType = TemplateType.Daily }
+                Metadata = new TemplateMetadata { Id = "custom-daily", Title = "Custom Daily", TemplateType = TemplateType.Daily }
             }
         };
 
@@ -343,7 +343,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
                 Content = "Default daily template {{USER_INPUT}}",
                 TemplateType = TemplateType.Daily,
                 Source = TemplateSource.Embedded,
-                Metadata = new TemplateMetadata { Title = "Daily Summary", TemplateType = TemplateType.Daily }
+                Metadata = new TemplateMetadata { Id = "daily-summary", Title = "Daily Summary", TemplateType = TemplateType.Daily }
             }
         };
 
@@ -367,7 +367,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
                 Content = "Daily template {{USER_INPUT}}",
                 TemplateType = TemplateType.Daily,
                 Source = TemplateSource.Embedded,
-                Metadata = new TemplateMetadata { Title = "Daily Summary", TemplateType = TemplateType.Daily }
+                Metadata = new TemplateMetadata { Id = "daily-summary", Title = "Daily Summary", TemplateType = TemplateType.Daily }
             },
             new PromptTemplate
             {
@@ -375,7 +375,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
                 Content = "Detailed daily template {{USER_INPUT}}",
                 TemplateType = TemplateType.Daily,
                 Source = TemplateSource.FileSystem,
-                Metadata = new TemplateMetadata { Title = "Daily Detailed", TemplateType = TemplateType.Daily }
+                Metadata = new TemplateMetadata { Id = "daily-detailed", Title = "Daily Detailed", TemplateType = TemplateType.Daily }
             },
             new PromptTemplate
             {
@@ -383,7 +383,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
                 Content = "Weekly template {{USER_INPUT}}",
                 TemplateType = TemplateType.Weekly,
                 Source = TemplateSource.Embedded,
-                Metadata = new TemplateMetadata { Title = "Weekly Review", TemplateType = TemplateType.Weekly }
+                Metadata = new TemplateMetadata { Id = "weekly-review", Title = "Weekly Review", TemplateType = TemplateType.Weekly }
             }
         };
 
@@ -395,10 +395,10 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
         // Mock LoadTemplateAsync for all templates
         _mockTemplateLoader
             .Setup(l => l.LoadTemplateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string templateId, CancellationToken _) => 
+            .ReturnsAsync((string templateId, CancellationToken _) =>
             {
                 var template = templates.FirstOrDefault(t => t.TemplateId == templateId);
-                return template != null 
+                return template != null
                     ? Result<PromptTemplate>.Success(template)
                     : Result<PromptTemplate>.Failure($"Template {templateId} not found");
             });
@@ -424,7 +424,7 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
                         Content = "Default daily template {{USER_INPUT}}",
                         TemplateType = TemplateType.Daily,
                         Source = TemplateSource.Embedded,
-                        Metadata = new TemplateMetadata { Title = "Daily Summary", TemplateType = TemplateType.Daily }
+                        Metadata = new TemplateMetadata { Id = "daily-summary", Title = "Daily Summary", TemplateType = TemplateType.Daily }
                     });
                 }
                 return Result<PromptTemplate>.Failure($"Template {templateId} not found");
@@ -458,8 +458,8 @@ public sealed class CreateDailyEntryWithTemplateSelectionTests : IDisposable
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
-            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse 
-            { 
+            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse
+            {
                 Content = "## Summary\nGenerated summary",
                 InputTokens = 10,
                 OutputTokens = 20

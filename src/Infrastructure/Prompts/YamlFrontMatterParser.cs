@@ -124,6 +124,7 @@ public sealed class YamlFrontMatterParser(ILogger<YamlFrontMatterParser> logger)
     {
         var metadata = new TemplateMetadata
         {
+            Id = yamlData.GetValueOrDefault("id")?.ToString(),
             TemplateType = ParseTemplateType(yamlData.GetValueOrDefault("templateType")),
             Title = yamlData.GetValueOrDefault("title")?.ToString(),
             Description = yamlData.GetValueOrDefault("description")?.ToString(),

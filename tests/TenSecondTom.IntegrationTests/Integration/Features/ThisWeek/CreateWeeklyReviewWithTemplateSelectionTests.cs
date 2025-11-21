@@ -256,8 +256,8 @@ public sealed class CreateWeeklyReviewWithTemplateSelectionTests : IDisposable
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
             .Callback<string, CancellationToken, int?, double?>((_, _, _, _) => callSequence.Add("LLMCall"))
-            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse 
-            { 
+            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse
+            {
                 Content = @"## Top 3 Accomplishments
 1. First accomplishment
 2. Second accomplishment
@@ -332,7 +332,7 @@ Some insights here
                 Content = "Default weekly template {{USER_INPUT}}",
                 TemplateType = TemplateType.Weekly,
                 Source = TemplateSource.Embedded,
-                Metadata = new TemplateMetadata { Title = "Weekly Review", TemplateType = TemplateType.Weekly }
+                Metadata = new TemplateMetadata { Id = "weekly-review", Title = "Weekly Review", TemplateType = TemplateType.Weekly }
             },
             new PromptTemplate
             {
@@ -340,7 +340,7 @@ Some insights here
                 Content = "Custom weekly template {{USER_INPUT}}",
                 TemplateType = TemplateType.Weekly,
                 Source = TemplateSource.FileSystem,
-                Metadata = new TemplateMetadata { Title = "Custom Weekly", TemplateType = TemplateType.Weekly }
+                Metadata = new TemplateMetadata { Id = "custom-weekly", Title = "Custom Weekly", TemplateType = TemplateType.Weekly }
             }
         };
 
@@ -351,10 +351,10 @@ Some insights here
         // Mock LoadTemplateAsync for both templates
         _mockTemplateLoader
             .Setup(l => l.LoadTemplateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string templateId, CancellationToken _) => 
+            .ReturnsAsync((string templateId, CancellationToken _) =>
             {
                 var template = templates.FirstOrDefault(t => t.TemplateId == templateId);
-                return template != null 
+                return template != null
                     ? Result<PromptTemplate>.Success(template)
                     : Result<PromptTemplate>.Failure($"Template {templateId} not found");
             });
@@ -370,7 +370,7 @@ Some insights here
                 Content = "Default weekly template {{USER_INPUT}}",
                 TemplateType = TemplateType.Weekly,
                 Source = TemplateSource.Embedded,
-                Metadata = new TemplateMetadata { Title = "Weekly Review", TemplateType = TemplateType.Weekly }
+                Metadata = new TemplateMetadata { Id = "weekly-review", Title = "Weekly Review", TemplateType = TemplateType.Weekly }
             }
         };
 
@@ -394,7 +394,7 @@ Some insights here
                 Content = "Daily template {{USER_INPUT}}",
                 TemplateType = TemplateType.Daily,
                 Source = TemplateSource.Embedded,
-                Metadata = new TemplateMetadata { Title = "Daily Summary", TemplateType = TemplateType.Daily }
+                Metadata = new TemplateMetadata { Id = "daily-summary", Title = "Daily Summary", TemplateType = TemplateType.Daily }
             },
             new PromptTemplate
             {
@@ -402,7 +402,7 @@ Some insights here
                 Content = "Weekly template {{USER_INPUT}}",
                 TemplateType = TemplateType.Weekly,
                 Source = TemplateSource.Embedded,
-                Metadata = new TemplateMetadata { Title = "Weekly Review", TemplateType = TemplateType.Weekly }
+                Metadata = new TemplateMetadata { Id = "weekly-review", Title = "Weekly Review", TemplateType = TemplateType.Weekly }
             },
             new PromptTemplate
             {
@@ -410,7 +410,7 @@ Some insights here
                 Content = "Detailed weekly template {{USER_INPUT}}",
                 TemplateType = TemplateType.Weekly,
                 Source = TemplateSource.FileSystem,
-                Metadata = new TemplateMetadata { Title = "Weekly Detailed", TemplateType = TemplateType.Weekly }
+                Metadata = new TemplateMetadata { Id = "weekly-detailed", Title = "Weekly Detailed", TemplateType = TemplateType.Weekly }
             }
         };
 
@@ -422,10 +422,10 @@ Some insights here
         // Mock LoadTemplateAsync for all templates
         _mockTemplateLoader
             .Setup(l => l.LoadTemplateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string templateId, CancellationToken _) => 
+            .ReturnsAsync((string templateId, CancellationToken _) =>
             {
                 var template = templates.FirstOrDefault(t => t.TemplateId == templateId);
-                return template != null 
+                return template != null
                     ? Result<PromptTemplate>.Success(template)
                     : Result<PromptTemplate>.Failure($"Template {templateId} not found");
             });
@@ -451,7 +451,7 @@ Some insights here
                         Content = "Default weekly template {{USER_INPUT}}",
                         TemplateType = TemplateType.Weekly,
                         Source = TemplateSource.Embedded,
-                        Metadata = new TemplateMetadata { Title = "Weekly Review", TemplateType = TemplateType.Weekly }
+                        Metadata = new TemplateMetadata { Id = "weekly-review", Title = "Weekly Review", TemplateType = TemplateType.Weekly }
                     });
                 }
                 return Result<PromptTemplate>.Failure($"Template {templateId} not found");
@@ -509,8 +509,8 @@ Some insights here
                 It.IsAny<CancellationToken>(),
                 It.IsAny<int?>(),
                 It.IsAny<double?>()))
-            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse 
-            { 
+            .ReturnsAsync(Result<LlmResponse>.Success(new LlmResponse
+            {
                 Content = @"## Top 3 Accomplishments
 1. First accomplishment
 2. Second accomplishment

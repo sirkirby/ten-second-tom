@@ -38,6 +38,7 @@ public sealed class FileSystemTemplateLoaderTests : IDisposable
     {
         // Arrange
         var templateContent = @"---
+id: test-daily
 templateType: daily
 title: Test Daily Template
 description: A test template
@@ -69,6 +70,7 @@ version: 1.0
     {
         // Arrange
         var templateContent = @"---
+id: invalid-yaml
 templateType: daily
 title: Test Template
 invalid-yaml: [broken
@@ -165,6 +167,7 @@ Content here";
 
         // Create invalid template (missing title in YAML)
         var invalidContent = @"---
+id: invalid-missing-title
 templateType: daily
 ---
 Content";
@@ -189,6 +192,7 @@ Content";
         // Arrange
         var templatePath = Path.Combine(_testDirectory, "concurrent-test.md");
         var templateContent = @"---
+id: concurrent-test
 templateType: daily
 title: Concurrent Test
 ---
@@ -213,6 +217,7 @@ Content";
     {
         // Arrange
         var templateContent = @"---
+id: empty-content
 templateType: daily
 title: Empty Template
 ---
@@ -280,6 +285,7 @@ title: Empty Template
     {
         // Arrange - Custom template (T054)
         var customContent = @"---
+id: my-custom-daily
 templateType: daily
 title: My Custom Daily Template
 description: A custom template for daily entries
@@ -315,6 +321,7 @@ Reflections:
     {
         // Arrange - Malformed YAML (T054)
         var malformedContent = @"---
+id: malformed
 templateType: daily
 title: Broken Template
 invalid-yaml-structure: {
@@ -340,6 +347,7 @@ Content here";
     {
         // Arrange - Missing required title (T054)
         var incompleteContent = @"---
+id: incomplete-metadata
 templateType: daily
 description: Missing title field
 ---
@@ -365,6 +373,7 @@ description: Missing title field
     {
         // Arrange - Validate template type parsing (T054)
         var content = $@"---
+id: test-{typeString}
 templateType: {typeString}
 title: Test Template Type
 ---
@@ -389,6 +398,7 @@ Content for {typeString} template";
         // Arrange - Invalid template type (T054)
         // Note: YAML parser may be lenient, so we test that validation catches invalid types
         var invalidContent = @"---
+id: invalid-type
 templateType: invalid-type
 title: Invalid Type Template
 ---
@@ -445,6 +455,7 @@ Content";
 
         // Invalid template with malformed YAML
         var invalidContent = @"---
+id: invalid-custom
 templateType: daily
 title: [broken yaml
 ---
@@ -469,6 +480,7 @@ Content";
     {
         // Arrange - Create template, load it, edit it, load again (T060)
         var originalContent = @"---
+id: editable
 templateType: daily
 title: Editable Template
 ---
@@ -487,6 +499,7 @@ This is the original version.";
 
         // Edit the template
         var editedContent = @"---
+id: editable
 templateType: daily
 title: Editable Template
 ---
@@ -510,6 +523,7 @@ This is the EDITED version with NEW content.";
     {
         // Arrange - Edit template metadata (T060)
         var originalContent = @"---
+id: metadata-editable
 templateType: daily
 title: Original Title
 description: Original description
@@ -528,6 +542,7 @@ description: Original description
 
         // Edit metadata
         var editedContent = @"---
+id: metadata-editable
 templateType: daily
 title: UPDATED Title
 description: UPDATED description with more details
@@ -551,6 +566,7 @@ version: 2.0
     {
         // Arrange - Change template type from daily to weekly (T060)
         var originalContent = @"---
+id: type-change
 templateType: daily
 title: Type Change Template
 ---
@@ -567,6 +583,7 @@ title: Type Change Template
 
         // Change type to weekly
         var editedContent = @"---
+id: type-change
 templateType: weekly
 title: Type Change Template
 ---
@@ -592,6 +609,7 @@ title: Type Change Template
 
         // Write version 1
         await File.WriteAllTextAsync(templatePath, @"---
+id: no-cache
 templateType: daily
 title: No Cache Test
 ---
@@ -602,6 +620,7 @@ title: No Cache Test
 
         // Write version 2
         await File.WriteAllTextAsync(templatePath, @"---
+id: no-cache
 templateType: daily
 title: No Cache Test
 ---
@@ -612,6 +631,7 @@ title: No Cache Test
 
         // Write version 3
         await File.WriteAllTextAsync(templatePath, @"---
+id: no-cache
 templateType: daily
 title: No Cache Test
 ---
@@ -633,6 +653,7 @@ title: No Cache Test
         // Arrange - Concurrent access during edit (T060)
         var templatePath = Path.Combine(_testDirectory, "concurrent-edit.md");
         await File.WriteAllTextAsync(templatePath, @"---
+id: concurrent-edit
 templateType: daily
 title: Concurrent Edit Test
 ---
@@ -670,6 +691,7 @@ title: Concurrent Edit Test
 
         // Edit one template
         var editedContent = @"---
+id: editable-2
 templateType: daily
 title: EDITED Title for Template 2
 description: This template was edited
@@ -702,6 +724,7 @@ description: This template was edited
     {
         var typeString = templateType == TemplateType.Daily ? "daily" : "weekly";
         var content = $@"---
+id: {templateId}
 templateType: {typeString}
 title: {templateId}
 description: Test template

@@ -177,7 +177,7 @@ public sealed class OutputStorageServiceTests
         result.IsSuccess.Should().BeTrue();
         var savedContent = fileSystem.File.ReadAllText(result.Value);
 
-        savedContent.Should().Contain(output.RecordingBaseName);
+        savedContent.Should().Contain(output.InputName);
         savedContent.Should().Contain(output.TemplateId);
         savedContent.Should().Contain(output.ProviderName);
         savedContent.Should().Contain(output.ModelName);
@@ -197,7 +197,7 @@ public sealed class OutputStorageServiceTests
         var output = CreateTestOutput();
 
         // Pre-create the file with old content
-        var outputPath = service.BuildOutputFilePath(output.RecordingBaseName, output.TemplateId);
+        var outputPath = service.BuildOutputFilePath(output.InputName, output.TemplateId);
         fileSystem.AddFile(outputPath, new MockFileData("old content"));
 
         // Act
@@ -246,7 +246,7 @@ public sealed class OutputStorageServiceTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeNullOrEmpty();
         result.Value.Should().EndWith(".md");
-        result.Value.Should().Contain(output.RecordingBaseName);
+        result.Value.Should().Contain(output.InputName);
         result.Value.Should().Contain("_generated");
     }
 
@@ -294,7 +294,8 @@ public sealed class OutputStorageServiceTests
         return new GeneratedOutput
         {
             Content = "This is the generated content from the LLM.",
-            RecordingBaseName = "10-21-2025_1",
+            InputName = "10-21-2025_1",
+            InputType = "Recording",
             TemplateId = "daily-summary",
             TemplateTitle = "Daily Summary",
             GeneratedAt = DateTimeOffset.UtcNow,

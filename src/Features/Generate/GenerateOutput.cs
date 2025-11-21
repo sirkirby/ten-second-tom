@@ -30,11 +30,16 @@ public static class GenerateOutput
         public required string TranscriptFilePath { get; init; }
 
         /// <summary>
-        /// Gets the base name of the recording (without extension).
+        /// Gets the base name of the input (without extension).
         /// Used for output file naming.
-        /// Example: "10-21-2025_1"
+        /// Example: "10-21-2025_1" or "MyNote"
         /// </summary>
-        public required string RecordingBaseName { get; init; }
+        public required string InputName { get; init; }
+
+        /// <summary>
+        /// Gets the type of input (Recording or Note).
+        /// </summary>
+        public required string InputType { get; init; }
 
         /// <summary>
         /// Gets the template ID to use for generation.
@@ -76,8 +81,9 @@ public static class GenerateOutput
         {
             var startTime = DateTimeOffset.UtcNow;
             logger.LogInformation(
-                "Starting generation for recording {Recording} with template {Template}",
-                request.RecordingBaseName,
+                "Starting generation for {InputType} {InputName} with template {Template}",
+                request.InputType,
+                request.InputName,
                 request.TemplateId);
 
             // Get LLM provider from options
@@ -142,9 +148,9 @@ public static class GenerateOutput
             }
 
             // 6. Build prompt by substituting standard template variables
-            // Parse date from recording base name (format: M-D-Y_Increment)
-            DateTimeOffset recordingDate = ParseRecordingDate(request.RecordingBaseName);
-            string dateString = recordingDate.ToString("MMMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture);
+            // Parse date from input name if possible, otherwise use current date
+            DateTimeOffset inputDate = ParseInputDate(request.InputName);
+            string dateString = inputDate.ToString("MMMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture);
 
             var prompt = template.Content
                 .Replace("{{USER_INPUT}}", processed.Content)
@@ -162,8 +168,8 @@ public static class GenerateOutput
                 if (!llmResult.IsSuccess)
                 {
                     logger.LogError(
-                        "LLM provider returned error for {Recording}: {Error}",
-                        request.RecordingBaseName,
+                        "LLM provider returned error for {InputName}: {Error}",
+                        request.InputName,
                         llmResult.Error);
 
                     return Result<GeneratedOutput>.Failure(
@@ -172,15 +178,15 @@ public static class GenerateOutput
             }
             catch (OperationCanceledException)
             {
-                logger.LogWarning("LLM request cancelled for {Recording}", request.RecordingBaseName);
+                logger.LogWarning("LLM request cancelled for {InputName}", request.InputName);
                 return Result<GeneratedOutput>.Failure("Operation was cancelled");
             }
             catch (TimeoutException ex)
             {
                 logger.LogError(
                     ex,
-                    "LLM request timed out for {Recording}",
-                    request.RecordingBaseName);
+                    "LLM request timed out for {InputName}",
+                    request.InputName);
 
                 return Result<GeneratedOutput>.Failure(
                     "LLM request timed out. The service may be experiencing delays. Please try again.");
@@ -189,8 +195,8 @@ public static class GenerateOutput
             {
                 logger.LogError(
                     ex,
-                    "Network error during LLM request for {Recording}",
-                    request.RecordingBaseName);
+                    "Network error during LLM request for {InputName}",
+                    request.InputName);
 
                 return Result<GeneratedOutput>.Failure(
                     "Network error: Unable to reach LLM service. Please check your internet connection and try again.");
@@ -199,8 +205,8 @@ public static class GenerateOutput
             {
                 logger.LogWarning(
                     ex,
-                    "Rate limit exceeded for {Recording}",
-                    request.RecordingBaseName);
+                    "Rate limit exceeded for {InputName}",
+                    request.InputName);
 
                 return Result<GeneratedOutput>.Failure(
                     "Rate limit exceeded. Please wait a moment and try again.");
@@ -209,8 +215,8 @@ public static class GenerateOutput
             {
                 logger.LogError(
                     ex,
-                    "API quota exceeded for {Recording}",
-                    request.RecordingBaseName);
+                    "API quota exceeded for {InputName}",
+                    request.InputName);
 
                 return Result<GeneratedOutput>.Failure(
                     "API quota exceeded. Please check your account limits.");
@@ -219,8 +225,8 @@ public static class GenerateOutput
             {
                 logger.LogError(
                     ex,
-                    "Unexpected error during LLM request for {Recording}",
-                    request.RecordingBaseName);
+                    "Unexpected error during LLM request for {InputName}",
+                    request.InputName);
 
                 return Result<GeneratedOutput>.Failure(
                     $"LLM service error: {ex.Message}. Please try again.");
@@ -235,7 +241,8 @@ public static class GenerateOutput
             var output = new GeneratedOutput
             {
                 Content = cleanedContent,
-                RecordingBaseName = request.RecordingBaseName,
+                InputName = request.InputName,
+                InputType = request.InputType,
                 TemplateId = template.TemplateId,
                 TemplateTitle = template.Metadata?.Title ?? template.TemplateId,
                 GeneratedAt = DateTimeOffset.UtcNow,
@@ -263,11 +270,11 @@ public static class GenerateOutput
             var duration = DateTimeOffset.UtcNow - startTime;
 
             logger.LogInformation(
-                "Generation completed for {Recording} using {Template}: {OutputPath} " +
+                "Generation completed for {InputName} using {Template}: {OutputPath} " +
                 "(Duration: {Duration:F2}s, Provider: {Provider}, Model: {Model}, " +
                 "Tokens: {InputTokens} input + {OutputTokens} output = {TotalTokens} total, " +
                 "Truncated: {WasTruncated})",
-                request.RecordingBaseName,
+                request.InputName,
                 template.TemplateId,
                 output.OutputFilePath,
                 duration.TotalSeconds,
@@ -282,23 +289,28 @@ public static class GenerateOutput
         }
 
         /// <summary>
-        /// Parses the recording date from the base name format: M-D-Y_Increment (e.g., "10-22-2025_1").
+        /// Parses the date from the input name if it matches the recording format: M-D-Y_Increment.
+        /// Otherwise returns current date.
         /// </summary>
-        /// <param name="recordingBaseName">The recording base name.</param>
+        /// <param name="inputName">The input base name.</param>
         /// <returns>The parsed date as DateTimeOffset.</returns>
-        private static DateTimeOffset ParseRecordingDate(string recordingBaseName)
+        private static DateTimeOffset ParseInputDate(string inputName)
         {
             // Format: M-D-Y_Increment (e.g., "10-22-2025_1")
             // Extract the date part before the underscore
-            var datepart = recordingBaseName.Split('_')[0];
-            var parts = datepart.Split('-');
-
-            if (parts.Length == 3 &&
-                int.TryParse(parts[0], out int month) &&
-                int.TryParse(parts[1], out int day) &&
-                int.TryParse(parts[2], out int year))
+            var parts = inputName.Split('_');
+            if (parts.Length > 0)
             {
-                return new DateTimeOffset(year, month, day, 0, 0, 0, TimeSpan.Zero);
+                var datePart = parts[0];
+                var dateComponents = datePart.Split('-');
+
+                if (dateComponents.Length == 3 &&
+                    int.TryParse(dateComponents[0], out int month) &&
+                    int.TryParse(dateComponents[1], out int day) &&
+                    int.TryParse(dateComponents[2], out int year))
+                {
+                    return new DateTimeOffset(year, month, day, 0, 0, 0, TimeSpan.Zero);
+                }
             }
 
             // Fallback to current date if parsing fails
