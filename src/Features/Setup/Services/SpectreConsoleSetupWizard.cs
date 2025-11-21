@@ -691,13 +691,11 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             return null; // User cancelled
         }
 
-        string defaultBaseUrl = selectedServer. Url;
-
-        // Override with current if exists
-        if (!string.IsNullOrWhiteSpace(currentBaseUrl))
-        {
-            defaultBaseUrl = currentBaseUrl;
-        }
+        // For known server types, always use the server's default URL
+        // For "Generic (Custom URL)", use currentBaseUrl as fallback if available
+        string defaultBaseUrl = selectedServer.Name == "Generic (Custom URL)" && !string.IsNullOrWhiteSpace(currentBaseUrl)
+            ? currentBaseUrl
+            : selectedServer.Url;
 
         // Step 2: Prompt for Base URL
         var baseUrlPrompt = new TextPrompt<string>("Base URL:")
