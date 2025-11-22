@@ -142,7 +142,7 @@ public sealed class MemoryEntryTests
         var entry = new MemoryEntry
         {
             EntryId = "thisweek-2025-40-1",
-            Command = "thisweek",
+            Command = CommandNames.ThisWeek,
             Timestamp = timestamp,
             EntryNumber = 1,
             UserInput = "Test input",
@@ -154,8 +154,17 @@ public sealed class MemoryEntryTests
         string filePath = entry.FilePath;
 
         // Assert
-        filePath.Should().StartWith("thisweek/2025-");
-        filePath.Should().EndWith("-1.md");
+        var (rangeStart, rangeEnd) = GetWeekRange(timestamp.Date);
+        string expectedPath = $"note/{rangeStart:MM-dd-yyyy}_{rangeEnd:MM-dd-yyyy}_1_generated.md";
+        filePath.Should().Be(expectedPath);
+    }
+
+    private static (DateTime Start, DateTime End) GetWeekRange(DateTime referenceDate)
+    {
+        var normalized = referenceDate.Date;
+        var daysSinceMonday = ((int)normalized.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+        var start = normalized.AddDays(-daysSinceMonday);
+        return (start, start.AddDays(6));
     }
 
     [Fact]

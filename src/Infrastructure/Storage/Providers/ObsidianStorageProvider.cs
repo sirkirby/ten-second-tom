@@ -142,6 +142,11 @@ public sealed class ObsidianStorageProvider : IStorageProvider
         => _innerProvider.GetEntriesAsync(command, startDate, endDate, cancellationToken);
 
     /// <inheritdoc/>
+    public Task<Result<IReadOnlyList<MemoryEntry>>> GetGeneratedEntriesAsync(
+        DateTime startDate, DateTime endDate, CancellationToken cancellationToken)
+        => _innerProvider.GetGeneratedEntriesAsync(startDate, endDate, cancellationToken);
+
+    /// <inheritdoc/>
     public Task<Result<int>> CountEntriesAsync(string command, DateTime targetDate, CancellationToken cancellationToken)
         => _innerProvider.CountEntriesAsync(command, targetDate, cancellationToken);
 

@@ -1,3 +1,4 @@
+using System.Linq;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -91,28 +92,29 @@ public static class CreateWeeklyReview
             // 3. Determine date range (custom or last 7 days)
             DateRange dateRange = request.CustomDateRange ?? GetLastSevenDays();
 
-            // 4. Retrieve daily entries from storage
-            Result<IReadOnlyList<MemoryEntry>> entriesResult = await _storage.GetEntriesAsync(
-                CommandNames.Today,
+            // 4. Retrieve generated entries from storage (note + recording)
+            Result<IReadOnlyList<MemoryEntry>> entriesResult = await _storage.GetGeneratedEntriesAsync(
                 dateRange.StartDate.DateTime,
                 dateRange.EndDate.DateTime,
                 cancellationToken).ConfigureAwait(false);
 
             if (!entriesResult.IsSuccess)
             {
-                return Result<WeeklyEntry>.Failure($"Failed to retrieve daily entries: {entriesResult.Error}");
+                return Result<WeeklyEntry>.Failure($"Failed to retrieve generated entries: {entriesResult.Error}");
             }
 
-            // 5. Return error if no entries found
-            if (entriesResult.Value.Count == 0)
+            List<MemoryEntry> eligibleEntries = FilterEligibleEntries(entriesResult.Value);
+
+            // 5. Return error if no eligible entries found
+            if (eligibleEntries.Count == 0)
             {
                 return Result<WeeklyEntry>.Failure(
-                    $"No daily entries found for the period {dateRange.StartDate:yyyy-MM-dd} to {dateRange.EndDate:yyyy-MM-dd}. " +
-                    "Please create some daily entries first using the 'tom today' command.");
+                    $"No generated entries found for the period {dateRange.StartDate:yyyy-MM-dd} to {dateRange.EndDate:yyyy-MM-dd}. " +
+                    "Create entries with 'tom today' or 'tom generate' first.");
             }
 
-            // 6. Aggregate daily summaries
-            string aggregatedContent = AggregateDailyEntries(entriesResult.Value);
+            // 6. Aggregate generated summaries
+            string aggregatedContent = AggregateGeneratedEntries(eligibleEntries);
 
             // 7. Select prompt template
             string selectedTemplateId;
@@ -168,7 +170,7 @@ public static class CreateWeeklyReview
                 return Result<WeeklyEntry>.Failure($"Failed to load prompt template: {templateResult.Error}");
             }
 
-            string prompt = RenderPrompt(templateResult.Value, aggregatedContent, dateRange, entriesResult.Value.Count);
+            string prompt = RenderPrompt(templateResult.Value, aggregatedContent, dateRange, eligibleEntries.Count);
 
             // 9. Determine LLM provider (use override, or load from options)
             string provider;
@@ -239,7 +241,7 @@ public static class CreateWeeklyReview
                 Command = CommandNames.ThisWeek,
                 Timestamp = DateTimeOffset.UtcNow,
                 EntryNumber = entryNumber,
-                UserInput = $"Weekly review for {dateRange.StartDate:yyyy-MM-dd} to {dateRange.EndDate:yyyy-MM-dd} ({entriesResult.Value.Count} daily entries)",
+                UserInput = $"Weekly review for {dateRange.StartDate:yyyy-MM-dd} to {dateRange.EndDate:yyyy-MM-dd} ({eligibleEntries.Count} generated entries)",
                 LlmResponse = cleanedResponse,
                 Metadata = new MemoryEntryMetadata
                 {
@@ -258,11 +260,11 @@ public static class CreateWeeklyReview
             }
 
             _logger.LogInformation(
-                "Created weekly review {EntryId} for period {StartDate} to {EndDate} with {EntryCount} daily entries",
+                "Created weekly review {EntryId} for period {StartDate} to {EndDate} with {EntryCount} generated entries",
                 weeklyEntry.EntryId,
                 dateRange.StartDate,
                 dateRange.EndDate,
-                entriesResult.Value.Count);
+                eligibleEntries.Count);
 
             // 13. Return Result<WeeklyEntry>
             return Result<WeeklyEntry>.Success(weeklyEntry);
@@ -325,7 +327,7 @@ public static class CreateWeeklyReview
             };
         }
 
-        private static string AggregateDailyEntries(IReadOnlyList<MemoryEntry> entries)
+        private static string AggregateGeneratedEntries(IReadOnlyList<MemoryEntry> entries)
         {
             System.Text.StringBuilder sb = new();
 
@@ -344,6 +346,14 @@ public static class CreateWeeklyReview
             }
 
             return sb.ToString();
+        }
+
+        private static List<MemoryEntry> FilterEligibleEntries(IReadOnlyList<MemoryEntry> entries)
+        {
+            return entries
+                .Where(entry => !entry.Command.Equals(CommandNames.ThisWeek, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(entry => entry.Timestamp)
+                .ToList();
         }
 
         private static string RenderPrompt(

@@ -1,4 +1,5 @@
 using FluentAssertions;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
 
 namespace TenSecondTom.Tests.Models;
@@ -52,14 +53,14 @@ public sealed class WeeklyEntryTests
     }
 
     [Fact]
-    public void WeeklyEntry_FilePath_ShouldUseThisWeekDirectory()
+    public void WeeklyEntry_FilePath_ShouldUseNoteDirectoryWithDateRange()
     {
         // Arrange
         var timestamp = new DateTimeOffset(2025, 10, 2, 14, 30, 0, TimeSpan.Zero); // Thursday, Oct 2, 2025, Week 40
         var entry = new WeeklyEntry
         {
             EntryId = "thisweek-2025-40-1",
-            Command = "thisweek",
+            Command = CommandNames.ThisWeek,
             Timestamp = timestamp,
             EntryNumber = 1,
             UserInput = "Test",
@@ -71,7 +72,16 @@ public sealed class WeeklyEntryTests
         string filePath = entry.FilePath;
 
         // Assert
-        filePath.Should().Be("thisweek/2025-40-Thu-1.md");
+        var (start, end) = GetWeekRange(timestamp.Date);
+        filePath.Should().Be($"note/{start:MM-dd-yyyy}_{end:MM-dd-yyyy}_1_generated.md");
+    }
+
+    private static (DateTime Start, DateTime End) GetWeekRange(DateTime referenceDate)
+    {
+        var normalized = referenceDate.Date;
+        var daysSinceMonday = ((int)normalized.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+        var start = normalized.AddDays(-daysSinceMonday);
+        return (start, start.AddDays(6));
     }
 
     private static MemoryEntryMetadata CreateValidMetadata()
