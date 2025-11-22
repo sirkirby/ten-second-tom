@@ -437,7 +437,7 @@ public sealed class GenerateOutputCommandHandlerTests
     {
         return new GenerateOutput.Command
         {
-            TranscriptFilePath = "/test/recording/10-21-2025_1.txt",
+            TranscriptFilePath = "/test/recording/10-21-2025_1.md",
             InputName = "10-21-2025_1",
             InputType = "Recording",
             TemplateId = "daily-summary",

@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace TenSecondTom.Shared.Extensions;
@@ -53,5 +54,46 @@ public static partial class StringExtensions
 
     [GeneratedRegex(@"^```(?:markdown)?(?:\r?\n|\r)([\s\S]*?)(?:\r?\n|\r)```\s*$", RegexOptions.IgnoreCase)]
     private static partial Regex CodeBlockRegex();
+
+    /// <summary>
+    /// Normalizes proprietary reasoning tags (e.g. &lt;think&gt;...&lt;/think&gt;) into markdown-friendly blocks.
+    /// Preserves the reasoning text while rendering it as a quoted section for readability.
+    /// </summary>
+    /// <param name="content">The content to normalize.</param>
+    /// <returns>The content with reasoning tags converted to markdown quotes.</returns>
+    public static string NormalizeReasoningTags(this string content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return content;
+        }
+
+        return ReasoningTagRegex().Replace(content, static match =>
+        {
+            var body = match.Groups["body"].Value.Trim();
+            if (string.IsNullOrEmpty(body))
+            {
+                return string.Empty;
+            }
+
+            var tag = match.Groups["tag"].Value;
+            var label = tag.Equals("think", StringComparison.OrdinalIgnoreCase)
+                ? "Reasoning"
+                : $"Reasoning ({tag})";
+
+            var normalizedBody = body.Replace("\r\n", "\n").Trim();
+            var sb = new StringBuilder();
+            sb.AppendLine("<details>");
+            sb.AppendLine($"<summary>{label}</summary>");
+            sb.AppendLine();
+            sb.AppendLine(normalizedBody);
+            sb.AppendLine("</details>");
+            sb.AppendLine();
+            return sb.ToString();
+        });
+    }
+
+    [GeneratedRegex(@"<(?<tag>[a-z0-9:_-]*think[a-z0-9:_-]*)>(?<body>[\s\S]*?)</\k<tag>>", RegexOptions.IgnoreCase)]
+    private static partial Regex ReasoningTagRegex();
 }
 

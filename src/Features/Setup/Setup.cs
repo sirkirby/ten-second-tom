@@ -27,6 +27,11 @@ public static class Setup
         /// Gets whether to force setup even if configuration exists.
         /// </summary>
         public bool Force { get; init; }
+
+        /// <summary>
+        /// Gets whether to suppress interactive prompts when running setup.
+        /// </summary>
+        public bool NonInteractive { get; init; }
     }
 
     /// <summary>
@@ -63,7 +68,10 @@ public static class Setup
         {
             try
             {
-                logger.LogInformation("Starting setup wizard (Force: {Force})", request.Force);
+                logger.LogInformation(
+                    "Starting setup wizard (Force: {Force}, NonInteractive: {NonInteractive})",
+                    request.Force,
+                    request.NonInteractive);
 
                 wizardUI.ShowStatus("Welcome to Ten Second Tom! Let's get you set up.");
 

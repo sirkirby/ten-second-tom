@@ -33,16 +33,26 @@ public sealed class SetupCommandBuilder : ICommandBuilder
         {
             Description = "Force setup to run even if configuration exists"
         };
+        var nonInteractiveOption = new Option<bool>("--non-interactive")
+        {
+            Description = "Run setup without interactive prompts (fails if input required)"
+        };
 
         setupCommand.Options.Add(forceOption);
+        setupCommand.Options.Add(nonInteractiveOption);
         setupCommand.Options.Add(jsonOutputOption);
 
         setupCommand.SetAction(async (parseResult) =>
         {
             bool force = parseResult.GetValue(forceOption);
+            bool nonInteractive = parseResult.GetValue(nonInteractiveOption);
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
 
-            var command = new Setup.Command { Force = force };
+            var command = new Setup.Command
+            {
+                Force = force,
+                NonInteractive = nonInteractive
+            };
 
             var handler = serviceProvider.GetRequiredService<Setup.Handler>();
             var result = await handler.Handle(command, CancellationToken.None).ConfigureAwait(false);

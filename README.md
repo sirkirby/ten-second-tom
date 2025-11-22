@@ -1,6 +1,6 @@
 # Ten Second Tom
 
-```
+```bash
  _____               ____                           _   _____
 |_   _|__ _ __      / ___|  ___  ___ ___  _ __   __| | |_   _|__  _ __ ___
   | |/ _ \ '_ \     \___ \ / _ \/ __/ _ \| '_ \ / _` |   | |/ _ \| '_ ` _ \
@@ -27,12 +27,13 @@
 - 🧠 **Simplified Daily Reflections**: Single free-form text entry to capture your thoughts
 - 📝 **Quick Capture**: Save notes instantly without AI processing for raw thoughts and meeting notes
 - 🎤 **Voice Entry**: Record audio notes with local-first speech-to-text transcription
+- 🔁 **Standalone Transcription**: Re-run STT on saved recordings or note audio with a dedicated command
 - 📊 **Weekly Reviews**: AI-generated summaries of your week with themes and patterns
 - 🔍 **Searchable Archive**: Full-text search across all your memories (including voice transcripts)
 - 🤖 **Multiple AI Providers**: Support for OpenAI, Anthropic, and local LLMs (Ollama, LM Studio, etc.)
 - 📝 **Custom Templates**: Create and edit prompt templates to personalize your summaries
 - 📁 **Markdown Storage**: Human-readable files in configured memory directory
-- 🔐 **SSH Authentication**: Secure session management with SSH keys
+- 🔐 **SSH Authentication**: Secure session management with SSH keys and local SSH agents
 - 🎨 **Beautiful Terminal UI**: Rich formatting with Spectre.Console
 - 📤 **JSON Output**: Programmatic access for automation and integrations
 - ⏰ **Auto-Purge**: Configurable data retention policies
@@ -40,8 +41,10 @@
 ### 🔒 Privacy-First: Fully Offline Capable
 
 Ten Second Tom can operate **100% offline** with **zero cloud dependencies**:
+
 - **Local Speech-to-Text**: Use whisper.cpp for private voice transcription
-- **Local LLM Processing**: Run models via Ollama or LM Studio for AI summaries
+- **Local LLM Processing**: Run models via Ollama, LM Studio, or llama.cpp, which support local OpenAI-compatible APIs.
+- Use advanced open source reasoning models, like `bytedance/seed-oss` and `microsoft/phi-4-reasoning-plus` for your most complext notes or `openai/gpt-oss` and `qwen/qwen3-next-80b` to optimize for speed without compromising quality. Size the model to your hardware capabilities.
 - **Your data stays on your device** - no API calls, no internet required
 
 Perfect for sensitive work, offline environments, or privacy-conscious users.
@@ -85,7 +88,7 @@ Perfect for sensitive work, offline environments, or privacy-conscious users.
 
 Capture quick notes without AI processing. Perfect for raw thoughts, meeting notes, or anything you want to save immediately without LLM summarization.
 
-```
+```bash
 tom note [content] [options]
 
 Arguments:
@@ -111,6 +114,7 @@ Examples:
 **Storage**: Notes are saved to `<memory-dir>/note/` directory with filename `MM-DD-YYYY_N.md` where N is an incremental counter for that day.
 
 **Use Cases**:
+
 - Quick capture without waiting for AI processing
 - Meeting notes that don't need summarization
 - Raw thoughts you want to preserve exactly as written
@@ -122,7 +126,7 @@ Examples:
 
 Capture daily reflections with AI-powered summarization. Opens an interactive editor, then processes your input using a prompt template to generate structured summaries.
 
-```
+```bash
 tom today [notes] [options]
 
 Arguments:
@@ -147,10 +151,12 @@ Examples:
 ```
 
 **Storage**: Creates two files in `<memory-dir>/note/`:
+
 - `MM-DD-YYYY_N.md` - Your raw input (same format as `/note` command)
 - `MM-DD-YYYY_N_generated.md` - AI-generated summary using selected template
 
 **Available Templates**:
+
 - `daily-summary` - Retrospective reflection (Key Events, Themes, To-Do Items)
 - `daily-standup` - Forward-looking planning (Priorities, Blockers, Success Criteria)
 - `journal` - Emotional reflection and insights
@@ -175,15 +181,18 @@ tom today --voice --stt openai           # Force OpenAI + AI summary
 ```
 
 **STT Engine Selection:**
+
 - `auto` (default): Tries local whisper.cpp first, falls back to OpenAI if enabled
 - `local`: Forces local whisper.cpp (privacy-focused, no API calls)
 - `openai`: Forces OpenAI Whisper API (cloud-based, higher accuracy)
 
 **Key Difference:**
+
 - `/note --voice`: Saves transcript directly (no LLM processing)
 - `/today --voice`: Transcript + AI-generated summary
 
 **Prerequisites:**
+
 - **FFmpeg** for audio recording ([Download](https://ffmpeg.org/))
 - **whisper.cpp** for local transcription ([Download](https://github.com/ggerganov/whisper.cpp)) OR **OpenAI API key** for cloud transcription
 
@@ -197,7 +206,7 @@ tom today --voice --stt openai           # Force OpenAI + AI summary
 
 Record and save audio with transcription for later use with the `generate` command:
 
-```
+```bash
 tom record [options]
 
 Options:
@@ -218,6 +227,32 @@ Files saved to:
 
 **Note:** The `record` command requires SSH authentication (like other commands that create data). Recordings are saved with metadata in YAML frontmatter including timestamp, duration, STT engine used, and word count.
 
+### transcribe Command
+
+Transcribe any saved audio file—whether it originated from `/note --voice`, `tom record`, or an external `.wav`—without creating a new recording session.
+
+```bash
+tom transcribe [options]
+
+Options:
+  --note <name>         Note base name (without extension) to transcribe (reads from note/ directory)
+  --recording <name>    Recording base name to re-transcribe (reads from recording/ directory)
+  --file <path>         Import an arbitrary .wav file from anywhere on disk
+  --name <name>         Override the destination recording name (defaults to source base name)
+  --stt <engine>        STT engine: auto (default), local, or openai
+  --list                List available note/recording audio files and exit
+  --force               Overwrite existing transcript/audio if the destination already exists
+  --output-json         Output results in JSON format
+
+Examples:
+  tom transcribe --note 10-24-2025_1             # Transcribe a voice note into the recording library
+  tom transcribe --recording 10-20-2025_2 --force # Re-run STT on an existing recording
+  tom transcribe --file ~/Desktop/meeting.wav    # Import a standalone WAV file
+  tom transcribe --list --output-json            # Enumerate available audio in JSON format
+```
+
+**Storage:** Transcripts are written to `<memory-dir>/recording/<name>.md` with YAML frontmatter, matching the files expected by the `/generate` workflow.
+
 ### Audio Configuration
 
 Ten Second Tom provides extensive audio configuration for different microphone types and recording scenarios. All settings can be configured via:
@@ -237,12 +272,14 @@ Ten Second Tom provides extensive audio configuration for different microphone t
 #### Quick Configuration Examples
 
 **For Laptop/Built-in Microphones (Default):**
+
 ```bash
 # No configuration needed - optimized by default!
 tom today --voice
 ```
 
 **For Professional Dynamic Microphones:**
+
 ```bash
 export TenSecondTom__Audio__Recorder__InputVolume=0.75
 export TenSecondTom__Audio__Recorder__EnableNoiseReduction=false
@@ -250,6 +287,7 @@ tom today --voice
 ```
 
 **Adjust Silence Removal Sensitivity:**
+
 ```bash
 export TenSecondTom__Audio__Preprocessing__SilenceThresholdDb=-60  # More aggressive
 tom today --voice
@@ -322,7 +360,7 @@ tom config llm    # Re-run provider/model selection any time
 
 You'll first select a provider, then a curated list of models is displayed with cost tier and description:
 
-```
+```bash
 Select an LLM provider:
   ▸ OpenAI
     Anthropic
@@ -379,7 +417,7 @@ tom config show
 
 Example LLM section in output:
 
-```
+```bash
 LLM Configuration
   Provider : OpenAI
   Model    : gpt-5-mini (Balanced)
@@ -398,6 +436,7 @@ This re-runs only the provider/model selection flow—other settings remain unch
 Ten Second Tom supports running **completely offline** using local LLM servers that provide an OpenAI-compatible API.
 
 **Supported Local Servers:**
+
 - [Ollama](https://ollama.ai/) - Easy-to-use local LLM runner
 - [LM Studio](https://lmstudio.ai/) - GUI-based local model manager
 - [llama.cpp](https://github.com/ggerganov/llama.cpp) - Direct model inference
@@ -410,6 +449,7 @@ Ten Second Tom supports running **completely offline** using local LLM servers t
    - Server runs at `http://localhost:11434` by default
 
 2. **Configure Tom:**
+
    ```bash
    tom config llm --provider LocalOpenAiCompatible --model gpt-oss:latest
    # Or run interactively:
@@ -420,6 +460,7 @@ Ten Second Tom supports running **completely offline** using local LLM servers t
    ```
 
 3. **Use Tom offline:**
+
    ```bash
    tom today --voice  # Voice + local STT + local LLM = 100% offline!
    ```
@@ -503,6 +544,7 @@ tom setup
 ```
 
 The setup wizard will guide you through:
+
 1. SSH key selection (auto-detected from your system)
 2. LLM provider selection (OpenAI or Anthropic)
 3. API key configuration with validation
@@ -512,11 +554,13 @@ The setup wizard will guide you through:
 **Configuration Management:**
 
 View your current configuration:
+
 ```bash
 tom config show
 ```
 
 Update individual settings:
+
 ```bash
 tom config set llm-provider Anthropic
 tom config set api-key "your-new-key"
@@ -529,6 +573,7 @@ See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for complete configuration gu
 All user configuration is stored in `~/ten-second-tom/config/config.json` and managed automatically by the setup wizard. The shipped application files contain only logging configuration.
 
 Configuration precedence (highest to lowest):
+
 1. **Environment variables** - Runtime overrides
 2. **User configuration** (`~/ten-second-tom/config/config.json`) - Managed by `tom config`
 3. **Shipped defaults** (logging only)
@@ -542,11 +587,13 @@ Ten Second Tom supports **multiple storage providers** to fit your workflow. Cho
 #### Available Providers
 
 **Default File System** (Recommended for new users)
+
 - TST-native hierarchical structure optimized for organization
 - Stores entries in: `note/`, `thisweek/`, `templates/`, `config/`
 - Perfect for standalone use
 
 **Obsidian Vault Integration**
+
 - Store entries directly in your Obsidian vault
 - Bidirectional sync: changes in either app appear in both
 - Obsidian-friendly naming: `"2025-10-28 Entry 1.md"`
@@ -589,7 +636,7 @@ tom config storage
 
 By default, memories and configuration are stored in `~/ten-second-tom/` in your home directory:
 
-```
+```bash
 ~/ten-second-tom/
 ├── config/
 │   └── config.json        # Your configuration (from setup wizard)
@@ -644,6 +691,7 @@ Step 1 of 5: SSH Key Configuration
 ```
 
 The setup wizard will guide you through:
+
 - SSH key selection (auto-detected from your system, 1Password, Secretive, etc.)
 - LLM provider selection (OpenAI or Anthropic)
 - API key configuration with validation
@@ -679,7 +727,7 @@ $ tom today
 
 **Example Session:**
 
-```
+```markdown
 📅 Daily Reflection - October 3, 2025
 
 📝 What would you like to remember from today?
@@ -806,7 +854,7 @@ $ tom
 
 This launches an interactive shell where you can execute multiple commands without re-authentication:
 
-```text
+```bash
  _____               ____                           _   _____
 |_   _|__ _ __      / ___|  ___  ___ ___  _ __   __| | |_   _|__  _ __ ___
   | |/ _ \ '_ \     \___ \ / _ \/ __/ _ \| '_ \ / _` |   | |/ _ \| '_ ` _ \
@@ -880,7 +928,7 @@ Use single command mode for:
 
 Your memories are stored as plain markdown files in your configured memory directory:
 
-```
+```bash
 ~/ten-second-tom/
 ├── config/
 │   └── config.json         # Your configuration (SSH, LLM, Audio settings)
@@ -999,7 +1047,7 @@ When you run `tom today` or `tom thisweek`, Ten Second Tom will:
 
 1. **Auto-select** if only one template is available (no prompt shown)
 2. **Show selection prompt** if multiple templates exist:
-   ```
+   ```bash
    Select a template for daily summary:
    ▸ Daily Summary - Default template for daily journal entries [Default]
      My Daily Standup - A focused template for daily standup format
@@ -1066,6 +1114,7 @@ Format as a structured agile sprint review.
 ### Template Best Practices
 
 ✅ **DO:**
+
 - Keep templates under 1MB (soft limit)
 - Use clear, descriptive titles
 - Add helpful descriptions for selection
@@ -1075,6 +1124,7 @@ Format as a structured agile sprint review.
 - Use variables for dynamic content
 
 ❌ **DON'T:**
+
 - Use parent directory references (`..`) in filenames
 - Include path separators (`/`, `\`) in template IDs
 - Store sensitive information in templates
@@ -1113,17 +1163,20 @@ Default templates are never overwritten, so feel free to customize them!
 ### Troubleshooting Templates
 
 **Template not appearing in selection?**
+
 - Check YAML front matter is valid (use a YAML validator)
 - Ensure `templateType` matches command type (`daily` for `tom today`)
 - Check file extension is `.md`
 - Review logs for validation errors
 
 **Template selection not showing?**
+
 - If only one template exists, it's auto-selected (no prompt)
 - Check `~/ten-second-tom/templates/` directory exists
 - Verify at least one valid template for the command type
 
 **Want to see all templates?**
+
 ```bash
 ls -la ~/ten-second-tom/templates/
 ```

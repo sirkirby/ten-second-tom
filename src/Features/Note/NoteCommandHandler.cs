@@ -1,3 +1,4 @@
+using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,6 +13,8 @@ using TenSecondTom.Shared.Results;
 using TenSecondTom.Shared.TextEditing.Services;
 using TenSecondTom.Shared.TextEditing.Models;
 using TenSecondTom.Features.Audio;  // Only for CQRS commands/queries
+using TenSecondTom.Features.Audio.Models;
+using TenSecondTom.Features.Audio.Services;
 using TenSecondTom.Shared.Models;  // For shared types like AudioValidationResult, AudioRecording, TranscriptionResult
 
 namespace TenSecondTom.Features.Note;
@@ -502,7 +505,8 @@ public static class NoteCommandHandler
 
             var note = noteResult.Value;
 
-            // Step 4: Handle audio file
+            // Step 4: Handle audio file persistence + transcript storage
+            string? persistedAudioPath = null;
             if (!audioOptions.KeepFiles)
             {
                 try
@@ -517,44 +521,21 @@ public static class NoteCommandHandler
             }
             else
             {
-                // Move audio file to note directory with consistent naming pattern
-                var noteDir = Path.Combine(storageBaseDir, DirectoryNames.Note);
-                Directory.CreateDirectory(noteDir); // Ensure directory exists
+                var baseName = VoiceCapturePersistence.BuildVoiceEntryBaseName(note.EntryId, recording.Filename);
+                var persistResult = await VoiceCapturePersistence.PersistAsync(
+                    mediator,
+                    audioFilePath,
+                    baseName,
+                    transcribeConfig,
+                    AudioLibraryScope.Note,
+                    transcription,
+                    logger,
+                    CancellationToken.None).ConfigureAwait(false);
 
-                // Extract date and number from entry-id (e.g., "note-10-21-2025-1" -> "10-21-2025_1.wav")
-                var entryIdParts = note.EntryId.Split('-');
-                if (entryIdParts.Length >= 5)
+                if (persistResult.IsSuccess && persistResult.Value is not null)
                 {
-                    var month = entryIdParts[1];
-                    var day = entryIdParts[2];
-                    var year = entryIdParts[3];
-                    var number = entryIdParts[4];
-                    var newFilename = $"{month}-{day}-{year}_{number}.wav";
-                    var audioDestPath = Path.Combine(noteDir, newFilename);
-
-                    try
-                    {
-                        File.Move(audioFilePath, audioDestPath, overwrite: true);
-                        logger.LogInformation("Moved audio file to {Destination}", audioDestPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogWarning(ex, "Failed to move audio file to note directory");
-                    }
-                }
-                else
-                {
-                    logger.LogWarning("Invalid entry ID format: {EntryId}, falling back to original filename", note.EntryId);
-                    var audioDestPath = Path.Combine(noteDir, recording.Filename);
-                    try
-                    {
-                        File.Move(audioFilePath, audioDestPath, overwrite: true);
-                        logger.LogInformation("Moved audio file to {Destination}", audioDestPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogWarning(ex, "Failed to move audio file to note directory");
-                    }
+                    persistedAudioPath = persistResult.Value.AudioFilePath;
+                    note = note with { AudioFilePath = persistedAudioPath };
                 }
             }
 
@@ -616,10 +597,10 @@ public static class NoteCommandHandler
                     AnsiConsole.MarkupLine("[dim]... (content truncated in preview)[/]");
                 }
 
-                if (audioOptions.KeepFiles && note.AudioFilePath is not null)
+                if (audioOptions.KeepFiles && persistedAudioPath is not null)
                 {
                     AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine($"[dim]Audio saved: {Path.GetFileName(note.AudioFilePath)}[/]");
+                    AnsiConsole.MarkupLine($"[dim]Audio saved: {Path.GetFileName(persistedAudioPath)}[/]");
                 }
             }
         }

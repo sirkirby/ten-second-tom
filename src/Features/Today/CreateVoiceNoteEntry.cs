@@ -252,7 +252,9 @@ public static class CreateVoiceNoteEntry
             }
 
             // 9. Strip markdown code block wrappers if present (defensive measure)
-            string cleanedResponse = llmResult.Value.Content.StripMarkdownCodeBlock();
+            string cleanedResponse = llmResult.Value.Content
+                .StripMarkdownCodeBlock()
+                .NormalizeReasoningTags();
 
             // 10. Create VoiceNoteEntry with voice-specific metadata
             // Note: The prompt template defines the output structure.

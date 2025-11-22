@@ -17,6 +17,7 @@ Ten Second Tom supports extensive audio configuration for different microphone t
 - **Recording Optimization**: Microphone presets for different hardware types
 - **Silence Removal**: Intelligent preprocessing to compress recordings
 - **Noise Reduction**: Adaptive filtering for cleaner audio
+- **Library Transcription**: Dedicated `tom transcribe` command to re-run STT on existing audio
 
 ## Configuration Priority
 

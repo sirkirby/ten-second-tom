@@ -224,7 +224,9 @@ public static class CreateWeeklyReview
             }
 
             // 10. Strip markdown code block wrappers if present (defensive measure)
-            string cleanedResponse = completionResult.Value.Content.StripMarkdownCodeBlock();
+            string cleanedResponse = completionResult.Value.Content
+                .StripMarkdownCodeBlock()
+                .NormalizeReasoningTags();
 
             // 11. Create WeeklyEntry
             // Note: The prompt template defines the output structure.
