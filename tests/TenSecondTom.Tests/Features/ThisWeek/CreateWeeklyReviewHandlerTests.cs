@@ -115,11 +115,10 @@ Noticed pattern of afternoon productivity dips.
     {
         // Arrange
         var dailyEntries = CreateSampleDailyEntries(5);
-        _mockStorage.Setup(s => s.GetEntriesAsync(
-                "today",
-                It.IsAny<DateTime>(),
-                It.IsAny<DateTime>(),
-                It.IsAny<CancellationToken>()))
+        _mockStorage.Setup(s => s.GetGeneratedEntriesAsync(
+            It.IsAny<DateTime>(),
+            It.IsAny<DateTime>(),
+            It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyList<MemoryEntry>>.Success(dailyEntries));
 
         _mockStorage.Setup(s => s.SaveAsync(It.IsAny<WeeklyEntry>(), It.IsAny<CancellationToken>()))
@@ -142,11 +141,10 @@ Noticed pattern of afternoon productivity dips.
     public async Task Handle_WithNoDailyEntries_ReturnsNoDataError()
     {
         // Arrange
-        _mockStorage.Setup(s => s.GetEntriesAsync(
-                "today",
-                It.IsAny<DateTime>(),
-                It.IsAny<DateTime>(),
-                It.IsAny<CancellationToken>()))
+        _mockStorage.Setup(s => s.GetGeneratedEntriesAsync(
+            It.IsAny<DateTime>(),
+            It.IsAny<DateTime>(),
+            It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyList<MemoryEntry>>.Success(Array.Empty<MemoryEntry>()));
 
         var command = new CreateWeeklyReview.Command();
@@ -156,7 +154,7 @@ Noticed pattern of afternoon productivity dips.
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("No daily entries found");
+        result.Error.Should().Contain("No generated entries found");
     }
 
     [Fact]
@@ -172,11 +170,10 @@ Noticed pattern of afternoon productivity dips.
         };
 
         var dailyEntries = CreateSampleDailyEntries(5);
-        _mockStorage.Setup(s => s.GetEntriesAsync(
-                "today",
-                customStart.DateTime,
-                customEnd.DateTime,
-                It.IsAny<CancellationToken>()))
+        _mockStorage.Setup(s => s.GetGeneratedEntriesAsync(
+            customStart.DateTime,
+            customEnd.DateTime,
+            It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyList<MemoryEntry>>.Success(dailyEntries));
 
         _mockStorage.Setup(s => s.SaveAsync(It.IsAny<WeeklyEntry>(), It.IsAny<CancellationToken>()))
@@ -189,7 +186,7 @@ Noticed pattern of afternoon productivity dips.
 
         // Assert
         _mockStorage.Verify(
-            s => s.GetEntriesAsync("today", customStart.DateTime, customEnd.DateTime, It.IsAny<CancellationToken>()),
+            s => s.GetGeneratedEntriesAsync(customStart.DateTime, customEnd.DateTime, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -198,11 +195,10 @@ Noticed pattern of afternoon productivity dips.
     {
         // Arrange
         var dailyEntries = CreateSampleDailyEntries(7);
-        _mockStorage.Setup(s => s.GetEntriesAsync(
-                "today",
-                It.IsAny<DateTime>(),
-                It.IsAny<DateTime>(),
-                It.IsAny<CancellationToken>()))
+        _mockStorage.Setup(s => s.GetGeneratedEntriesAsync(
+            It.IsAny<DateTime>(),
+            It.IsAny<DateTime>(),
+            It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyList<MemoryEntry>>.Success(dailyEntries));
 
         _mockStorage.Setup(s => s.SaveAsync(It.IsAny<WeeklyEntry>(), It.IsAny<CancellationToken>()))
@@ -216,8 +212,7 @@ Noticed pattern of afternoon productivity dips.
         // Assert
         result.IsSuccess.Should().BeTrue();
         _mockStorage.Verify(
-            s => s.GetEntriesAsync(
-                "today",
+            s => s.GetGeneratedEntriesAsync(
                 It.Is<DateTime>(d => d >= DateTime.UtcNow.AddDays(-7).Date),
                 It.IsAny<DateTime>(),
                 It.IsAny<CancellationToken>()),
@@ -229,11 +224,10 @@ Noticed pattern of afternoon productivity dips.
     {
         // Arrange
         var dailyEntries = CreateSampleDailyEntries(5);
-        _mockStorage.Setup(s => s.GetEntriesAsync(
-                "today",
-                It.IsAny<DateTime>(),
-                It.IsAny<DateTime>(),
-                It.IsAny<CancellationToken>()))
+        _mockStorage.Setup(s => s.GetGeneratedEntriesAsync(
+            It.IsAny<DateTime>(),
+            It.IsAny<DateTime>(),
+            It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyList<MemoryEntry>>.Success(dailyEntries));
 
         _mockLlmProvider.Setup(p => p.GenerateCompletionAsync(
@@ -264,11 +258,10 @@ Noticed pattern of afternoon productivity dips.
         };
         var dailyEntries = CreateSampleDailyEntries(5);
 
-        _mockStorage.Setup(s => s.GetEntriesAsync(
-                "today",
-                It.IsAny<DateTime>(),
-                It.IsAny<DateTime>(),
-                It.IsAny<CancellationToken>()))
+        _mockStorage.Setup(s => s.GetGeneratedEntriesAsync(
+            It.IsAny<DateTime>(),
+            It.IsAny<DateTime>(),
+            It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyList<MemoryEntry>>.Success(dailyEntries));
 
         _mockStorage.Setup(s => s.SaveAsync(It.IsAny<WeeklyEntry>(), It.IsAny<CancellationToken>()))
@@ -308,11 +301,10 @@ Noticed pattern of afternoon productivity dips.
     {
         // Arrange
         var dailyEntries = CreateSampleDailyEntries(7);
-        _mockStorage.Setup(s => s.GetEntriesAsync(
-                "today",
-                It.IsAny<DateTime>(),
-                It.IsAny<DateTime>(),
-                It.IsAny<CancellationToken>()))
+        _mockStorage.Setup(s => s.GetGeneratedEntriesAsync(
+            It.IsAny<DateTime>(),
+            It.IsAny<DateTime>(),
+            It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyList<MemoryEntry>>.Success(dailyEntries));
 
         _mockStorage.Setup(s => s.SaveAsync(It.IsAny<WeeklyEntry>(), It.IsAny<CancellationToken>()))
@@ -334,11 +326,10 @@ Noticed pattern of afternoon productivity dips.
     {
         // Arrange
         var dailyEntries = CreateSampleDailyEntries(7);
-        _mockStorage.Setup(s => s.GetEntriesAsync(
-                "today",
-                It.IsAny<DateTime>(),
-                It.IsAny<DateTime>(),
-                It.IsAny<CancellationToken>()))
+        _mockStorage.Setup(s => s.GetGeneratedEntriesAsync(
+            It.IsAny<DateTime>(),
+            It.IsAny<DateTime>(),
+            It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyList<MemoryEntry>>.Success(dailyEntries));
 
         _mockStorage.Setup(s => s.SaveAsync(It.IsAny<WeeklyEntry>(), It.IsAny<CancellationToken>()))
@@ -360,11 +351,10 @@ Noticed pattern of afternoon productivity dips.
     {
         // Arrange
         var dailyEntries = CreateSampleDailyEntries(10);
-        _mockStorage.Setup(s => s.GetEntriesAsync(
-                "today",
-                It.IsAny<DateTime>(),
-                It.IsAny<DateTime>(),
-                It.IsAny<CancellationToken>()))
+        _mockStorage.Setup(s => s.GetGeneratedEntriesAsync(
+            It.IsAny<DateTime>(),
+            It.IsAny<DateTime>(),
+            It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyList<MemoryEntry>>.Success(dailyEntries));
 
         _mockStorage.Setup(s => s.SaveAsync(It.IsAny<WeeklyEntry>(), It.IsAny<CancellationToken>()))

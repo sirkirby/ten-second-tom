@@ -33,6 +33,14 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
         DirectoryNames.Templates
     };
 
+    private static readonly Regex DailyGeneratedFileRegex = new(
+        "^(?<start>\\d{2}-\\d{2}-\\d{4})_(?<number>\\d+)_generated$",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+
+    private static readonly Regex WeeklyGeneratedFileRegex = new(
+        "^(?<start>\\d{2}-\\d{2}-\\d{4})_(?<end>\\d{2}-\\d{2}-\\d{4})_(?<number>\\d+)_generated$",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+
     /// <summary>
     /// Initializes a new instance of the <see cref="FileSystemStorageProvider"/> class.
     /// </summary>
@@ -98,35 +106,48 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
     {
         try
         {
-            string commandDirectory = Path.Combine(_baseDirectory, command);
-
-            if (!Directory.Exists(commandDirectory))
-            {
-                return Result<IReadOnlyList<MemoryEntry>>.Success(Array.Empty<MemoryEntry>());
-            }
-
+            DateTime normalizedStartDate = startDate.Date;
+            DateTime normalizedEndDate = endDate.Date;
             var entries = new List<MemoryEntry>();
-            string[] files = Directory.GetFiles(commandDirectory, "*.md", SearchOption.AllDirectories);
+            var processedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (string file in files)
+            foreach (string commandDirectory in GetCommandDirectories(command))
             {
-                if (cancellationToken.IsCancellationRequested)
+                if (!Directory.Exists(commandDirectory))
                 {
-                    break;
+                    continue;
                 }
 
-                MemoryEntry? entry = await ParseMarkdownFileAsync(file, cancellationToken).ConfigureAwait(false);
-                
-                if (entry != null && entry.Timestamp.Date >= startDate && entry.Timestamp.Date <= endDate)
+                string[] files = Directory.GetFiles(commandDirectory, "*.md", SearchOption.AllDirectories);
+
+                foreach (string file in files)
                 {
-                    entries.Add(entry);
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        break;
+                    }
+
+                    if (!processedFiles.Add(file))
+                    {
+                        continue;
+                    }
+
+                    MemoryEntry? entry = await ParseMarkdownFileAsync(file, cancellationToken).ConfigureAwait(false);
+                    
+                    if (entry != null &&
+                        entry.Command.Equals(command, StringComparison.OrdinalIgnoreCase) &&
+                        entry.Timestamp.Date >= normalizedStartDate &&
+                        entry.Timestamp.Date <= normalizedEndDate)
+                    {
+                        entries.Add(entry);
+                    }
                 }
             }
 
             entries.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
 
             _logger.LogDebug("Retrieved {Count} entries for command {Command} between {StartDate} and {EndDate}",
-                entries.Count, command, startDate, endDate);
+                entries.Count, command, normalizedStartDate, normalizedEndDate);
 
             return Result<IReadOnlyList<MemoryEntry>>.Success(entries);
         }
@@ -138,18 +159,95 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
     }
 
     /// <inheritdoc/>
+    public async Task<Result<IReadOnlyList<MemoryEntry>>> GetGeneratedEntriesAsync(
+        DateTime startDate,
+        DateTime endDate,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            DateTime normalizedStartDate = startDate.Date;
+            DateTime normalizedEndDate = endDate.Date;
+            var entries = new List<MemoryEntry>();
+            var processedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string directory in GetCommandDirectories(CommandNames.Generate))
+            {
+                if (!Directory.Exists(directory))
+                {
+                    continue;
+                }
+
+                IEnumerable<string> files = Directory.EnumerateFiles(directory, "*_generated.md", SearchOption.AllDirectories);
+
+                foreach (string file in files)
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        break;
+                    }
+
+                    if (!processedFiles.Add(file))
+                    {
+                        continue;
+                    }
+
+                    MemoryEntry? entry = await ParseMarkdownFileAsync(file, cancellationToken).ConfigureAwait(false);
+
+                    if (entry == null)
+                    {
+                        continue;
+                    }
+
+                    if (entry.Command.Equals(CommandNames.ThisWeek, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _logger.LogDebug(
+                            "Skipping weekly entry {EntryId} while aggregating generated entries",
+                            entry.EntryId);
+                        continue;
+                    }
+
+                    if (entry.Timestamp.Date >= normalizedStartDate && entry.Timestamp.Date <= normalizedEndDate)
+                    {
+                        entries.Add(entry);
+                    }
+                }
+            }
+
+            entries.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
+
+            _logger.LogDebug(
+                "Retrieved {Count} generated entries between {StartDate} and {EndDate}",
+                entries.Count,
+                normalizedStartDate,
+                normalizedEndDate);
+
+            return Result<IReadOnlyList<MemoryEntry>>.Success(entries);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get generated entries between {StartDate} and {EndDate}", startDate, endDate);
+            return Result<IReadOnlyList<MemoryEntry>>.Failure($"Failed to retrieve generated entries: {ex.Message}");
+        }
+    }
+
+    /// <inheritdoc/>
     public Task<Result<int>> CountEntriesAsync(string command, DateTime targetDate, CancellationToken cancellationToken)
     {
         try
         {
-            string commandDirectory = Path.Combine(_baseDirectory, command);
+            int count = 0;
 
-            if (!Directory.Exists(commandDirectory))
+            foreach (string commandDirectory in GetCommandDirectories(command))
             {
-                return Task.FromResult(Result<int>.Success(0));
+                if (!Directory.Exists(commandDirectory))
+                {
+                    continue;
+                }
+
+                count += CountEntriesByConvention(commandDirectory, command, targetDate);
             }
 
-            int count = CountEntriesByConvention(commandDirectory, command, targetDate);
             _logger.LogDebug("Counted {Count} entries for command {Command} on {Date}", count, command, targetDate);
 
             return Task.FromResult(Result<int>.Success(count));
@@ -176,7 +274,7 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
             return 0;
         }
 
-        string pattern = $"{targetDate:MM-dd-yyyy}_*.md";
+        string pattern = $"{targetDate:MM-dd-yyyy}_*_generated.md";
         return Directory.EnumerateFiles(commandDirectory, pattern, SearchOption.TopDirectoryOnly).Count();
     }
 
@@ -187,13 +285,11 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
             return 0;
         }
 
-        int weekNumber = CultureInfo.InvariantCulture.Calendar.GetWeekOfYear(
-            targetDate,
-            CalendarWeekRule.FirstFourDayWeek,
-            DayOfWeek.Monday);
+        var (start, end) = GetWeeklyRange(targetDate);
+        string prefix = $"{start:MM-dd-yyyy}_{end:MM-dd-yyyy}_";
 
-        string prefix = $"{targetDate.Year:0000}-{weekNumber:00}-";
-        return Directory.EnumerateFiles(commandDirectory, $"{prefix}*.md", SearchOption.TopDirectoryOnly).Count();
+        return Directory.EnumerateFiles(commandDirectory, "*.md", SearchOption.TopDirectoryOnly)
+            .Count(file => Path.GetFileName(file).StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
     }
 
     private static int CountEntriesByScan(string commandDirectory, DateTime targetDate)
@@ -206,6 +302,41 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
         string dateToken = targetDate.ToString("MM-dd-yyyy", CultureInfo.InvariantCulture);
         return Directory.EnumerateFiles(commandDirectory, "*.md", SearchOption.AllDirectories)
             .Count(file => Path.GetFileName(file).Contains(dateToken, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private IEnumerable<string> GetCommandDirectories(string command)
+    {
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            yield break;
+        }
+
+        var normalized = command.ToLowerInvariant();
+
+        var relativeDirectories = normalized switch
+        {
+            CommandNames.Today => new[] { DirectoryNames.Note, DirectoryNames.Today },
+            CommandNames.Note => new[] { DirectoryNames.Note },
+            CommandNames.ThisWeek => new[] { DirectoryNames.Note, DirectoryNames.ThisWeek },
+            CommandNames.Generate => new[] { DirectoryNames.Note, DirectoryNames.Recording, DirectoryNames.Today },
+            _ => new[] { normalized }
+        };
+
+        var emitted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var relative in relativeDirectories)
+        {
+            if (string.IsNullOrWhiteSpace(relative))
+            {
+                continue;
+            }
+
+            var fullPath = Path.Combine(_baseDirectory, relative);
+            if (emitted.Add(fullPath))
+            {
+                yield return fullPath;
+            }
+        }
     }
 
     /// <inheritdoc/>
@@ -285,6 +416,8 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
     {
         try
         {
+            DateTime normalizedStartDate = startDate.Date;
+            DateTime normalizedEndDate = endDate.Date;
             int deletedCount = 0;
 
             if (!Directory.Exists(_baseDirectory))
@@ -308,7 +441,9 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
 
                 MemoryEntry? entry = await ParseMarkdownFileAsync(file, cancellationToken).ConfigureAwait(false);
                 
-                if (entry != null && entry.Timestamp.Date >= startDate && entry.Timestamp.Date <= endDate)
+                if (entry != null &&
+                    entry.Timestamp.Date >= normalizedStartDate &&
+                    entry.Timestamp.Date <= normalizedEndDate)
                 {
                     File.Delete(file);
                     deletedCount++;
@@ -317,7 +452,7 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
             }
 
             _logger.LogInformation("Deleted {Count} entries between {StartDate} and {EndDate}",
-                deletedCount, startDate, endDate);
+                deletedCount, normalizedStartDate, normalizedEndDate);
 
             return Result<int>.Success(deletedCount);
         }
@@ -440,6 +575,12 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
             
             if (yamlBlock == null)
             {
+                if (TryParseLegacyEntry(filePath, content, out MemoryEntry? legacyEntry))
+                {
+                    _logger.LogDebug("Parsed legacy entry without YAML frontmatter: {FilePath}", filePath);
+                    return legacyEntry;
+                }
+
                 _logger.LogWarning("No YAML frontmatter found in file: {FilePath}", filePath);
                 return null;
             }
@@ -519,6 +660,115 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
         }
     }
 
+    private static MemoryEntryMetadata CreateUnknownMetadata()
+        => new()
+        {
+            LlmProvider = "Unknown",
+            LlmModel = "Unknown"
+        };
+
+    private bool TryParseLegacyEntry(string filePath, string content, out MemoryEntry? entry)
+    {
+        entry = null;
+
+        string relativePath = Path.GetRelativePath(_baseDirectory, filePath);
+        string fileName = Path.GetFileNameWithoutExtension(filePath);
+
+        Match weeklyMatch = WeeklyGeneratedFileRegex.Match(fileName);
+        Match dailyMatch = DailyGeneratedFileRegex.Match(fileName);
+
+        bool isRecording = PathContainsSegment(relativePath, DirectoryNames.Recording);
+
+        if (weeklyMatch.Success)
+        {
+            if (!TryParseDateToken(weeklyMatch.Groups["start"].Value, out DateTime startDate) ||
+                !TryParseDateToken(weeklyMatch.Groups["end"].Value, out DateTime endDate) ||
+                !int.TryParse(weeklyMatch.Groups["number"].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int entryNumber))
+            {
+                return false;
+            }
+
+            string userInput = ExtractSection(content, "## User Input", "## Summary");
+            string llmResponse = ExtractSection(content, "## Summary", null);
+
+            entry = new WeeklyEntry
+            {
+                EntryId = $"{CommandNames.ThisWeek}-{startDate:yyyy-MM-dd}-{entryNumber}",
+                Command = CommandNames.ThisWeek,
+                Timestamp = new DateTimeOffset(DateTime.SpecifyKind(endDate, DateTimeKind.Utc)),
+                EntryNumber = entryNumber,
+                UserInput = userInput,
+                LlmResponse = llmResponse,
+                Metadata = CreateUnknownMetadata()
+            };
+
+            return true;
+        }
+
+        if (dailyMatch.Success)
+        {
+            if (!TryParseDateToken(dailyMatch.Groups["start"].Value, out DateTime primaryDate) ||
+                !int.TryParse(dailyMatch.Groups["number"].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int entryNumber))
+            {
+                return false;
+            }
+
+            DateTimeOffset timestamp = new(DateTime.SpecifyKind(primaryDate, DateTimeKind.Utc));
+            string userInput = ExtractSection(content, "## User Input", "## Summary");
+            string llmResponse = ExtractSection(content, "## Summary", null);
+
+            if (isRecording)
+            {
+                entry = new MemoryEntry
+                {
+                    EntryId = $"{CommandNames.Generate}-{primaryDate:yyyy-MM-dd}-{entryNumber}",
+                    Command = CommandNames.Generate,
+                    Timestamp = timestamp,
+                    EntryNumber = entryNumber,
+                    UserInput = string.Empty,
+                    LlmResponse = string.IsNullOrWhiteSpace(llmResponse) ? content.Trim() : llmResponse,
+                    Metadata = CreateUnknownMetadata(),
+                    FilePath = relativePath
+                };
+
+                return true;
+            }
+
+            entry = new DailyEntry
+            {
+                EntryId = $"{CommandNames.Today}-{primaryDate:yyyy-MM-dd}-{entryNumber}",
+                Command = CommandNames.Today,
+                Timestamp = timestamp,
+                EntryNumber = entryNumber,
+                UserInput = userInput,
+                LlmResponse = llmResponse,
+                Metadata = CreateUnknownMetadata()
+            };
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryParseDateToken(string token, out DateTime date)
+    {
+        if (DateTime.TryParseExact(token, "MM-dd-yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsed))
+        {
+            date = DateTime.SpecifyKind(parsed, DateTimeKind.Utc);
+            return true;
+        }
+
+        date = default;
+        return false;
+    }
+
+    private static bool PathContainsSegment(string relativePath, string segment)
+    {
+        string[] segments = relativePath.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+        return segments.Any(s => s.Equals(segment, StringComparison.OrdinalIgnoreCase));
+    }
+
     /// <summary>
     /// Extracts all content that comes after the YAML frontmatter block.
     /// </summary>
@@ -561,6 +811,15 @@ public sealed partial class FileSystemStorageProvider : IMemoryStorageProvider
         }
 
         return content.Substring(startIndex, endIndex - startIndex).Trim();
+    }
+
+    private static (DateTime Start, DateTime End) GetWeeklyRange(DateTime referenceDate)
+    {
+        var normalized = referenceDate.Date;
+        var daysSinceMonday = ((int)normalized.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+        var start = normalized.AddDays(-daysSinceMonday);
+        var end = start.AddDays(6);
+        return (start, end);
     }
 
     /// <summary>

@@ -1,7 +1,9 @@
+using System.Linq;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using TenSecondTom.Infrastructure.Storage;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 
@@ -114,9 +116,9 @@ public sealed class FileSystemStorageProviderTests : IDisposable
         var entry = CreateTestDailyEntry("today-10-02-2025-1", 1, new DateTimeOffset(2025, 10, 2, 14, 0, 0, TimeSpan.Zero));
         await provider.SaveAsync(entry, CancellationToken.None);
 
-        // Act - Get entries using "note" command since today entries are now saved in note/ directory
+        // Act
         Result<IReadOnlyList<MemoryEntry>> result = await provider.GetEntriesAsync(
-            "note",
+            CommandNames.Today,
             new DateTime(2025, 10, 1),
             new DateTime(2025, 10, 3),
             CancellationToken.None);
@@ -126,6 +128,158 @@ public sealed class FileSystemStorageProviderTests : IDisposable
         result.Value.Should().HaveCount(1);
         result.Value[0].EntryId.Should().Be("today-10-02-2025-1");
         result.Value[0].UserInput.Should().Be("Test user input");
+    }
+
+    [Fact]
+    public async Task GetGeneratedEntriesAsync_ReturnsEntriesFromNoteAndRecording()
+    {
+        // Arrange
+        var provider = new FileSystemStorageProvider(_testDirectory, _mockLogger.Object);
+        var noteEntry = CreateTestDailyEntry("today-10-02-2025-1", 1, new DateTimeOffset(2025, 10, 2, 8, 0, 0, TimeSpan.Zero));
+        await provider.SaveAsync(noteEntry, CancellationToken.None);
+
+        var recordingEntry = new MemoryEntry
+        {
+            EntryId = "generate-10-02-2025-1",
+            Command = CommandNames.Generate,
+            Timestamp = new DateTimeOffset(2025, 10, 2, 9, 0, 0, TimeSpan.Zero),
+            EntryNumber = 1,
+            UserInput = "Recording transcript",
+            LlmResponse = "Recording summary",
+            Metadata = new MemoryEntryMetadata
+            {
+                LlmProvider = "OpenAI",
+                LlmModel = "gpt-4o",
+                TokensUsed = 200,
+                ProcessingDuration = TimeSpan.FromSeconds(4)
+            },
+            FilePath = Path.Combine(DirectoryNames.Recording, "10-02-2025_1_generated.md")
+        };
+        await provider.SaveAsync(recordingEntry, CancellationToken.None);
+
+        // Act
+        Result<IReadOnlyList<MemoryEntry>> result = await provider.GetGeneratedEntriesAsync(
+            new DateTime(2025, 10, 1),
+            new DateTime(2025, 10, 3),
+            CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().HaveCount(2);
+        result.Value.Should().ContainSingle(e => e.Command == CommandNames.Today);
+        result.Value.Should().ContainSingle(e => e.Command == CommandNames.Generate);
+    }
+
+    [Fact]
+    public async Task GetGeneratedEntriesAsync_IgnoresNonGeneratedFiles()
+    {
+        // Arrange
+        var provider = new FileSystemStorageProvider(_testDirectory, _mockLogger.Object);
+        string noteDir = Path.Combine(_testDirectory, DirectoryNames.Note);
+        Directory.CreateDirectory(noteDir);
+        string manualPath = Path.Combine(noteDir, "10-02-2025_1.md");
+        await File.WriteAllTextAsync(manualPath, "# Manual note\nBody");
+
+        // Act
+        Result<IReadOnlyList<MemoryEntry>> result = await provider.GetGeneratedEntriesAsync(
+            new DateTime(2025, 10, 1),
+            new DateTime(2025, 10, 3),
+            CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetGeneratedEntriesAsync_ExcludesWeeklyEntries()
+    {
+        // Arrange
+        var provider = new FileSystemStorageProvider(_testDirectory, _mockLogger.Object);
+        var dailyEntry = CreateTestDailyEntry("today-10-02-2025-1", 1, new DateTimeOffset(2025, 10, 2, 8, 0, 0, TimeSpan.Zero));
+        await provider.SaveAsync(dailyEntry, CancellationToken.None);
+
+        var weeklyEntry = new WeeklyEntry
+        {
+            EntryId = "thisweek-2025-40-1",
+            Command = CommandNames.ThisWeek,
+            Timestamp = new DateTimeOffset(2025, 10, 4, 12, 0, 0, TimeSpan.Zero),
+            EntryNumber = 1,
+            UserInput = "Weekly summary input",
+            LlmResponse = "Weekly summary response",
+            Metadata = new MemoryEntryMetadata
+            {
+                LlmProvider = "Anthropic",
+                LlmModel = "claude-3-sonnet-20240229"
+            }
+        };
+        await provider.SaveAsync(weeklyEntry, CancellationToken.None);
+
+        // Act
+        Result<IReadOnlyList<MemoryEntry>> result = await provider.GetGeneratedEntriesAsync(
+            new DateTime(2025, 10, 1),
+            new DateTime(2025, 10, 7),
+            CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().HaveCount(1);
+        result.Value.Should().ContainSingle(entry => entry.Command == CommandNames.Today);
+    }
+
+    [Fact]
+    public async Task GetGeneratedEntriesAsync_NormalizesDateRangeBoundaries()
+    {
+        // Arrange
+        var provider = new FileSystemStorageProvider(_testDirectory, _mockLogger.Object);
+        var startOfRangeEntry = CreateTestDailyEntry(
+            "today-10-01-2025-1",
+            1,
+            new DateTimeOffset(2025, 10, 1, 8, 0, 0, TimeSpan.Zero));
+        var endOfRangeEntry = CreateTestDailyEntry(
+            "today-10-03-2025-1",
+            1,
+            new DateTimeOffset(2025, 10, 3, 20, 0, 0, TimeSpan.Zero));
+
+        await provider.SaveAsync(startOfRangeEntry, CancellationToken.None);
+        await provider.SaveAsync(endOfRangeEntry, CancellationToken.None);
+
+        // Act - supply non-midnight start/end times to verify normalization
+        Result<IReadOnlyList<MemoryEntry>> result = await provider.GetGeneratedEntriesAsync(
+            new DateTime(2025, 10, 1, 12, 0, 0),
+            new DateTime(2025, 10, 3, 6, 0, 0),
+            CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().HaveCount(2, "date ranges must be interpreted inclusively regardless of supplied time components");
+        result.Value.Select(e => e.EntryId).Should().Contain(["today-10-01-2025-1", "today-10-03-2025-1"]);
+    }
+
+    [Fact]
+    public async Task GetGeneratedEntriesAsync_IncludesLegacyTodayDirectory()
+    {
+        // Arrange
+        var provider = new FileSystemStorageProvider(_testDirectory, _mockLogger.Object);
+        var legacyEntry = CreateTestDailyEntry(
+            "today-10-01-2025-1",
+            1,
+            new DateTimeOffset(2025, 10, 1, 9, 0, 0, TimeSpan.Zero)) with
+        {
+            FilePath = Path.Combine(DirectoryNames.Today, "10-01-2025_1_generated.md")
+        };
+        await provider.SaveAsync(legacyEntry, CancellationToken.None);
+
+        // Act
+        Result<IReadOnlyList<MemoryEntry>> result = await provider.GetGeneratedEntriesAsync(
+            new DateTime(2025, 9, 30),
+            new DateTime(2025, 10, 2),
+            CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().HaveCount(1, "legacy today directory entries must be discovered");
+        result.Value[0].EntryId.Should().Be("today-10-01-2025-1");
     }
 
     [Fact]
@@ -141,12 +295,34 @@ public sealed class FileSystemStorageProviderTests : IDisposable
         await provider.SaveAsync(entry1, CancellationToken.None);
         await provider.SaveAsync(entry2, CancellationToken.None);
 
-        // Act - Count using "note" command since today entries are now saved in note/ directory
-        Result<int> result = await provider.CountEntriesAsync("note", date, CancellationToken.None);
+        // Act
+        Result<int> result = await provider.CountEntriesAsync(CommandNames.Today, date, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task CountEntriesAsync_TodayCommand_IgnoresManualNotes()
+    {
+        // Arrange
+        var provider = new FileSystemStorageProvider(_testDirectory, _mockLogger.Object);
+        var date = new DateTime(2025, 10, 2);
+        var entry = CreateTestDailyEntry("today-10-02-2025-1", 1, new DateTimeOffset(date, TimeSpan.Zero));
+        await provider.SaveAsync(entry, CancellationToken.None);
+
+        string noteDirectory = Path.Combine(_testDirectory, DirectoryNames.Note);
+        Directory.CreateDirectory(noteDirectory);
+        string manualNote = Path.Combine(noteDirectory, "10-02-2025_manual.md");
+        await File.WriteAllTextAsync(manualNote, "# Manual note\nThis file should be ignored.");
+
+        // Act
+        Result<int> result = await provider.CountEntriesAsync(CommandNames.Today, date, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().Be(1, "manual note files must not impact today numbering");
     }
 
     [Fact]
@@ -352,9 +528,10 @@ public sealed class FileSystemStorageProviderTests : IDisposable
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        string expectedPath = Path.Combine(_testDirectory, "thisweek", "2025-40-Thu-1.md");
+        string expectedPath = Path.Combine(_testDirectory, DirectoryNames.Note, GetWeeklyFileName(entry.Timestamp, entry.EntryNumber));
         File.Exists(expectedPath).Should().BeTrue();
     }
+
 
     [Fact]
     public async Task SearchEntriesAsync_ExcludesTemplatesDirectory()
@@ -456,5 +633,14 @@ public sealed class FileSystemStorageProviderTests : IDisposable
                 LlmModel = "gpt-4"
             }
         };
+    }
+
+    private static string GetWeeklyFileName(DateTimeOffset timestamp, int entryNumber)
+    {
+        var date = timestamp.Date;
+        var daysSinceMonday = ((int)date.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+        var start = date.AddDays(-daysSinceMonday);
+        var end = start.AddDays(6);
+        return $"{start:MM-dd-yyyy}_{end:MM-dd-yyyy}_{entryNumber}_generated.md";
     }
 }

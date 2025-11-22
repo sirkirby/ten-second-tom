@@ -501,6 +501,11 @@ Some insights here
                 It.IsAny<DateTime>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyList<MemoryEntry>>.Success(mockDailyEntries));
+        mockStorage.Setup(s => s.GetGeneratedEntriesAsync(
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyList<MemoryEntry>>.Success(mockDailyEntries));
         services.AddSingleton(mockStorage.Object);
 
         // Mock LLM - return properly formatted weekly summary

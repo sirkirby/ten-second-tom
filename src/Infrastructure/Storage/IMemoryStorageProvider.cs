@@ -32,6 +32,19 @@ public interface IMemoryStorageProvider
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Retrieves all generated entries (files ending with _generated.md) across supported directories
+    /// within the specified date range.
+    /// </summary>
+    /// <param name="startDate">Start date of the range (inclusive).</param>
+    /// <param name="endDate">End date of the range (inclusive).</param>
+    /// <param name="cancellationToken">Cancellation token for the async operation.</param>
+    /// <returns>Result containing generated entries ordered chronologically on success.</returns>
+    Task<Result<IReadOnlyList<MemoryEntry>>> GetGeneratedEntriesAsync(
+        DateTime startDate,
+        DateTime endDate,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Counts the number of entries for a specific command and date.
     /// Used to determine the next entry number for the day.
     /// </summary>

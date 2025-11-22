@@ -56,12 +56,17 @@ public record MemoryEntry
     {
         get
         {
+            if (_filePath is not null)
+            {
+                return _filePath;
+            }
+
             return Command switch
             {
                 CommandNames.Today => $"{DirectoryNames.Note}/{Timestamp:MM-dd-yyyy}_{EntryNumber}_generated.md",
                 CommandNames.Note => $"{DirectoryNames.Note}/{Timestamp:MM-dd-yyyy}_{EntryNumber}.md",
                 CommandNames.ThisWeek => GetWeeklyPath(),
-                CommandNames.Generate => _filePath ?? throw new InvalidOperationException("FilePath not set for generate entry"),
+                CommandNames.Generate => throw new InvalidOperationException("FilePath not set for generate entry"),
                 _ => throw new InvalidOperationException($"Unknown command: {Command}")
             };
         }
@@ -72,13 +77,17 @@ public record MemoryEntry
 
     private string GetWeeklyPath()
     {
-        var calendar = CultureInfo.InvariantCulture.Calendar;
-        var weekNumber = calendar.GetWeekOfYear(
-            Timestamp.DateTime,
-            CalendarWeekRule.FirstFourDayWeek,
-            DayOfWeek.Monday);
-        var dayOfWeek = Timestamp.DateTime.ToString("ddd", CultureInfo.InvariantCulture);
-        return $"{CommandNames.ThisWeek}/{Timestamp.Year:0000}-{weekNumber:00}-{dayOfWeek}-{EntryNumber}.md";
+        var (startDate, endDate) = CalculateWeeklyRange(Timestamp.Date);
+        return $"{DirectoryNames.Note}/{startDate:MM-dd-yyyy}_{endDate:MM-dd-yyyy}_{EntryNumber}_generated.md";
+    }
+
+    private static (DateTime StartDate, DateTime EndDate) CalculateWeeklyRange(DateTime referenceDate)
+    {
+        var normalized = referenceDate.Date;
+        var daysSinceMonday = ((int)normalized.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+        var startDate = normalized.AddDays(-daysSinceMonday);
+        var endDate = startDate.AddDays(6);
+        return (startDate, endDate);
     }
 }
 

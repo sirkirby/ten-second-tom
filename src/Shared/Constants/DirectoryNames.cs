@@ -19,14 +19,16 @@ public static class DirectoryNames
     public const string Templates = "templates";
 
     /// <summary>
-    /// Directory name for storing today's memory entries.
-    /// Located at: {root}/today/
+    /// Legacy directory name for storing daily memory entries.
+    /// Located at: {root}/today/. Kept for backwards compatibility with
+    /// historical storage layouts; new entries are written to <see cref="Note"/>.
     /// </summary>
     public const string Today = "today";
 
     /// <summary>
-    /// Directory name for storing this week's memory entries.
-    /// Located at: {root}/thisweek/
+    /// Legacy directory name for storing weekly memory entries.
+    /// Located at: {root}/thisweek/. Kept for backwards compatibility with
+    /// historical storage layouts; new entries are written to <see cref="Note"/>.
     /// </summary>
     public const string ThisWeek = "thisweek";
 
