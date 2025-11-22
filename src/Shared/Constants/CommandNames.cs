@@ -43,6 +43,11 @@ public static class CommandNames
     public const string Record = "record";
 
     /// <summary>
+    /// Command name for transcribing existing audio files.
+    /// </summary>
+    public const string Transcribe = "transcribe";
+
+    /// <summary>
     /// Command name for capturing quick notes.
     /// </summary>
     public const string Note = "note";
@@ -59,6 +64,7 @@ public static class CommandNames
         Logout,
         Generate,
         Record,
+        Transcribe,
         Note
     ];
 }

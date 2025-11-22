@@ -134,37 +134,10 @@ public sealed class RecordCommandBuilder : ICommandBuilder
 
             var audioOptions = audioOptionsResult.Value;
 
-            // Parse STT selection - use configured default or fall back to Auto
-            var sttSelection = SttSelection.Auto;
-
-            // If no --stt flag provided, use configuration default
-            if (string.IsNullOrWhiteSpace(stt))
+            if (!SttSelectionMapper.TryParse(stt, out var sttSelection, out var sttError))
             {
-                if (audioOptions.SttProvider is not null)
-                {
-                    if (!Enum.TryParse<SttSelection>(audioOptions.SttProvider, ignoreCase: true, out sttSelection))
-                    {
-                        // Invalid config value, fall back to Auto
-                        sttSelection = SttSelection.Auto;
-                    }
-                }
-            }
-            else
-            {
-                // --stt flag provided, parse and validate it
-                if (!Enum.TryParse<SttSelection>(stt, ignoreCase: true, out sttSelection))
-                {
-                    CommandOutputFormatter.WriteValidationError(
-                        "STT selection",
-                        $"Invalid value: {stt}. Valid options: auto, local, openai",
-                        jsonOutput);
-
-                    if (!jsonOutput)
-                    {
-                        CommandOutputFormatter.WriteInfo("Valid options: auto, local, openai", jsonOutput);
-                    }
-                    return 1;
-                }
+                CommandOutputFormatter.WriteValidationError("STT selection", sttError!, jsonOutput);
+                return 1;
             }
 
             // Authenticate first (record command creates data that will be used by authenticated commands)
@@ -234,7 +207,7 @@ public sealed class RecordCommandBuilder : ICommandBuilder
             // Execute command with configured timeout
             var command = new Record.Command
             {
-                AudioConfig = ConvertSttSelectionToAudioOptions(sttSelection, audioOptions),
+                AudioConfig = SttSelectionMapper.BuildAudioOptions(sttSelection, audioOptions),
                 MaxDurationSeconds = audioOptions.Timeouts.RecordSeconds  // Use configured timeout
             };
 
@@ -294,65 +267,4 @@ public sealed class RecordCommandBuilder : ICommandBuilder
         return recordCommand;
     }
 
-    /// <summary>
-    /// Converts CLI SttSelection intent to AudioOptions with appropriate fallback settings.
-    /// Maps user-friendly CLI options (auto/local/openai) to the proper configuration.
-    /// </summary>
-    /// <param name="selection">The STT selection from CLI (auto, local, or openai)</param>
-    /// <param name="baseOptions">The base audio options from configuration</param>
-    /// <returns>AudioOptions with appropriate provider and fallback settings</returns>
-    private static AudioOptions ConvertSttSelectionToAudioOptions(SttSelection selection, AudioOptions baseOptions)
-    {
-        return selection switch
-        {
-            // Auto: Try local provider first, fallback to configured fallback if enabled
-            SttSelection.Auto => new AudioOptions
-            {
-                SttProvider = baseOptions.SttProvider,
-                SttApiKey = baseOptions.SttApiKey,
-                SttFallbackEnabled = true,
-                SttFallbackProvider = baseOptions.SttFallbackProvider,
-                SttFallbackApiKey = baseOptions.SttFallbackApiKey,
-                SttBinaryPath = baseOptions.SttBinaryPath,
-                SttModel = baseOptions.SttModel,
-                SttFallbackBinaryPath = baseOptions.SttFallbackBinaryPath,
-                SttFallbackModel = baseOptions.SttFallbackModel,
-                KeepFiles = baseOptions.KeepFiles,
-                Recorder = baseOptions.Recorder,
-                Preprocessing = baseOptions.Preprocessing,
-                Timeouts = baseOptions.Timeouts
-            },
-
-            // Local: Use only the configured local provider (whisper.cpp, ollama, etc.) - no fallback
-            SttSelection.Local => new AudioOptions
-            {
-                SttProvider = baseOptions.SttProvider,
-                SttApiKey = baseOptions.SttApiKey,
-                SttFallbackEnabled = false,
-                SttBinaryPath = baseOptions.SttBinaryPath,
-                SttModel = baseOptions.SttModel,
-                KeepFiles = baseOptions.KeepFiles,
-                Recorder = baseOptions.Recorder,
-                Preprocessing = baseOptions.Preprocessing,
-                Timeouts = baseOptions.Timeouts
-            },
-
-            // OpenAI: Force OpenAI provider, no fallback
-            SttSelection.OpenAI => new AudioOptions
-            {
-                SttProvider = SttProviders.OpenAI,
-                SttApiKey = baseOptions.SttApiKey,
-                SttFallbackEnabled = false,
-                SttBinaryPath = baseOptions.SttBinaryPath,
-                SttModel = baseOptions.SttModel,
-                KeepFiles = baseOptions.KeepFiles,
-                Recorder = baseOptions.Recorder,
-                Preprocessing = baseOptions.Preprocessing,
-                Timeouts = baseOptions.Timeouts
-            },
-
-            _ => throw new ArgumentOutOfRangeException(nameof(selection), selection,
-                $"Unsupported STT selection: {selection}")
-        };
-    }
 }

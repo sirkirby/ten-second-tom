@@ -1,4 +1,4 @@
-using System.Text;
+using System.IO.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TenSecondTom.Shared.Options;
@@ -51,15 +51,16 @@ public static class Record
     /// Orchestrates: record audio → preprocess (optional) → transcribe → save to recording/ directory.
     /// </summary>
     public sealed class Handler(
-        RecordAudio.Handler recordHandler,
-        TranscribeAudio.Handler transcribeHandler,
+        IMediator mediator,
         IAudioPreprocessor audioPreprocessor,
         IOptions<StorageOptions> storageOptions,
         IOptionsMonitor<AudioOptions> audioOptions,
+        IFileSystem fileSystem,
         ILogger<Handler> logger) : IRequestHandler<Command, Result<StoredRecording>>
     {
         private readonly StorageOptions _storageOptions = storageOptions.Value;
         private readonly IOptionsMonitor<AudioOptions> _audioOptionsMonitor = audioOptions;
+        private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
 
         /// <inheritdoc/>
         public async Task<Result<StoredRecording>> Handle(Command request, CancellationToken cancellationToken)
@@ -77,12 +78,12 @@ public static class Record
                 return Result<StoredRecording>.Failure("Storage directory is not configured");
             }
 
-            var recordingDir = Path.Combine(storageBaseDir, DirectoryNames.Recording);
-            if (!Directory.Exists(recordingDir))
+            var recordingDir = _fileSystem.Path.Combine(storageBaseDir, DirectoryNames.Recording);
+            if (!_fileSystem.Directory.Exists(recordingDir))
             {
                 try
                 {
-                    Directory.CreateDirectory(recordingDir);
+                    _fileSystem.Directory.CreateDirectory(recordingDir);
                     logger.LogDebug("Created recording directory at {RecordingDir}", recordingDir);
                 }
                 catch (Exception ex)
@@ -100,7 +101,7 @@ public static class Record
                 request.AudioConfig.SttProvider, recordingDir, maxDurationSeconds);
 
             // Step 1: Record audio - the recorder will save to a temp file first, then we move it
-            var tempAudioPath = Path.Combine(Path.GetTempPath(), $"tom-recording-{Guid.NewGuid()}.wav");
+            var tempAudioPath = _fileSystem.Path.Combine(_fileSystem.Path.GetTempPath(), $"tom-recording-{Guid.NewGuid()}.wav");
 
             var recordCommand = new RecordAudio.Command
             {
@@ -108,7 +109,7 @@ public static class Record
                 MaxDurationSeconds = maxDurationSeconds
             };
 
-            var recordResult = await recordHandler.Handle(recordCommand, cancellationToken);
+            var recordResult = await mediator.Send(recordCommand, cancellationToken);
             if (!recordResult.IsSuccess || recordResult.Value is null)
             {
                 logger.LogError("Audio recording failed: {Error}", recordResult.Error);
@@ -154,128 +155,76 @@ public static class Record
                 };
             }
 
-            // Step 2: Transcribe audio from the (possibly preprocessed) temp file
-            var transcribeCommand = new TranscribeAudio.Command
+            // Step 2: Determine entry number for today and create consistent naming pattern
+            var today = DateTimeOffset.UtcNow;
+            var existingFiles = _fileSystem.Directory.GetFiles(recordingDir, $"{today:MM-dd-yyyy}_*.wav");
+            var nextNumber = existingFiles.Length + 1;
+            var filePrefix = $"{today:MM-dd-yyyy}_{nextNumber}";
+
+            var transcribeLibraryCommand = new TranscribeLibraryAudio.Command
             {
                 AudioFilePath = recording.FilePath,
-                AudioConfig = request.AudioConfig
+                RecordingBaseName = filePrefix,
+                AudioConfig = request.AudioConfig,
+                Source = AudioLibraryScope.Recording
             };
 
-            var transcribeResult = await transcribeHandler.Handle(transcribeCommand, cancellationToken);
-            if (!transcribeResult.IsSuccess || transcribeResult.Value is null)
+            Result<TranscribeLibraryAudio.TranscribedLibraryRecording> libraryTranscribeResult;
+            try
             {
-                logger.LogError("Transcription failed: {Error}", transcribeResult.Error);
-
-                // Clean up temp audio file
+                libraryTranscribeResult = await mediator.Send(transcribeLibraryCommand, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Unexpected failure while transcribing recording entry {RecordingBaseName}", filePrefix);
                 CleanupFile(recording.FilePath);
-
-                return Result<StoredRecording>.Failure(transcribeResult.Error ?? "Transcription failed");
+                return Result<StoredRecording>.Failure($"Transcription failed: {ex.Message}");
             }
 
-            var transcription = transcribeResult.Value;
+            if (!libraryTranscribeResult.IsSuccess || libraryTranscribeResult.Value is null)
+            {
+                logger.LogError("Transcription failed: {Error}", libraryTranscribeResult.Error);
+                CleanupFile(recording.FilePath);
+                return Result<StoredRecording>.Failure(libraryTranscribeResult.Error ?? "Transcription failed");
+            }
+
+            var transcribedRecording = libraryTranscribeResult.Value;
+            var transcription = transcribedRecording.Transcription;
             logger.LogInformation("Transcription completed: {WordCount} words using {SttEngine} ({SttModel})",
                 transcription.WordCount,
                 transcription.SttEngine,
                 transcription.SttModel);
 
-            // Step 3: Determine entry number for today and create consistent naming pattern
-            var today = DateTimeOffset.UtcNow;
+            // The library handler now owns the audio file; remove the temporary capture
+            CleanupFile(recording.FilePath);
 
-            // Count existing recordings for today to get the next number
-            var existingFiles = Directory.GetFiles(recordingDir, $"{today:MM-dd-yyyy}_*.wav");
-            int nextNumber = existingFiles.Length + 1;
-
-            // Use consistent naming pattern: MM-dd-yyyy_N (e.g., "10-21-2025_1")
-            var filePrefix = $"{today:MM-dd-yyyy}_{nextNumber}";
-            var audioFilePath = Path.Combine(recordingDir, $"{filePrefix}.wav");
-            var transcriptionFilePath = Path.Combine(recordingDir, $"{filePrefix}.txt");
-
-            try
+            var audioFileInfo = _fileSystem.FileInfo.New(transcribedRecording.AudioFilePath);
+            var storedRecording = new StoredRecording
             {
-                // Move audio file from temp to recording directory
-                File.Move(recording.FilePath, audioFilePath, overwrite: true);
-                logger.LogDebug("Moved audio file to {AudioFilePath}", audioFilePath);
+                AudioFilePath = transcribedRecording.AudioFilePath,
+                TranscriptionFilePath = transcribedRecording.TranscriptFilePath,
+                RecordedAt = today,
+                Duration = recording.Duration,
+                FileSizeBytes = audioFileInfo.Length,
+                TranscriptionWordCount = transcription.WordCount,
+                SttEngine = transcription.SttEngine,
+                SttModel = transcription.SttModel
+            };
 
-                // Get file size
-                var audioFileInfo = new FileInfo(audioFilePath);
-                var fileSizeBytes = audioFileInfo.Length;
+            logger.LogInformation("Recording stored successfully: {AudioPath}, {TranscriptionPath}",
+                storedRecording.AudioFilePath,
+                storedRecording.TranscriptionFilePath);
 
-                // Write transcription file with YAML frontmatter metadata
-                var transcriptWithMetadata = new StringBuilder();
-                transcriptWithMetadata.AppendLine("---");
-                transcriptWithMetadata.AppendLine($"recording-id: {filePrefix}");
-                transcriptWithMetadata.AppendLine($"timestamp: {today:O}");
-                transcriptWithMetadata.AppendLine($"audio-duration-seconds: {recording.Duration.TotalSeconds:F2}");
-                transcriptWithMetadata.AppendLine($"file-size-bytes: {fileSizeBytes}");
-                transcriptWithMetadata.AppendLine($"stt-engine: {transcription.SttEngine}");
-                transcriptWithMetadata.AppendLine($"stt-model: {transcription.SttModel}");
-                transcriptWithMetadata.AppendLine($"word-count: {transcription.WordCount}");
-                transcriptWithMetadata.AppendLine($"processing-duration-seconds: {transcription.ProcessingDuration.TotalSeconds:F2}");
-                if (!string.IsNullOrEmpty(transcription.Language))
-                {
-                    transcriptWithMetadata.AppendLine($"language: {transcription.Language}");
-                }
-                transcriptWithMetadata.AppendLine("---");
-                transcriptWithMetadata.AppendLine();
-                transcriptWithMetadata.AppendLine(transcription.TranscriptText);
-
-                var fileContent = $"""
-                                   ---
-                                   recording-id: {Guid.NewGuid()}
-                                   date: {today:yyyy-MM-dd HH:mm:ss}
-                                   duration: {recording.Duration.TotalSeconds:F2}
-                                   file-size-bytes: {fileSizeBytes}
-                                   stt-engine: {transcription.SttEngine}
-                                   stt-model: {transcription.SttModel}
-                                   word-count: {transcription.WordCount}
-                                   processing-duration-seconds: {transcription.ProcessingDuration.TotalSeconds:F2}
-                                   {(string.IsNullOrEmpty(transcription.Language) ? "" : $"language: {transcription.Language}\n")}---
-
-                                   {transcription.TranscriptText}
-                                   """;
-
-                await File.WriteAllTextAsync(transcriptionFilePath, fileContent, cancellationToken);
-                logger.LogDebug("Saved transcription to {TranscriptionFilePath}", transcriptionFilePath);
-
-                // Create result
-                var storedRecording = new StoredRecording
-                {
-                    AudioFilePath = audioFilePath,
-                    TranscriptionFilePath = transcriptionFilePath,
-                    RecordedAt = today,
-                    Duration = recording.Duration,
-                    FileSizeBytes = fileSizeBytes,
-                    TranscriptionWordCount = transcription.WordCount,
-                    SttEngine = transcription.SttEngine,
-                    SttModel = transcription.SttModel
-                };
-
-                logger.LogInformation("Recording stored successfully: {AudioPath}, {TranscriptionPath}",
-                    audioFilePath,
-                    transcriptionFilePath);
-
-                return Result<StoredRecording>.Success(storedRecording);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to save recording files to {RecordingDir}", recordingDir);
-
-                // Attempt to clean up any partially written files
-                CleanupFile(recording.FilePath);
-                CleanupFile(audioFilePath);
-                CleanupFile(transcriptionFilePath);
-
-                return Result<StoredRecording>.Failure($"Failed to save recording files: {ex.Message}");
-            }
+            return Result<StoredRecording>.Success(storedRecording);
         }
 
         private void CleanupFile(string filePath)
         {
             try
             {
-                if (File.Exists(filePath))
+                if (_fileSystem.File.Exists(filePath))
                 {
-                    File.Delete(filePath);
+                    _fileSystem.File.Delete(filePath);
                     logger.LogDebug("Cleaned up file: {FilePath}", filePath);
                 }
             }

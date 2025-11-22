@@ -235,7 +235,9 @@ public static class GenerateOutput
             var llmResponse = llmResult.Value;
 
             // 8. Strip markdown code block wrappers if present (defensive measure)
-            string cleanedContent = llmResponse.Content.StripMarkdownCodeBlock();
+            string cleanedContent = llmResponse.Content
+                .StripMarkdownCodeBlock()
+                .NormalizeReasoningTags();
 
             // 9. Build GeneratedOutput
             var output = new GeneratedOutput

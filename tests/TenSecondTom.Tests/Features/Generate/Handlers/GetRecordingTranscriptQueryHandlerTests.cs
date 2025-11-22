@@ -27,7 +27,7 @@ public sealed class GetRecordingTranscriptQueryHandlerTests
     {
         // Arrange
         var expectedContent = "This is the transcript content.";
-        var transcriptPath = "/test/recording/10-21-2025_1.txt";
+        var transcriptPath = "/test/recording/10-21-2025_1.md";
 
         _mockRecordingService
             .Setup(s => s.GetTranscriptContentAsync(transcriptPath, It.IsAny<CancellationToken>()))
@@ -51,7 +51,7 @@ public sealed class GetRecordingTranscriptQueryHandlerTests
     public async Task Handle_WithFileNotFound_ReturnsFailure()
     {
         // Arrange
-        var transcriptPath = "/test/missing.txt";
+        var transcriptPath = "/test/missing.md";
 
         _mockRecordingService
             .Setup(s => s.GetTranscriptContentAsync(transcriptPath, It.IsAny<CancellationToken>()))
@@ -110,7 +110,7 @@ public sealed class GetRecordingTranscriptQueryHandlerTests
     public async Task Handle_PassesCancellationToken()
     {
         // Arrange
-        var transcriptPath = "/test/recording.txt";
+        var transcriptPath = "/test/recording.md";
         var cts = new CancellationTokenSource();
 
         _mockRecordingService
@@ -138,7 +138,7 @@ public sealed class GetRecordingTranscriptQueryHandlerTests
     public async Task Handle_OnServiceFailure_PropagatesError()
     {
         // Arrange
-        var transcriptPath = "/test/recording.txt";
+        var transcriptPath = "/test/recording.md";
 
         _mockRecordingService
             .Setup(s => s.GetTranscriptContentAsync(transcriptPath, It.IsAny<CancellationToken>()))

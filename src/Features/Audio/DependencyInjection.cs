@@ -36,6 +36,9 @@ public static class AudioFeatureExtensions
         // Register audio preprocessor implementation
         services.AddScoped<IAudioPreprocessor, FfmpegAudioPreprocessor>();
 
+        // Register audio library discovery service
+        services.AddScoped<IAudioLibraryService, AudioLibraryService>();
+
         // Register STT provider implementations
         services.AddScoped<LocalWhisperSttProvider>();
         services.AddScoped<OpenAiSttProvider>();
@@ -54,6 +57,7 @@ public static class AudioFeatureExtensions
         services.AddScoped<RecordAudio.Handler>();
         services.AddScoped<TranscribeAudio.Handler>();
         services.AddScoped<Record.Handler>();
+        services.AddScoped<TranscribeLibraryAudio.Handler>();
         services.AddScoped<GetAudioConfiguration.Handler>();
         services.AddScoped<UpdateAudioConfiguration.Handler>();
 

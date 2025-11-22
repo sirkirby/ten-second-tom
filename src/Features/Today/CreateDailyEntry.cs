@@ -239,7 +239,9 @@ public static class CreateDailyEntry
             }
 
             // 8. Strip markdown code block wrappers if present (defensive measure)
-            string cleanedResponse = llmResult.Value.Content.StripMarkdownCodeBlock();
+            string cleanedResponse = llmResult.Value.Content
+                .StripMarkdownCodeBlock()
+                .NormalizeReasoningTags();
 
             // 9. Create DailyEntry
             // Note: The prompt template defines the output structure.

@@ -117,50 +117,80 @@ public sealed class RecordingMigration(
         return true; // Considered successful even if nothing was migrated
     }
 
-    private static string InjectRecordingId(string content)
+    private static string InjectRecordingId(string? content)
     {
-        // Check if front matter exists
-        if (!content.StartsWith("---"))
+        content ??= string.Empty;
+        var newline = content.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+
+        if (!content.StartsWith("---", StringComparison.Ordinal))
         {
-            // No front matter, just prepend it with ID
-            return $"""
-                    ---
-                    recording-id: {Guid.NewGuid()}
-                    ---
-                    
-                    {content}
-                    """;
+            return BuildFrontMatter(content, newline);
         }
 
-        // Find the end of the first front matter block
-        // We assume it starts with ---
-        var firstLineEnd = content.IndexOf('\n');
-        if (firstLineEnd == -1) return content; // Should not happen if StartsWith("---")
-
-        // Insert recording-id after the first ---
-        // We want to insert "recording-id: <guid>\n" after "---" (and newline)
-
-        // Handle CRLF or LF
-        var newline = content.Substring(0, firstLineEnd).Contains('\r') ? "\r\n" : "\n";
-        // Actually, just use Environment.NewLine or \n, but better to match file.
-        // Let's just insert after "---"
-
-        var insertionPoint = 3; // Length of "---"
-        // Check if there is a newline after ---
-        if (content.Length > 3 && (content[3] == '\r' || content[3] == '\n'))
+        var closingIndex = FindFrontMatterClosingIndex(content, newline);
+        if (closingIndex == -1)
         {
-            // Find where the newline ends
-            if (content[3] == '\r' && content.Length > 4 && content[4] == '\n')
+            if (ContainsRecordingId(content))
             {
-                insertionPoint = 5;
+                return content;
             }
-            else
-            {
-                insertionPoint = 4;
-            }
+
+            return InsertAfterOpeningDelimiter(content, newline);
         }
 
-        var idLine = $"recording-id: {Guid.NewGuid()}{Environment.NewLine}";
-        return content.Insert(insertionPoint, idLine);
+        var firstNewlineIndex = content.IndexOf(newline, StringComparison.Ordinal);
+        if (firstNewlineIndex == -1)
+        {
+            return InsertAfterOpeningDelimiter(content, newline);
+        }
+
+        var bodyStart = firstNewlineIndex + newline.Length;
+        var bodyLength = Math.Max(0, closingIndex - bodyStart);
+        var frontMatterBody = bodyLength == 0
+            ? string.Empty
+            : content.Substring(bodyStart, bodyLength);
+
+        if (ContainsRecordingId(frontMatterBody))
+        {
+            return content;
+        }
+
+        var idLine = $"recording-id: {Guid.NewGuid()}{newline}";
+        return content.Insert(bodyStart, idLine);
     }
+
+    private static string BuildFrontMatter(string body, string newline)
+    {
+        return $"---{newline}recording-id: {Guid.NewGuid()}{newline}---{newline}{newline}{body}";
+    }
+
+    private static string InsertAfterOpeningDelimiter(string content, string newline)
+    {
+        var firstNewlineIndex = content.IndexOf(newline, StringComparison.Ordinal);
+        if (firstNewlineIndex == -1)
+        {
+            var idLine = $"{newline}recording-id: {Guid.NewGuid()}{newline}";
+            return content.StartsWith("---", StringComparison.Ordinal)
+                ? content.Insert(3, idLine)
+                : BuildFrontMatter(content, newline);
+        }
+
+        var insertionPoint = firstNewlineIndex + newline.Length;
+        return content.Insert(insertionPoint, $"recording-id: {Guid.NewGuid()}{newline}");
+    }
+
+    private static int FindFrontMatterClosingIndex(string content, string newline)
+    {
+        var closingMarker = newline + "---";
+        var index = content.IndexOf(closingMarker, 3, StringComparison.Ordinal);
+        if (index == -1 && newline == "\r\n")
+        {
+            index = content.IndexOf("\n---", 3, StringComparison.Ordinal);
+        }
+
+        return index;
+    }
+
+    private static bool ContainsRecordingId(string text)
+        => text.Contains("recording-id:", StringComparison.OrdinalIgnoreCase);
 }

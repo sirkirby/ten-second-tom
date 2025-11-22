@@ -1,8 +1,10 @@
+using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
 using TenSecondTom.Features.Audio;  // Only for CQRS commands/queries
+using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Features.Today.Models;
 using TenSecondTom.Infrastructure.Auth;
 using MediatR;
@@ -15,6 +17,7 @@ using TenSecondTom.Shared.Results;
 using TenSecondTom.Shared.TextEditing.Services;
 using TenSecondTom.Shared.TextEditing.Models;
 using TenSecondTom.Features.Note;  // For CreateNote command
+using TenSecondTom.Features.Audio.Services;
 
 namespace TenSecondTom.Features.Today;
 
@@ -649,7 +652,7 @@ public static class TodayCommandHandler
                 return;
             }
 
-            // Step 4: Clean up audio file if configured
+            string? persistedAudioPath = null;
             if (!audioOptions.KeepFiles)
             {
                 try
@@ -664,45 +667,21 @@ public static class TodayCommandHandler
             }
             else
             {
-                // Move audio file to today directory with consistent naming pattern
-                var todayDir = Path.Combine(storageBaseDir, DirectoryNames.Today);
-                Directory.CreateDirectory(todayDir); // Ensure directory exists
+                var baseName = VoiceCapturePersistence.BuildVoiceEntryBaseName(entry.EntryId, recording.Filename);
+                var persistResult = await VoiceCapturePersistence.PersistAsync(
+                    mediator,
+                    audioFilePath,
+                    baseName,
+                    transcribeConfig,
+                    AudioLibraryScope.Today,
+                    transcription,
+                    logger,
+                    CancellationToken.None).ConfigureAwait(false);
 
-                // Extract date and number from entry-id (e.g., "today-10-21-2025-1" -> "10-21-2025_1.wav")
-                var entryIdParts = entry.EntryId.Split('-');
-                if (entryIdParts.Length >= 5)
+                if (persistResult.IsSuccess && persistResult.Value is not null)
                 {
-                    var month = entryIdParts[1];
-                    var day = entryIdParts[2];
-                    var year = entryIdParts[3];
-                    var number = entryIdParts[4];
-                    var newFilename = $"{month}-{day}-{year}_{number}.wav";
-                    var audioDestPath = Path.Combine(todayDir, newFilename);
-
-                    try
-                    {
-                        File.Move(audioFilePath, audioDestPath, overwrite: true);
-                        entry.AudioFilename = newFilename; // Update entry to reflect actual filename
-                        logger.LogInformation("Moved audio file to {Destination}", audioDestPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogWarning(ex, "Failed to move audio file to today directory");
-                    }
-                }
-                else
-                {
-                    logger.LogWarning("Invalid entry ID format: {EntryId}, falling back to original filename", entry.EntryId);
-                    var audioDestPath = Path.Combine(todayDir, recording.Filename);
-                    try
-                    {
-                        File.Move(audioFilePath, audioDestPath, overwrite: true);
-                        logger.LogInformation("Moved audio file to {Destination}", audioDestPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogWarning(ex, "Failed to move audio file to today directory");
-                    }
+                    persistedAudioPath = persistResult.Value.AudioFilePath;
+                    entry.AudioFilename = Path.GetFileName(persistedAudioPath);
                 }
             }
 

@@ -154,7 +154,7 @@ public sealed class ListRecordingsQueryHandlerTests
         return new RecordingListItem
         {
             RecordingBaseName = baseName,
-            TranscriptFilePath = $"/test/{baseName}.txt",
+            TranscriptFilePath = $"/test/{baseName}.md",
             RecordedAt = recordedAt ?? DateTimeOffset.UtcNow,
             FormattedDate = "Oct 24, 2025 2:30 PM",
             WordCount = 100,

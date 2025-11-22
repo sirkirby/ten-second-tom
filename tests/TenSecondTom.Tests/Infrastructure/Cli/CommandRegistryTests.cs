@@ -56,9 +56,12 @@ public sealed class CommandRegistryTests : IDisposable
         // Assert
         var subcommandNames = rootCommand.Subcommands.Select(c => c.Name).ToList();
         
+        subcommandNames.Should().Contain("note", "note command should be registered");
         subcommandNames.Should().Contain("today", "today command should be registered");
         subcommandNames.Should().Contain("thisweek", "thisweek command should be registered");
         subcommandNames.Should().Contain("search", "search command should be registered");
+        subcommandNames.Should().Contain("record", "record command should be registered");
+        subcommandNames.Should().Contain("transcribe", "transcribe command should be registered");
         subcommandNames.Should().Contain("generate", "generate command should be registered");
         subcommandNames.Should().Contain("login", "login command should be registered");
         subcommandNames.Should().Contain("logout", "logout command should be registered");
@@ -70,14 +73,14 @@ public sealed class CommandRegistryTests : IDisposable
     }
 
     [Fact]
-    public void BuildRootCommand_ShouldHaveExactlyThirteenCommands()
+    public void BuildRootCommand_ShouldHaveExactlyFourteenCommands()
     {
         // Arrange & Act
         var rootCommand = CommandRegistry.BuildRootCommand(_serviceProvider);
 
         // Assert
-        rootCommand.Subcommands.Should().HaveCount(13,
-            "root command should have exactly 13 subcommands: today, note, thisweek, search, record, generate, login, logout, setup, config, shell, help, version");
+        rootCommand.Subcommands.Should().HaveCount(14,
+            "root command should have exactly 14 subcommands: note, today, thisweek, search, record, transcribe, generate, login, logout, setup, config, shell, help, version");
     }
 
     [Fact]

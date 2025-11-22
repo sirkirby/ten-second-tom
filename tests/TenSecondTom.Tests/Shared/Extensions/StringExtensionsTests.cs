@@ -191,5 +191,75 @@ public sealed class StringExtensionsTests
         result.Should().Contain("## Key Events");
         result.Should().NotContain("```");
     }
+
+    [Fact]
+    public void NormalizeReasoningTags_ConvertsThinkBlocksToBlockquote()
+    {
+        // Arrange
+        var input = """
+            Here is a response.
+
+            <think>
+            step one
+
+            step two
+            </think>
+            """;
+
+        // Act
+        var result = input.NormalizeReasoningTags();
+
+        // Assert
+        result.Should().Contain("<details>");
+        result.Should().Contain("<summary>Reasoning</summary>");
+        result.Should().Contain("step one");
+        result.Should().Contain("step two");
+        result.Should().Contain("</details>");
+    }
+
+    [Fact]
+    public void NormalizeReasoningTags_PreservesSeedThinkTag()
+    {
+        // Arrange
+        var input = """
+            <seed:think>internal reasoning</seed:think>
+            Final answer.
+            """;
+
+        // Act
+        var result = input.NormalizeReasoningTags();
+
+        // Assert
+        result.Should().Contain("<summary>Reasoning (seed:think)</summary>");
+        result.Should().Contain("internal reasoning");
+        result.Should().Contain("Final answer.");
+    }
+
+    [Fact]
+    public void NormalizeReasoningTags_HandlesCustomThinkTags()
+    {
+        // Arrange
+        var input = "<meta-think-block>Chain reasoning</meta-think-block>";
+
+        // Act
+        var result = input.NormalizeReasoningTags();
+
+        // Assert
+        result.Should().Contain("<summary>Reasoning (meta-think-block)</summary>");
+        result.Should().Contain("Chain reasoning");
+    }
+
+    [Fact]
+    public void NormalizeReasoningTags_LeavesContentWithoutTagsUnchanged()
+    {
+        // Arrange
+        var input = "No reasoning tags here.";
+
+        // Act
+        var result = input.NormalizeReasoningTags();
+
+        // Assert
+        result.Should().Be(input);
+    }
 }
 
