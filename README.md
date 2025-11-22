@@ -44,7 +44,7 @@ Ten Second Tom can operate **100% offline** with **zero cloud dependencies**:
 
 - **Local Speech-to-Text**: Use whisper.cpp for private voice transcription
 - **Local LLM Processing**: Run models via Ollama, LM Studio, or llama.cpp, which support local OpenAI-compatible APIs.
-- Use advanced open source reasoning models, like `bytedance/seed-oss` and `microsoft/phi-4-reasoning-plus` for your most complext notes or `openai/gpt-oss` and `qwen/qwen3-next-80b` to optimize for speed without compromising quality. Size the model to your hardware capabilities.
+- Use advanced open source reasoning models, like `bytedance/seed-oss` and `microsoft/phi-4-reasoning-plus` for your most complex notes or `openai/gpt-oss` and `qwen/qwen3-next-80b` to optimize for speed without compromising quality. Size the model to your hardware capabilities.
 - **Your data stays on your device** - no API calls, no internet required
 
 Perfect for sensitive work, offline environments, or privacy-conscious users.
