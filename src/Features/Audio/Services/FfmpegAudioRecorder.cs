@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using MediatR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TenSecondTom.Shared.Models;
@@ -17,18 +18,22 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
 {
     private readonly AudioOptions _config;
     private readonly ILogger<FfmpegAudioRecorder> _logger;
+    private readonly IMediator _mediator;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="FfmpegAudioRecorder"/> class.
     /// </summary>
     /// <param name="config">Audio configuration options.</param>
     /// <param name="logger">Logger instance.</param>
+    /// <param name="mediator">Mediator for cross-feature communication.</param>
     public FfmpegAudioRecorder(
         IOptions<AudioOptions> config,
-        ILogger<FfmpegAudioRecorder> logger)
+        ILogger<FfmpegAudioRecorder> logger,
+        IMediator mediator)
     {
         _config = config?.Value ?? throw new ArgumentNullException(nameof(config));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
     }
 
     /// <inheritdoc/>
@@ -219,7 +224,44 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
                     var totalElapsed = (DateTimeOffset.UtcNow - recordingStart).TotalSeconds;
                     Console.WriteLine($"\nRecording limit reached ({totalElapsed:F0}s / {maxDurationSeconds}s interval).");
                     Console.Write("Continue recording? (y/n): ");
-                    
+
+                    // Send notification as enhancement (non-blocking, fire-and-forget)
+                    // NOTE: Terminal prompt is PRIMARY - notification is secondary enhancement
+                    // Notification failures must NOT impact recording functionality
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var durationMinutes = maxDurationSeconds.Value / 60;
+                            var durationLabel = durationMinutes > 0
+                                ? $"{durationMinutes}-minute"
+                                : $"{maxDurationSeconds}-second";
+
+                            var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                                Title: "Recording Session Expiring",
+                                Message: $"Your {durationLabel} session has ended. Continue recording? (Press Enter in terminal)",
+                                Priority: NotificationPriority.High,
+                                TimeoutSeconds: 30,
+                                Actions: null); // macOS does not support interactive notification buttons
+
+                            var result = await _mediator.Send(notificationCommand, CancellationToken.None);
+
+                            if (!result.IsSuccess)
+                            {
+                                _logger.LogWarning(
+                                    "Failed to send recording expiration notification: {Error}",
+                                    result.Error);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            // Graceful degradation - log but don't fail recording
+                            _logger.LogWarning(
+                                ex,
+                                "Unexpected error sending recording expiration notification. Recording continues normally.");
+                        }
+                    }, CancellationToken.None);
+
                     // Add a timeout to the continuation prompt (30 seconds)
                     var responseTask = Task.Run(() => Console.ReadLine()?.Trim().ToLowerInvariant());
                     var promptTimeout = Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);

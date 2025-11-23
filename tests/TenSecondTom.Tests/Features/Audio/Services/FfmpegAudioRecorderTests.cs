@@ -1,4 +1,5 @@
 using FluentAssertions;
+using MediatR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -11,6 +12,7 @@ namespace TenSecondTom.Tests.Features.Audio.Services;
 public sealed class FfmpegAudioRecorderTests
 {
     private readonly Mock<ILogger<FfmpegAudioRecorder>> _mockLogger = new();
+    private readonly Mock<IMediator> _mockMediator = new();
     private readonly AudioOptions _config = new()
     {
         Recorder = new RecorderOptions
@@ -50,7 +52,7 @@ public sealed class FfmpegAudioRecorderTests
     private FfmpegAudioRecorder CreateRecorder(AudioOptions? config = null)
     {
         config ??= _config;
-        return new FfmpegAudioRecorder(Options.Create(config), _mockLogger.Object);
+        return new FfmpegAudioRecorder(Options.Create(config), _mockLogger.Object, _mockMediator.Object);
     }
 }
 

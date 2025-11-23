@@ -86,10 +86,12 @@ public static class InstallDefaultTemplates
     /// </remarks>
     public sealed class Handler(
         ITemplateInstaller templateInstaller,
+        IMediator mediator,
         ILogger<Handler> logger)
         : IRequestHandler<Command, Result<TemplateInstallationResult>>
     {
         private readonly ITemplateInstaller _templateInstaller = templateInstaller ?? throw new ArgumentNullException(nameof(templateInstaller));
+        private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         private readonly ILogger<Handler> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         /// <summary>
@@ -131,6 +133,36 @@ public static class InstallDefaultTemplates
                     "Template installation failed for {Directory}: {Error}",
                     request.TargetDirectory,
                     result.Error);
+
+                // Send error notification (non-blocking, fire-and-forget)
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                            Title: "Template Installation Failed",
+                            Message: $"Failed to install templates: {result.Error}\n\nPlease check directory permissions.",
+                            Priority: NotificationPriority.High,
+                            TimeoutSeconds: null,
+                            Actions: null);
+
+                        var notificationResult = await _mediator.Send(notificationCommand, CancellationToken.None);
+
+                        if (!notificationResult.IsSuccess)
+                        {
+                            _logger.LogWarning(
+                                "Failed to send template installation error notification: {Error}",
+                                notificationResult.Error);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(
+                            ex,
+                            "Unexpected error sending template installation error notification (non-critical)");
+                    }
+                }, CancellationToken.None);
+
                 return result;
             }
 
@@ -139,6 +171,39 @@ public static class InstallDefaultTemplates
                 result.Value.TemplatesInstalled,
                 result.Value.TemplatesSkipped,
                 result.Value.TemplatesFailed);
+
+            // Send success notification (non-blocking, fire-and-forget)
+            // Only notify if at least one template was installed
+            if (result.Value.TemplatesInstalled > 0)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                            Title: "Templates Installed",
+                            Message: $"{result.Value.TemplatesInstalled} template(s) installed successfully.\n\n{string.Join(", ", result.Value.InstalledTemplateIds.Take(3))}{(result.Value.InstalledTemplateIds.Count > 3 ? "..." : "")}",
+                            Priority: NotificationPriority.Low,
+                            TimeoutSeconds: null,
+                            Actions: null);
+
+                        var notificationResult = await _mediator.Send(notificationCommand, CancellationToken.None);
+
+                        if (!notificationResult.IsSuccess)
+                        {
+                            _logger.LogWarning(
+                                "Failed to send template installation notification: {Error}",
+                                notificationResult.Error);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(
+                            ex,
+                            "Unexpected error sending template installation notification (non-critical)");
+                    }
+                }, CancellationToken.None);
+            }
 
             return result;
         }

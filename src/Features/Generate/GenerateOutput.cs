@@ -6,6 +6,7 @@ using TenSecondTom.Infrastructure.Llm;
 using TenSecondTom.Infrastructure.Prompts;
 using MediatR;
 using TenSecondTom.Shared.Extensions;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
@@ -70,6 +71,7 @@ public static class GenerateOutput
         ILlmProviderFactory llmProviderFactory,
         IOptionsSnapshot<LlmOptions> llmOptions,
         IOutputStorageService outputStorageService,
+        IMediator mediator,
         ILogger<Handler> logger)
         : IRequestHandler<Command, Result<GeneratedOutput>>
     {
@@ -172,6 +174,35 @@ public static class GenerateOutput
                         request.InputName,
                         llmResult.Error);
 
+                    // Send error notification (non-blocking, fire-and-forget)
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                                Title: "Output Generation Failed",
+                                Message: $"LLM generation failed: {llmResult.Error}\n\nPlease check your LLM configuration.",
+                                Priority: NotificationPriority.High,
+                                TimeoutSeconds: null,
+                                Actions: null);
+
+                            var result = await mediator.Send(notificationCommand, CancellationToken.None);
+
+                            if (!result.IsSuccess)
+                            {
+                                logger.LogWarning(
+                                    "Failed to send generation error notification: {Error}",
+                                    result.Error);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogWarning(
+                                ex,
+                                "Unexpected error sending generation error notification (non-critical)");
+                        }
+                    }, CancellationToken.None);
+
                     return Result<GeneratedOutput>.Failure(
                         $"LLM generation failed: {llmResult.Error}");
                 }
@@ -188,6 +219,35 @@ public static class GenerateOutput
                     "LLM request timed out for {InputName}",
                     request.InputName);
 
+                // Send error notification (non-blocking, fire-and-forget)
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                            Title: "Output Generation Timeout",
+                            Message: "LLM request timed out. The service may be experiencing delays.\n\nPlease try again.",
+                            Priority: NotificationPriority.High,
+                            TimeoutSeconds: null,
+                            Actions: null);
+
+                        var result = await mediator.Send(notificationCommand, CancellationToken.None);
+
+                        if (!result.IsSuccess)
+                        {
+                            logger.LogWarning(
+                                "Failed to send timeout notification: {Error}",
+                                result.Error);
+                        }
+                    }
+                    catch (Exception notifyEx)
+                    {
+                        logger.LogWarning(
+                            notifyEx,
+                            "Unexpected error sending timeout notification (non-critical)");
+                    }
+                }, CancellationToken.None);
+
                 return Result<GeneratedOutput>.Failure(
                     "LLM request timed out. The service may be experiencing delays. Please try again.");
             }
@@ -198,6 +258,35 @@ public static class GenerateOutput
                     "Network error during LLM request for {InputName}",
                     request.InputName);
 
+                // Send error notification (non-blocking, fire-and-forget)
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                            Title: "Output Generation Failed",
+                            Message: "Network error: Unable to reach LLM service.\n\nPlease check your internet connection and try again.",
+                            Priority: NotificationPriority.High,
+                            TimeoutSeconds: null,
+                            Actions: null);
+
+                        var result = await mediator.Send(notificationCommand, CancellationToken.None);
+
+                        if (!result.IsSuccess)
+                        {
+                            logger.LogWarning(
+                                "Failed to send network error notification: {Error}",
+                                result.Error);
+                        }
+                    }
+                    catch (Exception notifyEx)
+                    {
+                        logger.LogWarning(
+                            notifyEx,
+                            "Unexpected error sending network error notification (non-critical)");
+                    }
+                }, CancellationToken.None);
+
                 return Result<GeneratedOutput>.Failure(
                     "Network error: Unable to reach LLM service. Please check your internet connection and try again.");
             }
@@ -207,6 +296,35 @@ public static class GenerateOutput
                     ex,
                     "Rate limit exceeded for {InputName}",
                     request.InputName);
+
+                // Send error notification (non-blocking, fire-and-forget)
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                            Title: "Output Generation Rate Limited",
+                            Message: "Rate limit exceeded. Please wait a moment and try again.",
+                            Priority: NotificationPriority.High,
+                            TimeoutSeconds: null,
+                            Actions: null);
+
+                        var result = await mediator.Send(notificationCommand, CancellationToken.None);
+
+                        if (!result.IsSuccess)
+                        {
+                            logger.LogWarning(
+                                "Failed to send rate limit notification: {Error}",
+                                result.Error);
+                        }
+                    }
+                    catch (Exception notifyEx)
+                    {
+                        logger.LogWarning(
+                            notifyEx,
+                            "Unexpected error sending rate limit notification (non-critical)");
+                    }
+                }, CancellationToken.None);
 
                 return Result<GeneratedOutput>.Failure(
                     "Rate limit exceeded. Please wait a moment and try again.");
@@ -263,6 +381,37 @@ public static class GenerateOutput
 
             if (!saveResult.IsSuccess)
             {
+                logger.LogError("Failed to save generated output: {Error}", saveResult.Error);
+
+                // Send error notification (non-blocking, fire-and-forget)
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                            Title: "Output Save Failed",
+                            Message: $"Failed to save generated output: {saveResult.Error}\n\nPlease check your storage directory permissions.",
+                            Priority: NotificationPriority.High,
+                            TimeoutSeconds: null,
+                            Actions: null);
+
+                        var result = await mediator.Send(notificationCommand, CancellationToken.None);
+
+                        if (!result.IsSuccess)
+                        {
+                            logger.LogWarning(
+                                "Failed to send save error notification: {Error}",
+                                result.Error);
+                        }
+                    }
+                    catch (Exception notifyEx)
+                    {
+                        logger.LogWarning(
+                            notifyEx,
+                            "Unexpected error sending save error notification (non-critical)");
+                    }
+                }, CancellationToken.None);
+
                 return Result<GeneratedOutput>.Failure(saveResult.Error!);
             }
 
@@ -286,6 +435,35 @@ public static class GenerateOutput
                 output.OutputTokens,
                 output.TotalTokens,
                 output.WasTruncated);
+
+            // Send success notification (non-blocking, fire-and-forget)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                        Title: "Output Generated",
+                        Message: $"Output generated successfully:\n{Path.GetFileName(output.OutputFilePath)}\n\nTemplate: {output.TemplateTitle}",
+                        Priority: NotificationPriority.Normal,
+                        TimeoutSeconds: null,
+                        Actions: null);
+
+                    var result = await mediator.Send(notificationCommand, CancellationToken.None);
+
+                    if (!result.IsSuccess)
+                    {
+                        logger.LogWarning(
+                            "Failed to send generation success notification: {Error}",
+                            result.Error);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(
+                        ex,
+                        "Unexpected error sending generation success notification (non-critical)");
+                }
+            }, CancellationToken.None);
 
             return Result<GeneratedOutput>.Success(output);
         }

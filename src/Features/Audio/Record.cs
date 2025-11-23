@@ -113,6 +113,36 @@ public static class Record
             if (!recordResult.IsSuccess || recordResult.Value is null)
             {
                 logger.LogError("Audio recording failed: {Error}", recordResult.Error);
+
+                // Send error notification (non-blocking, fire-and-forget)
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                            Title: "Recording Failed",
+                            Message: $"Audio recording failed: {recordResult.Error ?? "Unknown error"}\n\nPlease check your microphone configuration.",
+                            Priority: NotificationPriority.High,
+                            TimeoutSeconds: null,
+                            Actions: null);
+
+                        var notificationResult = await mediator.Send(notificationCommand, CancellationToken.None);
+
+                        if (!notificationResult.IsSuccess)
+                        {
+                            logger.LogWarning(
+                                "Failed to send recording error notification: {Error}",
+                                notificationResult.Error);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(
+                            ex,
+                            "Unexpected error sending recording error notification (non-critical)");
+                    }
+                }, CancellationToken.None);
+
                 return Result<StoredRecording>.Failure(recordResult.Error ?? "Audio recording failed");
             }
 
@@ -184,6 +214,36 @@ public static class Record
             if (!libraryTranscribeResult.IsSuccess || libraryTranscribeResult.Value is null)
             {
                 logger.LogError("Transcription failed: {Error}", libraryTranscribeResult.Error);
+
+                // Send error notification (non-blocking, fire-and-forget)
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                            Title: "Transcription Failed",
+                            Message: $"Audio transcription failed: {libraryTranscribeResult.Error ?? "Unknown error"}\n\nPlease check your STT configuration.",
+                            Priority: NotificationPriority.High,
+                            TimeoutSeconds: null,
+                            Actions: null);
+
+                        var notificationResult = await mediator.Send(notificationCommand, CancellationToken.None);
+
+                        if (!notificationResult.IsSuccess)
+                        {
+                            logger.LogWarning(
+                                "Failed to send transcription error notification: {Error}",
+                                notificationResult.Error);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(
+                            ex,
+                            "Unexpected error sending transcription error notification (non-critical)");
+                    }
+                }, CancellationToken.None);
+
                 CleanupFile(recording.FilePath);
                 return Result<StoredRecording>.Failure(libraryTranscribeResult.Error ?? "Transcription failed");
             }
@@ -214,6 +274,35 @@ public static class Record
             logger.LogInformation("Recording stored successfully: {AudioPath}, {TranscriptionPath}",
                 storedRecording.AudioFilePath,
                 storedRecording.TranscriptionFilePath);
+
+            // Send success notification (non-blocking, fire-and-forget)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                        Title: "Recording Saved",
+                        Message: $"Recording saved successfully:\n{Path.GetFileName(storedRecording.AudioFilePath)}",
+                        Priority: NotificationPriority.Normal,
+                        TimeoutSeconds: null,
+                        Actions: null);
+
+                    var notificationResult = await mediator.Send(notificationCommand, CancellationToken.None);
+
+                    if (!notificationResult.IsSuccess)
+                    {
+                        logger.LogWarning(
+                            "Failed to send recording success notification: {Error}",
+                            notificationResult.Error);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(
+                        ex,
+                        "Unexpected error sending recording success notification (non-critical)");
+                }
+            }, CancellationToken.None);
 
             return Result<StoredRecording>.Success(storedRecording);
         }

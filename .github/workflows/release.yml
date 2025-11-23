@@ -192,6 +192,23 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
       
+      - name: Build macOS Extension
+        if: startsWith(matrix.platform, 'osx-')
+        shell: bash
+        run: |
+          echo "🔨 Building macOS Extension for ${{ matrix.platform }}"
+          chmod +x src/Extensions/MacOS/build.sh
+          cd src/Extensions/MacOS && ./build.sh
+          
+          # Verify extension was built
+          if [ ! -f ../../../bin/TenSecondTom.Extensions.MacOS.app/Contents/MacOS/notifier ]; then
+            echo "❌ Error: Extension binary not found after build"
+            exit 1
+          fi
+          
+          echo "✅ Extension built successfully"
+          ls -la ../../../bin/TenSecondTom.Extensions.MacOS.app/Contents/MacOS/
+      
       - name: Publish ${{ matrix.platform }} executable with release version
         shell: bash
         run: |
@@ -205,6 +222,21 @@ jobs:
             --output ./publish \
             -p:PublishSingleFile=true \
             -p:Version=${VERSION}
+      
+      - name: Verify Extension in Publish Output
+        if: startsWith(matrix.platform, 'osx-')
+        shell: bash
+        run: |
+          EXTENSION_PATH="./publish/TenSecondTom.Extensions.MacOS.app/Contents/MacOS/notifier"
+          if [ ! -f "$EXTENSION_PATH" ]; then
+            echo "❌ Error: Extension not found in publish output at $EXTENSION_PATH"
+            echo "Contents of publish directory:"
+            find ./publish -type f
+            exit 1
+          fi
+          
+          echo "✅ Extension verified in publish directory"
+          ls -lh "$EXTENSION_PATH"
       
       - name: Rename executable to 'tom' or 'tom.exe'
         shell: bash
@@ -272,6 +304,7 @@ jobs:
             ./publish/appsettings*.json
             ./publish/*.dylib
             ./publish/*.dll
+            ./publish/TenSecondTom.Extensions.MacOS.app/**/*
           retention-days: 90
 
   # Job 3: Create GitHub Release
@@ -489,6 +522,11 @@ jobs:
           cp "./artifacts/ten-second-tom-osx-arm64-release/tom" "$BOTTLE_DIR_ARM64/tom"
           cp ./artifacts/ten-second-tom-osx-arm64-release/appsettings*.json "$BOTTLE_DIR_ARM64/" 2>/dev/null || true
           cp ./artifacts/ten-second-tom-osx-arm64-release/*.dylib "$BOTTLE_DIR_ARM64/" 2>/dev/null || true
+          
+          # Copy macOS extension to bottle (in prefix, not bin)
+          EXTENSION_DIR_ARM64="ten-second-tom/${VERSION}"
+          cp -R "./artifacts/ten-second-tom-osx-arm64-release/TenSecondTom.Extensions.MacOS.app" "$EXTENSION_DIR_ARM64/" 2>/dev/null || true
+          
           chmod +x "$BOTTLE_DIR_ARM64/tom"
           tar czf "$BOTTLE_NAME_ARM64" ten-second-tom
           
@@ -508,6 +546,11 @@ jobs:
           cp "./artifacts/ten-second-tom-osx-x64-release/tom" "$BOTTLE_DIR_X64/tom"
           cp ./artifacts/ten-second-tom-osx-x64-release/appsettings*.json "$BOTTLE_DIR_X64/" 2>/dev/null || true
           cp ./artifacts/ten-second-tom-osx-x64-release/*.dylib "$BOTTLE_DIR_X64/" 2>/dev/null || true
+          
+          # Copy macOS extension to bottle (in prefix, not bin)
+          EXTENSION_DIR_X64="ten-second-tom/${VERSION}"
+          cp -R "./artifacts/ten-second-tom-osx-x64-release/TenSecondTom.Extensions.MacOS.app" "$EXTENSION_DIR_X64/" 2>/dev/null || true
+          
           chmod +x "$BOTTLE_DIR_X64/tom"
           tar czf "$BOTTLE_NAME_X64" ten-second-tom
           
@@ -594,6 +637,11 @@ jobs:
             echo ""
             echo "  def install"
             echo "    bin.install \"tom\""
+            echo ""
+            echo "    # Install native macOS extension for notifications"
+            echo "    if OS.mac?"
+            echo "      prefix.install \"TenSecondTom.Extensions.MacOS.app\""
+            echo "    end"
             echo "  end"
             echo ""
             echo "  def caveats"

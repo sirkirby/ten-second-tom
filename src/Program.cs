@@ -28,13 +28,13 @@ internal static class Program
     {
         ILoggerFactory? loggerFactory = null;
         CancellationTokenSource? cancellationTokenSource = null;
-        
+
         try
         {
             // Setup global Ctrl+C handler
             cancellationTokenSource = new CancellationTokenSource();
             bool firstCancellation = true;
-            
+
             Console.CancelKeyPress += (sender, eventArgs) =>
             {
                 if (firstCancellation)
@@ -72,7 +72,7 @@ internal static class Program
             // Stage 2: Now we can determine user config path and rebuild with all sources
             // Priority (highest to lowest): Command line args > Environment variables > User config > appsettings.{env}.json > appsettings.json (defaults)
             var userConfigPath = ConfigurationHelpers.GetUserConfigPath(tempConfig);
-            
+
             var configuration = new ConfigurationBuilder()
                 .SetBasePath(AppContext.BaseDirectory)
                 // Default configuration shipped with binary (logging, defaults)
@@ -89,7 +89,7 @@ internal static class Program
             var logger = loggerFactory.CreateLogger("TenSecondTom.Program");
 
             logger.LogInformation("Ten Second Tom starting");
-            
+
             // Build DI container
             var services = new ServiceCollection();
             services.AddSingleton<IConfiguration>(configuration);
@@ -107,22 +107,22 @@ internal static class Program
 
             // Feature slices (vertical slice architecture)
             services.AddAllFeatures(configuration);
-            
+
             using var serviceProvider = services.BuildServiceProvider();
-            
+
             // Bootstrap application (handles setup, configuration validation, migrations)
             var bootstrapper = serviceProvider.GetRequiredService<ApplicationBootstrapper>();
             var bootstrapResult = await bootstrapper.BootstrapAsync(args, cancellationTokenSource.Token).ConfigureAwait(false);
-            
+
             // If bootstrap determined we should exit early (setup ran, invalid config, etc.), honor that
             if (!bootstrapResult.ShouldContinue)
             {
                 return bootstrapResult.ExitCode;
             }
-            
+
             // Determine execution mode: shell or single command
             int exitCode;
-            
+
             if (args.Length == 0)
             {
                 // No arguments: Launch shell mode
@@ -138,30 +138,30 @@ internal static class Program
                 var parseResult = rootCommand.Parse(args);
                 exitCode = await parseResult.InvokeAsync().ConfigureAwait(false);
             }
-            
+
             logger.LogInformation("Ten Second Tom completed with exit code {ExitCode}", exitCode);
             return exitCode;
         }
         catch (Exception ex)
         {
             await Console.Error.WriteLineAsync($"Fatal error: {ex.Message}").ConfigureAwait(false);
-            
+
             if (loggerFactory != null)
             {
                 var logger = loggerFactory.CreateLogger("TenSecondTom.Program");
                 logger.LogCritical(ex, "Fatal error during application execution");
             }
-            
+
             return 1;
         }
         finally
         {
             // Dispose cancellation token source
             cancellationTokenSource?.Dispose();
-            
+
             // Dispose logger factory
             loggerFactory?.Dispose();
-            
+
             // Ensure all log messages are flushed
             LoggingConfiguration.CloseAndFlush();
         }
