@@ -68,11 +68,14 @@
   <ItemGroup>
   </ItemGroup>
 
-  <Target Name="CopyExtensions" AfterTargets="Build;Publish">
+  <Target Name="CopyExtensions" AfterTargets="Build;Publish" Condition="Exists('..\bin\TenSecondTom.Extensions.MacOS.app')">
     <ItemGroup>
       <ExtensionFiles Include="..\bin\TenSecondTom.Extensions.MacOS.app\**\*" />
     </ItemGroup>
-    <Copy SourceFiles="@(ExtensionFiles)" DestinationFolder="$(OutDir)\TenSecondTom.Extensions.MacOS.app\%(RecursiveDir)" SkipUnchangedFiles="true" />
+    <!-- Copy to OutDir for Build -->
+    <Copy SourceFiles="@(ExtensionFiles)" DestinationFolder="$(OutDir)\TenSecondTom.Extensions.MacOS.app\%(RecursiveDir)" SkipUnchangedFiles="true" Condition="'$(PublishDir)' == ''" />
+    <!-- Copy to PublishDir for Publish -->
+    <Copy SourceFiles="@(ExtensionFiles)" DestinationFolder="$(PublishDir)\TenSecondTom.Extensions.MacOS.app\%(RecursiveDir)" SkipUnchangedFiles="true" Condition="'$(PublishDir)' != ''" />
   </Target>
 
   <ItemGroup>
