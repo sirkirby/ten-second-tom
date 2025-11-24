@@ -198,9 +198,9 @@ Ten Second Tom needs your public key to verify signatures. You can provide it in
 
 The recommended approach is to use a `.env` file for local development:
 
-1. Copy `.env.example` to `.env`:
+1. Copy `example.env` to `.env`:
    ```bash
-   cp .env.example .env
+   cp example.env .env
    ```
 
 2. Edit `.env` and add your public key using one of these methods:

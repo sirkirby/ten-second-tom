@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using Microsoft.Extensions.Options;
 
 namespace TenSecondTom.Shared.Options.Validation;
@@ -37,6 +39,38 @@ public sealed class NotificationOptionsValidator : IValidateOptions<Notification
                 $"DefaultPriority must be a valid NotificationPriority value (Low, Normal, High, Critical). " +
                 $"Current value: {options.DefaultPriority}. " +
                 "Set a valid value in the 'TenSecondTom:Notifications:DefaultPriority' configuration.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.ExtensionDirectory))
+        {
+            string extensionDir;
+            try
+            {
+                extensionDir = Path.GetFullPath(options.ExtensionDirectory);
+            }
+            catch (Exception ex)
+            {
+                return ValidateOptionsResult.Fail(
+                    "ExtensionDirectory is not a valid path. " +
+                    $"Value: '{options.ExtensionDirectory}'. Error: {ex.Message}. " +
+                    "Update the 'TenSecondTom:Notifications:ExtensionDirectory' configuration.");
+            }
+
+            if (!Directory.Exists(extensionDir))
+            {
+                return ValidateOptionsResult.Fail(
+                    "ExtensionDirectory does not exist. " +
+                    $"Resolved path: '{extensionDir}'. " +
+                    "Ensure the macOS extension bundle exists or remove the override 'TenSecondTom:Notifications:ExtensionDirectory'.");
+            }
+
+            var notifierPath = Path.Combine(extensionDir, "Contents", "MacOS", "notifier");
+            if (!File.Exists(notifierPath))
+            {
+                return ValidateOptionsResult.Fail(
+                    "ExtensionDirectory must contain the native notifier binary at 'Contents/MacOS/notifier'. " +
+                    $"Expected path: '{notifierPath}'. Rebuild the extension with 'make extensions'.");
+            }
         }
 
         return ValidateOptionsResult.Success;

@@ -1,9 +1,11 @@
 using System.Runtime.InteropServices;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using TenSecondTom.Infrastructure.Notifications.Channels.OS;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Options;
 
 namespace TenSecondTom.Tests.Infrastructure.Notifications.Channels;
 
@@ -19,12 +21,14 @@ namespace TenSecondTom.Tests.Infrastructure.Notifications.Channels;
 public sealed class MacOsNotificationProviderTests
 {
     private readonly Mock<ILogger<MacOsNotificationProvider>> _mockLogger;
+    private readonly IOptions<NotificationOptions> _options;
     private readonly MacOsNotificationProvider _provider;
 
     public MacOsNotificationProviderTests()
     {
         _mockLogger = new Mock<ILogger<MacOsNotificationProvider>>();
-        _provider = new MacOsNotificationProvider(_mockLogger.Object);
+        _options = Options.Create(new NotificationOptions());
+        _provider = new MacOsNotificationProvider(_mockLogger.Object, _options);
     }
 
     [Fact]
@@ -287,10 +291,21 @@ public sealed class MacOsNotificationProviderTests
     public void Constructor_WithNullLogger_ThrowsArgumentNullException()
     {
         // Arrange & Act & Assert
-        var act = () => new MacOsNotificationProvider(null!);
+        var act = () => new MacOsNotificationProvider(null!, _options);
 
         act.Should().Throw<ArgumentNullException>()
             .WithParameterName("logger");
+    }
+
+    [Fact]
+    public void Constructor_WithNullOptions_ThrowsArgumentNullException()
+    {
+        // Arrange
+        var act = () => new MacOsNotificationProvider(_mockLogger.Object, null!);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>()
+            .WithParameterName("options");
     }
 
     [Theory]
