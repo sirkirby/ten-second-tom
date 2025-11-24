@@ -69,6 +69,8 @@ public static class ListNotes
                         lastModified = new DateTimeOffset(fileInfo.LastWriteTime);
                     }
 
+                    lastModified = lastModified.ToUserLocalTime();
+
                     notes.Add(new NoteListItem
                     {
                         FileName = Path.GetFileNameWithoutExtension(filename),
