@@ -134,6 +134,9 @@ public sealed partial class RecordingService : IRecordingService
                     recordedAt = new DateTimeOffset(fileInfo.LastWriteTime);
                 }
 
+                recordedAt = recordedAt.ToUserLocalTime();
+                var formattedDate = recordedAt.ToUserLocalDisplayString("MMM dd, yyyy h:mm tt", CultureInfo.InvariantCulture);
+
                 // Strip front matter for word count
                 var contentWithoutFrontMatter = StripFrontMatter(content);
                 var wordCount = CountWords(contentWithoutFrontMatter);
@@ -143,7 +146,7 @@ public sealed partial class RecordingService : IRecordingService
                     RecordingBaseName = baseName,
                     TranscriptFilePath = filePath,
                     RecordedAt = recordedAt,
-                    FormattedDate = recordedAt.ToString("MMM dd, yyyy h:mm tt", CultureInfo.InvariantCulture),
+                    FormattedDate = formattedDate,
                     WordCount = wordCount,
                     FileSizeBytes = fileInfo.Length
                 });

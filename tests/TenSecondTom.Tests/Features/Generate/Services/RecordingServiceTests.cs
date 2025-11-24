@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
+using System.Globalization;
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using TenSecondTom.Features.Generate.Models;
@@ -167,6 +168,42 @@ public sealed class RecordingServiceTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Value[0].FileSizeBytes.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task ListRecordingsAsync_ConvertsUtcFrontMatterToLocalTime()
+    {
+        // Arrange
+        var fileSystem = new MockFileSystem();
+        var recordingDir = $"{_testMemoryDirectory}/{DirectoryNames.Recording}";
+        fileSystem.AddDirectory(recordingDir);
+
+        var timestampUtc = new DateTimeOffset(2025, 10, 24, 15, 45, 0, TimeSpan.Zero);
+        var content = $"""
+        ---
+        timestamp: {timestampUtc:O}
+        ---
+        Recording body
+        """;
+
+        var filePath = $"{recordingDir}/10-24-2025_1.md";
+        fileSystem.AddFile(filePath, new MockFileData(content)
+        {
+            LastWriteTime = timestampUtc.UtcDateTime
+        });
+
+        var service = CreateService(fileSystem);
+
+        // Act
+        var result = await service.ListRecordingsAsync();
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        var recording = result.Value.Should().ContainSingle().Subject;
+
+        var expectedLocal = timestampUtc.ToLocalTime();
+        recording.RecordedAt.Should().Be(expectedLocal);
+        recording.FormattedDate.Should().Be(expectedLocal.ToString("MMM dd, yyyy h:mm tt", CultureInfo.InvariantCulture));
     }
 
     #endregion
