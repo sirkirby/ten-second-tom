@@ -12,7 +12,8 @@ import UserNotifications
 //   "group": "string?",
 //   "actions": [
 //     { "id": "string", "label": "string" }
-//   ]
+//   ],
+//   "pipePath": "string?"  // Optional - for IPC via named pipe
 // }
 
 struct NotificationAction: Codable {
@@ -26,6 +27,7 @@ struct NotificationPayload: Codable {
     let message: String
     let group: String?
     let actions: [NotificationAction]?
+    let pipePath: String?  // Optional - for IPC via named pipe
 }
 
 class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
@@ -36,24 +38,41 @@ class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         let userInfo = response.notification.request.content.userInfo
-        
+
         if let notificationId = userInfo["notificationId"] as? String {
             let actionId = response.actionIdentifier
-            
-            // Output JSON to stdout for the parent process to read
+
+            // Output JSON to stdout for the parent process to read (for logging/debugging)
             let output = [
                 "type": "action",
                 "notificationId": notificationId,
                 "actionId": actionId
             ]
-            
+
             if let jsonData = try? JSONSerialization.data(withJSONObject: output, options: []),
                let jsonString = String(data: jsonData, encoding: .utf8) {
                 print(jsonString)
                 fflush(stdout) // Ensure output is flushed immediately
             }
+
+            // Write to named pipe if pipePath is provided (IPC mechanism)
+            if let pipePath = userInfo["pipePath"] as? String, !pipePath.isEmpty {
+                let signal = "\(actionId)\n"
+                if let signalData = signal.data(using: .utf8) {
+                    do {
+                        if let fileHandle = FileHandle(forWritingAtPath: pipePath) {
+                            fileHandle.write(signalData)
+                            try fileHandle.close()
+                        } else {
+                            fputs("Warning: Could not open pipe at \(pipePath)\n", stderr)
+                        }
+                    } catch {
+                        fputs("Warning: Failed to write to pipe: \(error.localizedDescription)\n", stderr)
+                    }
+                }
+            }
         }
-        
+
         completionHandler()
         exit(0) // Exit after handling the action
     }
@@ -93,7 +112,10 @@ let content = UNMutableNotificationContent()
 content.title = payload.title
 content.body = payload.message
 content.sound = .default
-content.userInfo = ["notificationId": payload.id]
+content.userInfo = [
+    "notificationId": payload.id,
+    "pipePath": payload.pipePath ?? ""
+]
 
 if let group = payload.group {
     content.threadIdentifier = group

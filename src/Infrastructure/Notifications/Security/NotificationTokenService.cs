@@ -25,6 +25,15 @@ public sealed class NotificationTokenService(
     /// <inheritdoc/>
     public string GenerateToken(Guid notificationId, string actionId)
     {
+        // Gracefully handle missing secret configuration
+        if (string.IsNullOrWhiteSpace(_securityOptions.NotificationSecret))
+        {
+            logger.LogWarning(
+                "NotificationSecret is not configured. Interactive notifications will not work. " +
+                "Set 'TenSecondTom:Security:NotificationSecret' in configuration or user secrets.");
+            return string.Empty;
+        }
+
         var payload = NotificationTokenPayload.Create(notificationId, actionId);
         var payloadJson = JsonSerializer.Serialize(payload);
         var payloadBytes = Encoding.UTF8.GetBytes(payloadJson);
@@ -49,6 +58,15 @@ public sealed class NotificationTokenService(
         Guid expectedNotificationId,
         string expectedActionId)
     {
+        // Gracefully handle missing secret configuration
+        if (string.IsNullOrWhiteSpace(_securityOptions.NotificationSecret))
+        {
+            logger.LogWarning(
+                "NotificationSecret is not configured. Cannot validate notification tokens.");
+            return Result<NotificationTokenPayload>.Failure(
+                "NotificationSecret is not configured. Interactive notifications are disabled.");
+        }
+
         if (string.IsNullOrWhiteSpace(token))
         {
             return Result<NotificationTokenPayload>.Failure("Token is null or empty.");
@@ -142,6 +160,15 @@ public sealed class NotificationTokenService(
 
     private byte[] GenerateSignature(byte[] payloadBytes)
     {
+        // This method should only be called after checking NotificationSecret is not null
+        // Throw if called incorrectly (defensive programming)
+        if (string.IsNullOrWhiteSpace(_securityOptions.NotificationSecret))
+        {
+            throw new InvalidOperationException(
+                "Cannot generate signature: NotificationSecret is not configured. " +
+                "This is a programming error - callers should check configuration first.");
+        }
+
         var keyBytes = Encoding.UTF8.GetBytes(_securityOptions.NotificationSecret);
         return HMACSHA256.HashData(keyBytes, payloadBytes);
     }

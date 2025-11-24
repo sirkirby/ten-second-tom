@@ -8,6 +8,7 @@ using MediatR;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Extensions;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Requests;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Audio;
@@ -119,7 +120,7 @@ public static class Record
                 {
                     try
                     {
-                        var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                        var notificationCommand = new SendNotificationRequest(
                             Title: "Recording Failed",
                             Message: $"Audio recording failed: {recordResult.Error ?? "Unknown error"}\n\nPlease check your microphone configuration.",
                             Priority: NotificationPriority.High,
@@ -220,7 +221,7 @@ public static class Record
                 {
                     try
                     {
-                        var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                        var notificationCommand = new SendNotificationRequest(
                             Title: "Transcription Failed",
                             Message: $"Audio transcription failed: {libraryTranscribeResult.Error ?? "Unknown error"}\n\nPlease check your STT configuration.",
                             Priority: NotificationPriority.High,
@@ -275,34 +276,32 @@ public static class Record
                 storedRecording.AudioFilePath,
                 storedRecording.TranscriptionFilePath);
 
-            // Send success notification (non-blocking, fire-and-forget)
-            _ = Task.Run(async () =>
+            // Send success notification and wait for it to complete before returning to REPL
+            // This ensures all log output is finished before the REPL prompt appears
+            try
             {
-                try
-                {
-                    var notificationCommand = new Features.Notifications.ShowNotification.Command(
-                        Title: "Recording Saved",
-                        Message: $"Recording saved successfully:\n{Path.GetFileName(storedRecording.AudioFilePath)}",
-                        Priority: NotificationPriority.Normal,
-                        TimeoutSeconds: null,
-                        Actions: null);
+                var notificationCommand = new SendNotificationRequest(
+                    Title: "Recording Saved",
+                    Message: $"Recording saved successfully:\n{Path.GetFileName(storedRecording.AudioFilePath)}",
+                    Priority: NotificationPriority.Normal,
+                    TimeoutSeconds: null,
+                    Actions: null);
 
-                    var notificationResult = await mediator.Send(notificationCommand, CancellationToken.None);
+                var notificationResult = await mediator.Send(notificationCommand, CancellationToken.None);
 
-                    if (!notificationResult.IsSuccess)
-                    {
-                        logger.LogWarning(
-                            "Failed to send recording success notification: {Error}",
-                            notificationResult.Error);
-                    }
-                }
-                catch (Exception ex)
+                if (!notificationResult.IsSuccess)
                 {
                     logger.LogWarning(
-                        ex,
-                        "Unexpected error sending recording success notification (non-critical)");
+                        "Failed to send recording success notification: {Error}",
+                        notificationResult.Error);
                 }
-            }, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Unexpected error sending recording success notification (non-critical)");
+            }
 
             return Result<StoredRecording>.Success(storedRecording);
         }

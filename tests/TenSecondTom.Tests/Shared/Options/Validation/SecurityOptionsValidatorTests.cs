@@ -31,9 +31,9 @@ public sealed class SecurityOptionsValidatorTests
     }
 
     [Fact]
-    public void Validate_WithEmptyNotificationSecret_ReturnsFailure()
+    public void Validate_WithEmptyNotificationSecret_ReturnsSuccess()
     {
-        // Arrange
+        // Arrange - Empty secret is now allowed for graceful degradation
         var options = new SecurityOptions
         {
             NotificationSecret = string.Empty,
@@ -43,17 +43,14 @@ public sealed class SecurityOptionsValidatorTests
         // Act
         var result = _validator.Validate(null, options);
 
-        // Assert
-        result.Should().NotBe(ValidateOptionsResult.Success);
-        result.Failed.Should().BeTrue();
-        result.FailureMessage.Should().Contain("NotificationSecret");
-        result.FailureMessage.Should().Contain("required");
+        // Assert - Should succeed (interactive notifications will be disabled at runtime)
+        result.Should().Be(ValidateOptionsResult.Success);
     }
 
     [Fact]
-    public void Validate_WithWhitespaceNotificationSecret_ReturnsFailure()
+    public void Validate_WithWhitespaceNotificationSecret_ReturnsSuccess()
     {
-        // Arrange
+        // Arrange - Whitespace secret is now allowed for graceful degradation
         var options = new SecurityOptions
         {
             NotificationSecret = "   ",
@@ -63,11 +60,25 @@ public sealed class SecurityOptionsValidatorTests
         // Act
         var result = _validator.Validate(null, options);
 
-        // Assert
-        result.Should().NotBe(ValidateOptionsResult.Success);
-        result.Failed.Should().BeTrue();
-        result.FailureMessage.Should().Contain("NotificationSecret");
-        result.FailureMessage.Should().Contain("required");
+        // Assert - Should succeed (interactive notifications will be disabled at runtime)
+        result.Should().Be(ValidateOptionsResult.Success);
+    }
+
+    [Fact]
+    public void Validate_WithNullNotificationSecret_ReturnsSuccess()
+    {
+        // Arrange - Null secret is now allowed for graceful degradation
+        var options = new SecurityOptions
+        {
+            NotificationSecret = null,
+            MaxTokenAgeSeconds = 300
+        };
+
+        // Act
+        var result = _validator.Validate(null, options);
+
+        // Assert - Should succeed (interactive notifications will be disabled at runtime)
+        result.Should().Be(ValidateOptionsResult.Success);
     }
 
     [Fact]
@@ -87,7 +98,7 @@ public sealed class SecurityOptionsValidatorTests
         result.Should().NotBe(ValidateOptionsResult.Success);
         result.Failed.Should().BeTrue();
         result.FailureMessage.Should().Contain("NotificationSecret");
-        result.FailureMessage.Should().Contain("at least 16 characters");
+        result.FailureMessage.Should().Contain("at least 16 bytes");
     }
 
     [Fact]
@@ -210,10 +221,10 @@ public sealed class SecurityOptionsValidatorTests
     [Fact]
     public void Validate_ErrorMessage_IncludesConfigurationPath()
     {
-        // Arrange
+        // Arrange - Use short secret to trigger validation error
         var options = new SecurityOptions
         {
-            NotificationSecret = string.Empty,
+            NotificationSecret = "short",
             MaxTokenAgeSeconds = 300
         };
 
@@ -221,16 +232,17 @@ public sealed class SecurityOptionsValidatorTests
         var result = _validator.Validate(null, options);
 
         // Assert
+        result.Failed.Should().BeTrue();
         result.FailureMessage.Should().Contain("TenSecondTom:Security:NotificationSecret");
     }
 
     [Fact]
     public void Validate_ErrorMessage_IncludesSecurityWarning()
     {
-        // Arrange
+        // Arrange - Use short secret to trigger validation error
         var options = new SecurityOptions
         {
-            NotificationSecret = string.Empty,
+            NotificationSecret = "short",
             MaxTokenAgeSeconds = 300
         };
 
@@ -238,7 +250,8 @@ public sealed class SecurityOptionsValidatorTests
         var result = _validator.Validate(null, options);
 
         // Assert
-        result.FailureMessage.Should().Contain("NEVER commit this secret to source control");
+        result.Failed.Should().BeTrue();
+        result.FailureMessage.Should().Contain("NEVER commit");
     }
 
     [Fact]

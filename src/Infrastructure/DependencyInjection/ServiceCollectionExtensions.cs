@@ -79,6 +79,14 @@ public static class ServiceCollectionExtensions
         // Register AudioOptions with Options Pattern
         services.Configure<AudioOptions>(configuration.GetSection(AudioOptions.SectionPath));
 
+        // Register SecurityOptions with validation
+        // NOTE: Don't use ValidateOnStart() - allow unconfigured state during first-time setup
+        services.Configure<SecurityOptions>(configuration.GetSection(SecurityOptions.SectionPath));
+        services.AddSingleton<IValidateOptions<SecurityOptions>, SecurityOptionsValidator>();
+
+        // Register NotificationOptions (no validation needed - all have defaults)
+        services.Configure<NotificationOptions>(configuration.GetSection(NotificationOptions.SectionPath));
+
         return services;
     }
 

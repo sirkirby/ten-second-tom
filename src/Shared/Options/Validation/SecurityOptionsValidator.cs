@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.Extensions.Options;
 
 namespace TenSecondTom.Shared.Options.Validation;
@@ -25,24 +26,24 @@ public sealed class SecurityOptionsValidator : IValidateOptions<SecurityOptions>
     /// </returns>
     public ValidateOptionsResult Validate(string? name, SecurityOptions options)
     {
-        // NotificationSecret is required
-        if (string.IsNullOrWhiteSpace(options.NotificationSecret))
+        // NotificationSecret is optional (graceful degradation)
+        // If not set, interactive notifications will be disabled with a warning
+        // If set, it must meet minimum security requirements
+        if (!string.IsNullOrWhiteSpace(options.NotificationSecret))
         {
-            return ValidateOptionsResult.Fail(
-                "NotificationSecret is required for interactive notifications. " +
-                "Set the 'TenSecondTom:Security:NotificationSecret' configuration value " +
-                "or the 'TenSecondTom__Security__NotificationSecret' environment variable. " +
-                "Generate a random 32+ character string for this value. " +
-                "NEVER commit this secret to source control - use user secrets or environment variables.");
-        }
-
-        // NotificationSecret must be sufficiently long for security
-        if (options.NotificationSecret.Length < MinimumSecretLength)
-        {
-            return ValidateOptionsResult.Fail(
-                $"NotificationSecret must be at least {MinimumSecretLength} characters long for security. " +
-                $"Current length: {options.NotificationSecret.Length}. " +
-                "Generate a longer random string for this value.");
+            // NotificationSecret must be sufficiently long for security
+            // Check byte length (not character count) since HMAC works with bytes
+            // Unicode characters provide more entropy, so byte length is the correct measure
+            var secretBytes = Encoding.UTF8.GetByteCount(options.NotificationSecret);
+            if (secretBytes < MinimumSecretLength)
+            {
+                return ValidateOptionsResult.Fail(
+                    $"NotificationSecret must be at least {MinimumSecretLength} bytes long for security. " +
+                    $"Current byte length: {secretBytes}. " +
+                    "Generate a longer random string (32+ characters recommended). " +
+                    "Set 'TenSecondTom:Security:NotificationSecret' in user secrets or environment variables. " +
+                    "NEVER commit secrets to source control.");
+            }
         }
 
         // MaxTokenAgeSeconds must be positive

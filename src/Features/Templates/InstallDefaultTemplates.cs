@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Shared.Abstractions.Templates;
+using TenSecondTom.Shared.Abstractions.Notifications;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 
@@ -86,12 +87,12 @@ public static class InstallDefaultTemplates
     /// </remarks>
     public sealed class Handler(
         ITemplateInstaller templateInstaller,
-        IMediator mediator,
+        INotificationService notificationService,
         ILogger<Handler> logger)
         : IRequestHandler<Command, Result<TemplateInstallationResult>>
     {
         private readonly ITemplateInstaller _templateInstaller = templateInstaller ?? throw new ArgumentNullException(nameof(templateInstaller));
-        private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        private readonly INotificationService _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
         private readonly ILogger<Handler> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         /// <summary>
@@ -139,14 +140,13 @@ public static class InstallDefaultTemplates
                 {
                     try
                     {
-                        var notificationCommand = new Features.Notifications.ShowNotification.Command(
-                            Title: "Template Installation Failed",
-                            Message: $"Failed to install templates: {result.Error}\n\nPlease check directory permissions.",
-                            Priority: NotificationPriority.High,
-                            TimeoutSeconds: null,
-                            Actions: null);
+                        var notification = Notification.CreateBasic(
+                            title: "Template Installation Failed",
+                            message: $"Failed to install templates: {result.Error}\n\nPlease check directory permissions.",
+                            priority: NotificationPriority.High,
+                            timeoutSeconds: null);
 
-                        var notificationResult = await _mediator.Send(notificationCommand, CancellationToken.None);
+                        var notificationResult = await _notificationService.SendAsync(notification, CancellationToken.None);
 
                         if (!notificationResult.IsSuccess)
                         {
@@ -180,14 +180,13 @@ public static class InstallDefaultTemplates
                 {
                     try
                     {
-                        var notificationCommand = new Features.Notifications.ShowNotification.Command(
-                            Title: "Templates Installed",
-                            Message: $"{result.Value.TemplatesInstalled} template(s) installed successfully.\n\n{string.Join(", ", result.Value.InstalledTemplateIds.Take(3))}{(result.Value.InstalledTemplateIds.Count > 3 ? "..." : "")}",
-                            Priority: NotificationPriority.Low,
-                            TimeoutSeconds: null,
-                            Actions: null);
+                        var notification = Notification.CreateBasic(
+                            title: "Templates Installed",
+                            message: $"{result.Value.TemplatesInstalled} template(s) installed successfully.\n\n{string.Join(", ", result.Value.InstalledTemplateIds.Take(3))}{(result.Value.InstalledTemplateIds.Count > 3 ? "..." : "")}",
+                            priority: NotificationPriority.Low,
+                            timeoutSeconds: null);
 
-                        var notificationResult = await _mediator.Send(notificationCommand, CancellationToken.None);
+                        var notificationResult = await _notificationService.SendAsync(notification, CancellationToken.None);
 
                         if (!notificationResult.IsSuccess)
                         {

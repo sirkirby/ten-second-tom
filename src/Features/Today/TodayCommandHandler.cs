@@ -13,6 +13,7 @@ using TenSecondTom.Shared.Constants;  // For CommandNames, SttProviders, Directo
 using TenSecondTom.Shared.Extensions;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.OutputFormatters;
+using TenSecondTom.Shared.Requests;
 using TenSecondTom.Shared.Results;
 using TenSecondTom.Shared.TextEditing.Services;
 using TenSecondTom.Shared.TextEditing.Models;
@@ -384,6 +385,31 @@ public static class TodayCommandHandler
                 AnsiConsole.WriteLine();
                 AnsiConsole.MarkupLine($"[dim]Full entry:[/] [link]{fullPath.EscapeMarkup()}[/]");
             }
+
+            // Send success notification (non-blocking, fire-and-forget)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var notificationCommand = new SendNotificationRequest(
+                        Title: "Daily Entry Created",
+                        Message: $"Your reflection has been processed and saved.\n\nProvider: {entry.Metadata.LlmProvider}, Tokens: {entry.Metadata.TokensUsed}",
+                        Priority: NotificationPriority.Normal,
+                        TimeoutSeconds: null,
+                        Actions: null);
+
+                    var result = await mediator.Send(notificationCommand, CancellationToken.None);
+
+                    if (!result.IsSuccess)
+                    {
+                        logger.LogWarning("Failed to send daily entry notification: {Error}", result.Error);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Unexpected error sending daily entry notification (non-critical)");
+                }
+            }, CancellationToken.None);
         }
     }
 
@@ -750,6 +776,31 @@ public static class TodayCommandHandler
                     AnsiConsole.WriteLine();
                     AnsiConsole.MarkupLine($"[dim]Audio saved: {entry.AudioFilename}[/]");
                 }
+
+                // Send success notification (non-blocking, fire-and-forget)
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var notificationCommand = new SendNotificationRequest(
+                            Title: "Voice Note Entry Created",
+                            Message: $"Voice note processed and saved.\n\nTranscription: {transcription.WordCount} words ({entry.SttEngine})\nTokens: {entry.Metadata.TokensUsed}",
+                            Priority: NotificationPriority.Normal,
+                            TimeoutSeconds: null,
+                            Actions: null);
+
+                        var result = await mediator.Send(notificationCommand, CancellationToken.None);
+
+                        if (!result.IsSuccess)
+                        {
+                            logger.LogWarning("Failed to send voice note entry notification: {Error}", result.Error);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, "Unexpected error sending voice note entry notification (non-critical)");
+                    }
+                }, CancellationToken.None);
             }
         }
         finally

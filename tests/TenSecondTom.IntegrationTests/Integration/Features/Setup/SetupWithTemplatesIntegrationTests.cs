@@ -7,6 +7,7 @@ using Moq;
 using TenSecondTom.Features.Templates;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Templates;
+using TenSecondTom.Shared.Abstractions.Notifications;
 using TenSecondTom.Shared.Results;
 using TenSecondTom.Shared.Models;
 using Xunit;
@@ -23,7 +24,7 @@ public sealed class SetupWithTemplatesIntegrationTests
     private readonly MockFileSystem _fileSystem;
     private readonly Mock<ILogger<InstallDefaultTemplates.Handler>> _handlerLogger;
     private readonly Mock<ILogger<YamlFrontMatterParser>> _parserLogger;
-    private readonly Mock<IMediator> _mockMediator;
+    private readonly Mock<INotificationService> _mockNotificationService;
     private readonly EmbeddedPromptTemplateLoader _embeddedLoader;
     private readonly string _testDirectory;
 
@@ -32,7 +33,7 @@ public sealed class SetupWithTemplatesIntegrationTests
         _fileSystem = new MockFileSystem();
         _handlerLogger = new Mock<ILogger<InstallDefaultTemplates.Handler>>();
         _parserLogger = new Mock<ILogger<YamlFrontMatterParser>>();
-        _mockMediator = new Mock<IMediator>();
+        _mockNotificationService = new Mock<INotificationService>();
         var yamlParser = new YamlFrontMatterParser(_parserLogger.Object);
         _embeddedLoader = new EmbeddedPromptTemplateLoader(baseDirectory: null, yamlParser: yamlParser);
         _testDirectory = "/Users/test/.memory/templates";
@@ -189,7 +190,7 @@ public sealed class SetupWithTemplatesIntegrationTests
 
         return new InstallDefaultTemplates.Handler(
             templateInstaller,
-            _mockMediator.Object,
+            _mockNotificationService.Object,
             _handlerLogger.Object);
     }
 }

@@ -240,6 +240,17 @@ public sealed record Notification
     public string? GroupKey { get; init; }
 
     /// <summary>
+    /// Gets the path to a named pipe (FIFO) for IPC communication.
+    /// Used for interactive notifications to receive action callbacks from the notification system.
+    /// </summary>
+    /// <remarks>
+    /// When set, the notification provider will pass this path to the notification helper,
+    /// which will write action signals to the pipe when the user clicks action buttons.
+    /// This enables bidirectional communication between the CLI and the notification system.
+    /// </remarks>
+    public string? PipePath { get; init; }
+
+    /// <summary>
     /// Creates a basic non-interactive notification.
     /// </summary>
     /// <param name="title">Notification title.</param>

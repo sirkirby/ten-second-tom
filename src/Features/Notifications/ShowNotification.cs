@@ -3,13 +3,14 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Shared.Abstractions.Notifications;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Requests;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Notifications;
 
 /// <summary>
-/// Sends a notification to the user through the configured notification channel.
-/// Supports both simple text notifications and interactive notifications with action buttons.
+/// Infrastructure handler for sending notifications to the user through the configured notification channel.
+/// Processes <see cref="SendNotificationRequest"/> from any feature.
 /// </summary>
 /// <remarks>
 /// This feature provides a unified interface for sending notifications across platforms.
@@ -19,25 +20,10 @@ namespace TenSecondTom.Features.Notifications;
 public static class ShowNotification
 {
     /// <summary>
-    /// Command to display a notification to the user.
-    /// </summary>
-    /// <param name="Title">The notification title (heading). Required. Max 100 characters.</param>
-    /// <param name="Message">The notification body text. Required. Max 500 characters.</param>
-    /// <param name="Priority">The urgency level (Low, Normal, High, Critical). Defaults to Normal.</param>
-    /// <param name="TimeoutSeconds">Auto-dismiss timeout in seconds. Null means no timeout. Range: 1-300 seconds.</param>
-    /// <param name="Actions">Optional interactive action buttons. macOS does not support interactive buttons.</param>
-    public sealed record Command(
-        string Title,
-        string Message,
-        NotificationPriority Priority = NotificationPriority.Normal,
-        int? TimeoutSeconds = null,
-        IReadOnlyList<NotificationAction>? Actions = null) : IRequest<Result>;
-
-    /// <summary>
-    /// Validates the ShowNotification command.
+    /// Validates the SendNotificationRequest.
     /// Auto-discovered by FluentValidation assembly scanning.
     /// </summary>
-    public sealed class Validator : AbstractValidator<Command>
+    public sealed class Validator : AbstractValidator<SendNotificationRequest>
     {
         private const int MaxTitleLength = 100;
         private const int MaxMessageLength = 500;
@@ -81,17 +67,17 @@ public static class ShowNotification
     }
 
     /// <summary>
-    /// Handles the ShowNotification command by sending the notification through the notification service.
+    /// Handles the SendNotificationRequest by sending the notification through the notification service.
     /// Auto-discovered by MediatR assembly scanning.
     /// </summary>
     public sealed class Handler(
         INotificationService notificationService,
-        ILogger<Handler> logger) : IRequestHandler<Command, Result>
+        ILogger<Handler> logger) : IRequestHandler<SendNotificationRequest, Result>
     {
         /// <summary>
-        /// Handles the ShowNotification command by creating and sending the notification.
+        /// Handles the SendNotificationRequest by creating and sending the notification.
         /// </summary>
-        /// <param name="request">The notification command containing display parameters.</param>
+        /// <param name="request">The notification request containing display parameters.</param>
         /// <param name="cancellationToken">A token to cancel the operation.</param>
         /// <returns>
         /// A <see cref="Result"/> indicating success or failure.
@@ -99,7 +85,7 @@ public static class ShowNotification
         /// Failure indicates the notification service rejected the request.
         /// </returns>
         public async Task<Result> Handle(
-            Command request,
+            SendNotificationRequest request,
             CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(request);

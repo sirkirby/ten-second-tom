@@ -5,6 +5,7 @@ using Moq;
 using TenSecondTom.Features.Notifications;
 using TenSecondTom.Shared.Abstractions.Notifications;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Requests;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Tests.Features.Notifications;
@@ -23,7 +24,7 @@ public sealed class ShowNotificationTests
     public void Validator_WithValidCommand_PassesValidation()
     {
         // Arrange
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: "Test Message",
             Priority: NotificationPriority.Normal,
@@ -41,7 +42,7 @@ public sealed class ShowNotificationTests
     public void Validator_WithEmptyTitle_FailsValidation()
     {
         // Arrange
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: string.Empty,
             Message: "Test Message");
 
@@ -57,7 +58,7 @@ public sealed class ShowNotificationTests
     public void Validator_WithNullTitle_FailsValidation()
     {
         // Arrange
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: null!,
             Message: "Test Message");
 
@@ -73,7 +74,7 @@ public sealed class ShowNotificationTests
     {
         // Arrange
         var longTitle = new string('A', 101); // 101 characters, max is 100
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: longTitle,
             Message: "Test Message");
 
@@ -90,7 +91,7 @@ public sealed class ShowNotificationTests
     {
         // Arrange
         var maxTitle = new string('A', 100); // Exactly 100 characters
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: maxTitle,
             Message: "Test Message");
 
@@ -105,7 +106,7 @@ public sealed class ShowNotificationTests
     public void Validator_WithEmptyMessage_FailsValidation()
     {
         // Arrange
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: string.Empty);
 
@@ -121,7 +122,7 @@ public sealed class ShowNotificationTests
     public void Validator_WithNullMessage_FailsValidation()
     {
         // Arrange
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: null!);
 
@@ -137,7 +138,7 @@ public sealed class ShowNotificationTests
     {
         // Arrange
         var longMessage = new string('A', 501); // 501 characters, max is 500
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: longMessage);
 
@@ -154,7 +155,7 @@ public sealed class ShowNotificationTests
     {
         // Arrange
         var maxMessage = new string('A', 500); // Exactly 500 characters
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: maxMessage);
 
@@ -172,7 +173,7 @@ public sealed class ShowNotificationTests
     public void Validator_WithInvalidTimeout_FailsValidation(int invalidTimeout)
     {
         // Arrange
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: "Test Message",
             TimeoutSeconds: invalidTimeout);
@@ -189,7 +190,7 @@ public sealed class ShowNotificationTests
     public void Validator_WithTimeoutTooLarge_FailsValidation()
     {
         // Arrange
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: "Test Message",
             TimeoutSeconds: 301); // Max is 300
@@ -208,7 +209,7 @@ public sealed class ShowNotificationTests
     public void Validator_WithValidTimeout_PassesValidation(int validTimeout)
     {
         // Arrange
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: "Test Message",
             TimeoutSeconds: validTimeout);
@@ -224,7 +225,7 @@ public sealed class ShowNotificationTests
     public void Validator_WithNullTimeout_PassesValidation()
     {
         // Arrange
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: "Test Message",
             TimeoutSeconds: null);
@@ -244,7 +245,7 @@ public sealed class ShowNotificationTests
     public void Validator_WithValidPriority_PassesValidation(NotificationPriority priority)
     {
         // Arrange
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: "Test Message",
             Priority: priority);
@@ -269,7 +270,7 @@ public sealed class ShowNotificationTests
             NotificationAction.Create("action5", "Action 5", "cmd5") // 5 actions, max is 4
         };
 
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: "Test Message",
             Actions: tooManyActions);
@@ -294,7 +295,7 @@ public sealed class ShowNotificationTests
             NotificationAction.Create("action4", "Action 4", "cmd4")
         };
 
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: "Test Message",
             Actions: maxActions);
@@ -320,7 +321,7 @@ public sealed class ShowNotificationTests
             }
         };
 
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: "Test Message",
             Actions: invalidActions);
@@ -347,7 +348,7 @@ public sealed class ShowNotificationTests
             }
         };
 
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: "Test Message",
             Actions: invalidActions);
@@ -377,7 +378,7 @@ public sealed class ShowNotificationTests
 
         var handler = new ShowNotification.Handler(mockService.Object, mockLogger.Object);
 
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: "Test Message",
             Priority: NotificationPriority.Normal,
@@ -418,7 +419,7 @@ public sealed class ShowNotificationTests
             NotificationAction.Create("action1", "Continue", "record continue")
         };
 
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: "Test Message",
             Actions: actions);
@@ -449,7 +450,7 @@ public sealed class ShowNotificationTests
 
         var handler = new ShowNotification.Handler(mockService.Object, mockLogger.Object);
 
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: "Test Message");
 
@@ -474,7 +475,7 @@ public sealed class ShowNotificationTests
 
         var handler = new ShowNotification.Handler(mockService.Object, mockLogger.Object);
 
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: "Test Message");
 
@@ -513,7 +514,7 @@ public sealed class ShowNotificationTests
 
         var handler = new ShowNotification.Handler(mockService.Object, mockLogger.Object);
 
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: "Test Message",
             Priority: NotificationPriority.High,
@@ -550,7 +551,7 @@ public sealed class ShowNotificationTests
 
         var handler = new ShowNotification.Handler(mockService.Object, mockLogger.Object);
 
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: "Test Message");
 
@@ -581,7 +582,7 @@ public sealed class ShowNotificationTests
 
         var handler = new ShowNotification.Handler(mockService.Object, mockLogger.Object);
 
-        var command = new ShowNotification.Command(
+        var command = new SendNotificationRequest(
             Title: "Test Title",
             Message: "Test Message");
 

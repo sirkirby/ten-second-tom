@@ -34,11 +34,11 @@ public sealed class SecurityOptions
     /// <summary>
     /// Gets or sets the secret key used for signing notification callback tokens.
     /// This value is used to generate HMAC signatures that prevent tampering with notification actions.
-    /// REQUIRED: Must be set for interactive notifications to work.
+    /// OPTIONAL: If not set, interactive notifications will be disabled (graceful degradation).
     /// SECURITY: Store in user secrets or environment variables, never in source control.
     /// Recommended: Generate a random 32+ character string.
     /// </summary>
-    public required string NotificationSecret { get; init; }
+    public string? NotificationSecret { get; init; }
 
     /// <summary>
     /// Gets or sets the maximum age in seconds for notification tokens.

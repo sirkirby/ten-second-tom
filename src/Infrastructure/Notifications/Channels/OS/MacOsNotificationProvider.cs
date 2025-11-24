@@ -75,7 +75,8 @@ public sealed class MacOsNotificationProvider : INotificationChannel
                 title = notification.Title,
                 message = notification.Message,
                 group = notification.GroupKey,
-                actions = notification.Actions.Select(a => new { id = a.ActionId, label = a.Label }).ToArray()
+                actions = notification.Actions.Select(a => new { id = a.ActionId, label = a.Label }).ToArray(),
+                pipePath = notification.PipePath  // For IPC with notification actions
             };
 
             var json = JsonSerializer.Serialize(payload);

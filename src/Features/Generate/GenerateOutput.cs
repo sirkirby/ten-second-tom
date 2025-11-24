@@ -8,6 +8,7 @@ using MediatR;
 using TenSecondTom.Shared.Extensions;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Options;
+using TenSecondTom.Shared.Requests;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Generate;
@@ -179,7 +180,7 @@ public static class GenerateOutput
                     {
                         try
                         {
-                            var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                            var notificationCommand = new SendNotificationRequest(
                                 Title: "Output Generation Failed",
                                 Message: $"LLM generation failed: {llmResult.Error}\n\nPlease check your LLM configuration.",
                                 Priority: NotificationPriority.High,
@@ -224,7 +225,7 @@ public static class GenerateOutput
                 {
                     try
                     {
-                        var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                        var notificationCommand = new SendNotificationRequest(
                             Title: "Output Generation Timeout",
                             Message: "LLM request timed out. The service may be experiencing delays.\n\nPlease try again.",
                             Priority: NotificationPriority.High,
@@ -263,7 +264,7 @@ public static class GenerateOutput
                 {
                     try
                     {
-                        var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                        var notificationCommand = new SendNotificationRequest(
                             Title: "Output Generation Failed",
                             Message: "Network error: Unable to reach LLM service.\n\nPlease check your internet connection and try again.",
                             Priority: NotificationPriority.High,
@@ -302,7 +303,7 @@ public static class GenerateOutput
                 {
                     try
                     {
-                        var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                        var notificationCommand = new SendNotificationRequest(
                             Title: "Output Generation Rate Limited",
                             Message: "Rate limit exceeded. Please wait a moment and try again.",
                             Priority: NotificationPriority.High,
@@ -388,7 +389,7 @@ public static class GenerateOutput
                 {
                     try
                     {
-                        var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                        var notificationCommand = new SendNotificationRequest(
                             Title: "Output Save Failed",
                             Message: $"Failed to save generated output: {saveResult.Error}\n\nPlease check your storage directory permissions.",
                             Priority: NotificationPriority.High,
@@ -441,7 +442,7 @@ public static class GenerateOutput
             {
                 try
                 {
-                    var notificationCommand = new Features.Notifications.ShowNotification.Command(
+                    var notificationCommand = new SendNotificationRequest(
                         Title: "Output Generated",
                         Message: $"Output generated successfully:\n{Path.GetFileName(output.OutputFilePath)}\n\nTemplate: {output.TemplateTitle}",
                         Priority: NotificationPriority.Normal,

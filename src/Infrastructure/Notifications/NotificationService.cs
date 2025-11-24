@@ -294,7 +294,7 @@ public sealed class NotificationService : INotificationService
             ? "No interactive notification channel available on this platform"
             : "No notification channel available on this platform";
 
-        _logger.LogWarning("Channel selection failed: {Error}", errorMessage);
+        _logger.LogDebug("Channel selection failed: {Error}", errorMessage);
         return Result<INotificationChannel>.Failure(errorMessage);
     }
 }
