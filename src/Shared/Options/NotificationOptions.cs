@@ -24,6 +24,7 @@ namespace TenSecondTom.Shared.Options;
 /// - TenSecondTom__Notifications__DefaultTimeoutSeconds
 /// - TenSecondTom__Notifications__DefaultPriority
 /// - TenSecondTom__Notifications__SilentFallback
+/// - TenSecondTom__Notifications__ExtensionDirectory
 /// </remarks>
 public sealed class NotificationOptions
 {
@@ -62,4 +63,12 @@ public sealed class NotificationOptions
     /// Default: true.
     /// </summary>
     public bool SilentFallback { get; init; } = true;
+
+    /// <summary>
+    /// Gets or sets an optional absolute or relative path to the macOS extension bundle (.app).
+    /// When specified, this overrides the default discovery logic so developers can point to
+    /// a locally built helper (e.g., <c>bin/TenSecondTom.Extensions.MacOS.app</c>).
+    /// Leave unset (null) to use auto-discovery.
+    /// </summary>
+    public string? ExtensionDirectory { get; init; }
 }

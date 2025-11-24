@@ -1,8 +1,11 @@
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TenSecondTom.Shared.Models;
+using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Infrastructure.Notifications.Channels.OS;
@@ -15,26 +18,14 @@ public sealed class MacOsNotificationProvider : INotificationChannel
     private readonly ILogger<MacOsNotificationProvider> _logger;
     private readonly string _notifierPath;
 
-    public MacOsNotificationProvider(ILogger<MacOsNotificationProvider> logger)
+    public MacOsNotificationProvider(
+        ILogger<MacOsNotificationProvider> logger,
+        IOptions<NotificationOptions> options)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        ArgumentNullException.ThrowIfNull(options);
 
-        // Try relative to executable first (dev/direct install)
-        var extensionPath = Path.Combine(AppContext.BaseDirectory, "TenSecondTom.Extensions.MacOS.app");
-
-        // For Homebrew: executable in bin/, extension in prefix/
-        if (!Directory.Exists(extensionPath) && RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            // Get Cellar path ../TenSecondTom.Extensions.MacOS.app
-            var executableDir = Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
-            var cellarPath = Path.GetFullPath(Path.Combine(executableDir, "..", "TenSecondTom.Extensions.MacOS.app"));
-
-            if (Directory.Exists(cellarPath))
-            {
-                extensionPath = cellarPath;
-            }
-        }
-
+        var extensionPath = ResolveExtensionPath(options.Value);
         _notifierPath = Path.Combine(extensionPath, "Contents", "MacOS", "notifier");
     }
 
@@ -125,6 +116,42 @@ public sealed class MacOsNotificationProvider : INotificationChannel
             _logger.LogError(ex, "Failed to send native macOS notification");
             return Result<Guid>.Failure($"Native macOS notification failed: {ex.Message}");
         }
+    }
+
+    private string ResolveExtensionPath(NotificationOptions options)
+    {
+        if (!string.IsNullOrWhiteSpace(options.ExtensionDirectory))
+        {
+            var overridePath = Path.GetFullPath(options.ExtensionDirectory);
+            if (Directory.Exists(overridePath))
+            {
+                _logger.LogDebug("Using configured macOS extension directory override: {Path}", overridePath);
+                return overridePath;
+            }
+
+            _logger.LogWarning(
+                "Configured macOS extension directory '{Path}' was not found. Falling back to automatic discovery.",
+                overridePath);
+        }
+
+        // Try relative to executable first (dev/direct install)
+        var extensionPath = Path.Combine(AppContext.BaseDirectory, "TenSecondTom.Extensions.MacOS.app");
+
+        // For Homebrew: executable in bin/, extension in prefix/
+        if (!Directory.Exists(extensionPath) && RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            // Get Cellar path ../TenSecondTom.Extensions.MacOS.app
+            var executableDir = Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
+            var cellarPath = Path.GetFullPath(Path.Combine(executableDir, "..", "TenSecondTom.Extensions.MacOS.app"));
+
+            if (Directory.Exists(cellarPath))
+            {
+                _logger.LogDebug("Using Homebrew macOS extension directory: {Path}", cellarPath);
+                return cellarPath;
+            }
+        }
+
+        return extensionPath;
     }
 
     /// <inheritdoc/>

@@ -215,7 +215,7 @@ Create a `.env` file in your working directory:
 
 ```bash
 # Copy the example
-cp .env.example .env
+cp example.env .env
 
 # Edit with your settings
 DOTNET_ENVIRONMENT=Development

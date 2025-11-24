@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
 using TenSecondTom.Shared.Models;
@@ -200,5 +202,56 @@ public sealed class NotificationOptionsValidatorTests
 
         // Assert
         result.Should().Be(ValidateOptionsResult.Success);
+    }
+
+    [Fact]
+    public void Validate_WithMissingExtensionDirectory_ReturnsFailure()
+    {
+        // Arrange
+        var options = new NotificationOptions
+        {
+            ExtensionDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+        };
+
+        // Act
+        var result = _validator.Validate(null, options);
+
+        // Assert
+        result.Should().NotBe(ValidateOptionsResult.Success);
+        result.FailureMessage.Should().Contain("ExtensionDirectory");
+    }
+
+    [Fact]
+    public void Validate_WithValidExtensionDirectory_ReturnsSuccess()
+    {
+        // Arrange
+        var tempRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            var extensionDir = Path.Combine(tempRoot, "TenSecondTom.Extensions.MacOS.app");
+            var notifierDir = Path.Combine(extensionDir, "Contents", "MacOS");
+            Directory.CreateDirectory(notifierDir);
+            File.WriteAllText(Path.Combine(notifierDir, "notifier"), string.Empty);
+
+            var options = new NotificationOptions
+            {
+                ExtensionDirectory = extensionDir
+            };
+
+            // Act
+            var result = _validator.Validate(null, options);
+
+            // Assert
+            result.Should().Be(ValidateOptionsResult.Success);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, true);
+            }
+        }
     }
 }
