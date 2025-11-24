@@ -105,9 +105,17 @@ public sealed class ReplLoop : IReplLoop
 
                     // Clear any buffered console input left by the command
                     // This ensures clean state for the next prompt (especially after voice commands)
-                    while (Console.KeyAvailable)
+                    try
                     {
-                        Console.ReadKey(intercept: true);
+                        while (Console.KeyAvailable)
+                        {
+                            Console.ReadKey(intercept: true);
+                        }
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // No interactive console available (e.g., CI environment)
+                        // This is expected and safe to ignore
                     }
 
                     // Add visual spacing between commands
