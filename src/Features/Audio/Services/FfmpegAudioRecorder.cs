@@ -5,6 +5,8 @@ using Microsoft.Extensions.Options;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Shared.Abstractions.Notifications;
+using TenSecondTom.Infrastructure.Notifications.Channels.OS;
 
 namespace TenSecondTom.Features.Audio.Services;
 
@@ -17,18 +19,22 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
 {
     private readonly AudioOptions _config;
     private readonly ILogger<FfmpegAudioRecorder> _logger;
+    private readonly INotificationService _notificationService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="FfmpegAudioRecorder"/> class.
     /// </summary>
     /// <param name="config">Audio configuration options.</param>
     /// <param name="logger">Logger instance.</param>
+    /// <param name="notificationService">Service for sending notifications.</param>
     public FfmpegAudioRecorder(
         IOptions<AudioOptions> config,
-        ILogger<FfmpegAudioRecorder> logger)
+        ILogger<FfmpegAudioRecorder> logger,
+        INotificationService notificationService)
     {
         _config = config?.Value ?? throw new ArgumentNullException(nameof(config));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
     }
 
     /// <inheritdoc/>
@@ -191,7 +197,7 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
             var recordingStart = DateTimeOffset.UtcNow;
             var lastPromptTime = recordingStart;
 
-            // Use a polling loop to check for Enter key without blocking Console.ReadLine
+            // Main polling loop - check for Enter key to stop
             while (shouldContinue && !cancellationToken.IsCancellationRequested)
             {
                 // Calculate time until next timeout prompt
@@ -218,35 +224,159 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
                     // Timeout reached - prompt user to continue
                     var totalElapsed = (DateTimeOffset.UtcNow - recordingStart).TotalSeconds;
                     Console.WriteLine($"\nRecording limit reached ({totalElapsed:F0}s / {maxDurationSeconds}s interval).");
-                    Console.Write("Continue recording? (y/n): ");
-                    
-                    // Add a timeout to the continuation prompt (30 seconds)
-                    var responseTask = Task.Run(() => Console.ReadLine()?.Trim().ToLowerInvariant());
-                    var promptTimeout = Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
-                    var completedPromptTask = await Task.WhenAny(responseTask, promptTimeout);
-                    
-                    string? response = null;
-                    if (completedPromptTask == responseTask)
+
+                    // Create named pipe for IPC (for notification button clicks)
+                    using var pipeListener = new NamedPipeListener(_logger);
+                    var pipeResult = pipeListener.CreatePipe();
+
+                    if (!pipeResult.IsSuccess)
                     {
-                        response = await responseTask;
+                        _logger.LogWarning("Failed to create notification pipe: {Error}", pipeResult.Error);
+                    }
+
+                    // Send interactive notification (non-blocking, fire-and-forget)
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var durationMinutes = maxDurationSeconds.Value / 60;
+                            var durationLabel = durationMinutes > 0
+                                ? $"{durationMinutes}-minute"
+                                : $"{maxDurationSeconds}-second";
+
+                            var actions = new List<NotificationAction>
+                            {
+                                NotificationAction.Create(
+                                    actionId: "record.continue",
+                                    label: "Continue",
+                                    command: "record continue")
+                            };
+
+                            var notification = Notification.CreateInteractive(
+                                title: "Recording Session Expiring",
+                                message: $"Your {durationLabel} session has ended. Click Continue or respond in terminal.",
+                                actions: actions,
+                                priority: NotificationPriority.High,
+                                timeoutSeconds: 30);
+
+                            notification = notification with { PipePath = pipeListener.PipePath };
+
+                            var result = await _notificationService.SendInteractiveAsync(
+                                notification,
+                                CancellationToken.None);
+
+                            if (!result.IsSuccess)
+                            {
+                                _logger.LogWarning("Failed to send interactive notification: {Error}", result.Error);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Error sending interactive notification (non-critical)");
+                        }
+                    }, CancellationToken.None);
+
+                    // Prompt user to continue or stop, monitoring both terminal and notification
+                    Console.Write("Continue recording? (y/n): ");
+
+                    bool continueRecording = false;
+                    if (pipeResult.IsSuccess)
+                    {
+                        // Race between keyboard and notification button
+                        using var responseCts = new CancellationTokenSource();
+                        var pipeSignalTask = pipeListener.WaitForSignalAsync(30, responseCts.Token);
+
+                        // Poll for Y/N keypresses (can be cancelled)
+                        var keyboardTask = Task.Run(async () =>
+                        {
+                            var endTime = DateTimeOffset.UtcNow.AddSeconds(30);
+                            while (DateTimeOffset.UtcNow < endTime && !responseCts.Token.IsCancellationRequested)
+                            {
+                                if (Console.KeyAvailable)
+                                {
+                                    var key = Console.ReadKey(intercept: true);
+                                    if (key.Key == ConsoleKey.Y)
+                                    {
+                                        Console.WriteLine("y");
+                                        return "y";
+                                    }
+                                    else if (key.Key == ConsoleKey.N)
+                                    {
+                                        Console.WriteLine("n");
+                                        return "n";
+                                    }
+                                }
+                                await Task.Delay(50, responseCts.Token).ConfigureAwait(false);
+                            }
+                            return null;
+                        }, responseCts.Token);
+
+                        var completedTask = await Task.WhenAny(keyboardTask, pipeSignalTask);
+                        responseCts.Cancel();
+
+                        if (completedTask == keyboardTask)
+                        {
+                            var response = await keyboardTask;
+                            continueRecording = response == "y";
+                            _logger.LogInformation("Keyboard response: {Response}", response);
+                        }
+                        else
+                        {
+                            var signal = await pipeSignalTask;
+                            continueRecording = signal == "record.continue";
+                            _logger.LogInformation("Notification action: {Signal}", signal ?? "none");
+
+                            if (continueRecording)
+                            {
+                                Console.WriteLine("✓ Notification action: Continue recording");
+                            }
+                            else
+                            {
+                                Console.WriteLine("✓ Notification action: Stop recording");
+                            }
+                        }
                     }
                     else
                     {
-                        // User didn't respond within 30 seconds - default to stopping
-                        Console.WriteLine("\nNo response received. Stopping recording.");
-                        shouldContinue = false;
-                        break;
+                        // No pipe - simple keyboard polling with timeout
+                        var timeoutEnd = DateTimeOffset.UtcNow.AddSeconds(30);
+                        while (DateTimeOffset.UtcNow < timeoutEnd && !cancellationToken.IsCancellationRequested)
+                        {
+                            if (Console.KeyAvailable)
+                            {
+                                var key = Console.ReadKey(intercept: true);
+                                if (key.Key == ConsoleKey.Y)
+                                {
+                                    Console.WriteLine("y");
+                                    continueRecording = true;
+                                    break;
+                                }
+                                else if (key.Key == ConsoleKey.N)
+                                {
+                                    Console.WriteLine("n");
+                                    continueRecording = false;
+                                    break;
+                                }
+                            }
+                            await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+                        }
+
+                        if (!continueRecording && !cancellationToken.IsCancellationRequested)
+                        {
+                            Console.WriteLine("\nNo response received. Stopping recording.");
+                        }
+
+                        _logger.LogInformation("Keyboard response: {Response}", continueRecording ? "yes" : "no (timeout)");
                     }
-                    
-                    if (response == "y" || response == "yes")
+
+                    if (continueRecording)
                     {
                         Console.WriteLine("Recording continues. Press Enter to stop.");
-                        lastPromptTime = DateTimeOffset.UtcNow; // Reset the interval timer
+                        lastPromptTime = DateTimeOffset.UtcNow;
                         continue;
                     }
                     else
                     {
-                        // User chose to stop
                         shouldContinue = false;
                         break;
                     }
@@ -255,6 +385,28 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
                 // Small delay to avoid busy waiting
                 await Task.Delay(100, cancellationToken);
             }
+
+            // Clear console input buffer to remove any stray keypresses
+            // This ensures clean state before returning to REPL
+            while (Console.KeyAvailable)
+            {
+                Console.ReadKey(intercept: true);
+            }
+
+            // Flush console output and ensure cursor is at start of new line
+            Console.Out.Flush();
+            Console.Error.Flush();
+
+            // Write newlines and carriage return to fully reset terminal state for REPL
+            // This ensures Spectre.Console can properly display its prompt
+            Console.WriteLine();
+            Console.WriteLine();
+            Console.Write('\r');  // Carriage return to start of line
+            Console.Out.Flush();
+
+            // Small delay to allow any pending async log writes to complete
+            // This ensures Serilog has finished writing before returning to REPL
+            await Task.Delay(100, CancellationToken.None);
 
             // Send 'q' to FFmpeg stdin to gracefully stop
             await process.StandardInput.WriteAsync('q');

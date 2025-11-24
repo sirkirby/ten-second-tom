@@ -1,4 +1,6 @@
+using MediatR;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
 using TenSecondTom.Infrastructure.Auth;
@@ -6,6 +8,7 @@ using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.OutputFormatters;
+using TenSecondTom.Shared.Requests;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.ThisWeek;
@@ -38,6 +41,10 @@ public static class ThisWeekCommandHandler
     {
         ArgumentNullException.ThrowIfNull(handler);
         ArgumentNullException.ThrowIfNull(authService);
+
+        // Resolve required services
+        var mediator = serviceProvider.GetRequiredService<IMediator>();
+        var logger = serviceProvider.GetRequiredService<ILogger<CreateWeeklyReview.Handler>>();
 
         // Show warning if using mock authentication
         if (!jsonOutput && authService is MockAuthenticationService)
@@ -164,5 +171,30 @@ public static class ThisWeekCommandHandler
         {
             AnsiConsole.MarkupLine($"[dim]Entry saved to: .memory/{CommandNames.ThisWeek}/[/]");
         }
+
+        // Send success notification (non-blocking, fire-and-forget)
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var notificationCommand = new SendNotificationRequest(
+                    Title: "Weekly Review Generated",
+                    Message: $"Your weekly review has been generated and saved.\n\nProvider: {entry.Metadata.LlmProvider}, Tokens: {entry.Metadata.TokensUsed}",
+                    Priority: NotificationPriority.Normal,
+                    TimeoutSeconds: null,
+                    Actions: null);
+
+                var result = await mediator.Send(notificationCommand, CancellationToken.None);
+
+                if (!result.IsSuccess)
+                {
+                    logger.LogWarning("Failed to send weekly review notification: {Error}", result.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Unexpected error sending weekly review notification (non-critical)");
+            }
+        }, CancellationToken.None);
     }
 }

@@ -5,12 +5,14 @@ using Moq;
 using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Features.Audio.Services;
 using TenSecondTom.Shared.Options;
+using TenSecondTom.Shared.Abstractions.Notifications;
 
 namespace TenSecondTom.Tests.Features.Audio.Services;
 
 public sealed class FfmpegAudioRecorderTests
 {
     private readonly Mock<ILogger<FfmpegAudioRecorder>> _mockLogger = new();
+    private readonly Mock<INotificationService> _mockNotificationService = new();
     private readonly AudioOptions _config = new()
     {
         Recorder = new RecorderOptions
@@ -50,7 +52,6 @@ public sealed class FfmpegAudioRecorderTests
     private FfmpegAudioRecorder CreateRecorder(AudioOptions? config = null)
     {
         config ??= _config;
-        return new FfmpegAudioRecorder(Options.Create(config), _mockLogger.Object);
+        return new FfmpegAudioRecorder(Options.Create(config), _mockLogger.Object, _mockNotificationService.Object);
     }
 }
-

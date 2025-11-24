@@ -48,6 +48,12 @@ x86/
 [Aa][Rr][Mm]64/
 build-output.txt
 
+# Swift / macOS extension build artifacts
+src/Extensions/MacOS/*.app/
+src/Extensions/MacOS/notifier
+src/Extensions/MacOS/*.iconset/
+src/Extensions/MacOS/*.icns
+
 # Cross-platform props
 *.pid
 

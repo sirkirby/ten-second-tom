@@ -257,6 +257,58 @@ if (audioConfig.IsSuccess)
 var audioService = new AudioService(); // NO! Cross-feature coupling
 ```
 
+### Notification System
+
+**Infrastructure**: OS native notifications (macOS via osascript, Windows future)
+
+```csharp
+// Send a basic notification
+await _mediator.Send(new ShowNotification.Command
+{
+    Title = "Recording Saved",
+    Message = "Your recording has been saved successfully",
+    Priority = NotificationPriority.Normal
+});
+
+// Send with timeout
+await _mediator.Send(new ShowNotification.Command
+{
+    Title = "Session Expiring",
+    Message = "Your 30-minute session has ended",
+    Priority = NotificationPriority.High,
+    TimeoutSeconds = 30
+});
+```
+
+**Key Principles**:
+- **Graceful degradation** - notifications are enhancements, not requirements
+- **Non-blocking** - use fire-and-forget pattern (Task.Run) to avoid blocking primary flows
+- **Error handling** - catch and log notification failures, never propagate to calling code
+- **macOS limitations** - no interactive buttons (AppleScript limitation)
+- **Terminal first** - always preserve terminal output as primary interface
+
+```csharp
+// Fire-and-forget pattern for notifications
+_ = Task.Run(async () =>
+{
+    try
+    {
+        await _mediator.Send(new ShowNotification.Command { /* ... */ });
+    }
+    catch (Exception ex)
+    {
+        _logger.LogWarning(ex, "Notification failed (non-critical)");
+    }
+});
+
+// Continue with primary flow immediately
+Console.WriteLine("Recording saved successfully");
+```
+
+**Configuration**:
+- `TenSecondTom:Notifications` - Enable/disable, timeout, priority defaults
+- `TenSecondTom:Security` - Notification token secret, max token age
+
 ## CLI Command Structure
 
 ```csharp
@@ -331,6 +383,9 @@ if (command == CommandNames.Today) { }               // Constant
 **Constitution Version**: 1.8.0 | **Last Updated**: 2025-01-19
 
 **Recent Changes**:
+- OS Native Notification System added (macOS support, Windows future)
+- NotificationService infrastructure with channel-agnostic architecture
+- Recording session expiration notifications (graceful degradation)
 - ConfigurationSettings God Object removed (aggressive refactor complete)
 - IConfigurationSectionStore is now the standard for config storage
 - Force parameter pattern for independent configuration commands

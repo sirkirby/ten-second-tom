@@ -1,4 +1,5 @@
 using FluentAssertions;
+using MediatR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -27,6 +28,7 @@ public sealed class GenerateOutputCommandHandlerTests
     private readonly Mock<ILlmProviderFactory> _mockLlmProviderFactory;
     private readonly Mock<IOptionsSnapshot<LlmOptions>> _mockLlmOptions;
     private readonly Mock<IOutputStorageService> _mockOutputStorageService;
+    private readonly Mock<IMediator> _mockMediator;
     private readonly Mock<ILogger<GenerateOutput.Handler>> _mockLogger;
 
     public GenerateOutputCommandHandlerTests()
@@ -38,6 +40,7 @@ public sealed class GenerateOutputCommandHandlerTests
         _mockLlmProviderFactory = new Mock<ILlmProviderFactory>();
         _mockLlmOptions = new Mock<IOptionsSnapshot<LlmOptions>>();
         _mockOutputStorageService = new Mock<IOutputStorageService>();
+        _mockMediator = new Mock<IMediator>();
         _mockLogger = new Mock<ILogger<GenerateOutput.Handler>>();
 
         // Setup default LLM provider properties
@@ -430,6 +433,7 @@ public sealed class GenerateOutputCommandHandlerTests
             _mockLlmProviderFactory.Object,
             _mockLlmOptions.Object,
             _mockOutputStorageService.Object,
+            _mockMediator.Object,
             _mockLogger.Object);
     }
 

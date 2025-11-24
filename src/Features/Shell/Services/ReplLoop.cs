@@ -102,7 +102,22 @@ public sealed class ReplLoop : IReplLoop
                         // Display result feedback
                         DisplayResult(result);
                     }
-                    
+
+                    // Clear any buffered console input left by the command
+                    // This ensures clean state for the next prompt (especially after voice commands)
+                    try
+                    {
+                        while (Console.KeyAvailable)
+                        {
+                            Console.ReadKey(intercept: true);
+                        }
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // No interactive console available (e.g., CI environment)
+                        // This is expected and safe to ignore
+                    }
+
                     // Add visual spacing between commands
                     AnsiConsole.WriteLine();
                 }

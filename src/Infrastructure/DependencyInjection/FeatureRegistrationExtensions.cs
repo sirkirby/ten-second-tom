@@ -11,6 +11,7 @@ using TenSecondTom.Features.Shell;
 using TenSecondTom.Features.Templates;
 using TenSecondTom.Features.ThisWeek;
 using TenSecondTom.Features.Today;
+using TenSecondTom.Infrastructure.Notifications;
 
 namespace TenSecondTom.Infrastructure.DependencyInjection;
 
@@ -52,6 +53,9 @@ public static class FeatureRegistrationExtensions
 
         // Interactive Shell
         services.AddShellFeature();
+
+        // Notification infrastructure
+        services.AddNotificationFeature(configuration);
 
         return services;
     }
