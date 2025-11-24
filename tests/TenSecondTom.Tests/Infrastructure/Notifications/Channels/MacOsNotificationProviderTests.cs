@@ -353,6 +353,7 @@ public sealed class MacOsNotificationProviderTests
     {
         // Arrange
         var notification = Notification.CreateBasic("Test Title", "Test Message");
+        var isMacOS = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
 
         // Act
         try
@@ -364,15 +365,25 @@ public sealed class MacOsNotificationProviderTests
             // Ignore errors - we're testing logging
         }
 
-        // Assert - in test environment, extension binary likely doesn't exist
-        // So we expect an Error log message about the notifier binary
-        _mockLogger.Verify(
-            x => x.Log(
-                It.IsAny<LogLevel>(), // Accept any log level (Debug in prod, Error in test)
-                It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("notifier")),
-                It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.AtLeastOnce());
+        // Assert
+        if (isMacOS)
+        {
+            // On macOS, extension binary likely doesn't exist in test environment
+            // So we expect an Error log message about the notifier binary
+            _mockLogger.Verify(
+                x => x.Log(
+                    It.IsAny<LogLevel>(), // Accept any log level (Debug in prod, Error in test)
+                    It.IsAny<EventId>(),
+                    It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("notifier")),
+                    It.IsAny<Exception>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.AtLeastOnce());
+        }
+        else
+        {
+            // On non-macOS, the provider returns early without logging about notifier
+            // This is expected behavior - no logs are written about the notifier binary
+            _mockLogger.VerifyNoOtherCalls();
+        }
     }
 }
