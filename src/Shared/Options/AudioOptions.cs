@@ -193,11 +193,10 @@ public sealed class AudioOptions
             return !string.IsNullOrWhiteSpace(apiKey) && !string.IsNullOrWhiteSpace(model);
         }
 
-        // WhisperCpp needs binary path and model
+        // WhisperCpp (Whisper.NET) only needs model path - no external binary required
         if (SttProvider == SttProviders.WhisperCpp)
         {
-            var binaryPath = GetSttBinaryPath();
-            return !string.IsNullOrWhiteSpace(binaryPath) && !string.IsNullOrWhiteSpace(model);
+            return !string.IsNullOrWhiteSpace(model);
         }
 
         return false;
