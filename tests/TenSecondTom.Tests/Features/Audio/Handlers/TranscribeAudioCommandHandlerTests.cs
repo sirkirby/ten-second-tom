@@ -50,14 +50,14 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
-            AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
+            AudioConfig = CreateTestAudioConfig()
         };
 
         var transcription = CreateSampleTranscription(audioPath, SttEngine.Local);
 
         _mockFactory
             .Setup(f => f.GetProviderAsync(
-                It.Is<AudioOptions>(c => c.SttFallbackEnabled == true),
+                It.IsAny<AudioOptions>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(_mockLocalProvider.Object);
 
@@ -75,7 +75,7 @@ public sealed class TranscribeAudioCommandHandlerTests
         result.Value.SttEngine.Should().Be(SttEngine.Local);
         _mockFactory.Verify(
             f => f.GetProviderAsync(
-                It.Is<AudioOptions>(c => c.SttFallbackEnabled == true),
+                It.IsAny<AudioOptions>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -88,14 +88,14 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
-            AudioConfig = CreateTestAudioConfig()
+            AudioConfig = CreateTestAudioConfig(sttProvider: SttProviders.WhisperCpp)
         };
 
         var transcription = CreateSampleTranscription(audioPath, SttEngine.Local);
 
         _mockFactory
             .Setup(f => f.GetProviderAsync(
-                It.Is<AudioOptions>(c => c.SttFallbackEnabled == false),
+                It.Is<AudioOptions>(c => c.SttProvider == SttProviders.WhisperCpp),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(_mockLocalProvider.Object);
 
@@ -179,7 +179,7 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
-            AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
+            AudioConfig = CreateTestAudioConfig()
         };
 
         _mockFactory
@@ -208,7 +208,7 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
-            AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
+            AudioConfig = CreateTestAudioConfig()
         };
 
         var transcription = CreateSampleTranscription(audioPath, SttEngine.Local);
@@ -240,7 +240,7 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
-            AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
+            AudioConfig = CreateTestAudioConfig()
         };
 
         var transcription = CreateSampleTranscription(audioPath, SttEngine.Local);
@@ -273,7 +273,7 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
-            AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
+            AudioConfig = CreateTestAudioConfig()
         };
 
         var transcription = new TranscriptionResult
@@ -314,7 +314,7 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
-            AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
+            AudioConfig = CreateTestAudioConfig()
         };
 
         var transcription = CreateSampleTranscription(audioPath, SttEngine.Local);
@@ -345,11 +345,15 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = "/path/to/audio.wav",
-            AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
+            AudioConfig = CreateTestAudioConfig()
         };
 
-        var cts = new CancellationTokenSource();
-        cts.Cancel();
+        CancellationToken token;
+        using (var cts = new CancellationTokenSource())
+        {
+            cts.Cancel();
+            token = cts.Token;
+        }
 
         _mockFactory
             .Setup(f => f.GetProviderAsync(It.IsAny<AudioOptions>(), It.IsAny<CancellationToken>()))
@@ -358,7 +362,7 @@ public sealed class TranscribeAudioCommandHandlerTests
         var handler = CreateHandler();
 
         // Act
-        var act = () => handler.Handle(command, cts.Token);
+        var act = () => handler.Handle(command, token);
 
         // Assert
         await act.Should().ThrowAsync<OperationCanceledException>();
@@ -371,7 +375,7 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = string.Empty,
-            AudioConfig = CreateTestAudioConfig(cloudFallbackEnabled: true)
+            AudioConfig = CreateTestAudioConfig()
         };
 
         var handler = CreateHandler();
@@ -394,8 +398,14 @@ public sealed class TranscribeAudioCommandHandlerTests
         return new AudioOptions
         {
             SttProvider = SttProviders.WhisperCpp,
-            SttApiKey = null,
-            SttFallbackEnabled = false,
+            Providers = new Dictionary<string, Dictionary<string, string>>
+            {
+                [SttProviders.WhisperCpp] = new()
+                {
+                    ["BinaryPath"] = "whisper-cli",
+                    ["Model"] = "models/ggml-base.en.bin"
+                }
+            },
             KeepFiles = true,
             Recorder = new RecorderOptions(),
             Preprocessing = new PreprocessingOptions(),
@@ -405,14 +415,12 @@ public sealed class TranscribeAudioCommandHandlerTests
 
     private static AudioOptions CreateTestAudioConfig(
         string sttProvider = SttProviders.WhisperCpp,
-        string? sttApiKey = null,
-        bool cloudFallbackEnabled = false)
+        string? sttApiKey = null)
     {
-        return new AudioOptions
+        var options = new AudioOptions
         {
             SttProvider = sttProvider,
-            SttApiKey = sttApiKey,
-            SttFallbackEnabled = cloudFallbackEnabled,
+            Providers = new Dictionary<string, Dictionary<string, string>>(),
             KeepFiles = false,
             Recorder = new RecorderOptions
             {
@@ -421,8 +429,6 @@ public sealed class TranscribeAudioCommandHandlerTests
                 EnableNoiseReduction = true,
                 EnableFrequencyFilters = true
             },
-            SttBinaryPath = "whisper-cli",
-            SttModel = "models/ggml-base.en.bin",
             Preprocessing = new PreprocessingOptions
             {
                 RemoveSilence = true,
@@ -435,6 +441,29 @@ public sealed class TranscribeAudioCommandHandlerTests
                 RecordSeconds = 600
             }
         };
+
+        // Set provider-specific config based on provider type
+        if (sttProvider == SttProviders.OpenAI)
+        {
+            options.Providers[SttProviders.OpenAI] = new Dictionary<string, string>
+            {
+                ["Model"] = "whisper-1"
+            };
+            if (!string.IsNullOrEmpty(sttApiKey))
+            {
+                options.Providers[SttProviders.OpenAI]["ApiKey"] = sttApiKey;
+            }
+        }
+        else if (sttProvider == SttProviders.WhisperCpp)
+        {
+            options.Providers[SttProviders.WhisperCpp] = new Dictionary<string, string>
+            {
+                ["BinaryPath"] = "whisper-cli",
+                ["Model"] = "models/ggml-base.en.bin"
+            };
+        }
+
+        return options;
     }
 
     private static TranscriptionResult CreateSampleTranscription(string audioPath, SttEngine engine)

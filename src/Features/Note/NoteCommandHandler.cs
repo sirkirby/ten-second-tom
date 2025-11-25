@@ -372,7 +372,7 @@ public static class NoteCommandHandler
 
         // Create temp audio file path
         var timestamp = DateTimeOffset.Now.ToString("yyyyMMdd-HHmmss");
-        var audioFilePath = Path.Combine(Path.GetTempPath(), $"tom-note-voice-{timestamp}.wav");
+        var audioFilePath = Path.Combine(Path.GetTempPath(), $"tom-note-voice-{timestamp}.mp3");
 
         try
         {
@@ -417,14 +417,14 @@ public static class NoteCommandHandler
             // Step 2: Transcribe audio
             if (!jsonOutput)
             {
-                var providerDisplay = transcribeConfig.SttProvider == SttProviders.OpenAI ? "OpenAI" : "local";
-                var fallbackInfo = transcribeConfig.SttFallbackEnabled ? $" (fallback to {transcribeConfig.SttFallbackProvider})" : "";
-                AnsiConsole.MarkupLine($"[cyan]✍️  Transcribing with {providerDisplay}{fallbackInfo}...[/]");
+                var providerDisplay = transcribeConfig.SttProvider == SttProviders.OpenAI ? "OpenAI" :
+                                    transcribeConfig.SttProvider == SttProviders.BuiltInLocal ? "Built-in Local" : "Whisper.cpp";
+                AnsiConsole.MarkupLine($"[cyan]✍️  Transcribing with {providerDisplay}...[/]");
             }
             else
             {
-                logger.LogInformation("Transcribing audio with {Provider}, FallbackEnabled={FallbackEnabled}",
-                    transcribeConfig.SttProvider, transcribeConfig.SttFallbackEnabled);
+                logger.LogInformation("Transcribing audio with {Provider}",
+                    transcribeConfig.SttProvider);
             }
 
             IRequest<Result<TranscriptionResult>> transcribeCommand = new TranscribeAudio.Command
@@ -630,49 +630,37 @@ public static class NoteCommandHandler
     private static AudioOptions BuildTranscriptionConfig(string? sttSelection, AudioOptions audioOptions)
     {
         var normalizedSelection = sttSelection?.ToLowerInvariant();
+        var providers = audioOptions.Providers ?? new Dictionary<string, Dictionary<string, string>>();
 
         return normalizedSelection switch
         {
-            // "auto": Try local provider first, fallback to configured fallback if enabled
+            // "auto" or null: Use configured provider
             "auto" or null => new AudioOptions
             {
                 SttProvider = audioOptions.SttProvider,
-                SttApiKey = audioOptions.SttApiKey,
-                SttFallbackEnabled = true,
-                SttFallbackProvider = audioOptions.SttFallbackProvider,
-                SttFallbackApiKey = audioOptions.SttFallbackApiKey,
-                SttBinaryPath = audioOptions.SttBinaryPath,
-                SttModel = audioOptions.SttModel,
-                SttFallbackBinaryPath = audioOptions.SttFallbackBinaryPath,
-                SttFallbackModel = audioOptions.SttFallbackModel,
+                Providers = providers,
                 KeepFiles = audioOptions.KeepFiles,
                 Recorder = audioOptions.Recorder,
                 Preprocessing = audioOptions.Preprocessing,
                 Timeouts = audioOptions.Timeouts
             },
 
-            // "local": Use only the configured local provider (no fallback)
+            // "local": Use local provider
             "local" => new AudioOptions
             {
-                SttProvider = audioOptions.SttProvider,
-                SttApiKey = audioOptions.SttApiKey,
-                SttFallbackEnabled = false,
-                SttBinaryPath = audioOptions.SttBinaryPath,
-                SttModel = audioOptions.SttModel,
+                SttProvider = SttProviders.WhisperCpp,
+                Providers = providers,
                 KeepFiles = audioOptions.KeepFiles,
                 Recorder = audioOptions.Recorder,
                 Preprocessing = audioOptions.Preprocessing,
                 Timeouts = audioOptions.Timeouts
             },
 
-            // "openai": Force OpenAI provider, no fallback
+            // "openai": Force OpenAI provider
             "openai" => new AudioOptions
             {
                 SttProvider = SttProviders.OpenAI,
-                SttApiKey = audioOptions.SttApiKey,
-                SttFallbackEnabled = false,
-                SttBinaryPath = audioOptions.SttBinaryPath,
-                SttModel = audioOptions.SttModel,
+                Providers = providers,
                 KeepFiles = audioOptions.KeepFiles,
                 Recorder = audioOptions.Recorder,
                 Preprocessing = audioOptions.Preprocessing,

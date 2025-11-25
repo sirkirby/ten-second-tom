@@ -125,6 +125,18 @@ public interface ISetupWizardUI
     void ShowStatus(string message);
 
     /// <summary>
+    /// Runs an async operation with a progress bar.
+    /// The operation receives a progress callback that reports percentage (0-100).
+    /// </summary>
+    /// <param name="taskDescription">Description shown next to progress bar</param>
+    /// <param name="operation">The async operation that reports progress (0-100)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    Task RunWithProgressAsync(
+        string taskDescription,
+        Func<Action<double>, Task> operation,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Shows a success message
     /// </summary>
     void ShowSuccess(string message);
@@ -199,25 +211,7 @@ public interface ISetupWizardUI
         string? currentApiKey,
         CancellationToken cancellationToken);
 
-    /// <summary>
-    /// Prompts user whether to enable fallback to a secondary STT provider
-    /// </summary>
-    /// <param name="currentValue">Current fallback enabled state</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>True if fallback should be enabled, false otherwise, null if cancelled</returns>
-    Task<bool?> PromptForSttFallbackAsync(
-        bool? currentValue,
-        CancellationToken cancellationToken);
 
-    /// <summary>
-    /// Prompts user to select a fallback STT provider
-    /// </summary>
-    /// <param name="currentProvider">Current fallback provider</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Selected fallback provider, or null if cancelled</returns>
-    Task<string?> PromptForSttFallbackProviderAsync(
-        string? currentProvider,
-        CancellationToken cancellationToken);
 
     /// <summary>
     /// Prompts user for a generic string input

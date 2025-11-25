@@ -27,8 +27,14 @@ public sealed class OpenAiSttProviderTests
         audioConfig ??= new AudioOptions
         {
             SttProvider = SttProviders.OpenAI,
-            SttModel = "whisper-1",
-            SttApiKey = "test-api-key"
+            Providers = new Dictionary<string, Dictionary<string, string>>
+            {
+                [SttProviders.OpenAI] = new()
+                {
+                    ["Model"] = "whisper-1",
+                    ["ApiKey"] = "test-api-key"
+                }
+            }
         };
 
         return new OpenAiSttProvider(Options.Create(audioConfig), _mockLogger.Object);

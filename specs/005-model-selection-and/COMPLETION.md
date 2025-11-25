@@ -125,12 +125,12 @@ Extended existing configuration system to support:
 
 | Model ID | Display Name | Cost Tier | Default | Description |
 |----------|--------------|-----------|---------|-------------|
-| `claude-3-haiku-20240307` | Claude 3 Haiku | Budget | ✅ | Fast and cost-effective |
-| `claude-3-5-haiku-20241022` | Claude 3.5 Haiku | Budget | | Improved performance |
+| `claude-3-haiku-20240307` | Claude 4 Haiku | Budget | ✅ | Fast and cost-effective |
+| `claude-3-5-haiku-20241022` | Claude 4.5 Haiku | Budget | | Improved performance |
 | `claude-sonnet-4-20250514` | Claude Sonnet 4 | Balanced | | Balanced capability |
 | `claude-sonnet-4-5-20250611` | Claude Sonnet 4.5 | Balanced | | Enhanced version |
-| `claude-opus-4-20250514` | Claude Opus 4 | Premium | | Highest capability |
-| `claude-opus-4-1-20250619` | Claude Opus 4.1 | Premium | | Top-tier model |
+| `claude-opus-4-20250514` | Claude Opus 4.1 | Premium | | Highest capability |
+| `claude-opus-4-1-20250619` | Claude Opus 4.5 | Premium | | Top-tier model |
 
 ## Edge Cases Handled
 

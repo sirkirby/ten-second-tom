@@ -26,11 +26,17 @@ public static class SttProviders
     public const string OpenAIDefaultSTTModel = "whisper-1";
 
     /// <summary>
+    /// Ten Second Tom built-in local engine (powered by Microsoft AI Foundry Local).
+    /// </summary>
+    public const string BuiltInLocal = "built-in-local";
+
+    /// <summary>
     /// All supported provider names (lowercase for normalization).
     /// </summary>
     public static IReadOnlyList<string> All { get; } =
     [
         WhisperCpp,
-        OpenAI
+        OpenAI,
+        BuiltInLocal
     ];
 }

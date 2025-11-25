@@ -11,7 +11,8 @@ public sealed class AudioConfigurationValidator : IAudioConfigurationValidator
     /// <inheritdoc/>
     public bool IsAudioConfigured(AudioOptions configuration)
     {
-        return GetMissingConfiguration(configuration).Count == 0;
+        // Delegate to AudioOptions.IsConfigured() which knows provider-specific requirements
+        return configuration.IsConfigured();
     }
 
     /// <inheritdoc/>
@@ -19,41 +20,24 @@ public sealed class AudioConfigurationValidator : IAudioConfigurationValidator
     {
         var missing = new List<string>();
 
-        // Check if STT provider is set (should always have a default, but validate anyway)
+        // Check if STT provider is set
         if (string.IsNullOrWhiteSpace(configuration.SttProvider))
         {
             missing.Add("STT Provider (Speech-to-Text provider must be configured)");
-        }
-        else
-        {
-            // If using cloud provider, API key is required
-            if (configuration.SttProvider.Equals(SttProviders.OpenAI, StringComparison.OrdinalIgnoreCase))
-            {
-                if (string.IsNullOrWhiteSpace(configuration.SttApiKey))
-                {
-                    missing.Add($"STT API Key (required for {SttProviders.OpenAI} provider)");
-                }
-            }
+            return missing.AsReadOnly();
         }
 
-        // If fallback is enabled, validate fallback configuration
-        if (configuration.SttFallbackEnabled)
+        // Delegate provider-specific validation to AudioOptions.IsConfigured()
+        // and provide user-friendly messages based on provider type
+        if (!configuration.IsConfigured())
         {
-            if (string.IsNullOrWhiteSpace(configuration.SttFallbackProvider))
+            missing.Add(configuration.SttProvider switch
             {
-                missing.Add("STT Fallback Provider (required when fallback is enabled)");
-            }
-            else
-            {
-                // If fallback provider is cloud, API key is required
-                if (configuration.SttFallbackProvider.Equals(SttProviders.OpenAI, StringComparison.OrdinalIgnoreCase))
-                {
-                    if (string.IsNullOrWhiteSpace(configuration.SttFallbackApiKey))
-                    {
-                        missing.Add($"STT Fallback API Key (required for {SttProviders.OpenAI} fallback provider)");
-                    }
-                }
-            }
+                SttProviders.BuiltInLocal => "STT Model (required for built-in local provider)",
+                SttProviders.OpenAI => "STT API Key and/or Model (required for OpenAI provider)",
+                SttProviders.WhisperCpp => "Binary Path and/or Model (required for whisper.cpp provider)",
+                _ => $"Configuration incomplete for {configuration.SttProvider} provider"
+            });
         }
 
         return missing.AsReadOnly();

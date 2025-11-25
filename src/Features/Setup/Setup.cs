@@ -10,6 +10,8 @@ using TenSecondTom.Shared.Abstractions.UI;
 using TenSecondTom.Shared.Results;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Options;
+using TenSecondTom.Shared.Abstractions.LocalAi;
+using TenSecondTom.Features.Audio;
 
 namespace TenSecondTom.Features.Setup;
 
@@ -57,7 +59,8 @@ public static class Setup
         ISetupWizardUI wizardUI,
         IMediator mediator,
         ILogger<Handler> logger,
-        IOptions<StorageOptions> storageOptions)
+        IOptions<StorageOptions> storageOptions,
+        ILocalAiEngine localAiEngine)
         : IRequestHandler<Command, Result<SetupResult>>
     {
         private readonly IOptions<StorageOptions> _storageOptions = storageOptions;
@@ -77,7 +80,7 @@ public static class Setup
 
                 // Step 1: SSH Key Configuration (delegated to Auth feature via MediatR)
                 // Force=false for idempotent setup wizard behavior (skip if already configured)
-                wizardUI.ShowStepHeader(1, 4, "SSH Authentication Configuration");
+                wizardUI.ShowStepHeader(1, 5, "SSH Authentication Configuration");
                 var sshConfigResult = await mediator.Send(new Auth.ConfigureSsh.Command
                 {
                     DetectionTimeout = TimeSpan.FromSeconds(5),
@@ -94,7 +97,7 @@ public static class Setup
 
                 // Step 2: LLM Provider Configuration (delegated to LLM feature via MediatR)
                 // Force=false for idempotent setup wizard behavior (skip if already configured)
-                wizardUI.ShowStepHeader(2, 4, "LLM Provider Configuration");
+                wizardUI.ShowStepHeader(2, 5, "LLM Provider Configuration");
                 var llmConfigResult = await mediator.Send(new Llm.ConfigureLlm.Command { Force = false }, cancellationToken);
 
                 if (!llmConfigResult.IsSuccess)
@@ -108,9 +111,59 @@ public static class Setup
                 // Step 2b: Local LLM Verification (if applicable)
                 await mediator.Send(new Llm.SetupLocalLlm.Command(), cancellationToken);
 
-                // Step 3: Storage Configuration (delegated to Storage feature via MediatR)
+                // Step 3: Audio Configuration (delegated to Audio feature via MediatR)
+                wizardUI.ShowStepHeader(3, 5, "Audio Configuration");
+                var audioConfigResult = await mediator.Send(new Audio.ConfigureAudio.Command(), cancellationToken);
+
+                if (!audioConfigResult.IsSuccess)
+                {
+                    logger.LogWarning("Audio configuration failed: {Error}", audioConfigResult.Error);
+                    wizardUI.ShowError($"Audio configuration failed: {audioConfigResult.Error}");
+                    return Result<SetupResult>.Failure($"Setup cancelled: Audio configuration failed. {audioConfigResult.Error}");
+                }
+
+                // Step 3b: Pre-warm Local Models if selected
+                if (llmConfigResult.Value.Provider == LlmProvider.BuiltInLocal ||
+                    audioConfigResult.Value.SttProvider == SttProviders.BuiltInLocal)
+                {
+                    wizardUI.ShowStatus("Initializing local AI engine and checking models...");
+
+                    if (llmConfigResult.Value.Provider == LlmProvider.BuiltInLocal)
+                    {
+                        var modelId = llmConfigResult.Value.Model ?? "phi-3.5-mini-instruct";
+                        wizardUI.ShowStatus($"Ensuring LLM model '{modelId}' is available...");
+                        var llmModelResult = await localAiEngine.EnsureModelAvailableAsync(modelId, cancellationToken: cancellationToken);
+                        if (!llmModelResult.IsSuccess)
+                        {
+                            wizardUI.ShowWarning($"Failed to download LLM model: {llmModelResult.Error}");
+                            wizardUI.ShowStatus("You can download the model later with 'tom llm --download-model'");
+                        }
+                        else
+                        {
+                            wizardUI.ShowSuccess($"LLM model '{modelId}' is ready");
+                        }
+                    }
+
+                    if (audioConfigResult.Value.SttProvider == SttProviders.BuiltInLocal)
+                    {
+                        var modelId = audioConfigResult.Value.GetSttModel() ?? "openai/whisper";
+                        wizardUI.ShowStatus($"Ensuring STT model '{modelId}' is available...");
+                        var sttModelResult = await localAiEngine.EnsureModelAvailableAsync(modelId, cancellationToken: cancellationToken);
+                        if (!sttModelResult.IsSuccess)
+                        {
+                            wizardUI.ShowWarning($"Failed to download STT model: {sttModelResult.Error}");
+                            wizardUI.ShowStatus("You can download the model later with 'tom stt --download-model'");
+                        }
+                        else
+                        {
+                            wizardUI.ShowSuccess($"STT model '{modelId}' is ready");
+                        }
+                    }
+                }
+
+                // Step 4: Storage Configuration (delegated to Storage feature via MediatR)
                 // Force=false for idempotent setup wizard behavior (skip if already configured)
-                wizardUI.ShowStepHeader(3, 4, "Storage Configuration");
+                wizardUI.ShowStepHeader(4, 5, "Storage Configuration");
                 var storageOptionsSnapshot = _storageOptions.Value;
                 var storageSectionResult = await sectionStore.ReadSectionAsync<StorageSettings>(
                     StorageOptions.SectionName,
@@ -187,7 +240,6 @@ public static class Setup
                         RetentionDays = retentionDays,
                         EnableTelemetry = false
                     },
-                    ["TenSecondTom:Audio"] = new AudioConfigurationDisplay(),
                     ["TenSecondTom:Configuration"] = metadata
                 };
 

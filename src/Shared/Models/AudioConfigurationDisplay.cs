@@ -7,9 +7,9 @@ public sealed record AudioConfigurationDisplay
 {
     /// <summary>
     /// Gets the speech-to-text provider.
-    /// Default: "whisper-cpp" (local, free).
+    /// Default: "built-in-local" (local AI via Microsoft Foundry).
     /// </summary>
-    public string SttProvider { get; init; } = "whisper-cpp";
+    public string SttProvider { get; init; } = "built-in-local";
 
     /// <summary>
     /// Gets the API key for the STT provider (masked for display)
@@ -17,19 +17,9 @@ public sealed record AudioConfigurationDisplay
     public string? SttApiKey { get; init; }
 
     /// <summary>
-    /// Gets whether fallback to a secondary STT provider is enabled
+    /// Gets the STT model name/path
     /// </summary>
-    public bool SttFallbackEnabled { get; init; }
-
-    /// <summary>
-    /// Gets the fallback STT provider (e.g., openai)
-    /// </summary>
-    public string? SttFallbackProvider { get; init; }
-
-    /// <summary>
-    /// Gets the API key for the fallback STT provider (masked for display)
-    /// </summary>
-    public string? SttFallbackApiKey { get; init; }
+    public string? SttModel { get; init; }
 
     /// <summary>
     /// Gets whether to keep audio files after transcription

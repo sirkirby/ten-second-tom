@@ -10,15 +10,20 @@ namespace TenSecondTom.Shared.Options;
 /// This class follows the .NET Options Pattern for strongly-typed configuration.
 /// Use with IOptions&lt;LlmOptions&gt; or IOptionsSnapshot&lt;LlmOptions&gt; in services.
 ///
+/// Provider-specific settings (Model, ApiKey, MaxInputTokens, BaseUrl) are stored under
+/// Providers/{providerName}. This allows switching between providers without losing config.
+///
 /// Configuration example (config.json):
 /// <code>
 /// {
 ///   "TenSecondTom": {
 ///     "Llm": {
 ///       "Provider": "OpenAI",
-///       "ApiKey": "sk-...",
-///       "Model": "gpt-4o",
-///       "MaxInputTokens": 50000
+///       "Providers": {
+///         "OpenAI": { "ApiKey": "sk-...", "Model": "gpt-4o", "MaxInputTokens": "50000" },
+///         "Anthropic": { "ApiKey": "sk-ant-...", "Model": "claude-3-5-sonnet-20241022" },
+///         "LocalOpenAiCompatible": { "BaseUrl": "http://127.0.0.1:8080/v1", "Model": "qwen2.5" }
+///       }
 ///     }
 ///   }
 /// }
@@ -26,9 +31,8 @@ namespace TenSecondTom.Shared.Options;
 ///
 /// Environment variables:
 /// - TenSecondTom__Llm__Provider
-/// - TenSecondTom__Llm__ApiKey
-/// - TenSecondTom__Llm__Model
-/// - TenSecondTom__Llm__MaxInputTokens
+/// - TenSecondTom__Llm__Providers__OpenAI__ApiKey
+/// - TenSecondTom__Llm__Providers__OpenAI__Model
 /// </remarks>
 public sealed class LlmOptions
 {
@@ -48,50 +52,133 @@ public sealed class LlmOptions
     public LlmProvider Provider { get; set; }
 
     /// <summary>
-    /// Gets the API key for the provider.
-    /// </summary>
-    /// <remarks>
-    /// This is a sensitive value and should be stored securely using environment variables
-    /// or other secure configuration providers. Never commit API keys to source control.
-    /// </remarks>
-    public string? ApiKey { get; set; }
-
-    /// <summary>
-    /// Gets the model to use for chat/text generation.
-    /// </summary>
-    /// <remarks>
-    /// Examples:
-    /// - OpenAI: "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"
-    /// - Anthropic: "claude-3-5-sonnet-20241022", "claude-3-opus-20240229"
-    /// </remarks>
-    public string? Model { get; set; }
-
-    /// <summary>
-    /// Gets the maximum number of input tokens to send to the LLM.
-    /// If null, uses provider-specific defaults (50K for OpenAI, 80K for Anthropic).
-    /// This limit helps control costs and ensures inputs fit within context windows.
-    /// </summary>
-    public int? MaxInputTokens { get; set; }
-
-    /// <summary>
     /// Gets the ordered list of providers to attempt for fallback.
     /// Defaults to just the configured Provider if not specified.
     /// </summary>
     public List<string> FallbackOrder { get; set; } = new();
 
     /// <summary>
-    /// Gets provider-specific configuration overrides.
-    /// Key is the provider name (e.g., "LocalOpenAiCompatible").
+    /// Gets provider-specific configuration.
+    /// Key is the provider name (e.g., "OpenAI", "Anthropic", "LocalOpenAiCompatible", "BuiltInLocal").
+    /// Value contains provider-specific settings (Model, ApiKey, MaxInputTokens, BaseUrl).
     /// </summary>
     public Dictionary<string, Dictionary<string, string>> Providers { get; set; } = new();
 
+    #region Provider Config Accessors
+
     /// <summary>
-    /// Determines whether the LLM configuration is complete and valid.
+    /// Gets the API key for a provider from the Providers dictionary.
     /// </summary>
-    /// <returns>True if ApiKey and Model are both configured; otherwise false.</returns>
+    public string? GetApiKey(LlmProvider? provider = null)
+    {
+        var targetProvider = provider ?? Provider;
+        var providerName = targetProvider.ToString();
+
+        if (Providers.TryGetValue(providerName, out var config) &&
+            config.TryGetValue("ApiKey", out var apiKey) &&
+            !string.IsNullOrWhiteSpace(apiKey))
+        {
+            return apiKey;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Gets the model for a provider from the Providers dictionary.
+    /// </summary>
+    public string? GetModel(LlmProvider? provider = null)
+    {
+        var targetProvider = provider ?? Provider;
+        var providerName = targetProvider.ToString();
+
+        if (Providers.TryGetValue(providerName, out var config) &&
+            config.TryGetValue("Model", out var model) &&
+            !string.IsNullOrWhiteSpace(model))
+        {
+            return model;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Gets the max input tokens for a provider from the Providers dictionary.
+    /// </summary>
+    public int? GetMaxInputTokens(LlmProvider? provider = null)
+    {
+        var targetProvider = provider ?? Provider;
+        var providerName = targetProvider.ToString();
+
+        if (Providers.TryGetValue(providerName, out var config) &&
+            config.TryGetValue("MaxInputTokens", out var maxTokensStr) &&
+            int.TryParse(maxTokensStr, out var maxTokens))
+        {
+            return maxTokens;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Gets the base URL for a provider (primarily for LocalOpenAiCompatible).
+    /// </summary>
+    public string? GetBaseUrl(LlmProvider? provider = null)
+    {
+        var targetProvider = provider ?? Provider;
+        var providerName = targetProvider.ToString();
+
+        if (Providers.TryGetValue(providerName, out var config) &&
+            config.TryGetValue("BaseUrl", out var baseUrl) &&
+            !string.IsNullOrWhiteSpace(baseUrl))
+        {
+            return baseUrl;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Sets a provider-specific configuration value.
+    /// </summary>
+    public void SetProviderConfig(LlmProvider provider, string key, string? value)
+    {
+        var providerName = provider.ToString();
+
+        if (!Providers.TryGetValue(providerName, out var config))
+        {
+            config = new Dictionary<string, string>();
+            Providers[providerName] = config;
+        }
+
+        if (string.IsNullOrEmpty(value))
+        {
+            config.Remove(key);
+        }
+        else
+        {
+            config[key] = value;
+        }
+    }
+
+    #endregion
+
+    /// <summary>
+    /// Determines whether the current provider's LLM configuration is complete and valid.
+    /// </summary>
+    /// <returns>True if Model is configured; ApiKey required for cloud providers.</returns>
     public bool IsConfigured()
     {
-        return !string.IsNullOrWhiteSpace(ApiKey)
-            && !string.IsNullOrWhiteSpace(Model);
+        var model = GetModel();
+        var apiKey = GetApiKey();
+
+        // Local providers don't need API keys
+        if (Provider == LlmProvider.LocalOpenAiCompatible || Provider == LlmProvider.BuiltInLocal)
+        {
+            return !string.IsNullOrWhiteSpace(model);
+        }
+
+        // Cloud providers need both API key and model
+        return !string.IsNullOrWhiteSpace(apiKey) && !string.IsNullOrWhiteSpace(model);
     }
 }

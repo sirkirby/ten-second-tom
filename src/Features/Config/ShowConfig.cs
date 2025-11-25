@@ -168,8 +168,8 @@ public static class ShowConfig
                     cancellationToken).ConfigureAwait(false);
 
                 // Read Audio config
-                var audioResult = await sectionStore.ReadSectionAsync<AudioConfigurationDisplay>(
-                    "TenSecondTom:Audio",
+                var audioOptionsResult = await sectionStore.ReadSectionAsync<AudioOptions>(
+                    AudioOptions.SectionPath,
                     cancellationToken).ConfigureAwait(false);
 
                 // Read Configuration metadata
@@ -192,13 +192,13 @@ public static class ShowConfig
                     Llm = new LlmConfiguration
                     {
                         Provider = llmResult.Value?.Provider ?? LlmProvider.OpenAI,
-                        ApiKey = llmResult.Value?.ApiKey ?? string.Empty,
-                        Model = llmResult.Value?.Model ?? string.Empty,
-                        MaxInputTokens = llmResult.Value?.MaxInputTokens ?? 0
+                        ApiKey = llmResult.Value?.GetApiKey() ?? string.Empty,
+                        Model = llmResult.Value?.GetModel() ?? string.Empty,
+                        MaxInputTokens = llmResult.Value?.GetMaxInputTokens() ?? 0
                     },
                     Storage = storageResult.Value ?? new StorageSettings(),
                     Optional = optionalResult.Value ?? new OptionalConfiguration(),
-                    Audio = audioResult.Value ?? new AudioConfigurationDisplay(),
+                    Audio = MapAudioOptions(audioOptionsResult.Value),
                     CreatedAt = metadataResult.Value?.CreatedAt ?? DateTime.UtcNow,
                     LastModifiedAt = metadataResult.Value?.LastModifiedAt,
                     ConfigurationVersion = metadataResult.Value?.Version ?? "1.0"
@@ -214,13 +214,43 @@ public static class ShowConfig
             }
         }
 
+        /// <summary>
+        /// Maps AudioOptions to AudioConfigurationDisplay using accessor methods.
+        /// </summary>
+        private static AudioConfigurationDisplay MapAudioOptions(AudioOptions? audioOptions)
+        {
+            if (audioOptions == null)
+            {
+                return new AudioConfigurationDisplay();
+            }
+
+            return new AudioConfigurationDisplay
+            {
+                SttProvider = audioOptions.SttProvider,
+                SttApiKey = audioOptions.GetSttApiKey(),
+                SttModel = audioOptions.GetSttModel(),
+                KeepFiles = audioOptions.KeepFiles,
+                Recorder = new RecorderConfigurationDisplay
+                {
+                    InputVolume = audioOptions.Recorder.InputVolume,
+                    EnableNoiseReduction = audioOptions.Recorder.EnableNoiseReduction,
+                    EnableFrequencyFilters = audioOptions.Recorder.EnableFrequencyFilters
+                },
+                Preprocessing = new PreprocessingConfigurationDisplay
+                {
+                    RemoveSilence = audioOptions.Preprocessing.RemoveSilence,
+                    SilenceThresholdDb = audioOptions.Preprocessing.SilenceThresholdDb,
+                    MinimumSilenceDurationMs = audioOptions.Preprocessing.MinimumSilenceDurationMs
+                }
+            };
+        }
+
         private Result<ConfigDisplay> HandleValidate()
         {
             // Validate using the Options Pattern values
             bool hasValidSsh = !string.IsNullOrWhiteSpace(authOptions.Value.KeyPath)
                 || authOptions.Value.KeySource != default;
-            bool hasValidLlm = !string.IsNullOrWhiteSpace(llmOptions.Value.ApiKey)
-                && !string.IsNullOrWhiteSpace(llmOptions.Value.Model);
+            bool hasValidLlm = llmOptions.Value.IsConfigured();
             bool hasValidStorage = !string.IsNullOrWhiteSpace(storageOptions.Value.RootDirectory);
 
             if (!hasValidSsh || !hasValidLlm || !hasValidStorage)

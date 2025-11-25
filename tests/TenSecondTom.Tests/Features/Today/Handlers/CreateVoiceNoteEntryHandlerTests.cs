@@ -14,6 +14,7 @@ using TenSecondTom.Features.Today.Models;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 using TenSecondTom.Features.Today;
+using TenSecondTom.Tests.TestHelpers;
 
 namespace TenSecondTom.Tests.Features.Today.Handlers;
 
@@ -44,13 +45,11 @@ public sealed class CreateVoiceNoteEntryHandlerTests
         _mockLlmProvider = new Mock<ILlmProvider>();
 
         // Setup default LLM options
-        _mockLlmOptions.Setup(o => o.Value).Returns(new LlmOptions
-        {
-            Provider = LlmProvider.OpenAI,
-            ApiKey = "test-key",
-            Model = "gpt-4",
-            MaxInputTokens = 100000
-        });
+        _mockLlmOptions.Setup(o => o.Value).Returns(LlmOptionsTestHelper.Create(
+            provider: LlmProvider.OpenAI,
+            apiKey: "test-key",
+            model: "gpt-4",
+            maxInputTokens: 100000));
     }
 
     [Fact]

@@ -100,7 +100,7 @@ Specify where Ten Second Tom should store your daily entries and memories.
 Step 4 of 8: Memory Storage Location
 
 Where should I store your memories?
-Default: ~/.memory/ten-second-tom
+Default: ~/ten-second-tom
 
 Directory path [default]: _
 ```
@@ -143,7 +143,7 @@ Step 7 of 8: Configuration Summary
 │ SSH Key             │ id_ed25519                               │
 │ LLM Provider        │ OpenAI                                   │
 │ API Key             │ ****************************************7890 │
-│ Memory Directory    │ /Users/you/.memory/ten-second-tom        │
+│ Memory Directory    │ /Users/you/ten-second-tom                │
 │ Log Level           │ Information                              │
 │ Retention Days      │ Unlimited (never delete)                 │
 └─────────────────────┴──────────────────────────────────────────┘
@@ -186,7 +186,7 @@ Current Configuration:
 │ SSH Key             │ id_ed25519                               │
 │ LLM Provider        │ OpenAI                                   │
 │ API Key             │ ****************************************7890 │
-│ Memory Directory    │ /Users/you/.memory/ten-second-tom        │
+│ Memory Directory    │ /Users/you/ten-second-tom                │
 │ Log Level           │ Information                              │
 │ Retention Days      │ Unlimited                                │
 └─────────────────────┴──────────────────────────────────────────┘
@@ -431,20 +431,13 @@ Ten Second Tom stores configuration using a structured hierarchy:
     },
     "Audio": {
       "SttProvider": "whisper-cpp",
-      "SttApiKey": null,
-      "SttFallbackEnabled": true,
-      "SttFallbackProvider": "openai",
-      "SttFallbackApiKey": "sk-...",
+      "SttModel": "base.en",
       "KeepFiles": true,
       "Recorder": {
         "FfmpegPath": "ffmpeg",
         "InputVolume": 1.0,
         "EnableNoiseReduction": true,
         "EnableFrequencyFilters": true
-      },
-      "LocalWhisper": {
-        "BinaryPath": "whisper-cli",
-        "ModelPath": "~/.cache/whisper/ggml-base.en.bin"
       },
       "Preprocessing": {
         "RemoveSilence": true,
@@ -483,11 +476,8 @@ TenSecondTom__Llm__Model=claude-sonnet-4-20250514
 TenSecondTom__MemoryDirectory=~/ten-second-tom
 
 # Audio Configuration (STT)
-TenSecondTom__Audio__SttProvider=whisper-cpp
+TenSecondTom__Audio__SttProvider=built-in-local
 TenSecondTom__Audio__SttApiKey=sk-...
-TenSecondTom__Audio__SttFallbackEnabled=true
-TenSecondTom__Audio__SttFallbackProvider=openai
-TenSecondTom__Audio__SttFallbackApiKey=sk-...
 
 # Audio Recording Settings
 TenSecondTom__Audio__Recorder__InputVolume=1.0

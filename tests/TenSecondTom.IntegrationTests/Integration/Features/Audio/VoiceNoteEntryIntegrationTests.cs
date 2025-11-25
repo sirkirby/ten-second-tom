@@ -232,7 +232,7 @@ public sealed class VoiceNoteEntryIntegrationTests
     {
         try
         {
-            var process = new Process
+            using var process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
@@ -260,7 +260,7 @@ public sealed class VoiceNoteEntryIntegrationTests
     {
         try
         {
-            var process = new Process
+            using var process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {

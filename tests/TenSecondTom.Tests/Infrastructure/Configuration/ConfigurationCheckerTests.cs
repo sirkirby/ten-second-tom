@@ -10,6 +10,7 @@ using TenSecondTom.Shared.Abstractions.Templates;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Tests.TestHelpers;
 
 namespace TenSecondTom.Tests.Infrastructure.Configuration;
 
@@ -47,13 +48,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange
         var checker = CreateConfigurationChecker(
-            llmOptions: new LlmOptions
-            {
-                Provider = LlmProvider.OpenAI,
-                ApiKey = "sk-test1234567890",
-                Model = LlmConstants.OpenAIModels.GPTMini,
-                MaxInputTokens = 100000
-            },
+            llmOptions: LlmOptionsTestHelper.Create(
+                provider: LlmProvider.OpenAI,
+                apiKey: "sk-test1234567890",
+                model: LlmConstants.OpenAIModels.GPTMini,
+                maxInputTokens: 100000),
             authOptions: new AuthOptions
             {
                 KeyPath = "~/.ssh/id_ed25519",
@@ -76,13 +75,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange
         var checker = CreateConfigurationChecker(
-            llmOptions: new LlmOptions
-            {
-                Provider = LlmProvider.Anthropic,
-                ApiKey = "sk-ant-test1234567890",
-                Model = LlmConstants.AnthropicModels.ClaudeHaiku,
-                MaxInputTokens = 100000
-            },
+            llmOptions: LlmOptionsTestHelper.Create(
+                provider: LlmProvider.Anthropic,
+                apiKey: "sk-ant-test1234567890",
+                model: LlmConstants.AnthropicModels.ClaudeHaiku,
+                maxInputTokens: 100000),
             authOptions: new AuthOptions
             {
                 KeyPath = "~/.ssh/id_ed25519",
@@ -105,13 +102,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange - Provider enum is case-sensitive, but parsing should handle it
         var checker = CreateConfigurationChecker(
-            llmOptions: new LlmOptions
-            {
-                Provider = LlmProvider.OpenAI,
-                ApiKey = "sk-test1234567890",
-                Model = LlmConstants.OpenAIModels.GPTMini,
-                MaxInputTokens = 100000
-            },
+            llmOptions: LlmOptionsTestHelper.Create(
+                provider: LlmProvider.OpenAI,
+                apiKey: "sk-test1234567890",
+                model: LlmConstants.OpenAIModels.GPTMini,
+                maxInputTokens: 100000),
             authOptions: new AuthOptions
             {
                 KeyPath = "~/.ssh/id_ed25519",
@@ -134,13 +129,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange - API key is now stored directly in LlmOptions
         var checker = CreateConfigurationChecker(
-            llmOptions: new LlmOptions
-            {
-                Provider = LlmProvider.OpenAI,
-                ApiKey = "sk-test1234567890",
-                Model = LlmConstants.OpenAIModels.GPTMini,
-                MaxInputTokens = 100000
-            },
+            llmOptions: LlmOptionsTestHelper.Create(
+                provider: LlmProvider.OpenAI,
+                apiKey: "sk-test1234567890",
+                model: LlmConstants.OpenAIModels.GPTMini,
+                maxInputTokens: 100000),
             authOptions: new AuthOptions
             {
                 KeyPath = "~/.ssh/id_ed25519",
@@ -167,13 +160,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange - Neither KeyPath nor KeySource is set
         var checker = CreateConfigurationChecker(
-            llmOptions: new LlmOptions
-            {
-                Provider = LlmProvider.OpenAI,
-                ApiKey = "sk-test1234567890",
-                Model = LlmConstants.OpenAIModels.GPTMini,
-                MaxInputTokens = 100000
-            },
+            llmOptions: LlmOptionsTestHelper.Create(
+                provider: LlmProvider.OpenAI,
+                apiKey: "sk-test1234567890",
+                model: LlmConstants.OpenAIModels.GPTMini,
+                maxInputTokens: 100000),
             authOptions: null, // SSH configuration missing entirely
             storageOptions: new StorageOptions
             {
@@ -193,13 +184,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange - KeyPath is null but KeySource is set (agent scenario)
         var checker = CreateConfigurationChecker(
-            llmOptions: new LlmOptions
-            {
-                Provider = LlmProvider.OpenAI,
-                ApiKey = "sk-test1234567890",
-                Model = LlmConstants.OpenAIModels.GPTMini,
-                MaxInputTokens = 100000
-            },
+            llmOptions: LlmOptionsTestHelper.Create(
+                provider: LlmProvider.OpenAI,
+                apiKey: "sk-test1234567890",
+                model: LlmConstants.OpenAIModels.GPTMini,
+                maxInputTokens: 100000),
             authOptions: new AuthOptions
             {
                 KeyPath = null,
@@ -239,7 +228,7 @@ public sealed class ConfigurationCheckerTests
 
         // Assert
         result.Should().BeFalse("LLM provider is required");
-        VerifyLogContains(LogLevel.Debug, "Missing: LLM provider");
+        VerifyLogContains(LogLevel.Debug, "Missing: LLM configuration");
     }
 
     [Fact]
@@ -247,13 +236,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange
         var checker = CreateConfigurationChecker(
-            llmOptions: new LlmOptions
-            {
-                Provider = LlmProvider.OpenAI,
-                ApiKey = "sk-test1234567890",
-                Model = LlmConstants.OpenAIModels.GPTMini,
-                MaxInputTokens = 100000
-            },
+            llmOptions: LlmOptionsTestHelper.Create(
+                provider: LlmProvider.OpenAI,
+                apiKey: "sk-test1234567890",
+                model: LlmConstants.OpenAIModels.GPTMini,
+                maxInputTokens: 100000),
             authOptions: new AuthOptions
             {
                 KeyPath = "~/.ssh/id_ed25519",
@@ -274,13 +261,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange - Create LlmOptions without API key using Mock to bypass required property
         var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
-        var llmOptionsValue = new LlmOptions
-        {
-            Provider = LlmProvider.OpenAI,
-            ApiKey = "", // Empty API key
-            Model = LlmConstants.OpenAIModels.GPTMini,
-            MaxInputTokens = 100000
-        };
+        var llmOptionsValue = LlmOptionsTestHelper.Create(
+            provider: LlmProvider.OpenAI,
+            apiKey: "", // Empty API key - won't be stored in Providers
+            model: LlmConstants.OpenAIModels.GPTMini,
+            maxInputTokens: 100000);
         mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
 
         var checker = new ConfigurationChecker(
@@ -294,6 +279,7 @@ public sealed class ConfigurationCheckerTests
             {
                 RootDirectory = "~/.ten-second-tom/memory"
             }),
+            new Mock<Microsoft.Extensions.Configuration.IConfiguration>().Object,
             _mockTemplateInstaller.Object,
             _mockLogger.Object);
 
@@ -301,8 +287,8 @@ public sealed class ConfigurationCheckerTests
         var result = checker.IsConfigured();
 
         // Assert
-        result.Should().BeFalse("API key is required");
-        VerifyLogContains(LogLevel.Debug, "Missing: LLM API key");
+        result.Should().BeFalse("API key is required for cloud providers");
+        VerifyLogContains(LogLevel.Debug, "Missing: LLM configuration");
     }
 
     [Fact]
@@ -310,13 +296,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange - API key is stored in Llm:ApiKey for all providers
         var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
-        var llmOptionsValue = new LlmOptions
-        {
-            Provider = LlmProvider.OpenAI,
-            ApiKey = "", // Missing API key
-            Model = LlmConstants.OpenAIModels.GPTMini,
-            MaxInputTokens = 100000
-        };
+        var llmOptionsValue = LlmOptionsTestHelper.Create(
+            provider: LlmProvider.OpenAI,
+            apiKey: "", // Missing API key
+            model: LlmConstants.OpenAIModels.GPTMini,
+            maxInputTokens: 100000);
         mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
 
         var checker = new ConfigurationChecker(
@@ -330,6 +314,7 @@ public sealed class ConfigurationCheckerTests
             {
                 RootDirectory = "~/.ten-second-tom/memory"
             }),
+            new Mock<Microsoft.Extensions.Configuration.IConfiguration>().Object,
             _mockTemplateInstaller.Object,
             _mockLogger.Object);
 
@@ -345,13 +330,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange - Create options with empty strings using Mock
         var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
-        var llmOptionsValue = new LlmOptions
-        {
-            Provider = LlmProvider.OpenAI,
-            ApiKey = "",
-            Model = "",
-            MaxInputTokens = 100000
-        };
+        var llmOptionsValue = LlmOptionsTestHelper.Create(
+            provider: LlmProvider.OpenAI,
+            apiKey: "",
+            model: "",
+            maxInputTokens: 100000);
         mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
 
         var mockAuthOptions = new Mock<IOptions<AuthOptions>>();
@@ -373,6 +356,7 @@ public sealed class ConfigurationCheckerTests
             mockLlmOptions.Object,
             mockAuthOptions.Object,
             mockStorageOptions.Object,
+            new Mock<Microsoft.Extensions.Configuration.IConfiguration>().Object,
             _mockTemplateInstaller.Object,
             _mockLogger.Object);
 
@@ -388,13 +372,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange - Create options with whitespace strings using Mock
         var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
-        var llmOptionsValue = new LlmOptions
-        {
-            Provider = LlmProvider.OpenAI,
-            ApiKey = "   ",
-            Model = "  ",
-            MaxInputTokens = 100000
-        };
+        var llmOptionsValue = LlmOptionsTestHelper.Create(
+            provider: LlmProvider.OpenAI,
+            apiKey: "   ",
+            model: "  ",
+            maxInputTokens: 100000);
         mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
 
         var mockAuthOptions = new Mock<IOptions<AuthOptions>>();
@@ -416,6 +398,7 @@ public sealed class ConfigurationCheckerTests
             mockLlmOptions.Object,
             mockAuthOptions.Object,
             mockStorageOptions.Object,
+            new Mock<Microsoft.Extensions.Configuration.IConfiguration>().Object,
             _mockTemplateInstaller.Object,
             _mockLogger.Object);
 
@@ -435,13 +418,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange - Any valid LlmProvider enum value will work
         var checker = CreateConfigurationChecker(
-            llmOptions: new LlmOptions
-            {
-                Provider = LlmProvider.OpenAI,
-                ApiKey = "sk-test1234567890",
-                Model = LlmConstants.OpenAIModels.GPTMini,
-                MaxInputTokens = 100000
-            },
+            llmOptions: LlmOptionsTestHelper.Create(
+                provider: LlmProvider.OpenAI,
+                apiKey: "sk-test1234567890",
+                model: LlmConstants.OpenAIModels.GPTMini,
+                maxInputTokens: 100000),
             authOptions: new AuthOptions
             {
                 KeyPath = "~/.ssh/id_ed25519",
@@ -488,23 +469,24 @@ public sealed class ConfigurationCheckerTests
 
         // Assert
         VerifyLogContains(LogLevel.Debug, "Missing: SSH configuration");
-        VerifyLogContains(LogLevel.Debug, "Missing: LLM provider");
+        VerifyLogContains(LogLevel.Debug, "Missing: LLM configuration");
         VerifyLogContains(LogLevel.Debug, "Missing: Root directory");
-        VerifyLogContains(LogLevel.Debug, "Missing: LLM API key");
     }
 
     [Fact]
     public void IsConfigured_WhenConfigured_DoesNotLogMissingSettings()
     {
-        // Arrange
+        // Arrange - Use provider-specific config (new format)
+        var llmOptions = new LlmOptions
+        {
+            Provider = LlmProvider.OpenAI,
+        };
+        llmOptions.SetProviderConfig(LlmProvider.OpenAI, "ApiKey", "sk-test1234567890");
+        llmOptions.SetProviderConfig(LlmProvider.OpenAI, "Model", LlmConstants.OpenAIModels.GPTMini);
+        llmOptions.SetProviderConfig(LlmProvider.OpenAI, "MaxInputTokens", "100000");
+
         var checker = CreateConfigurationChecker(
-            llmOptions: new LlmOptions
-            {
-                Provider = LlmProvider.OpenAI,
-                ApiKey = "sk-test1234567890",
-                Model = LlmConstants.OpenAIModels.GPTMini,
-                MaxInputTokens = 100000
-            },
+            llmOptions: llmOptions,
             authOptions: new AuthOptions
             {
                 KeyPath = "~/.ssh/id_ed25519",
@@ -532,15 +514,15 @@ public sealed class ConfigurationCheckerTests
     [Fact]
     public void IsConfigured_WithPartialConfiguration_LogsSpecificMissingItems()
     {
-        // Arrange - Missing API key and memory directory
+        // Arrange - Missing API key (cloud provider) and memory directory
         var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
         var llmOptionsValue = new LlmOptions
         {
             Provider = LlmProvider.OpenAI,
-            ApiKey = "", // Missing API key
-            Model = LlmConstants.OpenAIModels.GPTMini,
-            MaxInputTokens = 100000
+            // Cloud providers need API key - missing it means not configured
         };
+        // Set Model in provider-specific config but no API key
+        llmOptionsValue.SetProviderConfig(LlmProvider.OpenAI, "Model", LlmConstants.OpenAIModels.GPTMini);
         mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
 
         var checker = new ConfigurationChecker(
@@ -551,6 +533,7 @@ public sealed class ConfigurationCheckerTests
                 KeySource = SshKeySource.FileSystem
             }),
             null, // Missing storage options
+            new Mock<Microsoft.Extensions.Configuration.IConfiguration>().Object,
             _mockTemplateInstaller.Object,
             _mockLogger.Object);
 
@@ -559,7 +542,7 @@ public sealed class ConfigurationCheckerTests
 
         // Assert
         VerifyLogContains(LogLevel.Debug, "Missing: Root directory");
-        VerifyLogContains(LogLevel.Debug, "Missing: LLM API key");
+        VerifyLogContains(LogLevel.Debug, "Missing: LLM configuration");
 
         // Should NOT log for present settings
         _mockLogger.Verify(
@@ -592,13 +575,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Act & Assert
         var act = () => new ConfigurationChecker(
-            Options.Create(new LlmOptions
-            {
-                Provider = LlmProvider.OpenAI,
-                ApiKey = "sk-test1234567890",
-                Model = LlmConstants.OpenAIModels.GPTMini,
-                MaxInputTokens = 100000
-            }),
+            Options.Create(LlmOptionsTestHelper.Create(
+                provider: LlmProvider.OpenAI,
+                apiKey: "sk-test1234567890",
+                model: LlmConstants.OpenAIModels.GPTMini,
+                maxInputTokens: 100000)),
             Options.Create(new AuthOptions
             {
                 KeyPath = "~/.ssh/id_ed25519",
@@ -608,6 +589,7 @@ public sealed class ConfigurationCheckerTests
             {
                 RootDirectory = "~/.ten-second-tom/memory"
             }),
+            new Mock<Microsoft.Extensions.Configuration.IConfiguration>().Object,
             _mockTemplateInstaller.Object,
             null!);
 
@@ -636,13 +618,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange - API key is stored in LlmOptions
         var checker = CreateConfigurationChecker(
-            llmOptions: new LlmOptions
-            {
-                Provider = LlmProvider.OpenAI,
-                ApiKey = "sk-config-key",
-                Model = LlmConstants.OpenAIModels.GPTMini,
-                MaxInputTokens = 100000
-            },
+            llmOptions: LlmOptionsTestHelper.Create(
+                provider: LlmProvider.OpenAI,
+                apiKey: "sk-config-key",
+                model: LlmConstants.OpenAIModels.GPTMini,
+                maxInputTokens: 100000),
             authOptions: new AuthOptions
             {
                 KeyPath = "~/.ssh/id_ed25519",
@@ -666,13 +646,11 @@ public sealed class ConfigurationCheckerTests
         // Arrange - ConfigurationChecker only checks LlmOptions
         // Environment variables must be loaded into IConfiguration before this check
         var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
-        var llmOptionsValue = new LlmOptions
-        {
-            Provider = LlmProvider.OpenAI,
-            ApiKey = "", // No API key in options
-            Model = LlmConstants.OpenAIModels.GPTMini,
-            MaxInputTokens = 100000
-        };
+        var llmOptionsValue = LlmOptionsTestHelper.Create(
+            provider: LlmProvider.OpenAI,
+            apiKey: "", // No API key in options
+            model: LlmConstants.OpenAIModels.GPTMini,
+            maxInputTokens: 100000);
         mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
 
         var checker = new ConfigurationChecker(
@@ -686,6 +664,7 @@ public sealed class ConfigurationCheckerTests
             {
                 RootDirectory = "~/.ten-second-tom/memory"
             }),
+            new Mock<Microsoft.Extensions.Configuration.IConfiguration>().Object,
             _mockTemplateInstaller.Object,
             _mockLogger.Object);
 
@@ -705,13 +684,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange
         var checker = CreateConfigurationChecker(
-            llmOptions: new LlmOptions
-            {
-                Provider = LlmProvider.OpenAI,
-                ApiKey = "sk-test1234567890",
-                Model = LlmConstants.OpenAIModels.GPTMini,
-                MaxInputTokens = 100000
-            },
+            llmOptions: LlmOptionsTestHelper.Create(
+                provider: LlmProvider.OpenAI,
+                apiKey: "sk-test1234567890",
+                model: LlmConstants.OpenAIModels.GPTMini,
+                maxInputTokens: 100000),
             authOptions: new AuthOptions
             {
                 KeyPath = "~/.ssh/id_ed25519",
@@ -734,13 +711,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange
         var checker = CreateConfigurationChecker(
-            llmOptions: new LlmOptions
-            {
-                Provider = LlmProvider.Anthropic,
-                ApiKey = "sk-ant-test1234567890",
-                Model = LlmConstants.AnthropicModels.ClaudeHaiku,
-                MaxInputTokens = 100000
-            },
+            llmOptions: LlmOptionsTestHelper.Create(
+                provider: LlmProvider.Anthropic,
+                apiKey: "sk-ant-test1234567890",
+                model: LlmConstants.AnthropicModels.ClaudeHaiku,
+                maxInputTokens: 100000),
             authOptions: new AuthOptions
             {
                 KeyPath = "~/.ssh/id_ed25519",
@@ -763,13 +738,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange
         var checker = CreateConfigurationChecker(
-            llmOptions: new LlmOptions
-            {
-                Provider = LlmProvider.OpenAI,
-                ApiKey = "sk-test1234567890",
-                Model = LlmConstants.AnthropicModels.ClaudeHaiku, // Anthropic model with OpenAI provider
-                MaxInputTokens = 100000
-            },
+            llmOptions: LlmOptionsTestHelper.Create(
+                provider: LlmProvider.OpenAI,
+                apiKey: "sk-test1234567890",
+                model: LlmConstants.AnthropicModels.ClaudeHaiku, // Anthropic model with OpenAI provider
+                maxInputTokens: 100000),
             authOptions: new AuthOptions
             {
                 KeyPath = "~/.ssh/id_ed25519",
@@ -793,13 +766,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange
         var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
-        var llmOptionsValue = new LlmOptions
-        {
-            Provider = LlmProvider.OpenAI,
-            ApiKey = "sk-test1234567890",
-            Model = "", // No model configured
-            MaxInputTokens = 100000
-        };
+        var llmOptionsValue = LlmOptionsTestHelper.Create(
+            provider: LlmProvider.OpenAI,
+            apiKey: "sk-test1234567890",
+            model: "", // No model configured
+            maxInputTokens: 100000);
         mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
 
         var checker = new ConfigurationChecker(
@@ -813,6 +784,7 @@ public sealed class ConfigurationCheckerTests
             {
                 RootDirectory = "~/.ten-second-tom/memory"
             }),
+            new Mock<Microsoft.Extensions.Configuration.IConfiguration>().Object,
             _mockTemplateInstaller.Object,
             _mockLogger.Object);
 
@@ -851,13 +823,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange
         var checker = CreateConfigurationChecker(
-            llmOptions: new LlmOptions
-            {
-                Provider = LlmProvider.OpenAI,
-                ApiKey = "sk-test1234567890",
-                Model = "gpt-999-nonexistent",
-                MaxInputTokens = 100000
-            },
+            llmOptions: LlmOptionsTestHelper.Create(
+                provider: LlmProvider.OpenAI,
+                apiKey: "sk-test1234567890",
+                model: "gpt-999-nonexistent",
+                maxInputTokens: 100000),
             authOptions: new AuthOptions
             {
                 KeyPath = "~/.ssh/id_ed25519",
@@ -880,13 +850,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange
         var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
-        var llmOptionsValue = new LlmOptions
-        {
-            Provider = LlmProvider.OpenAI,
-            ApiKey = "sk-test1234567890",
-            Model = "",
-            MaxInputTokens = 100000
-        };
+        var llmOptionsValue = LlmOptionsTestHelper.Create(
+            provider: LlmProvider.OpenAI,
+            apiKey: "sk-test1234567890",
+            model: "",
+            maxInputTokens: 100000);
         mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
 
         var checker = new ConfigurationChecker(
@@ -900,6 +868,7 @@ public sealed class ConfigurationCheckerTests
             {
                 RootDirectory = "~/.ten-second-tom/memory"
             }),
+            new Mock<Microsoft.Extensions.Configuration.IConfiguration>().Object,
             _mockTemplateInstaller.Object,
             _mockLogger.Object);
 
@@ -915,13 +884,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange
         var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
-        var llmOptionsValue = new LlmOptions
-        {
-            Provider = LlmProvider.OpenAI,
-            ApiKey = "sk-test1234567890",
-            Model = "   ",
-            MaxInputTokens = 100000
-        };
+        var llmOptionsValue = LlmOptionsTestHelper.Create(
+            provider: LlmProvider.OpenAI,
+            apiKey: "sk-test1234567890",
+            model: "   ",
+            maxInputTokens: 100000);
         mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
 
         var checker = new ConfigurationChecker(
@@ -935,6 +902,7 @@ public sealed class ConfigurationCheckerTests
             {
                 RootDirectory = "~/.ten-second-tom/memory"
             }),
+            new Mock<Microsoft.Extensions.Configuration.IConfiguration>().Object,
             _mockTemplateInstaller.Object,
             _mockLogger.Object);
 
@@ -954,13 +922,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange
         var checker = CreateConfigurationChecker(
-            llmOptions: new LlmOptions
-            {
-                Provider = LlmProvider.OpenAI,
-                ApiKey = "sk-test1234567890",
-                Model = LlmConstants.OpenAIModels.GPTMini,
-                MaxInputTokens = 100000
-            },
+            llmOptions: LlmOptionsTestHelper.Create(
+                provider: LlmProvider.OpenAI,
+                apiKey: "sk-test1234567890",
+                model: LlmConstants.OpenAIModels.GPTMini,
+                maxInputTokens: 100000),
             authOptions: new AuthOptions
             {
                 KeyPath = "~/.ssh/id_ed25519",
@@ -983,13 +949,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange
         var checker = CreateConfigurationChecker(
-            llmOptions: new LlmOptions
-            {
-                Provider = LlmProvider.OpenAI,
-                ApiKey = "sk-test1234567890",
-                Model = LlmConstants.AnthropicModels.ClaudeHaiku, // Anthropic model
-                MaxInputTokens = 100000
-            },
+            llmOptions: LlmOptionsTestHelper.Create(
+                provider: LlmProvider.OpenAI,
+                apiKey: "sk-test1234567890",
+                model: LlmConstants.AnthropicModels.ClaudeHaiku, // Anthropic model
+                maxInputTokens: 100000),
             authOptions: new AuthOptions
             {
                 KeyPath = "~/.ssh/id_ed25519",
@@ -1015,13 +979,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange
         var mockLlmOptions = new Mock<IOptions<LlmOptions>>();
-        var llmOptionsValue = new LlmOptions
-        {
-            Provider = LlmProvider.OpenAI,
-            ApiKey = "sk-test1234567890",
-            Model = "", // No model configured
-            MaxInputTokens = 100000
-        };
+        var llmOptionsValue = LlmOptionsTestHelper.Create(
+            provider: LlmProvider.OpenAI,
+            apiKey: "sk-test1234567890",
+            model: "", // No model configured
+            maxInputTokens: 100000);
         mockLlmOptions.Setup(x => x.Value).Returns(llmOptionsValue);
 
         var checker = new ConfigurationChecker(
@@ -1035,6 +997,7 @@ public sealed class ConfigurationCheckerTests
             {
                 RootDirectory = "~/.ten-second-tom/memory"
             }),
+            new Mock<Microsoft.Extensions.Configuration.IConfiguration>().Object,
             _mockTemplateInstaller.Object,
             _mockLogger.Object);
 
@@ -1073,13 +1036,11 @@ public sealed class ConfigurationCheckerTests
     {
         // Arrange
         var checker = CreateConfigurationChecker(
-            llmOptions: new LlmOptions
-            {
-                Provider = LlmProvider.OpenAI,
-                ApiKey = "sk-test1234567890",
-                Model = "invalid-model",
-                MaxInputTokens = 100000
-            },
+            llmOptions: LlmOptionsTestHelper.Create(
+                provider: LlmProvider.OpenAI,
+                apiKey: "sk-test1234567890",
+                model: "invalid-model",
+                maxInputTokens: 100000),
             authOptions: new AuthOptions
             {
                 KeyPath = "~/.ssh/id_ed25519",
@@ -1129,6 +1090,7 @@ public sealed class ConfigurationCheckerTests
             llmOptionsWrapper,
             authOptionsWrapper,
             storageOptionsWrapper,
+            new Mock<Microsoft.Extensions.Configuration.IConfiguration>().Object,
             _mockTemplateInstaller.Object,
             _mockLogger.Object);
     }

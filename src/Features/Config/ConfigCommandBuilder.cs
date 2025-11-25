@@ -319,19 +319,9 @@ public sealed class ConfigCommandBuilder : ICommandBuilder
             table.AddRow("  STT API Key", sttApiKeyDisplay);
         }
 
-        table.AddRow("  STT Fallback", config.Audio.SttFallbackEnabled ? "Enabled" : "Disabled");
-
-        if (config.Audio.SttFallbackEnabled && !string.IsNullOrWhiteSpace(config.Audio.SttFallbackProvider))
+        if (!string.IsNullOrWhiteSpace(config.Audio.SttModel))
         {
-            table.AddRow("  Fallback Provider", config.Audio.SttFallbackProvider);
-
-            if (!string.IsNullOrWhiteSpace(config.Audio.SttFallbackApiKey))
-            {
-                string fallbackApiKeyDisplay = showSecrets
-                    ? config.Audio.SttFallbackApiKey
-                    : MaskApiKey(config.Audio.SttFallbackApiKey);
-                table.AddRow("  Fallback API Key", fallbackApiKeyDisplay);
-            }
+            table.AddRow("  STT Model", config.Audio.SttModel);
         }
 
         table.AddRow("  Keep Files", config.Audio.KeepFiles ? "Yes" : "No");

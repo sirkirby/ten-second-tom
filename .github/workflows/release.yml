@@ -43,6 +43,11 @@ on:
         required: false
         type: boolean
         default: false
+      skip_winget:
+        description: 'Skip Winget publication (for PR testing)'
+        required: false
+        type: boolean
+        default: false
       dry_run:
         description: 'Dry run - skip release creation (logs only)'
         required: false
@@ -166,10 +171,6 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            platform: osx-x64
-            runtime: osx-x64
-            executable: tom
-          - os: macos-latest
             platform: osx-arm64
             runtime: osx-arm64
             executable: tom
@@ -255,15 +256,20 @@ jobs:
           else
             SIZE=$(stat -f%z ./publish/${{ matrix.executable }})
           fi
-          
+
           SIZE_MB=$((SIZE / 1024 / 1024))
           echo "📦 Executable size: ${SIZE_MB}MB"
-          
-          if [ $SIZE -gt 52428800 ]; then
-            echo "❌ Error: Executable exceeds 50MB limit (${SIZE_MB}MB)"
+
+          # Size limit accounts for:
+          # - Main binary (~28MB)
+          # - Microsoft AI Foundry Local SDK (~194MB)
+          # - Whisper.NET platform runtime (~5-100MB depending on CUDA/CoreML)
+          # Total expected: ~230-330MB
+          if [ $SIZE -gt 367001600 ]; then
+            echo "❌ Error: Executable exceeds 350MB limit (${SIZE_MB}MB)"
             exit 1
           fi
-          
+
           echo "✅ Size check passed: ${SIZE_MB}MB"
       
       - name: Calculate checksum
@@ -295,6 +301,20 @@ jobs:
             exit 1
           fi
       
+      - name: List artifact contents
+        shell: bash
+        run: |
+          echo "📦 Contents of publish directory:"
+          find ./publish -type f -exec ls -lh {} \; | head -50
+          echo ""
+          echo "📊 Total size:"
+          du -sh ./publish/
+          echo ""
+          echo "📊 Size by type:"
+          du -sh ./publish/*.dylib 2>/dev/null || true
+          du -sh ./publish/*.dll 2>/dev/null || true
+          du -sh ./publish/runtimes 2>/dev/null || true
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -304,6 +324,8 @@ jobs:
             ./publish/appsettings*.json
             ./publish/*.dylib
             ./publish/*.dll
+            ./publish/*.metal
+            ./publish/runtimes/**/*
             ./publish/TenSecondTom.Extensions.MacOS.app/**/*
           retention-days: 90
 
@@ -336,19 +358,13 @@ jobs:
           
           echo "📦 Creating distribution packages for version ${VERSION}"
           mkdir -p ./release-packages
-          
-          # Package macOS x64
-          echo "Packaging macOS x64..."
-          cd ./artifacts/ten-second-tom-osx-x64-release
-          tar czf ../../release-packages/ten-second-tom-${VERSION}-osx-x64.tar.gz *
-          cd ../..
-          
+
           # Package macOS ARM64
           echo "Packaging macOS ARM64..."
           cd ./artifacts/ten-second-tom-osx-arm64-release
           tar czf ../../release-packages/ten-second-tom-${VERSION}-osx-arm64.tar.gz *
           cd ../..
-          
+
           # Package Windows x64
           echo "Packaging Windows x64..."
           cd ./artifacts/ten-second-tom-win-x64-release
@@ -376,15 +392,14 @@ jobs:
 
           Choose the appropriate package for your platform:
 
-          - **macOS (Intel)**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-x64.tar.gz\`
           - **macOS (Apple Silicon)**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-arm64.tar.gz\`
           - **Windows**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-win-x64.zip\`
 
           ### 🚀 Installation
 
-          **macOS:**
+          **macOS (Apple Silicon):**
           \`\`\`bash
-          tar xzf ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-x64.tar.gz
+          tar xzf ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-arm64.tar.gz
           chmod +x tom
           ./tom --version
           \`\`\`
@@ -405,15 +420,14 @@ jobs:
 
           Choose the appropriate package for your platform:
 
-          - **macOS (Intel)**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-x64.tar.gz\`
           - **macOS (Apple Silicon)**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-arm64.tar.gz\`
           - **Windows**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-win-x64.zip\`
 
           ### 🚀 Installation
 
-          **macOS:**
+          **macOS (Apple Silicon):**
           \`\`\`bash
-          tar xzf ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-x64.tar.gz
+          tar xzf ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-arm64.tar.gz
           chmod +x tom
           ./tom --version
           \`\`\`
@@ -522,7 +536,13 @@ jobs:
           cp "./artifacts/ten-second-tom-osx-arm64-release/tom" "$BOTTLE_DIR_ARM64/tom"
           cp ./artifacts/ten-second-tom-osx-arm64-release/appsettings*.json "$BOTTLE_DIR_ARM64/" 2>/dev/null || true
           cp ./artifacts/ten-second-tom-osx-arm64-release/*.dylib "$BOTTLE_DIR_ARM64/" 2>/dev/null || true
-          
+          cp ./artifacts/ten-second-tom-osx-arm64-release/*.metal "$BOTTLE_DIR_ARM64/" 2>/dev/null || true
+
+          # Copy Whisper.NET CoreML runtimes
+          if [ -d "./artifacts/ten-second-tom-osx-arm64-release/runtimes" ]; then
+            cp -R "./artifacts/ten-second-tom-osx-arm64-release/runtimes" "$BOTTLE_DIR_ARM64/"
+          fi
+
           # Copy macOS extension to bottle (in prefix, not bin)
           EXTENSION_DIR_ARM64="ten-second-tom/${VERSION}"
           cp -R "./artifacts/ten-second-tom-osx-arm64-release/TenSecondTom.Extensions.MacOS.app" "$EXTENSION_DIR_ARM64/" 2>/dev/null || true
@@ -533,38 +553,11 @@ jobs:
           BOTTLE_SHA_ARM64=$(shasum -a 256 "$BOTTLE_NAME_ARM64" | cut -d ' ' -f 1)
           echo "✅ ARM64 bottle: $BOTTLE_NAME_ARM64"
           echo "   SHA256: $BOTTLE_SHA_ARM64"
-          
-          # Clean up for x64 bottle
-          rm -rf ten-second-tom
-          
-          # Create x64 bottle
-          BOTTLE_TAG_X64="${MACOS_TAG}"
-          BOTTLE_NAME_X64="ten-second-tom-${VERSION}.${BOTTLE_TAG_X64}.bottle.tar.gz"
-          BOTTLE_DIR_X64="ten-second-tom/${VERSION}/bin"
-          
-          mkdir -p "$BOTTLE_DIR_X64"
-          cp "./artifacts/ten-second-tom-osx-x64-release/tom" "$BOTTLE_DIR_X64/tom"
-          cp ./artifacts/ten-second-tom-osx-x64-release/appsettings*.json "$BOTTLE_DIR_X64/" 2>/dev/null || true
-          cp ./artifacts/ten-second-tom-osx-x64-release/*.dylib "$BOTTLE_DIR_X64/" 2>/dev/null || true
-          
-          # Copy macOS extension to bottle (in prefix, not bin)
-          EXTENSION_DIR_X64="ten-second-tom/${VERSION}"
-          cp -R "./artifacts/ten-second-tom-osx-x64-release/TenSecondTom.Extensions.MacOS.app" "$EXTENSION_DIR_X64/" 2>/dev/null || true
-          
-          chmod +x "$BOTTLE_DIR_X64/tom"
-          tar czf "$BOTTLE_NAME_X64" ten-second-tom
-          
-          BOTTLE_SHA_X64=$(shasum -a 256 "$BOTTLE_NAME_X64" | cut -d ' ' -f 1)
-          echo "✅ x64 bottle: $BOTTLE_NAME_X64"
-          echo "   SHA256: $BOTTLE_SHA_X64"
-          
+
           # Output variables for later steps
           echo "bottle-name-arm64=$BOTTLE_NAME_ARM64" >> $GITHUB_OUTPUT
-          echo "bottle-name-x64=$BOTTLE_NAME_X64" >> $GITHUB_OUTPUT
           echo "bottle-tag-arm64=$BOTTLE_TAG_ARM64" >> $GITHUB_OUTPUT
-          echo "bottle-tag-x64=$BOTTLE_TAG_X64" >> $GITHUB_OUTPUT
           echo "bottle-sha-arm64=$BOTTLE_SHA_ARM64" >> $GITHUB_OUTPUT
-          echo "bottle-sha-x64=$BOTTLE_SHA_X64" >> $GITHUB_OUTPUT
       
       - name: Upload bottles to GitHub release
         env:
@@ -572,16 +565,14 @@ jobs:
         run: |
           VERSION="${{ needs.validate-version.outputs.version }}"
           BOTTLE_NAME_ARM64="${{ steps.bottles.outputs.bottle-name-arm64 }}"
-          BOTTLE_NAME_X64="${{ steps.bottles.outputs.bottle-name-x64 }}"
-          
-          echo "📤 Uploading bottles to GitHub release"
-          
-          # Upload both bottles to GitHub release
-          gh release upload "v${VERSION}" "$BOTTLE_NAME_ARM64" "$BOTTLE_NAME_X64" --clobber
-          
-          echo "✅ Bottles uploaded to release assets"
+
+          echo "📤 Uploading bottle to GitHub release"
+
+          # Upload ARM64 bottle to GitHub release
+          gh release upload "v${VERSION}" "$BOTTLE_NAME_ARM64" --clobber
+
+          echo "✅ Bottle uploaded to release assets"
           echo "📦 ARM64: https://github.com/${{ github.repository }}/releases/download/v${VERSION}/${BOTTLE_NAME_ARM64}"
-          echo "📦 x64: https://github.com/${{ github.repository }}/releases/download/v${VERSION}/${BOTTLE_NAME_X64}"
       
       - name: Generate Homebrew formula with bottle blocks
         id: formula
@@ -590,33 +581,17 @@ jobs:
           REPO_OWNER="${{ github.repository_owner }}"
           REPO_NAME="${{ github.event.repository.name }}"
           BOTTLE_TAG_ARM64="${{ steps.bottles.outputs.bottle-tag-arm64 }}"
-          BOTTLE_TAG_X64="${{ steps.bottles.outputs.bottle-tag-x64 }}"
           BOTTLE_SHA_ARM64="${{ steps.bottles.outputs.bottle-sha-arm64 }}"
-          BOTTLE_SHA_X64="${{ steps.bottles.outputs.bottle-sha-x64 }}"
-          
-          echo "📝 Generating Homebrew formula for version $VERSION with bottle support"
-          
+
+          echo "📝 Generating Homebrew formula for version $VERSION with ARM64 bottle"
+
           # Download source tarball to calculate SHA256
           SOURCE_TARBALL_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/archive/refs/tags/v${VERSION}.tar.gz"
           curl -sSL "$SOURCE_TARBALL_URL" -o source.tar.gz
           SOURCE_SHA=$(shasum -a 256 source.tar.gz | cut -d ' ' -f 1)
           echo "Source tarball SHA256: $SOURCE_SHA"
-          
-          # Create formula file with bottle block using echo to avoid heredoc YAML issues
-          # Calculate spacing for bottle digest alignment
-          ARM64_LEN=${#BOTTLE_TAG_ARM64}
-          X64_LEN=${#BOTTLE_TAG_X64}
-          # Add spaces to shorter tag to align the SHA256 values
-          if [ $ARM64_LEN -gt $X64_LEN ]; then
-            SPACES=$((ARM64_LEN - X64_LEN))
-            X64_PADDING=$(printf '%*s' $SPACES '')
-            ARM64_PADDING=""
-          else
-            SPACES=$((X64_LEN - ARM64_LEN))
-            ARM64_PADDING=$(printf '%*s' $SPACES '')
-            X64_PADDING=""
-          fi
-          
+
+          # Create formula file with ARM64 bottle only
           {
             echo "class TenSecondTom < Formula"
             echo "  desc \"CLI tool for daily work summaries using Claude AI with voice entry support\""
@@ -625,11 +600,10 @@ jobs:
             echo "  sha256 \"${SOURCE_SHA}\""
             echo "  license \"MIT\""
             echo ""
-            echo "  # Bottles (pre-built binaries) for fast installation"
+            echo "  # Bottle (pre-built binary) for Apple Silicon"
             echo "  bottle do"
             echo "    root_url \"https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v${VERSION}\""
-            echo "    sha256 cellar: :any_skip_relocation, ${BOTTLE_TAG_ARM64}:${ARM64_PADDING} \"${BOTTLE_SHA_ARM64}\""
-            echo "    sha256 cellar: :any_skip_relocation, ${BOTTLE_TAG_X64}:${X64_PADDING} \"${BOTTLE_SHA_X64}\""
+            echo "    sha256 cellar: :any_skip_relocation, ${BOTTLE_TAG_ARM64}: \"${BOTTLE_SHA_ARM64}\""
             echo "  end"
             echo ""
             echo "  # Dependencies for voice entry feature"
@@ -643,23 +617,8 @@ jobs:
             echo ""
             echo "  def caveats"
             echo "    <<~EOS"
-            echo "      Voice Entry Setup (Optional):"
-            echo ""
-            echo "      For local transcription (privacy-focused, offline):"
-            echo "        1. Install whisper.cpp: brew install whisper-cpp"
-            echo "        2. Download model to default location (base.en, 142 MB):"
-            echo "           mkdir -p ~/.cache/whisper"
-            echo "           curl -L -o ~/.cache/whisper/ggml-base.en.bin \\\\"
-            echo "             https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin"
-            echo "        3. Done! Tom looks for the model at ~/.cache/whisper/ggml-base.en.bin by default"
-            echo ""
-            echo "      OR use OpenAI transcription (requires API key, no local setup):"
-            echo "        tom today --voice --stt=openai"
-            echo ""
             echo "      Legal: Ten Second Tom is designed for single-user personal use on your own"
             echo "      device. Recording conversations may require consent in your jurisdiction."
-            echo ""
-            echo "      Storage: Audio recordings use ~4.7MB per 5-minute recording (16kHz mono WAV)."
             echo "    EOS"
             echo "  end"
             echo ""
@@ -737,138 +696,37 @@ jobs:
           
           echo "✅ Formula with bottle support published to Homebrew tap"
 
-  # Job 5: Document Winget Publication
-  # Generate Winget manifest and create issue for manual publication (Phase 1)
-  # Performance Target: <1 minute
-  # Note: Phase 2 will automate the publication process
-  document-winget:
-    name: Document Winget Publication
+  # Job 5: Publish to Winget
+  # Automatically submit package update to Windows Package Manager
+  # Uses winget-releaser action with Komac under the hood
+  # Performance Target: <2 minutes
+  #
+  # Prerequisites:
+  # 1. WINGET_TOKEN secret configured in 'production' environment
+  #    - Classic PAT with 'public_repo' scope
+  #    - Create at: https://github.com/settings/tokens/new
+  # 2. Fork of microsoft/winget-pkgs under same account/org
+  # 3. First version must be submitted manually to winget-pkgs
+  #
+  # First-time setup:
+  # 1. Fork https://github.com/microsoft/winget-pkgs
+  # 2. Manually submit first version using wingetcreate:
+  #    wingetcreate new https://github.com/sirkirby/ten-second-tom/releases/download/v1.0.0/ten-second-tom-1.0.0-win-x64.zip
+  # 3. After first version is merged, automation handles all future updates
+  publish-winget:
+    name: Publish to Winget
     runs-on: ubuntu-latest
     needs: [validate-version, create-github-release]
-    if: success()  # Run even if other jobs fail
-    
+    if: ${{ github.event.inputs.skip_winget != 'true' && github.event.inputs.dry_run != 'true' }}
+    environment:
+      name: production
+
     steps:
-      - name: Generate Winget manifest template
-        run: |
-          VERSION="${{ needs.validate-version.outputs.version }}"
-          REPO_OWNER="${{ github.repository_owner }}"
-          REPO_NAME="${{ github.event.repository.name }}"
-          
-          cat > winget-manifest.yaml <<EOF
-          # Winget Package Manifest
-          # This manifest should be submitted to microsoft/winget-pkgs repository
-          # Manual submission process (Phase 1) - will be automated in Phase 2
-          
-          PackageIdentifier: ${REPO_OWNER}.TenSecondTom
-          PackageVersion: ${VERSION}
-          PackageName: Ten Second Tom
-          Publisher: ${REPO_OWNER}
-          License: MIT
-          ShortDescription: CLI tool for daily work summaries using Claude AI
-          PackageUrl: https://github.com/${REPO_OWNER}/${REPO_NAME}
-          Installers:
-            - Architecture: x64
-              InstallerType: zip
-              InstallerUrl: https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v${VERSION}/tom.exe
-              # TODO: Add SHA256 checksum from release artifact
-          ManifestType: singleton
-          ManifestVersion: 1.0.0
-          EOF
-          
-          cat winget-manifest.yaml
-      
-      - name: Create GitHub issue for manual publication
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          VERSION="${{ needs.validate-version.outputs.version }}"
-          
-          gh issue create \
-            --repo ${{ github.repository }} \
-            --title "📦 Publish v${VERSION} to Winget" \
-            --body "## Manual Winget Publication Required
-
-          Version **v${VERSION}** has been released and needs to be published to Winget.
-
-          ### Steps:
-          1. Fork microsoft/winget-pkgs repository
-          2. Use the generated manifest template (see workflow artifacts)
-          3. Create a PR to microsoft/winget-pkgs
-          4. Wait for validation and merge
-
-          ### References:
-          - [Winget Package Manifest](https://github.com/microsoft/winget-pkgs)
-          - [Release v${VERSION}](https://github.com/${{ github.repository }}/releases/tag/v${VERSION})
-
-          ### Automation:
-          Phase 2 will automate this process." \
-            --label "release,winget" || echo "⚠️  Issue creation skipped (may already exist)"
-
-  # Job 6: Document Chocolatey Publication
-  # Generate Chocolatey nuspec and create issue for manual publication (Phase 1)
-  # Performance Target: <1 minute
-  # Note: Phase 2 will automate the publication process
-  document-chocolatey:
-    name: Document Chocolatey Publication
-    runs-on: ubuntu-latest
-    needs: [validate-version, create-github-release]
-    if: success()  # Run even if other jobs fail
-    
-    steps:
-      - name: Generate Chocolatey nuspec template
-        run: |
-          VERSION="${{ needs.validate-version.outputs.version }}"
-          REPO_OWNER="${{ github.repository_owner }}"
-          REPO_NAME="${{ github.event.repository.name }}"
-          
-          cat > ten-second-tom.nuspec <<EOF
-          <?xml version="1.0" encoding="utf-8"?>
-          <!-- Chocolatey Package Specification -->
-          <!-- Manual submission process (Phase 1) - will be automated in Phase 2 -->
-          <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
-            <metadata>
-              <id>ten-second-tom</id>
-              <version>${VERSION}</version>
-              <title>Ten Second Tom</title>
-              <authors>${REPO_OWNER}</authors>
-              <projectUrl>https://github.com/${REPO_OWNER}/${REPO_NAME}</projectUrl>
-              <licenseUrl>https://github.com/${REPO_OWNER}/${REPO_NAME}/blob/main/LICENSE</licenseUrl>
-              <requireLicenseAcceptance>false</requireLicenseAcceptance>
-              <description>CLI tool for daily work summaries using Claude AI</description>
-              <summary>Daily work summary CLI powered by Claude AI</summary>
-              <tags>cli productivity ai claude summary</tags>
-            </metadata>
-            <files>
-              <file src="tools\**" target="tools" />
-            </files>
-          </package>
-          EOF
-          
-          cat ten-second-tom.nuspec
-      
-      - name: Create GitHub issue for manual publication
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          VERSION="${{ needs.validate-version.outputs.version }}"
-          
-          gh issue create \
-            --repo ${{ github.repository }} \
-            --title "📦 Publish v${VERSION} to Chocolatey" \
-            --body "## Manual Chocolatey Publication Required
-
-          Version **v${VERSION}** has been released and needs to be published to Chocolatey.
-
-          ### Steps:
-          1. Create Chocolatey account (if not exists)
-          2. Use the generated nuspec template (see workflow artifacts)
-          3. Package and test locally: \`choco pack\`
-          4. Publish: \`choco push ten-second-tom.${VERSION}.nupkg --source https://push.chocolatey.org/\`
-
-          ### References:
-          - [Chocolatey Package Docs](https://docs.chocolatey.org/en-us/create/create-packages)
-          - [Release v${VERSION}](https://github.com/${{ github.repository }}/releases/tag/v${VERSION})
-
-          ### Automation:
-          Phase 2 will automate this process." \
-            --label "release,chocolatey" || echo "⚠️  Issue creation skipped (may already exist)"
+      - name: Publish to Winget
+        uses: vedantmgoyal9/winget-releaser@v2
+        with:
+          identifier: sirkirby.TenSecondTom
+          installers-regex: '\.zip$'  # Match our Windows zip package
+          token: ${{ secrets.WINGET_TOKEN }}
+          # Optional: specify fork user if different from repo owner
+          # fork-user: sirkirby

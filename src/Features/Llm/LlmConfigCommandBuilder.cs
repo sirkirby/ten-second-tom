@@ -233,8 +233,8 @@ public sealed class LlmConfigCommandBuilder : IConfigSubcommandBuilder
                         ? $"{baseUrl}/models"
                         : $"{baseUrl}/v1/models";
 
-                    var response = await client.GetAsync(modelsUrl);
-                    
+                    using var response = await client.GetAsync(modelsUrl);
+
                     if (!response.IsSuccessStatusCode)
                     {
                         if (jsonOutput)
@@ -380,7 +380,8 @@ public sealed class LlmConfigCommandBuilder : IConfigSubcommandBuilder
                 // Try OpenAI format: { "data": [ { "id": "model-name" } ] }
                 if (doc.RootElement.TryGetProperty("data", out var dataArray))
                 {
-                    foreach (var item in dataArray.EnumerateArray())
+                    using var dataEnumerator = dataArray.EnumerateArray();
+                    foreach (var item in dataEnumerator)
                     {
                         if (item.TryGetProperty("id", out var id))
                         {
@@ -391,7 +392,8 @@ public sealed class LlmConfigCommandBuilder : IConfigSubcommandBuilder
                 // Try Ollama format: { "models": [ { "name": "model:tag" } ] }
                 else if (doc.RootElement.TryGetProperty("models", out var modelsArray))
                 {
-                    foreach (var item in modelsArray.EnumerateArray())
+                    using var modelsEnumerator = modelsArray.EnumerateArray();
+                    foreach (var item in modelsEnumerator)
                     {
                         if (item.TryGetProperty("name", out var name))
                         {

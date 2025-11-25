@@ -12,6 +12,7 @@ using TenSecondTom.Infrastructure.Storage;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Results;
 using TenSecondTom.Features.ThisWeek;
+using TenSecondTom.Tests.TestHelpers;
 
 namespace TenSecondTom.Tests.Features.ThisWeek;
 
@@ -45,13 +46,11 @@ public sealed class CreateWeeklyReviewHandlerTests
         _mockTemplateSelectionUI = new Mock<ITemplateSelectionUI>();
 
         // Setup default LLM options
-        var llmOptions = new LlmOptions
-        {
-            Provider = LlmProvider.OpenAI,
-            ApiKey = "test-api-key",
-            Model = "gpt-4o",
-            MaxInputTokens = 100000
-        };
+        var llmOptions = LlmOptionsTestHelper.Create(
+            provider: LlmProvider.OpenAI,
+            apiKey: "test-api-key",
+            model: "gpt-4o",
+            maxInputTokens: 100000);
         _mockLlmOptions.Setup(o => o.Value).Returns(llmOptions);
 
         // Setup default successful behaviors

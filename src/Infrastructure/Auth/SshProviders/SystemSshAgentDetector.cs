@@ -46,7 +46,7 @@ public sealed class SystemSshAgentDetector : ISshKeyDetector
                 {
                     // Note: SSH.NET doesn't have direct agent support, so we'll need to use ssh-add or similar
                     // For now, we'll use a process-based approach as a fallback
-                    var process = new System.Diagnostics.Process
+                    using var process = new System.Diagnostics.Process
                     {
                         StartInfo = new System.Diagnostics.ProcessStartInfo
                         {

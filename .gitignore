@@ -82,6 +82,8 @@ artifacts/
 # Publish / generated
 publish/
 app.publish/
+publish-test/
+publish-verify/
 
 #############################
 # Testing & Coverage

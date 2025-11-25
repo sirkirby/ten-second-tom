@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using TenSecondTom.Features.Audio;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Abstractions.Audio;
+using TenSecondTom.Shared.Abstractions.LocalAi;
 using TenSecondTom.Shared.Abstractions.UI;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
@@ -58,6 +60,8 @@ public sealed class ConfigureAudioHandlerTests
         var handler = new ConfigureAudio.Handler(
             sectionStore.Object,
             wizard.Object,
+            Mock.Of<ILocalAiEngine>(),
+            Mock.Of<IWhisperNetModelManager>(),
             logger);
 
         var command = new ConfigureAudio.Command

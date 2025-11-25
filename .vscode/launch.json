@@ -94,6 +94,23 @@
             "stopAtEntry": false
         },
         {
+            "name": "TenSecondTom: Transcribe (Foundry Local)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/bin/Debug/net9.0/TenSecondTom.dll",
+            "args": ["transcribe"],
+            "cwd": "${workspaceFolder}/src/bin/Debug/net9.0",
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development",
+                "Serilog__MinimumLevel__Default": "Debug",
+                "NO_COLOR": "1"
+            },
+            "stopAtEntry": false
+        },
+        {
             "name": "TenSecondTom: Attach (Running Process)",
             "type": "coreclr",
             "request": "attach",

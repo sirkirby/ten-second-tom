@@ -13,7 +13,7 @@ namespace TenSecondTom.Features.Audio.Services;
 /// <summary>
 /// FFmpeg-based audio recorder implementation.
 /// Captures audio using system microphone via FFmpeg.
-/// Outputs WAV format optimized for whisper.cpp (16kHz, mono, pcm_s16le).
+/// Outputs MP3 format optimized for transcription (16kHz, mono, 64kbps).
 /// </summary>
 public sealed class FfmpegAudioRecorder : IAudioRecorder
 {
@@ -130,9 +130,11 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
 
         var audioFilter = string.Join(",", filters);
 
+        // Output MP3 format: 16kHz mono at 64kbps (excellent for voice, ~0.5 MB/min)
+        // This reduces file size by ~4x compared to WAV while maintaining speech quality
         var arguments = $"-f {inputFormat} -i {inputDevice} " +
                        $"-af \"{audioFilter}\" " +
-                       "-ar 16000 -ac 1 -acodec pcm_s16le " +
+                       "-ar 16000 -ac 1 -c:a libmp3lame -b:a 64k " +
                        $"\"{outputPath}\"";
 
         _logger.LogDebug(
@@ -151,7 +153,7 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
             CreateNoWindow = true
         };
 
-        Process? process;
+        Process? process = null;
         try
         {
             process = Process.Start(startInfo);
@@ -186,12 +188,14 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
         // Wait for user to press Enter to stop recording, with optional timeout
         try
         {
-            // Read stderr in background to prevent buffer overflow
-            var stderrTask = Task.Run(async () =>
+            using (process)
             {
-                var stderr = await process.StandardError.ReadToEndAsync(cancellationToken);
-                _logger.LogDebug("FFmpeg stderr: {StdErr}", stderr);
-            }, cancellationToken);
+                // Read stderr in background to prevent buffer overflow
+                var stderrTask = Task.Run(async () =>
+                {
+                    var stderr = await process.StandardError.ReadToEndAsync(cancellationToken);
+                    _logger.LogDebug("FFmpeg stderr: {StdErr}", stderr);
+                }, cancellationToken);
 
             bool shouldContinue = true;
             var recordingStart = DateTimeOffset.UtcNow;
@@ -416,10 +420,11 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
             await process.WaitForExitAsync(cancellationToken);
             await stderrTask;
 
-            if (process.ExitCode != 0)
-            {
-                _logger.LogError("FFmpeg exited with code {ExitCode}", process.ExitCode);
-                return Result<AudioRecording>.Failure($"FFmpeg recording failed with exit code {process.ExitCode}");
+                if (process.ExitCode != 0)
+                {
+                    _logger.LogError("FFmpeg exited with code {ExitCode}", process.ExitCode);
+                    return Result<AudioRecording>.Failure($"FFmpeg recording failed with exit code {process.ExitCode}");
+                }
             }
         }
         catch (OperationCanceledException)
@@ -452,8 +457,8 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
         var endTime = DateTimeOffset.UtcNow;
         var duration = endTime - startTime;
 
-        // Calculate duration from file size (16kHz, mono, 16-bit = 32,000 bytes/sec)
-        var audioDuration = TimeSpan.FromSeconds(fileInfo.Length / 32000.0);
+        // Calculate duration from file size (MP3 at 64kbps = 8,000 bytes/sec)
+        var audioDuration = TimeSpan.FromSeconds(fileInfo.Length / 8000.0);
 
         var recording = new AudioRecording
         {
@@ -462,8 +467,8 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
             Duration = audioDuration,
             SampleRate = 16000,
             Channels = 1,
-            Format = AudioFormat.Wav,
-            Encoding = "pcm_s16le",
+            Format = AudioFormat.Mp3,
+            Encoding = "mp3",
             RecordedAt = startTime,
             FileSizeBytes = fileInfo.Length
         };
@@ -506,16 +511,18 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
                 // system_profiler returns JSON with nested structure
                 if (!string.IsNullOrWhiteSpace(output))
                 {
-                    var jsonDoc = System.Text.Json.JsonDocument.Parse(output);
+                    using var jsonDoc = System.Text.Json.JsonDocument.Parse(output);
                     if (jsonDoc.RootElement.TryGetProperty("SPAudioDataType", out var audioDataArray))
                     {
                         // Get first element which contains _items array
-                        var firstElement = audioDataArray.EnumerateArray().FirstOrDefault();
+                        using var enumerator = audioDataArray.EnumerateArray();
+                        var firstElement = enumerator.FirstOrDefault();
                         if (firstElement.ValueKind != System.Text.Json.JsonValueKind.Undefined &&
                             firstElement.TryGetProperty("_items", out var items))
                         {
                             // Iterate through devices in _items to find default input
-                            foreach (var device in items.EnumerateArray())
+                            using var devicesEnumerator = items.EnumerateArray();
+                            foreach (var device in devicesEnumerator)
                             {
                                 if (device.TryGetProperty("coreaudio_default_audio_input_device", out var isDefault) &&
                                     isDefault.GetString() == "spaudio_yes" &&

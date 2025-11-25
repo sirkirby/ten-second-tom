@@ -3,6 +3,7 @@ using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using TenSecondTom.Features.Audio;
 using TenSecondTom.Infrastructure.Bootstrapping;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Models;
@@ -75,6 +76,12 @@ public sealed class ApplicationBootstrapper
         if (isConfigured && !configChecker.ValidateModel())
         {
             return await HandleInvalidConfigurationAsync(args, cancellationToken).ConfigureAwait(false);
+        }
+
+        // Check for legacy audio configuration that needs migration
+        if (isConfigured && configChecker.HasLegacyAudioConfiguration())
+        {
+            return await HandleLegacyAudioConfigurationAsync(args, cancellationToken).ConfigureAwait(false);
         }
 
         // Check for first-time setup (no arguments and not configured)
@@ -201,6 +208,74 @@ public sealed class ApplicationBootstrapper
         if (args.Length > 0)
         {
             Console.WriteLine($"Please run your command again: tom {string.Join(" ", args)}");
+        }
+
+        return BootstrapResult.ExitEarly(0);
+    }
+
+    /// <summary>
+    /// Handles legacy audio configuration by prompting user to reconfigure audio settings.
+    /// </summary>
+    private async Task<BootstrapResult> HandleLegacyAudioConfigurationAsync(
+        string[] args,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Legacy audio configuration detected. Audio reconfiguration required.");
+
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine("╔═══════════════════════════════════════════════════════════════════════════╗");
+        Console.WriteLine("║                    Audio Configuration Update Required                    ║");
+        Console.WriteLine("╚═══════════════════════════════════════════════════════════════════════════╝");
+        Console.ResetColor();
+        Console.WriteLine();
+        Console.WriteLine("Your audio configuration contains legacy settings that are no longer used.");
+        Console.WriteLine("The STT fallback system has been replaced with a simpler provider selection.");
+        Console.WriteLine();
+        Console.WriteLine("We'll guide you through a quick audio configuration update.");
+        Console.WriteLine();
+
+        // Wait for user acknowledgment before starting (wizard clears screen)
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.Write("Press any key to continue...");
+        Console.ResetColor();
+
+        if (!Console.IsInputRedirected)
+        {
+            Console.ReadKey(intercept: true);
+        }
+
+        Console.WriteLine();
+        Console.WriteLine();
+
+        // Run audio configuration
+        var mediator = _serviceProvider.GetRequiredService<MediatR.IMediator>();
+        var audioConfigResult = await mediator.Send(
+            new Audio.ConfigureAudio.Command(),
+            cancellationToken).ConfigureAwait(false);
+
+        if (!audioConfigResult.IsSuccess)
+        {
+            _logger.LogError("Audio configuration failed: {Error}", audioConfigResult.Error);
+            await Console.Error.WriteLineAsync($"Audio configuration failed: {audioConfigResult.Error}").ConfigureAwait(false);
+            return BootstrapResult.ExitEarly(1);
+        }
+
+        _logger.LogInformation("Audio configuration updated successfully");
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine("✓ Audio configuration updated!");
+        Console.ResetColor();
+        Console.WriteLine();
+
+        // If they were trying to run a command, suggest running it again
+        if (args.Length > 0)
+        {
+            Console.WriteLine($"Please run your command again: tom {string.Join(" ", args)}");
+        }
+        else
+        {
+            Console.WriteLine("You can now use Ten Second Tom with the new audio settings.");
         }
 
         return BootstrapResult.ExitEarly(0);

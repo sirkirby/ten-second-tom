@@ -96,7 +96,7 @@ TenSecondTom__MemoryDirectory=/Users/chris/Documents/tom-data
 TenSecondTom__MemoryDirectory=~/ten-second-tom
 
 # Relative path (resolved from current working directory)
-TenSecondTom__MemoryDirectory=./.memory
+TenSecondTom__MemoryDirectory=./tom-data
 ```
 
 > **Path Resolution:** Relative paths (e.g., `./data`) are resolved from the **current working directory** where you run the app, not the binary location. For production, use absolute (`/path/to/data`) or home-relative (`~/data`) paths.
@@ -104,13 +104,8 @@ TenSecondTom__MemoryDirectory=./.memory
 **Audio Configuration:**
 ```bash
 # STT Provider Selection
-TenSecondTom__Audio__SttProvider=whisper-cpp  # or openai
-TenSecondTom__Audio__SttApiKey=sk-your-api-key-here
-
-# STT Fallback Configuration
-TenSecondTom__Audio__SttFallbackEnabled=true
-TenSecondTom__Audio__SttFallbackProvider=openai
-TenSecondTom__Audio__SttFallbackApiKey=sk-fallback-api-key-here
+TenSecondTom__Audio__SttProvider=built-in-local  # or openai, whisper-cpp
+TenSecondTom__Audio__SttApiKey=sk-your-api-key-here  # Only needed for openai provider
 
 # Recording Settings
 TenSecondTom__Audio__Recorder__InputVolume=1.0

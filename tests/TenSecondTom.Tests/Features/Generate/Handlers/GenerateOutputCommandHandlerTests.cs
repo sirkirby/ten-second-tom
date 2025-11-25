@@ -11,6 +11,7 @@ using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 using TenSecondTom.Features.Generate;
+using TenSecondTom.Tests.TestHelpers;
 
 namespace TenSecondTom.Tests.Features.Generate.Handlers;
 
@@ -48,13 +49,7 @@ public sealed class GenerateOutputCommandHandlerTests
         _mockLlmProvider.Setup(p => p.ModelName).Returns("test-model");
 
         // Setup LLM options with default values
-        var llmOptions = new LlmOptions
-        {
-            Provider = LlmProvider.OpenAI,
-            ApiKey = "test-api-key",
-            Model = "test-model",
-            MaxInputTokens = 100000
-        };
+        var llmOptions = LlmOptionsTestHelper.Create();
         _mockLlmOptions.Setup(o => o.Value).Returns(llmOptions);
 
         // Setup factory to return the mock provider
@@ -339,7 +334,7 @@ public sealed class GenerateOutputCommandHandlerTests
     {
         // Arrange
         var command = CreateTestCommand();
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         SetupSuccessfulGeneration();
 
         var handler = CreateHandler();

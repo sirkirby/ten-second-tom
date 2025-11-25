@@ -1,3 +1,5 @@
+using TenSecondTom.Shared.Models;
+
 namespace TenSecondTom.Shared.Abstractions.Validation;
 
 /// <summary>
@@ -9,12 +11,12 @@ public interface IApiKeyValidator
     /// <summary>
     /// Validates the format of an API key using regex pattern
     /// </summary>
-    Task<Models.ApiValidationResult> ValidateFormatAsync(string apiKey);
+    Task<ApiValidationResult> ValidateFormatAsync(string apiKey);
 
     /// <summary>
     /// Validates the API key by making a network call with retry logic
     /// </summary>
-    Task<Models.ApiValidationResult> ValidateNetworkAsync(
+    Task<ApiValidationResult> ValidateNetworkAsync(
         string apiKey,
         int maxRetries,
         CancellationToken cancellationToken);
@@ -22,5 +24,5 @@ public interface IApiKeyValidator
     /// <summary>
     /// Gets the LLM provider this validator is for
     /// </summary>
-    Models.LlmProvider Provider { get; }
+    LlmProvider Provider { get; }
 }

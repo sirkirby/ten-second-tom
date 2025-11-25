@@ -10,7 +10,7 @@ namespace TenSecondTom.Tests.Features.Shell;
 /// <summary>
 /// Unit tests for CommandRouter edge cases and error handling.
 /// </summary>
-public sealed class CommandRouterTests
+public sealed class CommandRouterTests : IDisposable
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly Mock<ILogger<CommandRouter>> _mockLogger;
@@ -23,6 +23,8 @@ public sealed class CommandRouterTests
         _serviceProvider = services.BuildServiceProvider();
         _mockLogger = new Mock<ILogger<CommandRouter>>();
     }
+
+    public void Dispose() => (_serviceProvider as IDisposable)?.Dispose();
 
     [Fact]
     public async Task RouteAsync_WithEmptyStringAfterSlash_ReturnsError()

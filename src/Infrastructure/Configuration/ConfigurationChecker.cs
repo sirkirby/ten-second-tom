@@ -1,6 +1,7 @@
 using System.IO.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
@@ -18,6 +19,7 @@ public sealed class ConfigurationChecker
     private readonly LlmOptions? _llmOptions;
     private readonly AuthOptions? _authOptions;
     private readonly StorageOptions? _storageOptions;
+    private readonly IConfiguration _configuration;
     private readonly ITemplateInstaller _templateInstaller;
     private readonly ILogger<ConfigurationChecker> _logger;
 
@@ -27,15 +29,18 @@ public sealed class ConfigurationChecker
     /// <param name="llmOptions">LLM configuration options.</param>
     /// <param name="authOptions">Authentication configuration options.</param>
     /// <param name="storageOptions">Storage configuration options.</param>
+    /// <param name="configuration">Raw configuration to check for legacy keys.</param>
     /// <param name="templateInstaller">Installer used to restore bundled templates.</param>
     /// <param name="logger">Logger for diagnostics.</param>
     public ConfigurationChecker(
         IOptions<LlmOptions>? llmOptions,
         IOptions<AuthOptions>? authOptions,
         IOptions<StorageOptions>? storageOptions,
+        IConfiguration configuration,
         ITemplateInstaller templateInstaller,
         ILogger<ConfigurationChecker> logger)
     {
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _templateInstaller = templateInstaller ?? throw new ArgumentNullException(nameof(templateInstaller));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -84,14 +89,14 @@ public sealed class ConfigurationChecker
 
         bool hasSshConfiguration = hasSshKeyPath || hasSshKeySource;
 
-        bool hasLlmProvider = _llmOptions?.Provider != null;
-        bool hasLlmApiKey = !string.IsNullOrWhiteSpace(_llmOptions?.ApiKey);
+        // Use LlmOptions.IsConfigured() which handles provider-specific config correctly
+        // (local providers don't need API keys, cloud providers do)
+        bool hasLlmConfiguration = _llmOptions?.IsConfigured() ?? false;
         bool hasMemoryDirectory = !string.IsNullOrWhiteSpace(_storageOptions?.RootDirectory);
 
         bool isConfigured = hasSshConfiguration &&
-                           hasLlmProvider &&
-                           hasMemoryDirectory &&
-                           hasLlmApiKey;
+                           hasLlmConfiguration &&
+                           hasMemoryDirectory;
 
         if (!isConfigured)
         {
@@ -99,15 +104,42 @@ public sealed class ConfigurationChecker
 
             if (!hasSshConfiguration)
                 _logger.LogDebug("Missing: SSH configuration (neither TenSecondTom:Ssh:KeyPath nor TenSecondTom:Ssh:KeySource is set)");
-            if (!hasLlmProvider)
-                _logger.LogDebug("Missing: LLM provider (TenSecondTom:Llm:Provider)");
+            if (!hasLlmConfiguration)
+                _logger.LogDebug("Missing: LLM configuration (check provider, model, and API key for cloud providers)");
             if (!hasMemoryDirectory)
                 _logger.LogDebug("Missing: Root directory (TenSecondTom:RootDirectory)");
-            if (!hasLlmApiKey)
-                _logger.LogDebug("Missing: LLM API key (TenSecondTom:Llm:ApiKey)");
         }
 
         return isConfigured;
+    }
+
+    /// <summary>
+    /// Checks if the audio configuration contains legacy fallback fields that need migration.
+    /// These fields were removed and their presence indicates the config needs to be reconfigured.
+    /// </summary>
+    /// <returns>True if legacy audio config is detected and reconfiguration is needed</returns>
+    public bool HasLegacyAudioConfiguration()
+    {
+        // Check for any of the removed SttFallback* fields in the raw configuration
+        var audioSection = _configuration.GetSection("TenSecondTom:Audio");
+
+        // These fields were removed - their presence indicates legacy config
+        bool hasFallbackEnabled = audioSection.GetSection("SttFallbackEnabled").Exists();
+        bool hasFallbackProvider = audioSection.GetSection("SttFallbackProvider").Exists();
+        bool hasFallbackApiKey = audioSection.GetSection("SttFallbackApiKey").Exists();
+        bool hasFallbackBinaryPath = audioSection.GetSection("SttFallbackBinaryPath").Exists();
+        bool hasFallbackModel = audioSection.GetSection("SttFallbackModel").Exists();
+
+        bool hasLegacyConfig = hasFallbackEnabled || hasFallbackProvider || hasFallbackApiKey ||
+                              hasFallbackBinaryPath || hasFallbackModel;
+
+        if (hasLegacyConfig)
+        {
+            _logger.LogWarning(
+                "Legacy audio configuration detected (SttFallback* fields). Audio reconfiguration required.");
+        }
+
+        return hasLegacyConfig;
     }
 
     /// <summary>
@@ -117,7 +149,8 @@ public sealed class ConfigurationChecker
     public bool ValidateModel()
     {
         var provider = _llmOptions?.Provider;
-        var model = _llmOptions?.Model;
+        // Get model from provider-specific config using accessor
+        var model = _llmOptions?.GetModel();
 
         // If no model is configured, validation passes (model is optional in some scenarios)
         if (string.IsNullOrWhiteSpace(model))
@@ -133,10 +166,16 @@ public sealed class ConfigurationChecker
             return true;
         }
 
-        // Skip validation for LocalOpenAiCompatible - models are user-defined
+        // Skip validation for local providers - models are dynamic/user-defined
         if (provider.Value == LlmProvider.LocalOpenAiCompatible)
         {
             _logger.LogDebug("LocalOpenAiCompatible provider uses custom models, validation skipped");
+            return true;
+        }
+
+        if (provider.Value == LlmProvider.BuiltInLocal)
+        {
+            _logger.LogDebug("BuiltInLocal provider uses dynamic models from Foundry catalog, validation skipped");
             return true;
         }
 
@@ -166,7 +205,8 @@ public sealed class ConfigurationChecker
     public string? GetModelValidationError()
     {
         var provider = _llmOptions?.Provider;
-        var model = _llmOptions?.Model;
+        // Get model from provider-specific config using accessor
+        var model = _llmOptions?.GetModel();
 
         // If no model is configured, no error
         if (string.IsNullOrWhiteSpace(model))
@@ -180,10 +220,15 @@ public sealed class ConfigurationChecker
             return null;
         }
 
-        // Skip validation for LocalOpenAiCompatible - models are user-defined
+        // Skip validation for local providers - models are dynamic/user-defined
         if (provider.Value == LlmProvider.LocalOpenAiCompatible)
         {
             return null; // No validation error for custom models
+        }
+
+        if (provider.Value == LlmProvider.BuiltInLocal)
+        {
+            return null; // No validation error for dynamic Foundry models
         }
 
         // Validate model against registry

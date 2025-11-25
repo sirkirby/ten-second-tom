@@ -82,9 +82,10 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
     {
         var choices = new Dictionary<string, LlmProvider>
         {
-            ["OpenAI"] = LlmProvider.OpenAI,
-            ["Anthropic (Claude)"] = LlmProvider.Anthropic,
-            ["Local (OpenAI Compatible)"] = LlmProvider.LocalOpenAiCompatible
+            ["Local (Ollama, llama.cpp, LM Studio)"] = LlmProvider.LocalOpenAiCompatible,
+            ["Local (Built-in) [[experimental]]"] = LlmProvider.BuiltInLocal,
+            ["Cloud - OpenAI"] = LlmProvider.OpenAI,
+            ["Cloud - Anthropic (Claude)"] = LlmProvider.Anthropic
         };
 
         var prompt = new SelectionPrompt<string>()
@@ -111,19 +112,19 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
     {
         // Get models for the selected provider
         var models = ModelRegistry.GetByProvider(provider);
-        
+
         if (!models.Any())
         {
             ShowWarning($"No models found for {provider}");
             return Task.FromResult<SupportedModel?>(null);
         }
 
-    // Create choices with formatted display: "DisplayName [CostTier] - Description"
-    // Using square brackets now that we ensure escaping of markup-sensitive content.
-    // Dictionary maps the formatted choice back to the model instance.
+        // Create choices with formatted display: "DisplayName [CostTier] - Description"
+        // Using square brackets now that we ensure escaping of markup-sensitive content.
+        // Dictionary maps the formatted choice back to the model instance.
         var choiceToModel = new Dictionary<string, SupportedModel>();
         var choices = new List<string>();
-        
+
         foreach (var model in models)
         {
             // Build the choice string and escape the entire thing to prevent Spectre.Console
@@ -149,7 +150,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         }
 
         var selected = _console.Prompt(prompt);
-        
+
         // Find the model using the dictionary mapping
         if (choiceToModel.TryGetValue(selected, out var selectedModel))
         {
@@ -170,7 +171,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         var displayName = provider == LlmProvider.OpenAI
             ? "OpenAI"
             : "Anthropic";
-        
+
         var prompt = new TextPrompt<string>($"Enter your {displayName} API key:")
             .Secret();
 
@@ -187,8 +188,8 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         string? currentDirectory,
         CancellationToken cancellationToken)
     {
-        var defaultDir = currentDirectory ?? 
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), 
+        var defaultDir = currentDirectory ??
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 DirectoryNames.ApplicationRoot);
 
         var prompt = new TextPrompt<string>("Where should I store your memories?")
@@ -208,7 +209,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             .AddChoices(LogLevelChoices);
 
         var selected = _console.Prompt(prompt);
-        
+
         var logLevel = selected switch
         {
             SetupConstants.LogLevelDisplayNames.Debug => Microsoft.Extensions.Logging.LogLevel.Debug,
@@ -230,27 +231,27 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         _console.WriteLine();
 
         var prompt = new TextPrompt<string>("How long should memories be kept? (enter 'unlimited' or number of days)")
-            .DefaultValue(currentDays.HasValue && currentDays.Value > 0 
-                ? currentDays.Value.ToString() 
+            .DefaultValue(currentDays.HasValue && currentDays.Value > 0
+                ? currentDays.Value.ToString()
                 : SetupConstants.RetentionKeywords.Unlimited)
             .AllowEmpty();
 
         var input = _console.Prompt(prompt);
-        
+
         // Parse input: "unlimited", "forever", "0" -> -1, otherwise parse as number
-        if (string.IsNullOrWhiteSpace(input) || 
+        if (string.IsNullOrWhiteSpace(input) ||
             input.Equals(SetupConstants.RetentionKeywords.Unlimited, StringComparison.OrdinalIgnoreCase) ||
             input.Equals(SetupConstants.RetentionKeywords.Forever, StringComparison.OrdinalIgnoreCase) ||
             input == SetupConstants.RetentionKeywords.Zero)
         {
             return Task.FromResult<int?>(-1); // -1 means unlimited
         }
-        
+
         if (int.TryParse(input, out var days) && days > 0)
         {
             return Task.FromResult<int?>(days);
         }
-        
+
         ShowWarning($"Invalid input. Please enter a positive number or '{SetupConstants.RetentionKeywords.Unlimited}'. Using unlimited retention.");
         return Task.FromResult<int?>(-1);
     }
@@ -293,6 +294,33 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
     public void ShowStatus(string message)
     {
         _console.MarkupLine($"[grey]ℹ️  {message.EscapeMarkup()}[/]");
+    }
+
+    public async Task RunWithProgressAsync(
+        string taskDescription,
+        Func<Action<double>, Task> operation,
+        CancellationToken cancellationToken)
+    {
+        await _console.Progress()
+            .AutoClear(false)
+            .HideCompleted(false)
+            .Columns(
+                new TaskDescriptionColumn(),
+                new ProgressBarColumn(),
+                new PercentageColumn(),
+                new SpinnerColumn())
+            .StartAsync(async ctx =>
+            {
+                var progressTask = ctx.AddTask(taskDescription.EscapeMarkup(), maxValue: 100);
+
+                await operation(progress =>
+                {
+                    progressTask.Value = progress;
+                });
+
+                // Ensure we show 100% completion
+                progressTask.Value = 100;
+            });
     }
 
     public void ShowSuccess(string message)
@@ -389,43 +417,33 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         return Task.FromResult<int?>(null);
     }
 
-    public async Task<string?> PromptForSttProviderAsync(
+    public Task<string?> PromptForSttProviderAsync(
         string? currentProvider,
         CancellationToken cancellationToken)
     {
-        // Get provider info from Audio feature via CQRS query
-        var providerInfoResult = await _mediator.Send(new GetSttProviderInfo.Query(), cancellationToken);
-
-        if (!providerInfoResult.IsSuccess || providerInfoResult.Value.Count == 0)
+        // Order: whisper-cpp first (recommended), OpenAI second, Built-in last (experimental)
+        var choices = new Dictionary<string, string>
         {
-            ShowError("Failed to retrieve STT provider information.");
-            return null;
-        }
-
-        var providers = providerInfoResult.Value;
-
-        // Display provider options
-        _console.MarkupLine("[grey]ℹ️  Speech-to-Text provider options:[/]");
-        foreach (var provider in providers)
-        {
-            var location = provider.IsCloud ? "Cloud-based" : "Local";
-            var keyRequirement = provider.RequiresApiKey ? "requires API key" : "free";
-            _console.MarkupLine($"[grey]   • {provider.ProviderId}: {location}, {keyRequirement}[/]");
-        }
-        _console.WriteLine();
-
-        // Build choices dictionary from query results
-        var choices = providers.ToDictionary(
-            p => p.DisplayName,
-            p => p.ProviderId
-        );
+            ["Local (whisper.cpp)"] = SttProviders.WhisperCpp,
+            ["OpenAI (Cloud)"] = SttProviders.OpenAI
+            //["Local (Built-in) [[experimental]]"] = SttProviders.BuiltInLocal
+        };
 
         var prompt = new SelectionPrompt<string>()
             .Title("Select your speech-to-text provider:")
             .AddChoices(choices.Keys);
 
+        if (!string.IsNullOrEmpty(currentProvider))
+        {
+            var currentKey = choices.FirstOrDefault(x => x.Value == currentProvider).Key;
+            if (currentKey != null)
+            {
+                prompt.HighlightStyle(new Style(Color.Green));
+            }
+        }
+
         var selected = _console.Prompt(prompt);
-        return choices[selected];
+        return Task.FromResult<string?>(choices[selected]);
     }
 
     public Task<string?> PromptForSttApiKeyAsync(
@@ -447,55 +465,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         return Task.FromResult<string?>(apiKey);
     }
 
-    public Task<bool?> PromptForSttFallbackAsync(
-        bool? currentValue,
-        CancellationToken cancellationToken)
-    {
-        _console.MarkupLine("[grey]ℹ️  STT Fallback Provider:[/]");
-        _console.MarkupLine("[grey]   When enabled, automatically falls back to a secondary STT provider if the primary provider fails.[/]");
-        _console.MarkupLine("[grey]   Requires configuring a fallback provider and API key. Useful for reliability but may incur costs.[/]");
-        _console.WriteLine();
 
-        var choices = new[] { "Enabled", "Disabled" };
-        var defaultChoice = (currentValue ?? false) ? "Enabled" : "Disabled";
-
-        var prompt = new SelectionPrompt<string>()
-            .Title("Enable STT fallback provider?")
-            .AddChoices(choices);
-
-        var selected = _console.Prompt(prompt);
-        return Task.FromResult<bool?>(selected == "Enabled");
-    }
-
-    public async Task<string?> PromptForSttFallbackProviderAsync(
-        string? currentProvider,
-        CancellationToken cancellationToken)
-    {
-        _console.MarkupLine("[grey]ℹ️  Select fallback STT provider:[/]");
-        _console.WriteLine();
-
-        // Get provider info from Audio feature via CQRS query
-        var providerInfoResult = await _mediator.Send(new GetSttProviderInfo.Query(), cancellationToken);
-
-        if (!providerInfoResult.IsSuccess || providerInfoResult.Value.Count == 0)
-        {
-            ShowError("Failed to retrieve STT provider information.");
-            return null;
-        }
-
-        // Build choices dictionary from query results
-        var choices = providerInfoResult.Value.ToDictionary(
-            p => p.DisplayName,
-            p => p.ProviderId
-        );
-
-        var prompt = new SelectionPrompt<string>()
-            .Title("Fallback STT provider:")
-            .AddChoices(choices.Keys);
-
-        var selected = _console.Prompt(prompt);
-        return choices[selected];
-    }
 
     public Task<string?> PromptForRootDirectoryAsync(
         string? currentDirectory,
@@ -712,7 +682,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
 
         // Step 3: Verify connectivity and fetch available models
         _console.WriteLine();
-        
+
         var verificationResult = await _console.Status()
             .StartAsync("Verifying connection to local LLM server...", async ctx =>
             {
@@ -731,7 +701,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
                         ? $"{baseUrl}/models"
                         : $"{baseUrl}/v1/models";
 
-                    var response = await client.GetAsync(modelsUrl, cancellationToken);
+                    using var response = await client.GetAsync(modelsUrl, cancellationToken);
 
                     if (response.IsSuccessStatusCode)
                     {
@@ -768,7 +738,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
 
             // Step 4: Prompt for model selection using SelectionPrompt
             _console.WriteLine();
-            
+
             // Add an option to enter custom model name
             var modelChoices = new List<string>(verificationResult.models);
             const string customOption = "⌨️  Enter custom model name...";
@@ -792,7 +762,7 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
                     // Move matching model to top so it's selected by default
                     modelChoices.Remove(matchingModel);
                     modelChoices.Insert(0, matchingModel);
-                    
+
                     // Also highlight it
                     selectionPrompt.HighlightStyle(new Style(Color.Green));
                 }
@@ -859,7 +829,8 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             // Try OpenAI format: { "data": [ { "id": "model-name" } ] }
             if (doc.RootElement.TryGetProperty("data", out var dataArray))
             {
-                foreach (var item in dataArray.EnumerateArray())
+                using var dataEnumerator = dataArray.EnumerateArray();
+                foreach (var item in dataEnumerator)
                 {
                     if (item.TryGetProperty("id", out var id))
                     {
@@ -870,7 +841,8 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             // Try Ollama format: { "models": [ { "name": "model:tag" } ] }
             else if (doc.RootElement.TryGetProperty("models", out var modelsArray))
             {
-                foreach (var item in modelsArray.EnumerateArray())
+                using var modelsEnumerator = modelsArray.EnumerateArray();
+                foreach (var item in modelsEnumerator)
                 {
                     if (item.TryGetProperty("name", out var name))
                     {

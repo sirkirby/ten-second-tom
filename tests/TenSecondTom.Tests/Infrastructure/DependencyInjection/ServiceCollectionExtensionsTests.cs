@@ -43,9 +43,9 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
                 ["TenSecondTom:RootDirectory"] = "./.test-memory",
                 ["TenSecondTom:Storage:RootDirectory"] = "./.test-memory",
                 ["TenSecondTom:Llm:Provider"] = "OpenAI",
-                ["TenSecondTom:Llm:ApiKey"] = "test-api-key",
-                ["TenSecondTom:Llm:Model"] = "gpt-4",
-                ["TenSecondTom:Llm:MaxInputTokens"] = "100000",
+                ["TenSecondTom:Llm:Providers:OpenAI:ApiKey"] = "test-api-key",
+                ["TenSecondTom:Llm:Providers:OpenAI:Model"] = "gpt-4",
+                ["TenSecondTom:Llm:Providers:OpenAI:MaxInputTokens"] = "100000",
                 ["TenSecondTom:Auth:KeySource"] = "FileSystem",
                 ["TenSecondTom:Auth:KeyPath"] = "~/.ssh/id_ed25519"
             })
@@ -89,11 +89,15 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     {
         // Arrange & Act
         // Get configuration from the pre-built service provider
-        var tempProvider = _services.BuildServiceProvider();
-        var configuration = tempProvider.GetRequiredService<IConfiguration>();
-        tempProvider.Dispose();
-        
-        AddAllServices(_services, configuration);
+        using (var tempProvider = _services.BuildServiceProvider())
+        {
+            var configuration = tempProvider.GetRequiredService<IConfiguration>();
+            AddAllServices(_services, configuration);
+        }
+
+        _serviceProvider?.Dispose();
+        _serviceProvider?.Dispose();
+
         _serviceProvider = _services.BuildServiceProvider();
 
         // Assert - Infrastructure services (can be resolved without additional dependencies)
@@ -117,8 +121,16 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_RegistersStorageProviderAsSingleton()
     {
         // Arrange & Act
-        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        IConfiguration configuration;
+        using (var tempProvider = _services.BuildServiceProvider())
+        {
+            configuration = tempProvider.GetRequiredService<IConfiguration>();
+        }
+
         AddAllServices(_services, configuration);
+        _serviceProvider?.Dispose();
+        _serviceProvider?.Dispose();
+
         _serviceProvider = _services.BuildServiceProvider();
 
         // Act
@@ -133,8 +145,18 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_RegistersHandlersAsTransient()
     {
         // Arrange & Act
-        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        IConfiguration configuration;
+
+        using (var tempProvider = _services.BuildServiceProvider())
+
+        {
+
+            configuration = tempProvider.GetRequiredService<IConfiguration>();
+
+        }
         AddAllServices(_services, configuration);
+        _serviceProvider?.Dispose();
+
         _serviceProvider = _services.BuildServiceProvider();
 
         // Act
@@ -157,8 +179,8 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
                 ["TenSecondTom:Auth:KeySource"] = "FileSystem",
                 ["TenSecondTom:Auth:KeyPath"] = "~/.ssh/id_ed25519",
                 ["TenSecondTom:Llm:Provider"] = "OpenAI",
-                ["TenSecondTom:Llm:ApiKey"] = "test-key",
-                ["TenSecondTom:Llm:Model"] = "gpt-4"
+                ["TenSecondTom:Llm:Providers:OpenAI:ApiKey"] = "test-key",
+                ["TenSecondTom:Llm:Providers:OpenAI:Model"] = "gpt-4"
             })
             .Build();
 
@@ -187,8 +209,8 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
                 ["TenSecondTom:Auth:KeySource"] = "FileSystem",
                 ["TenSecondTom:Auth:KeyPath"] = "~/.ssh/id_ed25519",
                 ["TenSecondTom:Llm:Provider"] = "OpenAI",
-                ["TenSecondTom:Llm:ApiKey"] = "test-key",
-                ["TenSecondTom:Llm:Model"] = "gpt-4"
+                ["TenSecondTom:Llm:Providers:OpenAI:ApiKey"] = "test-key",
+                ["TenSecondTom:Llm:Providers:OpenAI:Model"] = "gpt-4"
             })
             .Build();
 
@@ -211,8 +233,18 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_CanResolveAllDependencies()
     {
         // Arrange & Act
-        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        IConfiguration configuration;
+
+        using (var tempProvider = _services.BuildServiceProvider())
+
+        {
+
+            configuration = tempProvider.GetRequiredService<IConfiguration>();
+
+        }
         AddAllServices(_services, configuration);
+        _serviceProvider?.Dispose();
+
         _serviceProvider = _services.BuildServiceProvider();
 
         // Act & Assert - Core services should resolve without throwing
@@ -280,8 +312,8 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
                 ["TenSecondTom:Auth:KeySource"] = "FileSystem",
                 ["TenSecondTom:Auth:KeyPath"] = "~/.ssh/id_ed25519",
                 ["TenSecondTom:Llm:Provider"] = "OpenAI",
-                ["TenSecondTom:Llm:ApiKey"] = "test-key",
-                ["TenSecondTom:Llm:Model"] = "gpt-4"
+                ["TenSecondTom:Llm:Providers:OpenAI:ApiKey"] = "test-key",
+                ["TenSecondTom:Llm:Providers:OpenAI:Model"] = "gpt-4"
             })
             .Build();
 
@@ -306,7 +338,15 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_ReturnsSameServiceCollection()
     {
         // Act
-        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        IConfiguration configuration;
+
+        using (var tempProvider = _services.BuildServiceProvider())
+
+        {
+
+            configuration = tempProvider.GetRequiredService<IConfiguration>();
+
+        }
         AddAllServices(_services, configuration);
         var result = _services;
 
@@ -318,15 +358,21 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void Configuration_BindsAuthOptions_WithKeyPath()
     {
         // Arrange
-        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        IConfiguration configuration;
+
+        using (var tempProvider = _services.BuildServiceProvider())
+
+        {
+
+            configuration = tempProvider.GetRequiredService<IConfiguration>();
+
+        }
         var section = configuration.GetSection(AuthOptions.SectionName);
         var options = new AuthOptions();
         var llmSection = configuration.GetSection(LlmOptions.SectionName);
         var llmOptions = new LlmOptions
         {
-            Provider = LlmProvider.OpenAI,
-            ApiKey = string.Empty,
-            Model = string.Empty
+            Provider = LlmProvider.OpenAI
         };
 
         // Act
@@ -336,14 +382,22 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
         // Assert
         options.KeySource.Should().Be(SshKeySource.FileSystem);
         options.KeyPath.Should().Be("~/.ssh/id_ed25519");
-        llmOptions.ApiKey.Should().Be("test-api-key");
+        llmOptions.GetApiKey().Should().Be("test-api-key");
     }
 
     [Fact(Skip = "Configuration binding with enums needs investigation")]
     public void AddTenSecondTomOptions_ConfiguresAuthOptions()
     {
         // Arrange
-        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        IConfiguration configuration;
+
+        using (var tempProvider = _services.BuildServiceProvider())
+
+        {
+
+            configuration = tempProvider.GetRequiredService<IConfiguration>();
+
+        }
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddLogging();
@@ -357,15 +411,25 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
         // Assert
         options.KeySource.Should().Be(SshKeySource.FileSystem);
         options.KeyPath.Should().Be("~/.ssh/id_ed25519");
-        llmOptions.ApiKey.Should().Be("test-api-key");
+        llmOptions.GetApiKey().Should().Be("test-api-key");
     }
 
     [Fact]
     public void AddTenSecondTomServices_RegistersCorrectImplementationTypes()
     {
         // Arrange & Act
-        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        IConfiguration configuration;
+
+        using (var tempProvider = _services.BuildServiceProvider())
+
+        {
+
+            configuration = tempProvider.GetRequiredService<IConfiguration>();
+
+        }
         AddAllServices(_services, configuration);
+        _serviceProvider?.Dispose();
+
         _serviceProvider = _services.BuildServiceProvider();
 
         // Assert - Verify concrete types
@@ -387,8 +451,18 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_HandlersCanResolveTheirDependencies()
     {
         // Arrange & Act
-        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        IConfiguration configuration;
+
+        using (var tempProvider = _services.BuildServiceProvider())
+
+        {
+
+            configuration = tempProvider.GetRequiredService<IConfiguration>();
+
+        }
         AddAllServices(_services, configuration);
+        _serviceProvider?.Dispose();
+
         _serviceProvider = _services.BuildServiceProvider();
 
         // Act & Assert - Handlers should successfully resolve all their constructor dependencies
@@ -408,8 +482,18 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_AuthenticationService_UsesFactoryMethod()
     {
         // Arrange & Act
-        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        IConfiguration configuration;
+
+        using (var tempProvider = _services.BuildServiceProvider())
+
+        {
+
+            configuration = tempProvider.GetRequiredService<IConfiguration>();
+
+        }
         AddAllServices(_services, configuration);
+        _serviceProvider?.Dispose();
+
         _serviceProvider = _services.BuildServiceProvider();
 
         // Act
@@ -424,8 +508,18 @@ public sealed class ServiceCollectionExtensionsTests : IDisposable
     public void AddTenSecondTomServices_AuthenticationService_RegisteredAsSingleton()
     {
         // Arrange & Act
-        var configuration = _services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        IConfiguration configuration;
+
+        using (var tempProvider = _services.BuildServiceProvider())
+
+        {
+
+            configuration = tempProvider.GetRequiredService<IConfiguration>();
+
+        }
         AddAllServices(_services, configuration);
+        _serviceProvider?.Dispose();
+
         _serviceProvider = _services.BuildServiceProvider();
 
         // Act

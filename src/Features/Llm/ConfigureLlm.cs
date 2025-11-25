@@ -2,6 +2,7 @@ using System.Linq;
 using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.Logging;
+using TenSecondTom.Shared.Abstractions.LocalAi;
 using TenSecondTom.Shared.Abstractions.UI;
 using TenSecondTom.Shared.Abstractions.Validation;
 using TenSecondTom.Infrastructure.Configuration;
@@ -71,6 +72,7 @@ public static class ConfigureLlm
         ISetupWizardUI setupWizard,
         IHttpClientFactory httpClientFactory,
         IEnumerable<IApiKeyValidator> apiKeyValidators,
+        ILocalAiEngine localAiEngine,
         ILogger<Handler> logger)
         : IRequestHandler<Command, Result<LlmConfiguration>>
     {
@@ -86,10 +88,7 @@ public static class ConfigureLlm
 
             var currentLlmConfig = loadResult.Value ?? new LlmOptions
             {
-                Provider = LlmProvider.OpenAI, // Default provider for first-time setup
-                ApiKey = null,
-                Model = null,
-                MaxInputTokens = LlmConstants.DefaultMaxInputTokensOpenAI
+                Provider = LlmProvider.OpenAI // Default provider for first-time setup
             };
 
             if (HasCommandLineOverrides(request))
@@ -105,16 +104,17 @@ public static class ConfigureLlm
             // When Force=false (setup wizard), skip if already configured
             if (!request.Force && currentLlmConfig.IsConfigured())
             {
+                var currentModel = currentLlmConfig.GetModel();
                 logger.LogInformation("LLM already configured and not forced, skipping interactive setup");
-                setupWizard.ShowSuccess($"✓ LLM already configured: {GetProviderName(currentLlmConfig.Provider)} - {currentLlmConfig.Model}");
+                setupWizard.ShowSuccess($"✓ LLM already configured: {GetProviderName(currentLlmConfig.Provider)} - {currentModel}");
 
                 // Return existing configuration
                 var existingConfig = new LlmConfiguration
                 {
                     Provider = currentLlmConfig.Provider,
-                    ApiKey = currentLlmConfig.ApiKey,
-                    Model = currentLlmConfig.Model,
-                    MaxInputTokens = currentLlmConfig.MaxInputTokens ?? (currentLlmConfig.Provider == LlmProvider.Anthropic
+                    ApiKey = currentLlmConfig.GetApiKey(),
+                    Model = currentModel,
+                    MaxInputTokens = currentLlmConfig.GetMaxInputTokens() ?? (currentLlmConfig.Provider == LlmProvider.Anthropic
                         ? LlmConstants.DefaultMaxInputTokensAnthropic
                         : LlmConstants.DefaultMaxInputTokensOpenAI)
                 };
@@ -126,7 +126,7 @@ public static class ConfigureLlm
 
             // Pre-calculate if we'll need API key prompt (needed to show accurate step count)
             // We'll need API key if it's missing - provider change check happens after selection
-            bool hasApiKey = !string.IsNullOrWhiteSpace(currentLlmConfig.ApiKey);
+            bool hasApiKey = !string.IsNullOrWhiteSpace(currentLlmConfig.GetApiKey());
 
             // Step 1: Prompt for LLM provider
             // Show max possible steps (3) - will adjust totalSteps after provider selection
@@ -143,7 +143,7 @@ public static class ConfigureLlm
 
             // Step 2 & 3: Provider-specific configuration
             string modelId;
-            string? apiKey = currentLlmConfig.ApiKey;
+            string? apiKey = currentLlmConfig.GetApiKey();
             string? baseUrl = null;
 
 
@@ -152,20 +152,9 @@ public static class ConfigureLlm
                 // Local LLM Configuration with inline verification
                 setupWizard.ShowStepHeader(2, 3, "Local LLM Configuration");
 
-                // Get current config for defaults
-                string? currentBaseUrl = null;
-                string? currentModel = null;
-                
-                if (currentLlmConfig.Providers.TryGetValue("LocalOpenAiCompatible", out var localConfig) &&
-                    localConfig.TryGetValue("BaseUrl", out var configUrl))
-                {
-                    currentBaseUrl = configUrl;
-                }
-
-                if (currentLlmConfig.Provider == LlmProvider.LocalOpenAiCompatible)
-                {
-                    currentModel = currentLlmConfig.Model;
-                }
+                // Get current config for defaults using accessor methods
+                string? currentBaseUrl = currentLlmConfig.GetBaseUrl(LlmProvider.LocalOpenAiCompatible);
+                string? currentModel = currentLlmConfig.GetModel(LlmProvider.LocalOpenAiCompatible);
 
                 // Use new inline verification method
                 var config = await setupWizard.PromptForLocalLlmConfigurationAsync(
@@ -181,23 +170,82 @@ public static class ConfigureLlm
                 }
 
                 (baseUrl, modelId) = config.Value;
+
+                // Local providers don't need API keys - clear any carried over from cloud providers
+                apiKey = null;
+            }
+            else if (selectedProvider.Value == LlmProvider.BuiltInLocal)
+            {
+                // Built-in Local LLM Configuration (Microsoft AI Foundry Local SDK)
+                setupWizard.ShowStepHeader(2, 2, "Model Selection");
+                setupWizard.ShowStatus("Fetching available models from AI Foundry catalog...");
+
+                var availableModels = (await localAiEngine.ListAvailableModelsAsync(cancellationToken)).ToList();
+
+                if (availableModels.Count == 0)
+                {
+                    setupWizard.ShowWarning("No models found in the AI Foundry catalog.");
+                    setupWizard.ShowStatus("The built-in local engine requires models to be available in the catalog.");
+                    setupWizard.ShowStatus("This may indicate a network issue or the SDK is not properly initialized.");
+                    return Result<LlmConfiguration>.Failure("No models available for built-in local provider.");
+                }
+
+                // Get current model for highlighting (from this provider's config)
+                string? currentModel = currentLlmConfig.GetModel(LlmProvider.BuiltInLocal);
+
+                var selectedModel = await setupWizard.PromptForSelectionAsync(
+                    "Select a model:",
+                    availableModels,
+                    m => m, // Model IDs are already display-friendly
+                    cancellationToken);
+
+                if (string.IsNullOrEmpty(selectedModel))
+                {
+                    logger.LogInformation("Built-in local model selection cancelled by user");
+                    return Result<LlmConfiguration>.Failure("Model selection cancelled. No changes were made.");
+                }
+
+                modelId = selectedModel;
+
+                // Ensure the model is downloaded with progress bar
+                Result? downloadResult = null;
+                await setupWizard.RunWithProgressAsync(
+                    $"Downloading model '{modelId}'...",
+                    async progress =>
+                    {
+                        downloadResult = await localAiEngine.EnsureModelAvailableAsync(
+                            modelId,
+                            progress,
+                            cancellationToken);
+                    },
+                    cancellationToken);
+
+                if (downloadResult?.IsSuccess != true)
+                {
+                    setupWizard.ShowError($"Failed to download model: {downloadResult?.Error ?? "Unknown error"}");
+                    return Result<LlmConfiguration>.Failure($"Failed to ensure model is available: {downloadResult?.Error ?? "Unknown error"}");
+                }
+
+                setupWizard.ShowSuccess($"✓ Model '{modelId}' is ready");
+
+                // Local providers don't need API keys - clear any carried over from cloud providers
+                apiKey = null;
             }
             else
             {
                 // OpenAI / Anthropic Configuration
-                
+
                 // Determine total steps based on whether we'll need API key prompt
-                bool providerWillChange = selectedProvider.Value != currentLlmConfig.Provider;
-                bool willNeedApiKey = providerWillChange || !hasApiKey;
+                // Check if selected provider already has an API key configured
+                var selectedProviderApiKeyForSteps = currentLlmConfig.GetApiKey(selectedProvider.Value);
+                bool willNeedApiKey = string.IsNullOrWhiteSpace(selectedProviderApiKeyForSteps);
                 int totalSteps = willNeedApiKey ? 3 : 2;
 
                 // Step 2: Prompt for model selection
                 setupWizard.ShowStepHeader(2, totalSteps, "Model Selection");
 
-                // Pass current model only if staying with same provider
-                var currentModelId = selectedProvider.Value == currentLlmConfig.Provider
-                    ? currentLlmConfig.Model
-                    : null;
+                // Get current model for this provider (uses accessor for provider-specific config)
+                var currentModelId = currentLlmConfig.GetModel(selectedProvider.Value);
 
                 var selectedModel = await setupWizard.PromptForModelAsync(
                     selectedProvider.Value,
@@ -212,26 +260,19 @@ public static class ConfigureLlm
                 
                 modelId = selectedModel.Id;
 
-                // Step 3: Prompt for API key if provider changed OR no API key exists
-                bool providerChanged = selectedProvider.Value != currentLlmConfig.Provider;
-                bool needsApiKey = providerChanged || string.IsNullOrWhiteSpace(apiKey);
+                // Step 3: Prompt for API key if the selected provider doesn't have one configured
+                // Check if the *selected* provider has an API key (not just current active provider)
+                var selectedProviderApiKey = currentLlmConfig.GetApiKey(selectedProvider.Value);
+                bool needsApiKey = string.IsNullOrWhiteSpace(selectedProviderApiKey);
 
                 if (needsApiKey)
                 {
                     setupWizard.ShowStepHeader(3, 3, "API Key Configuration");
-
-                    if (providerChanged)
-                    {
-                        setupWizard.ShowWarning($"Provider changed from {currentLlmConfig.Provider} to {selectedProvider.Value}. A new API key is required.");
-                    }
-                    else
-                    {
-                        setupWizard.ShowStatus($"Please provide your {GetProviderName(selectedProvider.Value)} API key.");
-                    }
+                    setupWizard.ShowStatus($"Please provide your {GetProviderName(selectedProvider.Value)} API key.");
 
                     var newApiKey = await setupWizard.PromptForApiKeyAsync(
                         selectedProvider.Value,
-                        providerChanged ? null : apiKey, // Show current key only if same provider
+                        selectedProviderApiKey, // Show existing key for this provider if any
                         cancellationToken);
 
                     if (string.IsNullOrWhiteSpace(newApiKey))
@@ -253,29 +294,44 @@ public static class ConfigureLlm
 
                     apiKey = newApiKey;
                 }
+                else
+                {
+                    // Use existing API key for this provider
+                    apiKey = selectedProviderApiKey;
+                }
             }
 
-            // Create updated LLM configuration
+            // Create updated LLM configuration - store provider-specific settings under Providers
             var updatedLlmConfig = new LlmOptions
             {
                 Provider = selectedProvider.Value,
-                Model = modelId,
-                ApiKey = apiKey,
-                MaxInputTokens = selectedProvider.Value == LlmProvider.Anthropic
-                    ? LlmConstants.DefaultMaxInputTokensAnthropic
-                    : LlmConstants.DefaultMaxInputTokensOpenAI,
                 Providers = currentLlmConfig.Providers ?? new Dictionary<string, Dictionary<string, string>>()
             };
 
-            // Save Local specific config
+            // Save provider-specific config
+            updatedLlmConfig.SetProviderConfig(selectedProvider.Value, "Model", modelId);
+
+            // Handle API key - save for cloud providers, remove for local providers
+            if (selectedProvider.Value == LlmProvider.LocalOpenAiCompatible ||
+                selectedProvider.Value == LlmProvider.BuiltInLocal)
+            {
+                // Explicitly remove API key from local providers (cleans up any stale config)
+                updatedLlmConfig.SetProviderConfig(selectedProvider.Value, "ApiKey", null);
+            }
+            else if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                updatedLlmConfig.SetProviderConfig(selectedProvider.Value, "ApiKey", apiKey);
+            }
+
+            var maxTokens = selectedProvider.Value == LlmProvider.Anthropic
+                ? LlmConstants.DefaultMaxInputTokensAnthropic
+                : LlmConstants.DefaultMaxInputTokensOpenAI;
+            updatedLlmConfig.SetProviderConfig(selectedProvider.Value, "MaxInputTokens", maxTokens.ToString());
+
+            // Save BaseUrl for LocalOpenAiCompatible
             if (selectedProvider.Value == LlmProvider.LocalOpenAiCompatible && !string.IsNullOrEmpty(baseUrl))
             {
-                if (!updatedLlmConfig.Providers.TryGetValue("LocalOpenAiCompatible", out var providerConfig))
-                {
-                    providerConfig = new Dictionary<string, string>();
-                    updatedLlmConfig.Providers["LocalOpenAiCompatible"] = providerConfig;
-                }
-                providerConfig["BaseUrl"] = baseUrl;
+                updatedLlmConfig.SetProviderConfig(selectedProvider.Value, "BaseUrl", baseUrl);
             }
             
             // Save to Llm section (canonical location)
@@ -304,7 +360,7 @@ public static class ConfigureLlm
                 Provider = selectedProvider.Value,
                 ApiKey = apiKey,
                 Model = modelId,
-                MaxInputTokens = updatedLlmConfig.MaxInputTokens
+                MaxInputTokens = maxTokens
             };
 
             return Result<LlmConfiguration>.Success(resultConfig);
@@ -320,6 +376,7 @@ public static class ConfigureLlm
                 LlmProvider.OpenAI => "OpenAI",
                 LlmProvider.Anthropic => "Anthropic",
                 LlmProvider.LocalOpenAiCompatible => "Local (OpenAI Compatible)",
+                LlmProvider.BuiltInLocal => "Built-in Local (AI Foundry)",
                 _ => provider.ToString()
             };
         }
@@ -336,15 +393,18 @@ public static class ConfigureLlm
             CancellationToken cancellationToken)
         {
             var provider = request.ProviderOverride ?? currentConfig.Provider;
-            var model = (request.ModelOverride ?? currentConfig.Model)?.Trim();
+            // Get model from override, or from target provider's config, or from legacy top-level
+            var model = (request.ModelOverride ?? currentConfig.GetModel(provider))?.Trim();
 
             if (string.IsNullOrWhiteSpace(model))
             {
                 return Result<LlmConfiguration>.Failure("Model is required when configuring LLM settings.");
             }
 
-            // Skip validation for LocalOpenAiCompatible as models are dynamic
-            if (provider != LlmProvider.LocalOpenAiCompatible && !ModelRegistry.IsValid(model, provider))
+            // Skip validation for local providers as models are dynamic
+            if (provider != LlmProvider.LocalOpenAiCompatible &&
+                provider != LlmProvider.BuiltInLocal &&
+                !ModelRegistry.IsValid(model, provider))
             {
                 var providerName = GetProviderName(provider);
                 var validModels = ModelRegistry.GetByProvider(provider);
@@ -360,14 +420,17 @@ public static class ConfigureLlm
                     $"Model '{model}' is not available for {providerName}. {guidance}");
             }
 
-            var apiKey = request.ApiKeyOverride ?? currentConfig.ApiKey;
+            // Get api key from override, or from target provider's config
+            var apiKey = request.ApiKeyOverride ?? currentConfig.GetApiKey(provider);
             var maxTokens = request.MaxInputTokensOverride
-                ?? currentConfig.MaxInputTokens
+                ?? currentConfig.GetMaxInputTokens(provider)
                 ?? GetDefaultMaxTokens(provider);
 
-            if (provider == LlmProvider.OpenAI && string.IsNullOrWhiteSpace(apiKey))
+            // Cloud providers require API key
+            if ((provider == LlmProvider.OpenAI || provider == LlmProvider.Anthropic) &&
+                string.IsNullOrWhiteSpace(apiKey))
             {
-                return Result<LlmConfiguration>.Failure("OpenAI provider requires an API key.");
+                return Result<LlmConfiguration>.Failure($"{GetProviderName(provider)} provider requires an API key.");
             }
 
             if (!string.IsNullOrWhiteSpace(apiKey))
@@ -384,14 +447,28 @@ public static class ConfigureLlm
                 }
             }
 
+            // Create updated config - store provider-specific settings under Providers
             var updatedConfig = new LlmOptions
             {
                 Provider = provider,
-                Model = model,
-                ApiKey = apiKey,
-                MaxInputTokens = maxTokens,
                 Providers = currentConfig.Providers ?? new Dictionary<string, Dictionary<string, string>>()
             };
+
+            // Save provider-specific config
+            updatedConfig.SetProviderConfig(provider, "Model", model);
+
+            // Handle API key - save for cloud providers, remove for local providers
+            if (provider == LlmProvider.LocalOpenAiCompatible || provider == LlmProvider.BuiltInLocal)
+            {
+                // Explicitly remove API key from local providers (cleans up any stale config)
+                updatedConfig.SetProviderConfig(provider, "ApiKey", null);
+            }
+            else if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                updatedConfig.SetProviderConfig(provider, "ApiKey", apiKey);
+            }
+
+            updatedConfig.SetProviderConfig(provider, "MaxInputTokens", maxTokens.ToString());
 
             var saveResult = await sectionStore.WriteSectionAsync(
                 LlmOptions.SectionPath,

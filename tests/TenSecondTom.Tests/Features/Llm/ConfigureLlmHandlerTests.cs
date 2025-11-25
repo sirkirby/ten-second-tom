@@ -6,11 +6,13 @@ using Moq;
 using TenSecondTom.Features.Llm;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Options;
+using TenSecondTom.Shared.Abstractions.LocalAi;
 using TenSecondTom.Shared.Abstractions.UI;
 using TenSecondTom.Shared.Abstractions.Validation;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
+using TenSecondTom.Tests.TestHelpers;
 
 namespace TenSecondTom.Tests.Features.Llm;
 
@@ -22,13 +24,11 @@ public sealed class ConfigureLlmHandlerTests
         var sectionStore = new Mock<IConfigurationSectionStore>();
         sectionStore
             .Setup(s => s.ReadSectionAsync<LlmOptions>(LlmOptions.SectionPath, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<LlmOptions>.Success(new LlmOptions
-            {
-                Provider = LlmProvider.OpenAI,
-                Model = "gpt-4o-mini",
-                ApiKey = "old-key",
-                MaxInputTokens = 1000
-            }));
+            .ReturnsAsync(Result<LlmOptions>.Success(LlmOptionsTestHelper.Create(
+                provider: LlmProvider.OpenAI,
+                model: "gpt-4o-mini",
+                apiKey: "old-key",
+                maxInputTokens: 1000)));
 
         sectionStore
             .Setup(s => s.WriteSectionAsync(
@@ -51,6 +51,7 @@ public sealed class ConfigureLlmHandlerTests
             wizard.Object,
             Mock.Of<IHttpClientFactory>(),
             new[] { validator.Object },
+            Mock.Of<ILocalAiEngine>(),
             Mock.Of<ILogger<ConfigureLlm.Handler>>());
 
         var command = new ConfigureLlm.Command
@@ -71,13 +72,14 @@ public sealed class ConfigureLlmHandlerTests
         result.Value!.ApiKey.Should().Be("anthropic-key");
         result.Value!.MaxInputTokens.Should().Be(200000);
 
+        // Verify provider-specific config is saved (new structure)
         sectionStore.Verify(s => s.WriteSectionAsync(
             LlmOptions.SectionPath,
             It.Is<LlmOptions>(o =>
                 o.Provider == LlmProvider.Anthropic &&
-                o.Model == LlmConstants.AnthropicModels.ClaudeSonnet &&
-                o.ApiKey == "anthropic-key" &&
-                o.MaxInputTokens == 200000),
+                o.GetModel(LlmProvider.Anthropic) == LlmConstants.AnthropicModels.ClaudeSonnet &&
+                o.GetApiKey(LlmProvider.Anthropic) == "anthropic-key" &&
+                o.GetMaxInputTokens(LlmProvider.Anthropic) == 200000),
             It.IsAny<CancellationToken>()),
             Times.Once);
 
@@ -90,13 +92,11 @@ public sealed class ConfigureLlmHandlerTests
         var sectionStore = new Mock<IConfigurationSectionStore>();
         sectionStore
             .Setup(s => s.ReadSectionAsync<LlmOptions>(LlmOptions.SectionPath, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<LlmOptions>.Success(new LlmOptions
-            {
-                Provider = LlmProvider.OpenAI,
-                Model = "gpt-4o-mini",
-                ApiKey = "existing-key",
-                MaxInputTokens = 1000
-            }));
+            .ReturnsAsync(Result<LlmOptions>.Success(LlmOptionsTestHelper.Create(
+                provider: LlmProvider.OpenAI,
+                model: "gpt-4o-mini",
+                apiKey: "existing-key",
+                maxInputTokens: 1000)));
 
         var wizard = new Mock<ISetupWizardUI>();
 
@@ -105,6 +105,7 @@ public sealed class ConfigureLlmHandlerTests
             wizard.Object,
             Mock.Of<IHttpClientFactory>(),
             Array.Empty<IApiKeyValidator>(),
+            Mock.Of<ILocalAiEngine>(),
             Mock.Of<ILogger<ConfigureLlm.Handler>>());
 
         var command = new ConfigureLlm.Command

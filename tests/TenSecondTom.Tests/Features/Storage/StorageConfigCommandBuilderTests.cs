@@ -11,10 +11,11 @@ using TenSecondTom.Infrastructure.Configuration;
 
 namespace TenSecondTom.Tests.Features.Storage;
 
-public sealed class StorageConfigCommandBuilderTests
+public sealed class StorageConfigCommandBuilderTests : IDisposable
 {
-    [Fact]
-    public async Task Invoke_ListProviders_WritesProvidersAndReturnsZero()
+    private readonly ServiceProvider _serviceProvider;
+
+    public StorageConfigCommandBuilderTests()
     {
         var mediator = new Mock<IMediator>(MockBehavior.Strict);
         var sectionStore = new Mock<IConfigurationSectionStore>(MockBehavior.Strict);
@@ -27,39 +28,42 @@ public sealed class StorageConfigCommandBuilderTests
                 new StorageProviderMetadata("obsidian", "Obsidian Vault", "Stores data in an Obsidian vault")
             });
 
-        var command = BuildCommand(mediator.Object, sectionStore.Object, storageOptions, providerFactory.Object);
+        var services = new ServiceCollection();
+        services.AddSingleton(mediator.Object);
+        services.AddSingleton(sectionStore.Object);
+        services.AddSingleton(storageOptions);
+        services.AddSingleton(providerFactory.Object);
 
-        var exitCode = await InvokeAsync(command, "--list-providers");
-
-        exitCode.Should().Be(0);
-        providerFactory.Verify(f => f.GetAvailableProviders(), Times.Once);
-        mediator.VerifyNoOtherCalls();
-        sectionStore.VerifyNoOtherCalls();
+        _serviceProvider = services.BuildServiceProvider();
     }
 
-    private static Command BuildCommand(
-        IMediator mediator,
-        IConfigurationSectionStore sectionStore,
-        IOptions<StorageOptions> storageOptions,
-        IStorageProviderFactory storageProviderFactory)
+    [Fact]
+    public async Task Invoke_ListProviders_WritesProvidersAndReturnsZero()
     {
-        var services = new ServiceCollection();
-        services.AddSingleton(mediator);
-        services.AddSingleton(sectionStore);
-        services.AddSingleton(storageOptions);
-        services.AddSingleton(storageProviderFactory);
-
-        var serviceProvider = services.BuildServiceProvider();
+        // Arrange
         var builder = new TenSecondTom.Features.Storage.StorageConfigCommandBuilder();
         var jsonOption = new Option<bool>("--json");
+        var command = builder.BuildConfigSubcommand(_serviceProvider, jsonOption)!;
 
-        return builder.BuildConfigSubcommand(serviceProvider, jsonOption)!;
+        // Act
+        var exitCode = await InvokeAsync(command, "--list-providers");
+
+        // Assert
+        exitCode.Should().Be(0);
+        var providerFactory = _serviceProvider.GetRequiredService<IStorageProviderFactory>();
+        var mock = Mock.Get(providerFactory);
+        mock.Verify(f => f.GetAvailableProviders(), Times.Once);
     }
 
     private static Task<int> InvokeAsync(Command command, string args)
     {
         var parseResult = command.Parse(args);
         return parseResult.InvokeAsync();
+    }
+
+    public void Dispose()
+    {
+        _serviceProvider?.Dispose();
     }
 }
 

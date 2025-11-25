@@ -21,7 +21,7 @@ namespace TenSecondTom.Infrastructure.Configuration;
 /// Atomic writes: Updates use temp file + File.Move to prevent corruption.
 /// Section preservation: Writing one section preserves all other sections.
 /// </remarks>
-public interface IConfigurationSectionStore
+public interface IConfigurationSectionStore : IDisposable
 {
     /// <summary>
     /// Reads a configuration section and deserializes it to the specified type.

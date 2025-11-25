@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Options;
-using TenSecondTom.Shared.Models;
 
 namespace TenSecondTom.Shared.Options.Validation;
 
@@ -31,23 +30,20 @@ public sealed class LlmOptionsValidator : IValidateOptions<LlmOptions>
             return ValidateOptionsResult.Success;
         }
 
-        // If Provider is set, validate related fields are consistent
-        if (string.IsNullOrWhiteSpace(options.ApiKey))
+        // Delegate to LlmOptions.IsConfigured() which knows provider-specific requirements
+        // (e.g., local providers don't need API keys, cloud providers do)
+        if (!options.IsConfigured())
         {
             return ValidateOptionsResult.Fail(
-                "LLM API key is required when Provider is configured. Set the 'TenSecondTom:Llm:ApiKey' configuration value or the 'TenSecondTom__Llm__ApiKey' environment variable.");
+                $"LLM configuration incomplete for {options.Provider}. Run 'tom llm' to configure.");
         }
 
-        if (string.IsNullOrWhiteSpace(options.Model))
+        // Validate MaxInputTokens if set (use accessor for provider-specific config)
+        var maxTokens = options.GetMaxInputTokens();
+        if (maxTokens.HasValue && maxTokens <= 0)
         {
             return ValidateOptionsResult.Fail(
-                "LLM model is required when Provider is configured. Set the 'TenSecondTom:Llm:Model' configuration value or the 'TenSecondTom__Llm__Model' environment variable.");
-        }
-
-        if (options.MaxInputTokens.HasValue && options.MaxInputTokens <= 0)
-        {
-            return ValidateOptionsResult.Fail(
-                $"MaxInputTokens must be a positive number. Current value: {options.MaxInputTokens}. Set a valid value in the 'TenSecondTom:Llm:MaxInputTokens' configuration.");
+                $"MaxInputTokens must be a positive number. Current value: {maxTokens}.");
         }
 
         return ValidateOptionsResult.Success;

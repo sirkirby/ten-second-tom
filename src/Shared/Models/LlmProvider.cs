@@ -18,5 +18,10 @@ public enum LlmProvider
     /// <summary>
     /// Local OpenAI-compatible provider (e.g., llama.cpp, Ollama, LM Studio).
     /// </summary>
-    LocalOpenAiCompatible
+    LocalOpenAiCompatible,
+
+    /// <summary>
+    /// Ten Second Tom built-in local engine (powered by Microsoft AI Foundry Local).
+    /// </summary>
+    BuiltInLocal
 }

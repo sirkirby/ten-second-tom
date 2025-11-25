@@ -48,6 +48,7 @@ public sealed record CommandMetadata
         new() { Name = "/search", HelpText = "Search memory entries by text query", RequiresAuthentication = true },
         new() { Name = "/record", HelpText = "Record audio with transcription and save to library", RequiresAuthentication = true },
         new() { Name = "/transcribe", HelpText = "Transcribe existing note/recording audio into the library", RequiresAuthentication = true },
+        new() { Name = "/llm", HelpText = "List and download models for configured LLM provider", RequiresAuthentication = true },
         new() { Name = "/generate", HelpText = "Generate output from a recording using a prompt template", RequiresAuthentication = true },
         new() { Name = "/setup", HelpText = "Run guided setup wizard to configure Ten Second Tom", RequiresAuthentication = false },
         new() { Name = "/config", HelpText = "View and manage configuration settings", RequiresAuthentication = false },

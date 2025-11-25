@@ -3,6 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
+    <RuntimeIdentifiers>win-x64;osx-arm64;linux-x64</RuntimeIdentifiers>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UserSecretsId>ten-second-tom-secrets</UserSecretsId>
@@ -32,6 +33,11 @@
     <TrimmerRootAssembly Include="MediatR" />
     <TrimmerRootAssembly Include="FluentValidation" />
     <TrimmerRootAssembly Include="TenSecondTom" />
+    <!-- Microsoft AI Foundry Local SDK and dependencies (uses reflection for model loading) -->
+    <TrimmerRootAssembly Include="Microsoft.AI.Foundry.Local" />
+    <TrimmerRootAssembly Include="Betalgo.Ranul.OpenAI" />
+    <!-- Whisper.NET for local speech-to-text (native interop) -->
+    <TrimmerRootAssembly Include="Whisper.net" />
   </ItemGroup>
 
   <ItemGroup>
@@ -63,6 +69,30 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.9" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.9" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.9" />
+    <PackageReference Include="Microsoft.AI.Foundry.Local" Version="0.8.2.1" />
+  </ItemGroup>
+
+  <!-- Whisper.NET: Platform-specific runtimes for optimized binary size -->
+  <!-- Release builds use platform-specific runtimes; dev builds use AllRuntimes -->
+  <ItemGroup>
+    <!-- Core Whisper.NET library (required for all platforms) -->
+    <PackageReference Include="Whisper.net" Version="1.9.0" />
+
+    <!-- Development: AllRuntimes when no RuntimeIdentifier specified (dotnet build/run) -->
+    <PackageReference Include="Whisper.net.AllRuntimes" Version="1.9.0"
+                      Condition="'$(RuntimeIdentifier)' == ''" />
+
+    <!-- Release: macOS CoreML for Apple Silicon hardware acceleration -->
+    <PackageReference Include="Whisper.net.Runtime.CoreML" Version="1.9.0"
+                      Condition="$(RuntimeIdentifier.StartsWith('osx-'))" />
+
+    <!-- Release: Windows CUDA for NVIDIA GPU acceleration -->
+    <PackageReference Include="Whisper.net.Runtime.Cuda" Version="1.9.0"
+                      Condition="$(RuntimeIdentifier.StartsWith('win-'))" />
+
+    <!-- Release: Linux CPU runtime with AVX2/FMA optimization -->
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.0"
+                      Condition="$(RuntimeIdentifier.StartsWith('linux-'))" />
   </ItemGroup>
 
   <ItemGroup>

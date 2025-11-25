@@ -16,9 +16,11 @@ using TenSecondTom.Infrastructure.Behaviors;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Infrastructure.Llm;
+using TenSecondTom.Infrastructure.LocalAi;
 using TenSecondTom.Infrastructure.Prompts;
 using TenSecondTom.Infrastructure.Storage;
 using TenSecondTom.Infrastructure.Templates;
+using TenSecondTom.Shared.Abstractions.LocalAi;
 using TenSecondTom.Shared.Abstractions.Templates;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Options;
@@ -176,8 +178,8 @@ public static class ServiceCollectionExtensions
             var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
 
             // Templates are in the configured root directory under templates/ subdirectory
-            // TenSecondTom:RootDirectory is the root (e.g., ~/ten-second-tom or ./.memory)
-            // Structure: {root}/templates/, {root}/today/, {root}/thisweek/
+            // TenSecondTom:RootDirectory is the root (e.g., ~/ten-second-tom)
+            // Structure: {root}/templates/, {root}/note/, {root}/recording/
             string? rootDirectory = storageOptions.Value.RootDirectory;
 
             // Backward compatibility: fall back to MemoryDirectory
@@ -285,16 +287,17 @@ public static class ServiceCollectionExtensions
         {
             var llmOptions = serviceProvider.GetRequiredService<IOptionsSnapshot<LlmOptions>>();
 
-            string? apiKey = llmOptions.Value.ApiKey;
+            // Get OpenAI-specific API key from provider config
+            string? apiKey = llmOptions.Value.GetApiKey(LlmProvider.OpenAI);
 
             if (string.IsNullOrWhiteSpace(apiKey))
             {
                 throw new InvalidOperationException(
                     "OpenAI API key not configured. Run 'tom setup' to configure your API key, " +
-                    "or set TenSecondTom__Llm__ApiKey environment variable.");
+                    "or set TenSecondTom__Llm__Providers__OpenAI__ApiKey environment variable.");
             }
 
-            string model = llmOptions.Value.Model ?? LlmConstants.OpenAIModels.GPTNano;
+            string model = llmOptions.Value.GetModel(LlmProvider.OpenAI) ?? LlmConstants.OpenAIModels.GPTNano;
             var openAIClient = new OpenAIClient(apiKey);
             return openAIClient.GetChatClient(model);
         });
@@ -305,11 +308,12 @@ public static class ServiceCollectionExtensions
         {
             var llmOptions = serviceProvider.GetRequiredService<IOptionsSnapshot<LlmOptions>>();
 
-            string? apiKey = llmOptions.Value.ApiKey;
+            // Get Anthropic-specific API key from provider config
+            string? apiKey = llmOptions.Value.GetApiKey(LlmProvider.Anthropic);
 
             if (string.IsNullOrWhiteSpace(apiKey))
             {
-                // Don't throw - allow app to run if only using OpenAI
+                // Don't throw - allow app to run if only using OpenAI or local providers
                 // Return a dummy client that will fail if actually used
                 return new AnthropicClient();
             }
@@ -326,11 +330,9 @@ public static class ServiceCollectionExtensions
             var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger<OpenAILlmProvider>();
 
-            // Get configured model or use default from ModelRegistry
-            string? configuredModel = llmOptions.Value.Model;
-            string model = !string.IsNullOrWhiteSpace(configuredModel)
-                ? configuredModel
-                : ModelRegistry.GetDefault(LlmProvider.OpenAI).Id;
+            // Get OpenAI-specific model from provider config or use default
+            string model = llmOptions.Value.GetModel(LlmProvider.OpenAI)
+                ?? ModelRegistry.GetDefault(LlmProvider.OpenAI).Id;
 
             return new OpenAILlmProvider(chatClient, logger, model);
         });
@@ -342,11 +344,9 @@ public static class ServiceCollectionExtensions
             var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger<AnthropicLlmProvider>();
 
-            // Get configured model or use default from ModelRegistry
-            string? configuredModel = llmOptions.Value.Model;
-            string model = !string.IsNullOrWhiteSpace(configuredModel)
-                ? configuredModel
-                : ModelRegistry.GetDefault(LlmProvider.Anthropic).Id;
+            // Get Anthropic-specific model from provider config or use default
+            string model = llmOptions.Value.GetModel(LlmProvider.Anthropic)
+                ?? ModelRegistry.GetDefault(LlmProvider.Anthropic).Id;
 
             return new AnthropicLlmProvider(client, logger, model);
         });
@@ -354,29 +354,34 @@ public static class ServiceCollectionExtensions
         services.AddTransient<LocalOpenAiCompatibleLlmProvider>(serviceProvider =>
         {
             var llmOptions = serviceProvider.GetRequiredService<IOptionsSnapshot<LlmOptions>>();
-            var httpClient = serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient();
             var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger<LocalOpenAiCompatibleLlmProvider>();
 
-            // Configure extended timeout for local LLMs (they can take 10+ minutes for long recordings)
-            // Default HttpClient timeout is 100 seconds, which is insufficient
-            httpClient.Timeout = TimeSpan.FromMinutes(15);
+            var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
 
-            // Get configured model or use default
-            string? configuredModel = llmOptions.Value.Model;
-            string model = !string.IsNullOrWhiteSpace(configuredModel)
-                ? configuredModel
-                : "local-model"; // Default fallback
+            // Get LocalOpenAiCompatible-specific model and base URL from provider config
+            string model = llmOptions.Value.GetModel(LlmProvider.LocalOpenAiCompatible)
+                ?? "local-model"; // Default fallback
 
-            // Get configured base URL or use default
-            string baseUrl = "http://127.0.0.1:8080/v1"; // Default
-            if (llmOptions.Value.Providers.TryGetValue("LocalOpenAiCompatible", out var providerConfig) &&
-                providerConfig.TryGetValue("BaseUrl", out var configuredBaseUrl))
-            {
-                baseUrl = configuredBaseUrl;
-            }
+            string baseUrl = llmOptions.Value.GetBaseUrl(LlmProvider.LocalOpenAiCompatible)
+                ?? "http://127.0.0.1:8080/v1"; // Default
 
-            return new LocalOpenAiCompatibleLlmProvider(httpClient, logger, model, baseUrl);
+            return new LocalOpenAiCompatibleLlmProvider(httpClientFactory, logger, model, baseUrl);
+        });
+
+        // Register Local AI Engine (Foundry Local SDK)
+        // Singleton - shared across both STT and LLM features to manage Foundry Local runtime
+        services.AddSingleton<ILocalAiEngine, LocalAiEngine>();
+
+        // Register Built-in Local LLM Provider
+        services.AddTransient<BuiltInLocalLlmProvider>(serviceProvider =>
+        {
+            var llmOptions = serviceProvider.GetRequiredService<IOptionsSnapshot<LlmOptions>>();
+            var localAiEngine = serviceProvider.GetRequiredService<ILocalAiEngine>();
+            var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
+                .CreateLogger<BuiltInLocalLlmProvider>();
+
+            return new BuiltInLocalLlmProvider(localAiEngine, llmOptions);
         });
 
         // Spectre.Console AnsiConsole for rich terminal UI

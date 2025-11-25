@@ -16,7 +16,7 @@ namespace TenSecondTom.IntegrationTests.TestHelpers;
 /// - Post-test cleanup even when tests fail
 /// - Diagnostic logging for troubleshooting cleanup issues
 /// </remarks>
-public abstract class UserSecretsTestFixture : IAsyncLifetime
+public abstract class UserSecretsTestFixture : IAsyncLifetime, IDisposable
 {
     private const int MaxCleanupRetries = 3;
     private const int CleanupRetryDelayMs = 100;
@@ -58,6 +58,12 @@ public abstract class UserSecretsTestFixture : IAsyncLifetime
         // Always attempt cleanup, even if tests failed
         CleanupUserSecretsDirectory();
         return Task.CompletedTask;
+    }
+
+    public virtual void Dispose()
+    {
+        DisposeAsync().GetAwaiter().GetResult();
+        GC.SuppressFinalize(this);
     }
 
     /// <summary>

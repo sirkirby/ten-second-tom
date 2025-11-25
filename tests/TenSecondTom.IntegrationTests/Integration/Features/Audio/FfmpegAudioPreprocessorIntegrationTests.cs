@@ -47,7 +47,7 @@ public sealed class FfmpegAudioPreprocessorIntegrationTests
     {
         try
         {
-            var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "ffmpeg",
                 Arguments = "-version",

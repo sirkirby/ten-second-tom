@@ -59,10 +59,9 @@ public static class TranscribeAudio
             }
 
             logger.LogInformation(
-                "Transcribing audio file {AudioFile} using provider {Provider} (CloudFallback={CloudFallback})",
+                "Transcribing audio file {AudioFile} using provider {Provider}",
                 request.AudioFilePath,
-                request.AudioConfig.SttProvider,
-                request.AudioConfig.SttFallbackEnabled);
+                request.AudioConfig.SttProvider);
 
             // Get the appropriate STT provider based on configuration
             var provider = await providerFactory.GetProviderAsync(request.AudioConfig, cancellationToken);
