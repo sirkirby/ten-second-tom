@@ -725,7 +725,7 @@ jobs:
       - name: Publish to Winget
         uses: vedantmgoyal9/winget-releaser@v2
         with:
-          identifier: sirkirby.TenSecondTom
+          identifier: SirKirby.TenSecondTom
           installers-regex: '\.zip$'  # Match our Windows zip package
           token: ${{ secrets.WINGET_TOKEN }}
           # Optional: specify fork user if different from repo owner
