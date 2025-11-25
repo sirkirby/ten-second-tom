@@ -12,8 +12,8 @@ Ten Second Tom supports extensive audio configuration for different microphone t
 
 ### Key Features
 
-- **Multiple STT Providers**: Support for built-in local AI, whisper-cpp, and OpenAI cloud STT
-- **Built-in Local AI**: Microsoft AI Foundry Local SDK - no external dependencies required
+- **Multiple STT Providers**: Built-in Whisper.NET, Microsoft AI Foundry Local, and OpenAI cloud STT
+- **Zero External Dependencies**: All local STT providers are bundled - no installation required
 - **Recording Optimization**: Microphone presets for different hardware types
 - **Silence Removal**: Intelligent preprocessing to compress recordings
 - **Noise Reduction**: Adaptive filtering for cleaner audio
@@ -34,17 +34,18 @@ Settings are applied in this order (highest priority first):
 
 Ten Second Tom supports three speech-to-text providers:
 
-**Built-in Local (Microsoft AI Foundry Local SDK):**
-- **Pros**: No external dependencies, works offline, no API costs, privacy-focused
-- **Cons**: Models must be downloaded first, requires disk space
+**whisper-cpp (Whisper.NET - Built-in):**
+- **Pros**: Built-in (no installation), fast local inference, works offline, privacy-focused
+- **Cons**: Models must be downloaded first (~75-3000 MB depending on model)
 - **Best for**: Default choice for most users, privacy-conscious workflows
 - **Default:** Yes (recommended)
-- **Status:** ⚠️ **Experimental** - Uses Microsoft AI Foundry Local SDK (preview). For production workloads requiring maximum stability, consider whisper.cpp or OpenAI.
+- **Hardware Acceleration**: CoreML on macOS Apple Silicon, CUDA on Windows with NVIDIA GPU
 
-**whisper.cpp (Local):**
-- **Pros**: Fast local inference, no API costs, works offline, privacy-focused
-- **Cons**: Requires separate installation and model download
-- **Best for**: Users who already have whisper.cpp installed
+**built-in-local (Microsoft AI Foundry Local SDK):**
+- **Pros**: No external dependencies, works offline, no API costs, privacy-focused
+- **Cons**: Models must be downloaded first, requires disk space
+- **Best for**: Alternative local option, experimental features
+- **Status:** ⚠️ **Experimental** - Uses Microsoft AI Foundry Local SDK (preview)
 
 **OpenAI (Cloud):**
 - **Pros**: Fast, highly accurate, no local setup or storage required
@@ -96,48 +97,57 @@ export TenSecondTom__Audio__Providers__openai__ApiKey=sk-your-api-key-here
 
 ### Model Management Commands
 
-For providers that support model management (built-in-local), you can list and download models using CLI commands:
+Local STT providers support model management via the `transcribe` command:
 
 #### List Available STT Models
 ```bash
-tom stt --list-models
-tom stt --list-models --provider built-in-local
-tom stt --list-models --output-json
+tom transcribe --list-models                          # Uses configured provider
+tom transcribe --list-models --provider whisper-cpp   # Whisper.NET models
+tom transcribe --list-models --provider built-in-local # Foundry Local models
+tom transcribe --list-models --output-json            # JSON output
 ```
 
 #### Download STT Model
 ```bash
-tom stt --download-model whisper-base
-tom stt --download-model whisper-small --provider built-in-local
+tom transcribe --download-model base.en               # Download base.en (142 MB)
+tom transcribe --download-model large-v3-turbo        # Download large-v3-turbo (1614 MB)
+tom transcribe --download-model whisper-base --provider built-in-local
 ```
 
-#### List Available LLM Models
-```bash
-tom llm --list-models
-tom llm --list-models --provider built-in-local
-tom llm --list-models --output-json
-```
+#### Available Whisper.NET Models
 
-#### Download LLM Model
-```bash
-tom llm --download-model phi-3-mini
-tom llm --download-model llama-3-8b --provider built-in-local
-```
+| Model | Size | Recommended |
+|-------|------|-------------|
+| tiny | 75 MB | |
+| tiny.en | 75 MB | |
+| base | 142 MB | |
+| base.en | 142 MB | ★ English-only |
+| small | 466 MB | |
+| small.en | 466 MB | |
+| medium | 1533 MB | |
+| medium.en | 1533 MB | |
+| large-v1 | 3094 MB | |
+| large-v2 | 3094 MB | |
+| large-v3 | 3094 MB | |
+| large-v3-turbo | 1614 MB | ★ Quality/speed balance |
 
-**Note:** Model management is currently only available for the `built-in-local` provider. Other providers (whisper-cpp, openai) do not support these commands.
+Models are stored in `~/.cache/whisper-net/` and downloaded from Hugging Face on first use.
+
+**Note:** Model management is available for `whisper-cpp` and `built-in-local` providers. OpenAI uses cloud-based transcription and does not require local models.
 
 ### Common STT Configurations
 
-**Built-in local (default, no configuration needed):**
-```bash
-export TenSecondTom__Audio__SttProvider=built-in-local
-# No API key needed - works offline after model download
-```
-
-**whisper.cpp (requires separate installation):**
+**Whisper.NET (default, recommended):**
 ```bash
 export TenSecondTom__Audio__SttProvider=whisper-cpp
-# Requires whisper.cpp to be installed separately
+# No installation needed - built-in! Download model via:
+# tom transcribe --download-model base.en
+```
+
+**Built-in local (Microsoft AI Foundry):**
+```bash
+export TenSecondTom__Audio__SttProvider=built-in-local
+# Alternative local provider, experimental
 ```
 
 **OpenAI cloud:**
@@ -388,23 +398,29 @@ export TenSecondTom__Audio__Recorder__InputVolume=1.2  # Boost by 20%
    export TenSecondTom__Audio__Preprocessing__MinimumSilenceDurationMs=1000
    ```
 
-### Built-in Local STT Model Not Found
-**Symptoms:** STT fails with "model not found" error
+### Local STT Model Not Found
+**Symptoms:** STT fails with "model not found" or "model not configured" error
 
 **Solutions:**
 1. List available models:
    ```bash
-   tom stt --list-models
+   tom transcribe --list-models
    ```
 
-2. Download the default model:
+2. Download a model:
    ```bash
-   tom stt --download-model whisper-base
+   tom transcribe --download-model base.en    # Recommended for English
+   tom transcribe --download-model large-v3-turbo  # Best quality/speed
    ```
 
 3. Or use interactive setup:
    ```bash
    tom config audio
+   ```
+
+4. Verify model location:
+   ```bash
+   ls ~/.cache/whisper-net/   # Should contain ggml-*.bin files
    ```
 
 ### OpenAI STT Failing

@@ -430,18 +430,14 @@ Ten Second Tom stores configuration using a structured hierarchy:
       "SpeechToTextModel": "whisper-1"
     },
     "Audio": {
-      "SttProvider": "built-in-local",
-      "SttApiKey": null,
+      "SttProvider": "whisper-cpp",
+      "SttModel": "base.en",
       "KeepFiles": true,
       "Recorder": {
         "FfmpegPath": "ffmpeg",
         "InputVolume": 1.0,
         "EnableNoiseReduction": true,
         "EnableFrequencyFilters": true
-      },
-      "LocalWhisper": {
-        "BinaryPath": "whisper-cli",
-        "ModelPath": "~/.cache/whisper/ggml-base.en.bin"
       },
       "Preprocessing": {
         "RemoveSilence": true,

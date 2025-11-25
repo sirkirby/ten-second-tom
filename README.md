@@ -42,8 +42,8 @@
 
 Ten Second Tom can operate **100% offline** with **zero cloud dependencies**:
 
-- **Local Speech-to-Text**: Use whisper.cpp for private voice transcription
-- **Local LLM Processing**: Run models via Ollama, LM Studio, or llama.cpp, which support local OpenAI-compatible APIs.
+- **Built-in Speech-to-Text**: Whisper.NET is bundled - no external installation required
+- **Local LLM Processing**: Run models via Ollama, LM Studio, or llama.cpp, which support local OpenAI-compatible APIs
 - Use advanced open source reasoning models, like `bytedance/seed-oss` and `microsoft/phi-4-reasoning-plus` for your most complex notes or `openai/gpt-oss` and `qwen/qwen3-next-80b` to optimize for speed without compromising quality. Size the model to your hardware capabilities.
 - **Your data stays on your device** - no API calls, no internet required
 
@@ -68,17 +68,16 @@ Perfect for sensitive work, offline environments, or privacy-conscious users.
   - macOS: `brew install ffmpeg` (automatically installed with Homebrew tom package)
   - Linux: `sudo apt install ffmpeg` (Ubuntu/Debian) or `sudo yum install ffmpeg` (RHEL/CentOS)
   - Windows: Download from [ffmpeg.org](https://ffmpeg.org/download.html)
-- **whisper.cpp** ([GitHub](https://github.com/ggerganov/whisper.cpp)) - for local, privacy-focused transcription (OR use OpenAI API)
-  - Install: `brew install whisper-cpp`
-  - Download model to default location (base.en, 142 MB):
+- **Local STT** - Built-in! No external installation required
+  - Ten Second Tom includes Whisper.NET for local, privacy-focused transcription
+  - Models are downloaded automatically on first use, or via CLI:
     ```bash
-    mkdir -p ~/.cache/whisper
-    curl -L -o ~/.cache/whisper/ggml-base.en.bin \
-      https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
+    tom transcribe --list-models              # See available models
+    tom transcribe --download-model base.en   # Download a specific model (142 MB)
     ```
-  - That's it! Tom looks for the model at `~/.cache/whisper/ggml-base.en.bin` by default
+  - Models are stored in `~/.cache/whisper-net/`
 
-**Note**: Homebrew installation automatically installs FFmpeg as a required dependency. whisper.cpp is optional - you can use OpenAI API for transcription instead.
+**Note**: Homebrew installation automatically installs FFmpeg as a required dependency. Local STT is built-in - no additional installation needed. OpenAI API is also available as an alternative.
 
 ---
 
@@ -182,9 +181,9 @@ tom today --voice --stt openai           # Force OpenAI + AI summary
 
 **STT Engine Selection:**
 
-- `auto` (default): Tries local whisper.cpp first, falls back to OpenAI if enabled
-- `local`: Forces local whisper.cpp (privacy-focused, no API calls)
-- `openai`: Forces OpenAI Whisper API (cloud-based, higher accuracy)
+- `auto` (default): Uses configured local provider (whisper-cpp or built-in-local)
+- `local`: Forces local provider (privacy-focused, no API calls)
+- `openai`: Forces OpenAI Whisper API (cloud-based)
 
 **Key Difference:**
 
@@ -194,7 +193,7 @@ tom today --voice --stt openai           # Force OpenAI + AI summary
 **Prerequisites:**
 
 - **FFmpeg** for audio recording ([Download](https://ffmpeg.org/))
-- **whisper.cpp** for local transcription ([Download](https://github.com/ggerganov/whisper.cpp)) OR **OpenAI API key** for cloud transcription
+- **Local STT** is built-in (Whisper.NET) - no installation needed, OR use **OpenAI API** for cloud transcription
 
 **Storage Note:** Audio recordings are ~940KB/minute. A 5-minute recording uses ~4.7MB.
 
