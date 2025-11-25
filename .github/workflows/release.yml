@@ -251,15 +251,20 @@ jobs:
           else
             SIZE=$(stat -f%z ./publish/${{ matrix.executable }})
           fi
-          
+
           SIZE_MB=$((SIZE / 1024 / 1024))
           echo "📦 Executable size: ${SIZE_MB}MB"
-          
-          if [ $SIZE -gt 52428800 ]; then
-            echo "❌ Error: Executable exceeds 50MB limit (${SIZE_MB}MB)"
+
+          # Size limit accounts for:
+          # - Main binary (~28MB)
+          # - Microsoft AI Foundry Local SDK (~194MB)
+          # - Whisper.NET platform runtime (~5-100MB depending on CUDA/CoreML)
+          # Total expected: ~230-330MB
+          if [ $SIZE -gt 367001600 ]; then
+            echo "❌ Error: Executable exceeds 350MB limit (${SIZE_MB}MB)"
             exit 1
           fi
-          
+
           echo "✅ Size check passed: ${SIZE_MB}MB"
       
       - name: Calculate checksum
