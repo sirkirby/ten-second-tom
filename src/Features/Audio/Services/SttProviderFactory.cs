@@ -91,11 +91,11 @@ public sealed class SttProviderFactory : ISttProviderFactory
         };
     }
 
-    private async Task<ISttProvider?> GetBuiltInLocalProviderAsync(CancellationToken cancellationToken)
+    private Task<ISttProvider?> GetBuiltInLocalProviderAsync(CancellationToken cancellationToken)
     {
         // Built-in local provider using Microsoft AI Foundry Local SDK
         _logger.LogInformation("Using built-in local STT provider (Foundry Local SDK)");
-        return _builtInLocalProvider;
+        return Task.FromResult<ISttProvider?>(_builtInLocalProvider);
     }
 
     private async Task<ISttProvider?> GetWhisperCppProviderAsync(CancellationToken cancellationToken)

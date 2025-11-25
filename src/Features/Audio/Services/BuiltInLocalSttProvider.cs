@@ -27,12 +27,12 @@ public sealed class BuiltInLocalSttProvider : ISttProvider, ISupportsModelManage
 
     public SttEngine Engine => SttEngine.Local; // Closest match, though it's generic local
 
-    public async Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
+    public Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
     {
         // For built-in, availability depends on the SDK being initialized and model being present.
         // We can consider it "available" if the engine is registered.
         // A more robust check would be to see if the model is downloaded.
-        return true;
+        return Task.FromResult(true);
     }
 
     public async Task<Result<TranscriptionResult>> TranscribeAsync(

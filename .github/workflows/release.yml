@@ -305,6 +305,8 @@ jobs:
             ./publish/appsettings*.json
             ./publish/*.dylib
             ./publish/*.dll
+            ./publish/*.metal
+            ./publish/runtimes/**/*
             ./publish/TenSecondTom.Extensions.MacOS.app/**/*
           retention-days: 90
 
@@ -515,7 +517,13 @@ jobs:
           cp "./artifacts/ten-second-tom-osx-arm64-release/tom" "$BOTTLE_DIR_ARM64/tom"
           cp ./artifacts/ten-second-tom-osx-arm64-release/appsettings*.json "$BOTTLE_DIR_ARM64/" 2>/dev/null || true
           cp ./artifacts/ten-second-tom-osx-arm64-release/*.dylib "$BOTTLE_DIR_ARM64/" 2>/dev/null || true
-          
+          cp ./artifacts/ten-second-tom-osx-arm64-release/*.metal "$BOTTLE_DIR_ARM64/" 2>/dev/null || true
+
+          # Copy Whisper.NET CoreML runtimes
+          if [ -d "./artifacts/ten-second-tom-osx-arm64-release/runtimes" ]; then
+            cp -R "./artifacts/ten-second-tom-osx-arm64-release/runtimes" "$BOTTLE_DIR_ARM64/"
+          fi
+
           # Copy macOS extension to bottle (in prefix, not bin)
           EXTENSION_DIR_ARM64="ten-second-tom/${VERSION}"
           cp -R "./artifacts/ten-second-tom-osx-arm64-release/TenSecondTom.Extensions.MacOS.app" "$EXTENSION_DIR_ARM64/" 2>/dev/null || true
