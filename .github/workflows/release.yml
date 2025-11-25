@@ -546,8 +546,10 @@ jobs:
           # Copy macOS extension to bottle (in prefix, not bin)
           EXTENSION_DIR_ARM64="ten-second-tom/${VERSION}"
           cp -R "./artifacts/ten-second-tom-osx-arm64-release/TenSecondTom.Extensions.MacOS.app" "$EXTENSION_DIR_ARM64/" 2>/dev/null || true
-          
+
+          # Ensure executables have proper permissions
           chmod +x "$BOTTLE_DIR_ARM64/tom"
+          chmod +x "$EXTENSION_DIR_ARM64/TenSecondTom.Extensions.MacOS.app/Contents/MacOS/notifier" 2>/dev/null || true
           tar czf "$BOTTLE_NAME_ARM64" ten-second-tom
           
           BOTTLE_SHA_ARM64=$(shasum -a 256 "$BOTTLE_NAME_ARM64" | cut -d ' ' -f 1)
@@ -613,6 +615,8 @@ jobs:
             echo "    bin.install \"tom\""
             echo "    # Install native macOS extension for notifications"
             echo "    prefix.install \"TenSecondTom.Extensions.MacOS.app\" if OS.mac?"
+            echo "    # Ensure notifier binary is executable"
+            echo "    chmod 0755, prefix/\"TenSecondTom.Extensions.MacOS.app/Contents/MacOS/notifier\" if OS.mac?"
             echo "  end"
             echo ""
             echo "  def caveats"

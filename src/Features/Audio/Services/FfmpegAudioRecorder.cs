@@ -130,11 +130,11 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
 
         var audioFilter = string.Join(",", filters);
 
-        // Output MP3 format: 16kHz mono at 64kbps (excellent for voice, ~0.5 MB/min)
-        // This reduces file size by ~4x compared to WAV while maintaining speech quality
+        // Output WAV format: 16kHz mono 16-bit PCM (~1.9 MB/min)
+        // WAV is required for Whisper.NET compatibility (no format conversion needed)
         var arguments = $"-f {inputFormat} -i {inputDevice} " +
                        $"-af \"{audioFilter}\" " +
-                       "-ar 16000 -ac 1 -c:a libmp3lame -b:a 64k " +
+                       "-ar 16000 -ac 1 -c:a pcm_s16le " +
                        $"\"{outputPath}\"";
 
         _logger.LogDebug(
@@ -467,8 +467,8 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
             Duration = audioDuration,
             SampleRate = 16000,
             Channels = 1,
-            Format = AudioFormat.Mp3,
-            Encoding = "mp3",
+            Format = AudioFormat.Wav,
+            Encoding = "pcm_s16le",
             RecordedAt = startTime,
             FileSizeBytes = fileInfo.Length
         };

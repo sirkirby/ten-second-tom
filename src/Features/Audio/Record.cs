@@ -102,7 +102,7 @@ public static class Record
                 request.AudioConfig.SttProvider, recordingDir, maxDurationSeconds);
 
             // Step 1: Record audio - the recorder will save to a temp file first, then we move it
-            var tempAudioPath = _fileSystem.Path.Combine(_fileSystem.Path.GetTempPath(), $"tom-recording-{Guid.NewGuid()}.mp3");
+            var tempAudioPath = _fileSystem.Path.Combine(_fileSystem.Path.GetTempPath(), $"tom-recording-{Guid.NewGuid()}.wav");
 
             var recordCommand = new RecordAudio.Command
             {
