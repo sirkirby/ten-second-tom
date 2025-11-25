@@ -121,9 +121,9 @@ public sealed class TranscribeLibraryAudioHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        // 3 files: original .wav + converted .mp3 + transcript .md
-        // Handler always stores as .mp3, so even in-place recordings get converted
-        fileSystem.AllFiles.Count().Should().Be(3);
+        // 2 files: original .wav + transcript .md
+        // Handler preserves source extension, no conversion/copy for in-place recordings
+        fileSystem.AllFiles.Count().Should().Be(2);
     }
 
     [Fact]

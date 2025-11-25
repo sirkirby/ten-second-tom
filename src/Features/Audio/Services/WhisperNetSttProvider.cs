@@ -99,9 +99,31 @@ public sealed class WhisperNetSttProvider : ISttProvider, ISupportsModelManageme
         var startTime = DateTimeOffset.UtcNow;
         var stopwatch = Stopwatch.StartNew();
 
+        // Check file format - WAV can be processed directly, others need FFmpeg conversion
+        var extension = Path.GetExtension(audioFilePath).ToLowerInvariant();
+        var isWav = extension == ".wav";
+        string? tempWavPath = null;
+
         try
         {
-            _logger.LogDebug("Starting Whisper.NET transcription with model: {ModelPath}", modelPath);
+            var pathToProcess = audioFilePath;
+
+            // Convert non-WAV files to WAV using FFmpeg (handles all edge cases reliably)
+            if (!isWav)
+            {
+                _logger.LogDebug("Converting {Extension} to WAV via FFmpeg", extension);
+                tempWavPath = await ConvertToWavAsync(audioFilePath, cancellationToken);
+
+                if (tempWavPath == null)
+                {
+                    return Result<TranscriptionResult>.Failure("Failed to convert audio to WAV format");
+                }
+
+                pathToProcess = tempWavPath;
+            }
+
+            _logger.LogDebug("Starting Whisper.NET transcription with model: {ModelPath}, Format: {Format}",
+                modelPath, extension);
 
             // Create whisper factory from model
             using var whisperFactory = WhisperFactory.FromPath(modelPath);
@@ -113,7 +135,7 @@ public sealed class WhisperNetSttProvider : ISttProvider, ISupportsModelManageme
 
             // Process the audio file
             var segments = new List<string>();
-            await using var fileStream = File.OpenRead(audioFilePath);
+            await using var fileStream = File.OpenRead(pathToProcess);
 
             await foreach (var segment in processor.ProcessAsync(fileStream, cancellationToken))
             {
@@ -150,10 +172,11 @@ public sealed class WhisperNetSttProvider : ISttProvider, ISupportsModelManageme
             };
 
             _logger.LogInformation(
-                "Whisper.NET transcription completed: Model={Model}, Duration={Duration}s, WordCount={WordCount}",
+                "Whisper.NET transcription completed: Model={Model}, Duration={Duration}s, WordCount={WordCount}, Format={Format}",
                 modelName,
                 result.ProcessingDuration.TotalSeconds,
-                wordCount);
+                wordCount,
+                extension);
 
             return Result<TranscriptionResult>.Success(result);
         }
@@ -165,6 +188,107 @@ public sealed class WhisperNetSttProvider : ISttProvider, ISupportsModelManageme
         {
             _logger.LogError(ex, "Whisper.NET transcription failed");
             return Result<TranscriptionResult>.Failure($"Whisper.NET transcription failed: {ex.Message}");
+        }
+        finally
+        {
+            // Clean up temp file if created
+            CleanupTempFile(tempWavPath);
+        }
+    }
+
+    /// <summary>
+    /// Converts an audio file to WAV format using FFmpeg.
+    /// Handles all MP3 edge cases (variable sample rates, etc.) reliably.
+    /// Output is 16kHz mono 16-bit PCM (optimal for Whisper).
+    /// </summary>
+    private async Task<string?> ConvertToWavAsync(string audioFilePath, CancellationToken cancellationToken)
+    {
+        var tempWavPath = Path.Combine(Path.GetTempPath(), $"tom-whisper-{Guid.NewGuid()}.wav");
+        var ffmpegPath = _config.Recorder.FfmpegPath;
+
+        // Convert to 16kHz mono WAV (optimal for Whisper)
+        var arguments = $"-i \"{audioFilePath}\" -ar 16000 -ac 1 -c:a pcm_s16le \"{tempWavPath}\" -y";
+
+        _logger.LogDebug("Converting audio to WAV: {FfmpegPath} {Arguments}", ffmpegPath, arguments);
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = ffmpegPath,
+            Arguments = arguments,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var process = Process.Start(startInfo);
+        if (process == null)
+        {
+            _logger.LogError("Failed to start FFmpeg process for audio conversion");
+            return null;
+        }
+
+        try
+        {
+            var stderr = await process.StandardError.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitAsync(cancellationToken);
+
+            if (process.ExitCode != 0)
+            {
+                _logger.LogError("FFmpeg audio conversion failed with exit code {ExitCode}: {StdErr}",
+                    process.ExitCode, stderr);
+                return null;
+            }
+
+            if (!File.Exists(tempWavPath))
+            {
+                _logger.LogError("FFmpeg did not create output WAV file");
+                return null;
+            }
+
+            return tempWavPath;
+        }
+        catch (OperationCanceledException)
+        {
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill();
+                }
+
+                if (File.Exists(tempWavPath))
+                {
+                    File.Delete(tempWavPath);
+                }
+            }
+            catch
+            {
+                // Ignore cleanup errors
+            }
+
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Cleans up a temporary file.
+    /// </summary>
+    private void CleanupTempFile(string? filePath)
+    {
+        if (filePath == null || !File.Exists(filePath))
+        {
+            return;
+        }
+
+        try
+        {
+            File.Delete(filePath);
+            _logger.LogDebug("Cleaned up temp WAV file: {TempPath}", filePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to clean up temp WAV file: {TempPath}", filePath);
         }
     }
 
