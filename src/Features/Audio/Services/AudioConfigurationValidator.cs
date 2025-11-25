@@ -35,7 +35,7 @@ public sealed class AudioConfigurationValidator : IAudioConfigurationValidator
             {
                 SttProviders.BuiltInLocal => "STT Model (required for built-in local provider)",
                 SttProviders.OpenAI => "STT API Key and/or Model (required for OpenAI provider)",
-                SttProviders.WhisperCpp => "Binary Path and/or Model (required for whisper.cpp provider)",
+                SttProviders.WhisperCpp => "Model path (required for Whisper.NET provider)",
                 _ => $"Configuration incomplete for {configuration.SttProvider} provider"
             });
         }
