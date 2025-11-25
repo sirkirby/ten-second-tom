@@ -9,17 +9,16 @@ namespace TenSecondTom.Shared.TextEditing.Services;
 /// Interactive multi-line text editor using Terminal.Gui TextView.
 /// Provides full cursor navigation, multi-line editing, and clipboard support.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable", Justification = "Terminal.Gui views are disposed via Application.Shutdown")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "Terminal.Gui manages disposal")]
-public sealed class TerminalGuiTextEditor : IInteractiveTextEditor
+public sealed class TerminalGuiTextEditor : IInteractiveTextEditor, IDisposable
 {
     private readonly InputSanitizer _sanitizer;
     private readonly ILogger<TerminalGuiTextEditor> _logger;
     private bool _isInitialized;
-    private TextView? _textView;
-    private Label? _hintLabel;
     private bool _shouldSave;
     private bool _shouldCancel;
+    private TextView? _textView;
+    private Label? _titleLabel;
+    private Label? _hintLabel;
 
     public TerminalGuiTextEditor(
         InputSanitizer sanitizer,
@@ -84,21 +83,8 @@ public sealed class TerminalGuiTextEditor : IInteractiveTextEditor
                 throw new EditorException("Terminal.Gui Application.Top is null");
             }
 
-            // Create title label showing the prompt/question
-            var titleLabel = new Label
-            {
-                X = 0,
-                Y = 0,
-                Width = Dim.Fill(),
-                Height = 1,
-                Text = config.Title ?? "Enter your text:",
-                ColorScheme = new ColorScheme
-                {
-                    Normal = Application.Driver.MakeAttribute(Color.BrightCyan, Color.Black)
-                }
-            };
-
             // Create the text view for editing (below title)
+            _textView?.Dispose();
             _textView = new TextView
             {
                 X = 0,
@@ -110,7 +96,24 @@ public sealed class TerminalGuiTextEditor : IInteractiveTextEditor
                 AllowsTab = true
             };
 
-            // Create hint label with keyboard shortcuts (T022)
+            // Create and add title label showing the prompt/question
+            _titleLabel?.Dispose();
+            _titleLabel = new Label
+            {
+                X = 0,
+                Y = 0,
+                Width = Dim.Fill(),
+                Height = 1,
+                Text = config.Title ?? "Enter your text:",
+                ColorScheme = new ColorScheme
+                {
+                    Normal = Application.Driver.MakeAttribute(Color.BrightCyan, Color.Black)
+                }
+            };
+            top.Add(_titleLabel);
+
+            // Create and add hint label with keyboard shortcuts (T022)
+            _hintLabel?.Dispose();
             _hintLabel = new Label
             {
                 X = 0,
@@ -122,7 +125,6 @@ public sealed class TerminalGuiTextEditor : IInteractiveTextEditor
                     : string.Empty
             };
 
-            top.Add(titleLabel);
             top.Add(_textView);
             top.Add(_hintLabel);
 
@@ -160,6 +162,10 @@ public sealed class TerminalGuiTextEditor : IInteractiveTextEditor
             await Task.CompletedTask;
 
             // Get the final content
+            if (_textView == null)
+            {
+                return EditorResult.Error("Text view was not initialized", EditorMetadata.FromSession(session));
+            }
             var content = _textView.Text.ToString() ?? string.Empty;
 
             // Update session with final content
@@ -339,6 +345,16 @@ public sealed class TerminalGuiTextEditor : IInteractiveTextEditor
                 _logger.LogWarning(ex, "Error during Terminal.Gui shutdown");
             }
         }
+    }
+
+    /// <summary>
+    /// Disposes resources owned by the text editor.
+    /// </summary>
+    public void Dispose()
+    {
+        _textView?.Dispose();
+        _titleLabel?.Dispose();
+        _hintLabel?.Dispose();
     }
 }
 

@@ -1,6 +1,7 @@
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -254,7 +255,7 @@ public sealed class SelfHealingTests
     {
         // Arrange
         _fileSystem.AddDirectory("/.memory");
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         cts.Cancel();
 
         var checker = CreateConfigurationChecker("/.memory");
@@ -362,13 +363,11 @@ public sealed class SelfHealingTests
     /// </summary>
     private ConfigurationChecker CreateConfigurationChecker(string memoryDirectory)
     {
-        var llmOptions = Options.Create(new LlmOptions
-        {
-            Provider = LlmProvider.OpenAI,
-            ApiKey = "test-key",
-            Model = LlmConstants.OpenAIModels.GPTMini,
-            MaxInputTokens = 100000
-        });
+        var llmOptionsValue = new LlmOptions { Provider = LlmProvider.OpenAI };
+        llmOptionsValue.SetProviderConfig(LlmProvider.OpenAI, "ApiKey", "test-key");
+        llmOptionsValue.SetProviderConfig(LlmProvider.OpenAI, "Model", LlmConstants.OpenAIModels.GPTMini);
+        llmOptionsValue.SetProviderConfig(LlmProvider.OpenAI, "MaxInputTokens", "100000");
+        var llmOptions = Options.Create(llmOptionsValue);
 
         var authOptions = Options.Create(new AuthOptions
         {
@@ -386,10 +385,15 @@ public sealed class SelfHealingTests
             CreateEmbeddedTemplateLoader(),
             Mock.Of<ILogger<TemplateInstaller>>());
 
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { })
+            .Build();
+        
         return new ConfigurationChecker(
             llmOptions,
             authOptions,
             storageOptions,
+            configuration,
             templateInstaller,
             _mockLogger.Object);
     }

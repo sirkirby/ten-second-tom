@@ -85,7 +85,7 @@ public sealed partial class AnthropicApiKeyValidator : IApiKeyValidator
                     attempt + 1, maxRetries + 1);
 
                 // Create Anthropic client with minimal request to test key
-                var client = new AnthropicClient(new APIAuthentication(apiKey));
+                using var client = new AnthropicClient(new APIAuthentication(apiKey));
 
                 // Make a minimal request to validate the key
                 var parameters = new MessageParameters

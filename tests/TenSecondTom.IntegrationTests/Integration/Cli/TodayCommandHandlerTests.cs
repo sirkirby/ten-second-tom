@@ -50,7 +50,7 @@ public sealed class TodayCommandHandlerTests
             });
 
         // Build service provider with mocks
-        var serviceProvider = new TestServiceProviderBuilder()
+        using var serviceProvider = new TestServiceProviderBuilder()
             .WithAuthenticationService(mockAuthService.Object)
             .WithTextEditor(mockEditor.Object)
             .WithLlmProvider(mockLlm)
@@ -100,7 +100,7 @@ public sealed class TodayCommandHandlerTests
             .ReturnsAsync(EditorResult.Cancelled(EditorMetadata.Empty));
 
         // Build service provider with mocks
-        var serviceProvider = new TestServiceProviderBuilder()
+        using var serviceProvider = new TestServiceProviderBuilder()
             .WithAuthenticationService(mockAuthService.Object)
             .WithTextEditor(mockEditor.Object)
             .Build();
@@ -155,7 +155,7 @@ public sealed class TodayCommandHandlerTests
             .ReturnsAsync(EditorResult.Error("Terminal error", EditorMetadata.Empty));
 
         // Build service provider with mocks
-        var serviceProvider = new TestServiceProviderBuilder()
+        using var serviceProvider = new TestServiceProviderBuilder()
             .WithAuthenticationService(mockAuthService.Object)
             .WithTextEditor(mockEditor.Object)
             .Build();
@@ -210,7 +210,7 @@ public sealed class TodayCommandHandlerTests
             .ReturnsAsync(EditorResult.Saved(multiLineContent, EditorMetadata.Empty));
 
         // Build service provider with mocks
-        var serviceProvider = new TestServiceProviderBuilder()
+        using var serviceProvider = new TestServiceProviderBuilder()
             .WithAuthenticationService(mockAuthService.Object)
             .WithTextEditor(mockEditor.Object)
             .WithLlmProvider(mockLlm)

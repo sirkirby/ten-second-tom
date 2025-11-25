@@ -26,7 +26,14 @@ public sealed class RecordHandlerTests
     private static readonly AudioOptions DefaultAudioOptions = new()
     {
         SttProvider = SttProviders.WhisperCpp,
-        SttModel = "/models/ggml-base.en.bin"
+        Providers = new Dictionary<string, Dictionary<string, string>>
+        {
+            [SttProviders.WhisperCpp] = new()
+            {
+                ["BinaryPath"] = "whisper-cpp",
+                ["Model"] = "/models/ggml-base.en.bin"
+            }
+        }
     };
 
     private readonly Mock<IMediator> _mediator = new();

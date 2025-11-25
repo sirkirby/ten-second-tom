@@ -3,6 +3,8 @@ using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Infrastructure.Configuration;
+using TenSecondTom.Shared.Abstractions.Audio;
+using TenSecondTom.Shared.Abstractions.LocalAi;
 using TenSecondTom.Shared.Abstractions.UI;
 using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Options;
@@ -86,6 +88,8 @@ public static class ConfigureAudio
     public sealed class Handler(
         IConfigurationSectionStore sectionStore,
         ISetupWizardUI setupWizard,
+        ILocalAiEngine localAiEngine,
+        IWhisperNetModelManager whisperNetModelManager,
         ILogger<Handler> logger)
         : IRequestHandler<Command, Result<AudioOptions>>
     {
@@ -251,74 +255,136 @@ public static class ConfigureAudio
                 return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
             }
 
-            // Step 7a: STT API Key (if provider requires it)
-            string? sttApiKey = currentAudio.SttApiKey;
-            if (sttProvider == SttProviders.OpenAI)
+            // Step 7a: Provider-specific configuration
+            string? sttApiKey = currentAudio.GetSttApiKey(sttProvider);
+            string? sttModel = currentAudio.GetSttModel(sttProvider);
+
+            if (sttProvider == SttProviders.BuiltInLocal)
+            {
+                // Built-in Local STT - select and download whisper model
+                setupWizard.ShowStatus("Fetching available whisper models from AI Foundry catalog...");
+
+                var availableModels = (await localAiEngine.ListAvailableModelsAsync(cancellationToken))
+                    .Where(m => m.Contains("whisper", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                if (availableModels.Count == 0)
+                {
+                    setupWizard.ShowWarning("No whisper models found in the AI Foundry catalog.");
+                    setupWizard.ShowStatus("The built-in local STT requires whisper models to be available.");
+                    return Result<AudioOptions>.Failure("No whisper models available for built-in local STT provider.");
+                }
+
+                var selectedModel = await setupWizard.PromptForSelectionAsync(
+                    "Select a whisper model for speech-to-text:",
+                    availableModels,
+                    m => m,
+                    cancellationToken);
+
+                if (string.IsNullOrEmpty(selectedModel))
+                {
+                    return Result<AudioOptions>.Failure("Model selection cancelled. No changes were made.");
+                }
+
+                sttModel = selectedModel;
+
+                // Ensure the model is downloaded with progress bar
+                Result? downloadResult = null;
+                await setupWizard.RunWithProgressAsync(
+                    $"Downloading whisper model '{sttModel}'...",
+                    async progress =>
+                    {
+                        downloadResult = await localAiEngine.EnsureModelAvailableAsync(
+                            sttModel,
+                            progress,
+                            cancellationToken);
+                    },
+                    cancellationToken);
+
+                if (downloadResult?.IsSuccess != true)
+                {
+                    setupWizard.ShowError($"Failed to download model: {downloadResult?.Error ?? "Unknown error"}");
+                    return Result<AudioOptions>.Failure($"Failed to ensure whisper model is available: {downloadResult?.Error ?? "Unknown error"}");
+                }
+
+                setupWizard.ShowSuccess($"✓ Whisper model '{sttModel}' is ready");
+            }
+            else if (sttProvider == SttProviders.WhisperCpp)
+            {
+                // Whisper.NET - no external binary installation required!
+                // Select and optionally download model using built-in Hugging Face downloader
+                setupWizard.ShowStatus("Available Whisper models (powered by Whisper.NET):");
+
+                var availableModels = whisperNetModelManager.ListAvailableModels();
+                var downloadedModels = await whisperNetModelManager.ListDownloadedModelsAsync(cancellationToken);
+                var downloadedIds = downloadedModels.Select(d => d.ModelId).ToHashSet();
+
+                // Format choices with download status
+                var modelChoices = availableModels
+                    .Select(m =>
+                    {
+                        var status = downloadedIds.Contains(m.Id) ? " (downloaded)" : "";
+                        var recommended = m.Recommended ? " ★" : "";
+                        return $"{m.Id} ({m.SizeMb} MB){recommended}{status}";
+                    })
+                    .ToList();
+
+                var selectedChoice = await setupWizard.PromptForSelectionAsync(
+                    "Select a whisper model for speech-to-text:",
+                    modelChoices,
+                    m => m,
+                    cancellationToken);
+
+                if (string.IsNullOrEmpty(selectedChoice))
+                {
+                    return Result<AudioOptions>.Failure("Model selection cancelled. No changes were made.");
+                }
+
+                // Extract model ID from choice string (format: "model-id (size MB)...")
+                var selectedModelId = selectedChoice.Split(' ')[0];
+                sttModel = whisperNetModelManager.GetModelPath(selectedModelId);
+
+                // If model not downloaded, download it automatically
+                if (sttModel == null)
+                {
+                    setupWizard.ShowStatus($"Downloading model '{selectedModelId}' from Hugging Face...");
+
+                    Result<string>? downloadResult = null;
+                    await setupWizard.RunWithProgressAsync(
+                        $"Downloading Whisper model '{selectedModelId}'...",
+                        async progress =>
+                        {
+                            downloadResult = await whisperNetModelManager.DownloadModelAsync(
+                                selectedModelId,
+                                progress,
+                                cancellationToken);
+                        },
+                        cancellationToken);
+
+                    if (downloadResult == null || !downloadResult.Value.IsSuccess)
+                    {
+                        setupWizard.ShowError($"Failed to download model: {downloadResult?.Error ?? "Unknown error"}");
+                        return Result<AudioOptions>.Failure($"Failed to download whisper model: {downloadResult?.Error ?? "Unknown error"}");
+                    }
+
+                    sttModel = downloadResult.Value.Value;
+                    setupWizard.ShowSuccess($"✓ Model downloaded to {sttModel}");
+                }
+                else
+                {
+                    setupWizard.ShowSuccess($"✓ Model '{selectedModelId}' is ready at {sttModel}");
+                }
+            }
+            else if (sttProvider == SttProviders.OpenAI)
             {
                 sttApiKey = await setupWizard.PromptForSttApiKeyAsync(
                     sttProvider,
-                    currentAudio.SttApiKey,
+                    sttApiKey,
                     cancellationToken);
 
                 if (sttApiKey == null)
                 {
                     return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
-                }
-            }
-
-            // Step 7b: STT Fallback Provider
-            bool sttFallbackEnabled = currentAudio.SttFallbackEnabled;
-            string? sttFallbackProvider = currentAudio.SttFallbackProvider;
-            string? sttFallbackApiKey = currentAudio.SttFallbackApiKey;
-
-            if (sttProvider == SttProviders.WhisperCpp)
-            {
-                var fallback = await setupWizard.PromptForSttFallbackAsync(
-                    currentAudio.SttFallbackEnabled,
-                    cancellationToken);
-
-                if (!fallback.HasValue)
-                {
-                    return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
-                }
-
-                sttFallbackEnabled = fallback.Value;
-
-                // If fallback is enabled, prompt for provider and API key
-                if (sttFallbackEnabled)
-                {
-                    // Prompt for fallback provider
-                    var fallbackProvider = await setupWizard.PromptForSttFallbackProviderAsync(
-                        currentAudio.SttFallbackProvider,
-                        cancellationToken);
-
-                    if (fallbackProvider == null)
-                    {
-                        return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
-                    }
-
-                    sttFallbackProvider = fallbackProvider;
-
-                    // Prompt for fallback API key
-                    setupWizard.ShowStatus($"Fallback provider '{fallbackProvider}' requires an API key.");
-
-                    var fallbackApiKey = await setupWizard.PromptForSttApiKeyAsync(
-                        fallbackProvider,
-                        currentAudio.SttFallbackApiKey,
-                        cancellationToken);
-
-                    if (fallbackApiKey == null)
-                    {
-                        return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
-                    }
-
-                    sttFallbackApiKey = fallbackApiKey;
-                }
-                else
-                {
-                    // Fallback is disabled, clear the provider and API key
-                    sttFallbackProvider = null;
-                    sttFallbackApiKey = null;
                 }
             }
 
@@ -376,14 +442,8 @@ public static class ConfigureAudio
             var updatedAudio = new AudioOptions
             {
                 SttProvider = sttProvider,
-                SttApiKey = sttApiKey,
-                SttFallbackEnabled = sttFallbackEnabled,
-                SttFallbackProvider = sttFallbackProvider,
-                SttFallbackApiKey = sttFallbackApiKey,
-                SttBinaryPath = currentAudio.SttBinaryPath,
-                SttModel = currentAudio.SttModel,
-                SttFallbackBinaryPath = currentAudio.SttFallbackBinaryPath,
-                SttFallbackModel = currentAudio.SttFallbackModel,
+                Providers = new Dictionary<string, Dictionary<string, string>>(
+                    currentAudio.Providers ?? new Dictionary<string, Dictionary<string, string>>()),
                 KeepFiles = currentAudio.KeepFiles,
                 Recorder = new RecorderOptions
                 {
@@ -404,6 +464,20 @@ public static class ConfigureAudio
                     RecordSeconds = recordTimeout.Value
                 }
             };
+
+            // Update provider-specific configuration using accessor methods
+            if (!string.IsNullOrEmpty(sttModel))
+            {
+                updatedAudio.SetSttProviderConfig(sttProvider, "Model", sttModel);
+            }
+
+            // Note: Whisper.NET doesn't need a binary path - it uses native bindings
+
+            if (sttProvider == SttProviders.OpenAI && !string.IsNullOrEmpty(sttApiKey))
+            {
+                updatedAudio.SetSttProviderConfig(sttProvider, "ApiKey", sttApiKey);
+            }
+
 
             // Save configuration directly to config.json
             var saveResult = await sectionStore.WriteSectionAsync(
@@ -429,14 +503,16 @@ public static class ConfigureAudio
                 setupWizard.ShowStatus($"  • Silence threshold: {silenceThresholdDb} dB");
                 setupWizard.ShowStatus($"  • Min silence duration: {minSilenceDurationMs} ms");
             }
-            var sttProviderDisplay = sttProvider == WhisperCpp ? "whisper.cpp (local)" : "OpenAI Whisper API (cloud)";
+            var sttProviderDisplay = sttProvider == SttProviders.WhisperCpp ? "whisper.cpp (local)" :
+                                     sttProvider == SttProviders.BuiltInLocal ? "Local (Built-in)" : "OpenAI Whisper API (cloud)";
             setupWizard.ShowStatus($"  • STT provider: {sttProviderDisplay}");
-            if (sttFallbackEnabled)
+            if ((sttProvider == SttProviders.BuiltInLocal || sttProvider == SttProviders.WhisperCpp) && !string.IsNullOrEmpty(sttModel))
             {
-                setupWizard.ShowStatus($"  • STT fallback provider: Enabled ({sttFallbackProvider})");
+                setupWizard.ShowStatus($"  • Whisper model: {sttModel}");
             }
-            setupWizard.ShowStatus($"  • Today timeout: {todayTimeout.Value}s");
-            setupWizard.ShowStatus($"  • Record timeout: {recordTimeout.Value}s");
+
+            setupWizard.ShowStatus($"  • Today timeout: {todayTimeout}s");
+            setupWizard.ShowStatus($"  • Record timeout: {recordTimeout}s");
 
             return Result<AudioOptions>.Success(updatedAudio);
         }
@@ -478,14 +554,8 @@ public static class ConfigureAudio
             return new AudioOptions
             {
                 SttProvider = currentAudio.SttProvider,
-                SttApiKey = currentAudio.SttApiKey,
-                SttFallbackEnabled = currentAudio.SttFallbackEnabled,
-                SttFallbackProvider = currentAudio.SttFallbackProvider,
-                SttFallbackApiKey = currentAudio.SttFallbackApiKey,
-                SttBinaryPath = currentAudio.SttBinaryPath,
-                SttModel = currentAudio.SttModel,
-                SttFallbackBinaryPath = currentAudio.SttFallbackBinaryPath,
-                SttFallbackModel = currentAudio.SttFallbackModel,
+                Providers = new Dictionary<string, Dictionary<string, string>>(
+                    currentAudio.Providers ?? new Dictionary<string, Dictionary<string, string>>()),
                 KeepFiles = currentAudio.KeepFiles,
                 Recorder = new RecorderOptions
                 {

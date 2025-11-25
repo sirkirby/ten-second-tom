@@ -367,7 +367,7 @@ Select an LLM provider:
     Local (OpenAI Compatible)
 
 Select a model (OpenAI):
-  ▸ GPT-5 Standard (gpt-5) [Premium] - Flagship model for coding, reasoning, and agentic tasks
+  ▸ GPT-5.1 (gpt-5.1) [Premium] - Flagship model for coding, reasoning, and agentic tasks
     GPT-5 Mini (gpt-5-mini) [Balanced] - Faster, cost-efficient version for well-defined tasks
     GPT-5 Nano (gpt-5-nano) [Budget] - Fastest, cheapest model for summarization and classification
 ```
@@ -396,7 +396,7 @@ Environment variable values take precedence over user secrets and `appsettings.j
 | OpenAI     | `gpt-5`              | GPT-5 Standard       | Premium   |         | Flagship model for coding, reasoning, and agentic tasks |
 | Anthropic  | `claude-haiku-4-5`   | Claude Haiku 4.5     | Budget    | ✅       | Fast and compact model for near-instant responsiveness |
 | Anthropic  | `claude-sonnet-4-5`  | Claude Sonnet 4.5    | Balanced  |         | Best model for complex agents and coding with highest intelligence |
-| Anthropic  | `claude-opus-4-1`    | Claude Opus 4.1      | Premium   |         | Exceptional model for specialized complex tasks requiring advanced reasoning |
+| Anthropic  | `claude-opus-4-5`    | Claude Opus 4.5      | Premium   |         | Exceptional model for specialized complex tasks requiring advanced reasoning |
 | Local      | Any model ID         | User-defined         | Free      | N/A     | Run local models via Ollama, LM Studio, or any OpenAI-compatible server |
 
 **Notes:**

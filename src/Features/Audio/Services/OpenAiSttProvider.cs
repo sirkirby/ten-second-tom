@@ -45,7 +45,7 @@ public sealed class OpenAiSttProvider : ISttProvider
             return Task.FromResult(false);
         }
 
-        var apiKey = _audioConfig.SttApiKey;
+        var apiKey = _audioConfig.GetSttApiKey();
         var isAvailable = !string.IsNullOrWhiteSpace(apiKey);
 
         if (!isAvailable)
@@ -75,16 +75,14 @@ public sealed class OpenAiSttProvider : ISttProvider
                 $"Cannot use OpenAI STT: Current STT provider is {_audioConfig.SttProvider}. Change to OpenAI in 'tom config audio'.");
         }
 
-        var apiKey = _audioConfig.SttApiKey;
+        var apiKey = _audioConfig.GetSttApiKey();
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             return Result<TranscriptionResult>.Failure("OpenAI STT API key not configured. Run 'tom config audio' to configure your API key.");
         }
 
         // Get STT model from audio config or use default
-        var model = string.IsNullOrWhiteSpace(_audioConfig.SttModel)
-            ? SttProviders.OpenAIDefaultSTTModel
-            : _audioConfig.SttModel;
+        var model = _audioConfig.GetSttModel() ?? SttProviders.OpenAIDefaultSTTModel;
 
         var startTime = DateTimeOffset.UtcNow;
         var stopwatch = Stopwatch.StartNew();

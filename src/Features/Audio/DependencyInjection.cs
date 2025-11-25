@@ -1,8 +1,9 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using TenSecondTom.Shared.Options;
 using TenSecondTom.Features.Audio.Services;
+using TenSecondTom.Shared.Abstractions.Audio;
+using TenSecondTom.Shared.Options;
 
 namespace TenSecondTom.Features.Audio;
 
@@ -36,20 +37,31 @@ public static class AudioFeatureExtensions
         // Register audio preprocessor implementation
         services.AddScoped<IAudioPreprocessor, FfmpegAudioPreprocessor>();
 
+        // Register Whisper.NET model manager for model listing and downloading
+        // Uses Whisper.NET's built-in Hugging Face downloader - no external binary needed
+        services.AddSingleton<IWhisperNetModelManager, WhisperNetModelManager>();
+
+        // Legacy whisper.cpp model manager (kept for backward compatibility during migration)
+        services.AddSingleton<IWhisperCppModelManager, WhisperCppModelManager>();
+
         // Register audio library discovery service
         services.AddScoped<IAudioLibraryService, AudioLibraryService>();
 
         // Register STT provider implementations
-        services.AddScoped<LocalWhisperSttProvider>();
+        services.AddScoped<BuiltInLocalSttProvider>();
+        services.AddScoped<WhisperNetSttProvider>();  // Whisper.NET-based (no external binary)
+        services.AddScoped<LocalWhisperSttProvider>(); // Legacy whisper-cli based
         services.AddScoped<OpenAiSttProvider>();
 
         // Register STT provider factory with named providers
+        // Uses WhisperNetSttProvider as the default for whisper-cpp (no installation required)
         services.AddScoped<ISttProviderFactory>(sp =>
         {
-            var localProvider = sp.GetRequiredService<LocalWhisperSttProvider>();
+            var builtInLocalProvider = sp.GetRequiredService<BuiltInLocalSttProvider>();
+            var whisperNetProvider = sp.GetRequiredService<WhisperNetSttProvider>();
             var openAiProvider = sp.GetRequiredService<OpenAiSttProvider>();
             var logger = sp.GetRequiredService<ILogger<SttProviderFactory>>();
-            return new SttProviderFactory(localProvider, openAiProvider, logger);
+            return new SttProviderFactory(builtInLocalProvider, whisperNetProvider, openAiProvider, logger);
         });
 
         // Register concrete handlers for direct resolution

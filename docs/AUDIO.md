@@ -12,11 +12,12 @@ Ten Second Tom supports extensive audio configuration for different microphone t
 
 ### Key Features
 
-- **Multiple STT Providers**: Support for local (whisper-cpp) and cloud (OpenAI) speech-to-text
-- **STT Fallback**: Automatic fallback to secondary provider if primary fails
+- **Multiple STT Providers**: Support for built-in local AI, whisper-cpp, and OpenAI cloud STT
+- **Built-in Local AI**: Microsoft AI Foundry Local SDK - no external dependencies required
 - **Recording Optimization**: Microphone presets for different hardware types
 - **Silence Removal**: Intelligent preprocessing to compress recordings
 - **Noise Reduction**: Adaptive filtering for cleaner audio
+- **Model Management**: CLI commands to list and download models for local providers
 - **Library Transcription**: Dedicated `tom transcribe` command to re-run STT on existing audio
 
 ## Configuration Priority
@@ -29,118 +30,123 @@ Settings are applied in this order (highest priority first):
 
 ## Speech-to-Text (STT) Provider Configuration
 
-### STT Provider Selection
+### Available STT Providers
 
-Choose between local and cloud speech-to-text providers:
+Ten Second Tom supports three speech-to-text providers:
 
-**Local Provider (whisper-cpp):**
-- **Pros**: No API costs, works offline, privacy-focused
-- **Cons**: Requires local installation, slower on some hardware
-- **Best for**: Privacy-conscious users, offline usage, cost optimization
+**Built-in Local (Microsoft AI Foundry Local SDK):**
+- **Pros**: No external dependencies, works offline, no API costs, privacy-focused
+- **Cons**: Models must be downloaded first, requires disk space
+- **Best for**: Default choice for most users, privacy-conscious workflows
+- **Default:** Yes (recommended)
+- **Status:** ⚠️ **Experimental** - Uses Microsoft AI Foundry Local SDK (preview). For production workloads requiring maximum stability, consider whisper.cpp or OpenAI.
 
-**Cloud Provider (OpenAI):**
-- **Pros**: Fast, highly accurate, no local setup
+**whisper.cpp (Local):**
+- **Pros**: Fast local inference, no API costs, works offline, privacy-focused
+- **Cons**: Requires separate installation and model download
+- **Best for**: Users who already have whisper.cpp installed
+
+**OpenAI (Cloud):**
+- **Pros**: Fast, highly accurate, no local setup or storage required
 - **Cons**: Requires API key, costs per minute, requires internet
-- **Best for**: Best accuracy, cloud-native workflows
+- **Best for**: Best accuracy, cloud-native workflows, no local storage concerns
 
-### STT Provider Settings
+### STT Provider Configuration
 
-#### Primary STT Provider
+#### Provider Selection
 
 - **Environment Variable:** `TenSecondTom__Audio__SttProvider`
-- **Type:** String (`whisper-cpp` or `openai`)
-- **Default:** `whisper-cpp`
-- **Purpose:** Select primary speech-to-text engine
+- **Type:** String (`built-in-local`, `whisper-cpp`, or `openai`)
+- **Default:** `built-in-local`
+- **Purpose:** Select speech-to-text provider
 
 **Example:**
 ```bash
-export TenSecondTom__Audio__SttProvider=whisper-cpp  # Local
-export TenSecondTom__Audio__SttProvider=openai       # Cloud
+export TenSecondTom__Audio__SttProvider=built-in-local  # Default (Microsoft AI Foundry Local)
+export TenSecondTom__Audio__SttProvider=whisper-cpp      # Local whisper.cpp
+export TenSecondTom__Audio__SttProvider=openai           # OpenAI cloud API
 ```
 
-#### STT API Key (Cloud Providers)
+#### Provider-Specific Configuration
 
-- **Environment Variable:** `TenSecondTom__Audio__SttApiKey`
-- **Type:** String (API key)
-- **Default:** `null`
-- **Purpose:** API key for cloud STT provider (required when using OpenAI)
+Each provider can have its own configuration stored in the `Providers` dictionary. Currently, only the OpenAI provider requires additional configuration (API key).
 
-**Example:**
+**Configuration file format** (`~/ten-second-tom/config/config.json`):
+```json
+{
+  "TenSecondTom": {
+    "Audio": {
+      "SttProvider": "built-in-local",
+      "Providers": {
+        "openai": {
+          "ApiKey": "sk-your-openai-api-key-here"
+        }
+      }
+    }
+  }
+}
+```
+
+**Environment variable** (for OpenAI):
 ```bash
-export TenSecondTom__Audio__SttApiKey=sk-your-openai-api-key-here
+# Note: Provider-specific settings are best managed via 'tom config audio'
+# Environment variables are available but use nested syntax:
+export TenSecondTom__Audio__Providers__openai__ApiKey=sk-your-api-key-here
 ```
 
-### STT Fallback Configuration
+### Model Management Commands
 
-Configure automatic fallback to a secondary STT provider if the primary fails.
+For providers that support model management (built-in-local), you can list and download models using CLI commands:
 
-#### Enable STT Fallback
-
-- **Environment Variable:** `TenSecondTom__Audio__SttFallbackEnabled`
-- **Type:** Boolean (`true` or `false`)
-- **Default:** `false`
-- **Purpose:** Enable automatic fallback to secondary provider
-
-**Example:**
+#### List Available STT Models
 ```bash
-export TenSecondTom__Audio__SttFallbackEnabled=true
+tom stt --list-models
+tom stt --list-models --provider built-in-local
+tom stt --list-models --output-json
 ```
 
-#### Fallback STT Provider
-
-- **Environment Variable:** `TenSecondTom__Audio__SttFallbackProvider`
-- **Type:** String (`whisper-cpp` or `openai`)
-- **Default:** `null`
-- **Purpose:** Secondary STT provider to use if primary fails
-
-**Example:**
+#### Download STT Model
 ```bash
-# Use OpenAI as fallback when local whisper-cpp fails
-export TenSecondTom__Audio__SttFallbackProvider=openai
+tom stt --download-model whisper-base
+tom stt --download-model whisper-small --provider built-in-local
 ```
 
-#### Fallback STT API Key
-
-- **Environment Variable:** `TenSecondTom__Audio__SttFallbackApiKey`
-- **Type:** String (API key)
-- **Default:** `null`
-- **Purpose:** API key for fallback cloud provider
-
-**Example:**
+#### List Available LLM Models
 ```bash
-export TenSecondTom__Audio__SttFallbackApiKey=sk-fallback-api-key-here
+tom llm --list-models
+tom llm --list-models --provider built-in-local
+tom llm --list-models --output-json
 ```
+
+#### Download LLM Model
+```bash
+tom llm --download-model phi-3-mini
+tom llm --download-model llama-3-8b --provider built-in-local
+```
+
+**Note:** Model management is currently only available for the `built-in-local` provider. Other providers (whisper-cpp, openai) do not support these commands.
 
 ### Common STT Configurations
 
-**Local-only (no fallback):**
+**Built-in local (default, no configuration needed):**
+```bash
+export TenSecondTom__Audio__SttProvider=built-in-local
+# No API key needed - works offline after model download
+```
+
+**whisper.cpp (requires separate installation):**
 ```bash
 export TenSecondTom__Audio__SttProvider=whisper-cpp
-export TenSecondTom__Audio__SttFallbackEnabled=false
+# Requires whisper.cpp to be installed separately
 ```
 
-**Local with cloud fallback:**
-```bash
-export TenSecondTom__Audio__SttProvider=whisper-cpp
-export TenSecondTom__Audio__SttFallbackEnabled=true
-export TenSecondTom__Audio__SttFallbackProvider=openai
-export TenSecondTom__Audio__SttFallbackApiKey=sk-...
-```
-
-**Cloud-only:**
+**OpenAI cloud:**
 ```bash
 export TenSecondTom__Audio__SttProvider=openai
-export TenSecondTom__Audio__SttApiKey=sk-...
-export TenSecondTom__Audio__SttFallbackEnabled=false
+# API key configured via: tom config audio
 ```
 
-**Cloud with local fallback:**
-```bash
-export TenSecondTom__Audio__SttProvider=openai
-export TenSecondTom__Audio__SttApiKey=sk-...
-export TenSecondTom__Audio__SttFallbackEnabled=true
-export TenSecondTom__Audio__SttFallbackProvider=whisper-cpp
-```
+**Recommended:** Use `tom config audio` to configure providers interactively rather than manually editing configuration files.
 
 ## Microphone Type Presets
 
@@ -206,7 +212,7 @@ Applies FFmpeg's adaptive noise reduction filter during recording.
 - **Type:** Boolean (`true` or `false`)
 - **Default:** `true`
 - **Purpose:** Reduces background noise, fan noise, room tone
-- **Recommendation:** 
+- **Recommendation:**
   - `true`: For laptop mics, untreated rooms
   - `false`: For professional mics in treated rooms
 
@@ -221,7 +227,7 @@ Applies high-pass and low-pass filters during recording.
 - **Environment Variable:** `TenSecondTom__Audio__Recorder__EnableFrequencyFilters`
 - **Type:** Boolean (`true` or `false`)
 - **Default:** `true`
-- **Purpose:** 
+- **Purpose:**
   - High-pass (80Hz): Removes rumble, handling noise, HVAC vibration
   - Low-pass (8kHz): Removes high-frequency hiss (speech is below 8kHz)
 - **Recommendation:**
@@ -240,9 +246,9 @@ Removes silence from recordings after capture, before transcription.
 
 - **Environment Variable:** `TenSecondTom__Audio__Preprocessing__RemoveSilence`
 - **Type:** Boolean (`true` or `false`)
-- **Default:** `true`
+- **Default:** `false`
 - **Purpose:** Compresses long silence gaps, removes leading/trailing silence
-- **Effect:** 
+- **Effect:**
   - Reduces file size
   - Speeds up transcription
   - Makes transcripts easier to read (no long pauses)
@@ -286,26 +292,49 @@ The minimum duration of silence before it gets removed.
 export TenSecondTom__Audio__Preprocessing__MinimumSilenceDurationMs=500
 ```
 
+## Recording Timeouts
+
+Configure maximum recording durations before prompting the user to continue.
+
+### Today Command Timeout
+- **Environment Variable:** `TenSecondTom__Audio__Timeouts__TodaySeconds`
+- **Type:** Integer (seconds)
+- **Default:** `300` (5 minutes)
+- **Purpose:** Maximum duration for `today --voice` recordings
+
+### Record Command Timeout
+- **Environment Variable:** `TenSecondTom__Audio__Timeouts__RecordSeconds`
+- **Type:** Integer (seconds)
+- **Default:** `1800` (30 minutes)
+- **Purpose:** Maximum duration for open-ended `record` command
+
+**Example:**
+```bash
+export TenSecondTom__Audio__Timeouts__TodaySeconds=600    # 10 minutes
+export TenSecondTom__Audio__Timeouts__RecordSeconds=3600  # 1 hour
+```
+
 ## Complete Environment Variable Example
 
-For a typical MacBook Pro user with local STT and cloud fallback:
+For a typical user with built-in local STT (default configuration):
 
 ```bash
-# STT Provider Configuration
-export TenSecondTom__Audio__SttProvider=whisper-cpp
-export TenSecondTom__Audio__SttFallbackEnabled=true
-export TenSecondTom__Audio__SttFallbackProvider=openai
-export TenSecondTom__Audio__SttFallbackApiKey=sk-your-api-key-here
+# STT Provider Configuration (built-in local is the default)
+export TenSecondTom__Audio__SttProvider=built-in-local
 
 # Audio recording settings (laptop mic optimized)
 export TenSecondTom__Audio__Recorder__InputVolume=1.0
 export TenSecondTom__Audio__Recorder__EnableNoiseReduction=true
 export TenSecondTom__Audio__Recorder__EnableFrequencyFilters=true
 
-# Silence removal settings
-export TenSecondTom__Audio__Preprocessing__RemoveSilence=true
+# Silence removal settings (disabled by default)
+export TenSecondTom__Audio__Preprocessing__RemoveSilence=false
 export TenSecondTom__Audio__Preprocessing__SilenceThresholdDb=-50
 export TenSecondTom__Audio__Preprocessing__MinimumSilenceDurationMs=500
+
+# Recording timeouts
+export TenSecondTom__Audio__Timeouts__TodaySeconds=300
+export TenSecondTom__Audio__Timeouts__RecordSeconds=1800
 ```
 
 ## Troubleshooting
@@ -359,6 +388,41 @@ export TenSecondTom__Audio__Recorder__InputVolume=1.2  # Boost by 20%
    export TenSecondTom__Audio__Preprocessing__MinimumSilenceDurationMs=1000
    ```
 
+### Built-in Local STT Model Not Found
+**Symptoms:** STT fails with "model not found" error
+
+**Solutions:**
+1. List available models:
+   ```bash
+   tom stt --list-models
+   ```
+
+2. Download the default model:
+   ```bash
+   tom stt --download-model whisper-base
+   ```
+
+3. Or use interactive setup:
+   ```bash
+   tom config audio
+   ```
+
+### OpenAI STT Failing
+**Symptoms:** Transcription fails with authentication or network errors
+
+**Solutions:**
+1. Verify API key is configured:
+   ```bash
+   tom config show --show-secrets
+   ```
+
+2. Reconfigure API key:
+   ```bash
+   tom config audio
+   ```
+
+3. Check internet connectivity
+
 ## Using a .env File (Development)
 
 For local development, you can create a `.env` file in your home directory:
@@ -366,11 +430,8 @@ For local development, you can create a `.env` file in your home directory:
 ```bash
 # ~/.tom.env
 
-# STT Configuration
-TenSecondTom__Audio__SttProvider=whisper-cpp
-TenSecondTom__Audio__SttFallbackEnabled=true
-TenSecondTom__Audio__SttFallbackProvider=openai
-TenSecondTom__Audio__SttFallbackApiKey=sk-your-fallback-api-key
+# STT Configuration (built-in local by default)
+TenSecondTom__Audio__SttProvider=built-in-local
 
 # Recording Settings
 TenSecondTom__Audio__Recorder__InputVolume=0.75
@@ -391,9 +452,24 @@ tom record
 
 **Recommended:** Use `tom config audio` for interactive configuration instead of manually creating `.env` files.
 
+## Migration from Previous Versions
+
+### Fallback Configuration Removed
+
+Previous versions supported STT fallback configuration (`SttFallbackEnabled`, `SttFallbackProvider`, `SttFallbackApiKey`). This feature has been removed in favor of a simpler, single-provider model.
+
+**If you were using fallback:**
+- Your configuration will be reset on upgrade
+- You'll be prompted to run `tom config audio` to reconfigure
+- Choose your preferred provider (built-in-local is recommended)
+
+**Why this changed:**
+- Simplified configuration model
+- Built-in local AI eliminates the need for fallback
+- Users can manually switch providers if needed via `tom config audio`
+
 ## See Also
 
 - [Configuration Guide](CONFIGURATION.md) - General configuration documentation
-- [Environment Variables](ENVIRONMENT.md) - All available environment variables
 - [Setup Guide](../README.md#setup) - Initial setup instructions
-
+- [CLI Reference](../README.md#commands) - Complete command reference

@@ -34,7 +34,7 @@ public interface ISttProvider
     /// </returns>
     /// <remarks>
     /// The implementation should validate the audio file format and size before transcription.
-    /// For local providers, ensure the audio meets whisper.cpp requirements (WAV, 16kHz, mono).
+    /// Supported formats: WAV, MP3, FLAC (16kHz, mono recommended for best results).
     /// </remarks>
     Task<Result<TranscriptionResult>> TranscribeAsync(
         string audioFilePath,

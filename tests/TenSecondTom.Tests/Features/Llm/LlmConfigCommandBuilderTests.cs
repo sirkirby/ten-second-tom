@@ -49,7 +49,7 @@ public sealed class LlmConfigCommandBuilderTests
     {
         var services = new ServiceCollection();
         services.AddSingleton(mediator);
-        var serviceProvider = services.BuildServiceProvider();
+        using var serviceProvider = services.BuildServiceProvider();
 
         var builder = new TenSecondTom.Features.Llm.LlmConfigCommandBuilder();
         var jsonOption = new Option<bool>("--json");

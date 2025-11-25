@@ -49,11 +49,15 @@ public sealed class AudioLibraryService : IAudioLibraryService
                 $"Audio directory not found: {directory}"));
         }
 
-        var files = _fileSystem.Directory.GetFiles(directory, "*.wav", SearchOption.TopDirectoryOnly);
+        // Search for both .mp3 (new format) and .wav (legacy format) files
+        var mp3Files = _fileSystem.Directory.GetFiles(directory, "*.mp3", SearchOption.TopDirectoryOnly);
+        var wavFiles = _fileSystem.Directory.GetFiles(directory, "*.wav", SearchOption.TopDirectoryOnly);
+        var files = mp3Files.Concat(wavFiles).ToArray();
+
         if (files.Length == 0)
         {
             return Task.FromResult(Result<IReadOnlyList<AudioLibraryItem>>.Failure(
-                $"No .wav files found in {directory}. Create a {scope.ToString().ToLowerInvariant()} entry first."));
+                $"No audio files found in {directory}. Create a {scope.ToString().ToLowerInvariant()} entry first."));
         }
 
         var items = new List<AudioLibraryItem>(files.Length);
@@ -90,18 +94,24 @@ public sealed class AudioLibraryService : IAudioLibraryService
         }
 
         var directory = GetDirectoryForScope(scope);
+
+        // Try .mp3 first (new format), then fall back to .wav (legacy format)
+        var mp3Path = _fileSystem.Path.Combine(directory, $"{baseName}.mp3");
         var wavPath = _fileSystem.Path.Combine(directory, $"{baseName}.wav");
 
-        if (!_fileSystem.File.Exists(wavPath))
+        var audioPath = _fileSystem.File.Exists(mp3Path) ? mp3Path :
+                        _fileSystem.File.Exists(wavPath) ? wavPath : null;
+
+        if (audioPath is null)
         {
             return Result<AudioLibraryItem>.Failure(
-                $"Audio file '{baseName}.wav' not found under {directory}.");
+                $"Audio file '{baseName}' not found under {directory}.");
         }
 
-        if (!TryCreateItem(scope, wavPath, out var item))
+        if (!TryCreateItem(scope, audioPath, out var item))
         {
             return Result<AudioLibraryItem>.Failure(
-                $"Unable to read metadata for '{baseName}.wav'.");
+                $"Unable to read metadata for '{baseName}'.");
         }
 
         return Result<AudioLibraryItem>.Success(item);

@@ -19,7 +19,7 @@ public sealed class EmbeddedPromptTemplateLoader : IPromptTemplateLoader
     /// </summary>
     /// <param name="baseDirectory">
     /// The base directory to search for user template overrides.
-    /// If null, uses the default .memory directory from environment.
+    /// If null, uses the default root directory from configuration.
     /// </param>
     /// <param name="yamlParser">
     /// The YAML parser to use for extracting metadata from templates.

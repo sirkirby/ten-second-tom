@@ -58,8 +58,9 @@ public sealed class SshAgentClient : ISshAgentClient
             }
 
             // Create Unix domain socket
+            _socket?.Dispose();
             _socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
-            
+
             var endpoint = new UnixDomainSocketEndPoint(socketPath);
             await _socket.ConnectAsync(endpoint, cancellationToken).ConfigureAwait(false);
             

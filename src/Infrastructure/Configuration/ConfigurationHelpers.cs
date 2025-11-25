@@ -86,7 +86,7 @@ public static class ConfigurationHelpers
     /// Path Resolution Rules:
     /// - Absolute paths: Used as-is (e.g., /Users/chris/tom-data)
     /// - Tilde paths: Expanded to user home (e.g., ~/tom-data)
-    /// - Relative paths: Resolved from CURRENT WORKING DIRECTORY (e.g., ./.memory)
+    /// - Relative paths: Resolved from CURRENT WORKING DIRECTORY (e.g., ./tom-data)
     /// 
     /// For production, use absolute or tilde paths to avoid current-directory dependencies.
     /// See docs/ENVIRONMENT.md for detailed path resolution rules.

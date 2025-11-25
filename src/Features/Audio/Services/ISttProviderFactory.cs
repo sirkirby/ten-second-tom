@@ -12,16 +12,18 @@ public interface ISttProviderFactory
     /// <summary>
     /// Gets the appropriate STT provider based on the audio configuration.
     /// </summary>
-    /// <param name="configuration">The audio configuration containing provider and fallback settings.</param>
+    /// <param name="configuration">The audio configuration containing provider settings.</param>
     /// <param name="cancellationToken">Cancellation token for async operation.</param>
     /// <returns>
     /// The selected STT provider instance, or null if no suitable provider is available.
     /// </returns>
     /// <remarks>
-    /// Selection logic:
-    /// - If SttProvider is "whisper-cpp" and SttFallbackEnabled is true: Try local first, fallback to configured provider if unavailable.
-    /// - If SttProvider is "whisper-cpp" and SttFallbackEnabled is false: Return local provider only (null if unavailable).
-    /// - If SttProvider is "openai": Return OpenAI provider only.
+    /// Selection logic based on SttProvider setting:
+    /// <list type="bullet">
+    /// <item>"built-in-local": Uses Microsoft AI Foundry Local SDK for transcription (default).</item>
+    /// <item>"whisper-cpp": Uses external whisper.cpp binary installation.</item>
+    /// <item>"openai": Uses OpenAI Whisper API (requires API key).</item>
+    /// </list>
     /// </remarks>
     Task<ISttProvider?> GetProviderAsync(
         AudioOptions configuration,

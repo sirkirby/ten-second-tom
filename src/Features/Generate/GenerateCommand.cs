@@ -288,7 +288,7 @@ public static class GenerateCommand
 
             // Step 4: Get max input tokens
             var llmOptions = serviceProvider.GetRequiredService<IOptionsSnapshot<LlmOptions>>().Value;
-            int maxInputTokens = llmOptions.MaxInputTokens
+            int maxInputTokens = llmOptions.GetMaxInputTokens()
                 ?? (llmOptions.Provider == LlmProvider.Anthropic
                     ? LlmConstants.DefaultMaxInputTokensAnthropic
                     : LlmConstants.DefaultMaxInputTokensOpenAI);

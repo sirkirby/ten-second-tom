@@ -1,6 +1,9 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using TenSecondTom.Shared.Abstractions.Audio;
+using TenSecondTom.Shared.Abstractions.Models;
+using TenSecondTom.Shared.Constants;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
@@ -11,21 +14,25 @@ namespace TenSecondTom.Features.Audio.Services;
 /// Local whisper.cpp STT provider implementation.
 /// Uses whisper.cpp CLI for offline speech-to-text transcription.
 /// </summary>
-public sealed class LocalWhisperSttProvider : ISttProvider
+public sealed class LocalWhisperSttProvider : ISttProvider, ISupportsModelManagement
 {
     private readonly AudioOptions _config;
+    private readonly IWhisperCppModelManager _modelManager;
     private readonly ILogger<LocalWhisperSttProvider> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LocalWhisperSttProvider"/> class.
     /// </summary>
     /// <param name="config">Audio configuration options.</param>
+    /// <param name="modelManager">Whisper.cpp model manager for model operations.</param>
     /// <param name="logger">Logger instance.</param>
     public LocalWhisperSttProvider(
         IOptions<AudioOptions> config,
+        IWhisperCppModelManager modelManager,
         ILogger<LocalWhisperSttProvider> logger)
     {
         _config = config?.Value ?? throw new ArgumentNullException(nameof(config));
+        _modelManager = modelManager ?? throw new ArgumentNullException(nameof(modelManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -35,12 +42,18 @@ public sealed class LocalWhisperSttProvider : ISttProvider
     /// <summary>
     /// Gets the binary path for whisper-cli from configuration.
     /// </summary>
-    private string GetBinaryPath() => _config.SttBinaryPath;
+    private string GetBinaryPath()
+    {
+        return _config.GetSttBinaryPath(SttProviders.WhisperCpp) ?? "whisper-cli";
+    }
 
     /// <summary>
     /// Gets the model path for whisper model from configuration.
     /// </summary>
-    private string? GetModelPath() => _config.SttModel;
+    private string? GetModelPath()
+    {
+        return _config.GetSttModel(SttProviders.WhisperCpp);
+    }
 
     /// <inheritdoc/>
     public async Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
@@ -239,4 +252,43 @@ public sealed class LocalWhisperSttProvider : ISttProvider
             throw;
         }
     }
+
+    #region ISupportsModelManagement Implementation
+
+    /// <inheritdoc/>
+    public Task<IEnumerable<string>> ListModelsAsync(CancellationToken cancellationToken = default)
+    {
+        var models = _modelManager.ListAvailableModels();
+        var downloaded = _modelManager.ListDownloadedModelsAsync(cancellationToken).GetAwaiter().GetResult();
+        var downloadedIds = downloaded.Select(d => d.Model.Id).ToHashSet();
+
+        // Format: "model-id (142 MB) ★ (downloaded)" or "model-id (142 MB)"
+        // Note: Using parentheses instead of brackets to avoid Spectre.Console markup interpretation
+        var result = models.Select(m =>
+        {
+            var status = downloadedIds.Contains(m.Id) ? " (downloaded)" : "";
+            var recommended = m.Recommended ? " ★" : "";
+            return $"{m.Id} ({m.SizeMb} MB){recommended}{status}";
+        });
+
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc/>
+    public async Task<Result> DownloadModelAsync(
+        string modelId,
+        Action<double>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _modelManager.DownloadModelAsync(modelId, progress, cancellationToken);
+
+        if (result.IsSuccess)
+        {
+            return Result.Success();
+        }
+
+        return Result.Failure(result.Error ?? "Download failed");
+    }
+
+    #endregion
 }

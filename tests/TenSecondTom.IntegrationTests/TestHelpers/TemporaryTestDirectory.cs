@@ -101,6 +101,5 @@ public sealed class TemporaryTestDirectory : IDisposable
         }
 
         _disposed = true;
-        GC.SuppressFinalize(this);
     }
 }

@@ -470,7 +470,7 @@ public static class TodayCommandHandler
 
         // Create temp audio file path
         var timestamp = DateTimeOffset.Now.ToString("yyyyMMdd-HHmmss");
-        var audioFilePath = Path.Combine(Path.GetTempPath(), $"tom-voice-{timestamp}.wav");
+        var audioFilePath = Path.Combine(Path.GetTempPath(), $"tom-voice-{timestamp}.mp3");
 
         try
         {
@@ -522,14 +522,14 @@ public static class TodayCommandHandler
             // Step 2: Transcribe audio
             if (!jsonOutput)
             {
-                var providerDisplay = transcribeConfig.SttProvider == SttProviders.OpenAI ? "OpenAI" : "local";
-                var fallbackInfo = transcribeConfig.SttFallbackEnabled ? $" (fallback to {transcribeConfig.SttFallbackProvider})" : "";
-                AnsiConsole.MarkupLine($"[cyan]✍️  Transcribing with {providerDisplay}{fallbackInfo}...[/]");
+                var providerDisplay = transcribeConfig.SttProvider == SttProviders.OpenAI ? "OpenAI" :
+                                    transcribeConfig.SttProvider == SttProviders.BuiltInLocal ? "Built-in Local" : "Whisper.cpp";
+                AnsiConsole.MarkupLine($"[cyan]✍️  Transcribing with {providerDisplay}...[/]");
             }
             else
             {
-                logger.LogInformation("Transcribing audio with {Provider}, FallbackEnabled={FallbackEnabled}",
-                    transcribeConfig.SttProvider, transcribeConfig.SttFallbackEnabled);
+                logger.LogInformation("Transcribing audio with {Provider}",
+                    transcribeConfig.SttProvider);
             }
 
             // Use interface type to avoid closure capturing concrete Command type (VSA compliance)
@@ -829,49 +829,37 @@ public static class TodayCommandHandler
         TenSecondTom.Shared.Options.AudioOptions audioOptions)
     {
         var normalizedSelection = sttSelection?.ToLowerInvariant();
+        var providers = audioOptions.Providers ?? new Dictionary<string, Dictionary<string, string>>();
 
         return normalizedSelection switch
         {
-            // "auto": Try local provider first, fallback to configured fallback if enabled
+            // "auto" or null: Use configured provider
             "auto" or null => new TenSecondTom.Shared.Options.AudioOptions
             {
                 SttProvider = audioOptions.SttProvider,
-                SttApiKey = audioOptions.SttApiKey,
-                SttFallbackEnabled = true,
-                SttFallbackProvider = audioOptions.SttFallbackProvider,
-                SttFallbackApiKey = audioOptions.SttFallbackApiKey,
-                SttBinaryPath = audioOptions.SttBinaryPath,
-                SttModel = audioOptions.SttModel,
-                SttFallbackBinaryPath = audioOptions.SttFallbackBinaryPath,
-                SttFallbackModel = audioOptions.SttFallbackModel,
+                Providers = providers,
                 KeepFiles = audioOptions.KeepFiles,
                 Recorder = audioOptions.Recorder,
                 Preprocessing = audioOptions.Preprocessing,
                 Timeouts = audioOptions.Timeouts
             },
 
-            // "local": Use only the configured local provider (no fallback)
+            // "local": Use local provider
             "local" => new TenSecondTom.Shared.Options.AudioOptions
             {
-                SttProvider = audioOptions.SttProvider,
-                SttApiKey = audioOptions.SttApiKey,
-                SttFallbackEnabled = false,
-                SttBinaryPath = audioOptions.SttBinaryPath,
-                SttModel = audioOptions.SttModel,
+                SttProvider = SttProviders.WhisperCpp,
+                Providers = providers,
                 KeepFiles = audioOptions.KeepFiles,
                 Recorder = audioOptions.Recorder,
                 Preprocessing = audioOptions.Preprocessing,
                 Timeouts = audioOptions.Timeouts
             },
 
-            // "openai": Force OpenAI provider, no fallback
+            // "openai": Force OpenAI provider
             "openai" => new TenSecondTom.Shared.Options.AudioOptions
             {
                 SttProvider = SttProviders.OpenAI,
-                SttApiKey = audioOptions.SttApiKey,
-                SttFallbackEnabled = false,
-                SttBinaryPath = audioOptions.SttBinaryPath,
-                SttModel = audioOptions.SttModel,
+                Providers = providers,
                 KeepFiles = audioOptions.KeepFiles,
                 Recorder = audioOptions.Recorder,
                 Preprocessing = audioOptions.Preprocessing,

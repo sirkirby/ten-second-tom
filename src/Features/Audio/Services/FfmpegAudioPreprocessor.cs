@@ -80,7 +80,7 @@ public sealed class FfmpegAudioPreprocessor : IAudioPreprocessor
         if (!_config.Preprocessing.RemoveSilence)
         {
             var fileInfo = new FileInfo(audioFilePath);
-            var noDuration = CalculateAudioDuration(fileInfo.Length);
+            var noDuration = CalculateAudioDuration(fileInfo.Length, audioFilePath);
 
             var noProcessingResult = new PreprocessingResult
             {
@@ -101,7 +101,7 @@ public sealed class FfmpegAudioPreprocessor : IAudioPreprocessor
         // Get original file info
         var originalFileInfo = new FileInfo(audioFilePath);
         var originalSize = originalFileInfo.Length;
-        var originalDuration = CalculateAudioDuration(originalSize);
+        var originalDuration = CalculateAudioDuration(originalSize, audioFilePath);
 
         // Determine output path
         string outputPath;
@@ -123,7 +123,13 @@ public sealed class FfmpegAudioPreprocessor : IAudioPreprocessor
         // Build FFmpeg silenceremove filter arguments
         var filterArgs = BuildSilenceRemoveFilter();
 
-        var arguments = $"-i \"{audioFilePath}\" -af \"{filterArgs}\" -ar 16000 -ac 1 -acodec pcm_s16le \"{outputPath}\" -y";
+        // Determine output codec based on input format (preserve format)
+        var extension = Path.GetExtension(audioFilePath).ToLowerInvariant();
+        var codecArgs = extension == ".mp3"
+            ? "-c:a libmp3lame -b:a 64k"  // MP3 at 64kbps (matches recording settings)
+            : "-acodec pcm_s16le";         // WAV (legacy)
+
+        var arguments = $"-i \"{audioFilePath}\" -af \"{filterArgs}\" -ar 16000 -ac 1 {codecArgs} \"{outputPath}\" -y";
 
         _logger.LogDebug(
             "Starting audio preprocessing: {FfmpegPath} {Arguments}",
@@ -205,7 +211,7 @@ public sealed class FfmpegAudioPreprocessor : IAudioPreprocessor
         // Get processed file info
         var processedFileInfo = new FileInfo(outputPath);
         var processedSize = processedFileInfo.Length;
-        var processedDuration = CalculateAudioDuration(processedSize);
+        var processedDuration = CalculateAudioDuration(processedSize, outputPath);
 
         // If replaceOriginal, replace the original file with processed version
         string finalPath = audioFilePath;
@@ -291,20 +297,23 @@ public sealed class FfmpegAudioPreprocessor : IAudioPreprocessor
     }
 
     /// <summary>
-    /// Calculates approximate audio duration from file size.
-    /// Assumes 16kHz, mono, 16-bit PCM (32,000 bytes per second).
+    /// Calculates approximate audio duration from file size and format.
     /// </summary>
     /// <param name="fileSizeBytes">File size in bytes.</param>
+    /// <param name="filePath">Optional file path to determine format (defaults to WAV calculation).</param>
     /// <returns>Approximate duration.</returns>
-    private static TimeSpan CalculateAudioDuration(long fileSizeBytes)
+    private static TimeSpan CalculateAudioDuration(long fileSizeBytes, string? filePath = null)
     {
-        // 16kHz * 1 channel * 2 bytes/sample = 32,000 bytes/second
-        const int bytesPerSecond = 32000;
-        
-        // Subtract WAV header (44 bytes) if present
-        var dataSize = fileSizeBytes > 44 ? fileSizeBytes - 44 : fileSizeBytes;
-        
-        var seconds = dataSize / (double)bytesPerSecond;
+        // Determine bytes per second based on format
+        // WAV (16kHz, mono, 16-bit): 32,000 bytes/sec
+        // MP3 (64kbps): 8,000 bytes/sec
+        var extension = filePath != null ? Path.GetExtension(filePath).ToLowerInvariant() : ".wav";
+        var bytesPerSecond = extension == ".mp3" ? 8000.0 : 32000.0;
+
+        // Subtract WAV header (44 bytes) if WAV format
+        var dataSize = extension != ".mp3" && fileSizeBytes > 44 ? fileSizeBytes - 44 : fileSizeBytes;
+
+        var seconds = dataSize / bytesPerSecond;
         return TimeSpan.FromSeconds(Math.Max(0, seconds));
     }
 }

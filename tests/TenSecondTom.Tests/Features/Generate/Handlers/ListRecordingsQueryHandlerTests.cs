@@ -100,7 +100,7 @@ public sealed class ListRecordingsQueryHandlerTests
     {
         // Arrange
         var recordings = new List<RecordingListItem> { CreateTestRecording("10-24-2025_1") };
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
 
         _mockRecordingService
             .Setup(s => s.ListRecordingsAsync(cts.Token))

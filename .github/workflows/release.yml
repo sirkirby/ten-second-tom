@@ -166,10 +166,6 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            platform: osx-x64
-            runtime: osx-x64
-            executable: tom
-          - os: macos-latest
             platform: osx-arm64
             runtime: osx-arm64
             executable: tom
@@ -336,19 +332,13 @@ jobs:
           
           echo "📦 Creating distribution packages for version ${VERSION}"
           mkdir -p ./release-packages
-          
-          # Package macOS x64
-          echo "Packaging macOS x64..."
-          cd ./artifacts/ten-second-tom-osx-x64-release
-          tar czf ../../release-packages/ten-second-tom-${VERSION}-osx-x64.tar.gz *
-          cd ../..
-          
+
           # Package macOS ARM64
           echo "Packaging macOS ARM64..."
           cd ./artifacts/ten-second-tom-osx-arm64-release
           tar czf ../../release-packages/ten-second-tom-${VERSION}-osx-arm64.tar.gz *
           cd ../..
-          
+
           # Package Windows x64
           echo "Packaging Windows x64..."
           cd ./artifacts/ten-second-tom-win-x64-release
@@ -376,15 +366,14 @@ jobs:
 
           Choose the appropriate package for your platform:
 
-          - **macOS (Intel)**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-x64.tar.gz\`
           - **macOS (Apple Silicon)**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-arm64.tar.gz\`
           - **Windows**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-win-x64.zip\`
 
           ### 🚀 Installation
 
-          **macOS:**
+          **macOS (Apple Silicon):**
           \`\`\`bash
-          tar xzf ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-x64.tar.gz
+          tar xzf ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-arm64.tar.gz
           chmod +x tom
           ./tom --version
           \`\`\`
@@ -405,15 +394,14 @@ jobs:
 
           Choose the appropriate package for your platform:
 
-          - **macOS (Intel)**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-x64.tar.gz\`
           - **macOS (Apple Silicon)**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-arm64.tar.gz\`
           - **Windows**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-win-x64.zip\`
 
           ### 🚀 Installation
 
-          **macOS:**
+          **macOS (Apple Silicon):**
           \`\`\`bash
-          tar xzf ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-x64.tar.gz
+          tar xzf ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-arm64.tar.gz
           chmod +x tom
           ./tom --version
           \`\`\`
@@ -533,38 +521,11 @@ jobs:
           BOTTLE_SHA_ARM64=$(shasum -a 256 "$BOTTLE_NAME_ARM64" | cut -d ' ' -f 1)
           echo "✅ ARM64 bottle: $BOTTLE_NAME_ARM64"
           echo "   SHA256: $BOTTLE_SHA_ARM64"
-          
-          # Clean up for x64 bottle
-          rm -rf ten-second-tom
-          
-          # Create x64 bottle
-          BOTTLE_TAG_X64="${MACOS_TAG}"
-          BOTTLE_NAME_X64="ten-second-tom-${VERSION}.${BOTTLE_TAG_X64}.bottle.tar.gz"
-          BOTTLE_DIR_X64="ten-second-tom/${VERSION}/bin"
-          
-          mkdir -p "$BOTTLE_DIR_X64"
-          cp "./artifacts/ten-second-tom-osx-x64-release/tom" "$BOTTLE_DIR_X64/tom"
-          cp ./artifacts/ten-second-tom-osx-x64-release/appsettings*.json "$BOTTLE_DIR_X64/" 2>/dev/null || true
-          cp ./artifacts/ten-second-tom-osx-x64-release/*.dylib "$BOTTLE_DIR_X64/" 2>/dev/null || true
-          
-          # Copy macOS extension to bottle (in prefix, not bin)
-          EXTENSION_DIR_X64="ten-second-tom/${VERSION}"
-          cp -R "./artifacts/ten-second-tom-osx-x64-release/TenSecondTom.Extensions.MacOS.app" "$EXTENSION_DIR_X64/" 2>/dev/null || true
-          
-          chmod +x "$BOTTLE_DIR_X64/tom"
-          tar czf "$BOTTLE_NAME_X64" ten-second-tom
-          
-          BOTTLE_SHA_X64=$(shasum -a 256 "$BOTTLE_NAME_X64" | cut -d ' ' -f 1)
-          echo "✅ x64 bottle: $BOTTLE_NAME_X64"
-          echo "   SHA256: $BOTTLE_SHA_X64"
-          
+
           # Output variables for later steps
           echo "bottle-name-arm64=$BOTTLE_NAME_ARM64" >> $GITHUB_OUTPUT
-          echo "bottle-name-x64=$BOTTLE_NAME_X64" >> $GITHUB_OUTPUT
           echo "bottle-tag-arm64=$BOTTLE_TAG_ARM64" >> $GITHUB_OUTPUT
-          echo "bottle-tag-x64=$BOTTLE_TAG_X64" >> $GITHUB_OUTPUT
           echo "bottle-sha-arm64=$BOTTLE_SHA_ARM64" >> $GITHUB_OUTPUT
-          echo "bottle-sha-x64=$BOTTLE_SHA_X64" >> $GITHUB_OUTPUT
       
       - name: Upload bottles to GitHub release
         env:
@@ -572,16 +533,14 @@ jobs:
         run: |
           VERSION="${{ needs.validate-version.outputs.version }}"
           BOTTLE_NAME_ARM64="${{ steps.bottles.outputs.bottle-name-arm64 }}"
-          BOTTLE_NAME_X64="${{ steps.bottles.outputs.bottle-name-x64 }}"
-          
-          echo "📤 Uploading bottles to GitHub release"
-          
-          # Upload both bottles to GitHub release
-          gh release upload "v${VERSION}" "$BOTTLE_NAME_ARM64" "$BOTTLE_NAME_X64" --clobber
-          
-          echo "✅ Bottles uploaded to release assets"
+
+          echo "📤 Uploading bottle to GitHub release"
+
+          # Upload ARM64 bottle to GitHub release
+          gh release upload "v${VERSION}" "$BOTTLE_NAME_ARM64" --clobber
+
+          echo "✅ Bottle uploaded to release assets"
           echo "📦 ARM64: https://github.com/${{ github.repository }}/releases/download/v${VERSION}/${BOTTLE_NAME_ARM64}"
-          echo "📦 x64: https://github.com/${{ github.repository }}/releases/download/v${VERSION}/${BOTTLE_NAME_X64}"
       
       - name: Generate Homebrew formula with bottle blocks
         id: formula
@@ -590,33 +549,17 @@ jobs:
           REPO_OWNER="${{ github.repository_owner }}"
           REPO_NAME="${{ github.event.repository.name }}"
           BOTTLE_TAG_ARM64="${{ steps.bottles.outputs.bottle-tag-arm64 }}"
-          BOTTLE_TAG_X64="${{ steps.bottles.outputs.bottle-tag-x64 }}"
           BOTTLE_SHA_ARM64="${{ steps.bottles.outputs.bottle-sha-arm64 }}"
-          BOTTLE_SHA_X64="${{ steps.bottles.outputs.bottle-sha-x64 }}"
-          
-          echo "📝 Generating Homebrew formula for version $VERSION with bottle support"
-          
+
+          echo "📝 Generating Homebrew formula for version $VERSION with ARM64 bottle"
+
           # Download source tarball to calculate SHA256
           SOURCE_TARBALL_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/archive/refs/tags/v${VERSION}.tar.gz"
           curl -sSL "$SOURCE_TARBALL_URL" -o source.tar.gz
           SOURCE_SHA=$(shasum -a 256 source.tar.gz | cut -d ' ' -f 1)
           echo "Source tarball SHA256: $SOURCE_SHA"
-          
-          # Create formula file with bottle block using echo to avoid heredoc YAML issues
-          # Calculate spacing for bottle digest alignment
-          ARM64_LEN=${#BOTTLE_TAG_ARM64}
-          X64_LEN=${#BOTTLE_TAG_X64}
-          # Add spaces to shorter tag to align the SHA256 values
-          if [ $ARM64_LEN -gt $X64_LEN ]; then
-            SPACES=$((ARM64_LEN - X64_LEN))
-            X64_PADDING=$(printf '%*s' $SPACES '')
-            ARM64_PADDING=""
-          else
-            SPACES=$((X64_LEN - ARM64_LEN))
-            ARM64_PADDING=$(printf '%*s' $SPACES '')
-            X64_PADDING=""
-          fi
-          
+
+          # Create formula file with ARM64 bottle only
           {
             echo "class TenSecondTom < Formula"
             echo "  desc \"CLI tool for daily work summaries using Claude AI with voice entry support\""
@@ -625,11 +568,10 @@ jobs:
             echo "  sha256 \"${SOURCE_SHA}\""
             echo "  license \"MIT\""
             echo ""
-            echo "  # Bottles (pre-built binaries) for fast installation"
+            echo "  # Bottle (pre-built binary) for Apple Silicon"
             echo "  bottle do"
             echo "    root_url \"https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v${VERSION}\""
-            echo "    sha256 cellar: :any_skip_relocation, ${BOTTLE_TAG_ARM64}:${ARM64_PADDING} \"${BOTTLE_SHA_ARM64}\""
-            echo "    sha256 cellar: :any_skip_relocation, ${BOTTLE_TAG_X64}:${X64_PADDING} \"${BOTTLE_SHA_X64}\""
+            echo "    sha256 cellar: :any_skip_relocation, ${BOTTLE_TAG_ARM64}: \"${BOTTLE_SHA_ARM64}\""
             echo "  end"
             echo ""
             echo "  # Dependencies for voice entry feature"

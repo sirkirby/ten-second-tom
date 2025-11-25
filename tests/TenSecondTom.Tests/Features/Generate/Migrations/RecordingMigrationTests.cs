@@ -37,7 +37,7 @@ public sealed class RecordingMigrationTests
         mockFileSystem.File.WriteAllText(legacyFilePath, legacyContent);
 
         var migration = new RecordingMigration(mockFileSystem, NullLogger<RecordingMigration>.Instance);
-        var serviceProvider = BuildServiceProvider(mockFileSystem, storageRoot);
+        using var serviceProvider = BuildServiceProvider(mockFileSystem, storageRoot);
 
         // Act
         var migrationSucceeded = await migration.MigrateAsync(serviceProvider, CancellationToken.None);
@@ -73,7 +73,7 @@ public sealed class RecordingMigrationTests
         mockFileSystem.File.WriteAllText(legacyFilePath, legacyContent);
 
         var migration = new RecordingMigration(mockFileSystem, NullLogger<RecordingMigration>.Instance);
-        var serviceProvider = BuildServiceProvider(mockFileSystem, storageRoot);
+        using var serviceProvider = BuildServiceProvider(mockFileSystem, storageRoot);
 
         // Act
         var migrationSucceeded = await migration.MigrateAsync(serviceProvider, CancellationToken.None);

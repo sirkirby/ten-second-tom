@@ -197,7 +197,6 @@ public sealed class SpectreConsoleSetupWizardTests
         var intMethod = typeof(SpectreConsoleSetupWizard).GetMethod("PromptForIntAsync");
         var sttProviderMethod = typeof(SpectreConsoleSetupWizard).GetMethod("PromptForSttProviderAsync");
         var sttApiKeyMethod = typeof(SpectreConsoleSetupWizard).GetMethod("PromptForSttApiKeyAsync");
-        var sttFallbackMethod = typeof(SpectreConsoleSetupWizard).GetMethod("PromptForSttFallbackAsync");
 
         // Assert
         inputVolumeMethod.Should().NotBeNull("PromptForInputVolumeAsync method should exist");
@@ -214,9 +213,6 @@ public sealed class SpectreConsoleSetupWizardTests
 
         sttApiKeyMethod.Should().NotBeNull("PromptForSttApiKeyAsync method should exist");
         sttApiKeyMethod!.ReturnType.Should().Be<Task<string?>>();
-
-        sttFallbackMethod.Should().NotBeNull("PromptForSttFallbackAsync method should exist");
-        sttFallbackMethod!.ReturnType.Should().Be<Task<bool?>>();
     }
 
     #endregion

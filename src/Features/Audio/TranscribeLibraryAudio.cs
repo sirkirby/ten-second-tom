@@ -110,7 +110,7 @@ public static class TranscribeLibraryAudio
             var recordingDirectory = _fileSystem.Path.Combine(_storageRoot, libraryDirectoryName);
             EnsureDirectory(recordingDirectory);
 
-            var audioDestination = _fileSystem.Path.Combine(recordingDirectory, $"{request.RecordingBaseName}.wav");
+            var audioDestination = _fileSystem.Path.Combine(recordingDirectory, $"{request.RecordingBaseName}.mp3");
             var transcriptDestination = _fileSystem.Path.Combine(recordingDirectory, $"{request.RecordingBaseName}.md");
 
             var sameFile = PathsEqual(request.AudioFilePath, audioDestination);

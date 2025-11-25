@@ -41,19 +41,15 @@ public static class SttSelectionMapper
     {
         ArgumentNullException.ThrowIfNull(baseOptions);
 
+        // Preserve provider-specific configuration
+        var providers = baseOptions.Providers ?? new Dictionary<string, Dictionary<string, string>>();
+
         return selection switch
         {
             SttSelection.Auto => new AudioOptions
             {
                 SttProvider = baseOptions.SttProvider,
-                SttApiKey = baseOptions.SttApiKey,
-                SttFallbackEnabled = true,
-                SttFallbackProvider = baseOptions.SttFallbackProvider,
-                SttFallbackApiKey = baseOptions.SttFallbackApiKey,
-                SttBinaryPath = baseOptions.SttBinaryPath,
-                SttModel = baseOptions.SttModel,
-                SttFallbackBinaryPath = baseOptions.SttFallbackBinaryPath,
-                SttFallbackModel = baseOptions.SttFallbackModel,
+                Providers = providers,
                 KeepFiles = baseOptions.KeepFiles,
                 Recorder = baseOptions.Recorder,
                 Preprocessing = baseOptions.Preprocessing,
@@ -62,10 +58,7 @@ public static class SttSelectionMapper
             SttSelection.Local => new AudioOptions
             {
                 SttProvider = baseOptions.SttProvider,
-                SttApiKey = baseOptions.SttApiKey,
-                SttFallbackEnabled = false,
-                SttBinaryPath = baseOptions.SttBinaryPath,
-                SttModel = baseOptions.SttModel,
+                Providers = providers,
                 KeepFiles = baseOptions.KeepFiles,
                 Recorder = baseOptions.Recorder,
                 Preprocessing = baseOptions.Preprocessing,
@@ -74,10 +67,7 @@ public static class SttSelectionMapper
             SttSelection.OpenAI => new AudioOptions
             {
                 SttProvider = SttProviders.OpenAI,
-                SttApiKey = baseOptions.SttApiKey,
-                SttFallbackEnabled = false,
-                SttBinaryPath = baseOptions.SttBinaryPath,
-                SttModel = baseOptions.SttModel,
+                Providers = providers,
                 KeepFiles = baseOptions.KeepFiles,
                 Recorder = baseOptions.Recorder,
                 Preprocessing = baseOptions.Preprocessing,

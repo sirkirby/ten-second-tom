@@ -29,7 +29,7 @@ public sealed class ThisWeekMigrationTests
         string legacyFilePath = fileSystem.Path.Combine(legacyDirectory, legacyFileName);
         fileSystem.File.WriteAllText(legacyFilePath, "Weekly review content");
 
-        var services = BuildServiceProvider(fileSystem, storageRoot);
+        using var services = BuildServiceProvider(fileSystem, storageRoot);
         var migration = new ThisWeekMigration();
 
         // Act
@@ -61,7 +61,7 @@ public sealed class ThisWeekMigrationTests
         string invalidFilePath = fileSystem.Path.Combine(legacyDirectory, "invalid-file.md");
         fileSystem.File.WriteAllText(invalidFilePath, "orphan content");
 
-        var services = BuildServiceProvider(fileSystem, storageRoot);
+        using var services = BuildServiceProvider(fileSystem, storageRoot);
         var migration = new ThisWeekMigration();
 
         // Act
@@ -79,7 +79,7 @@ public sealed class ThisWeekMigrationTests
         // Arrange
         const string storageRoot = "/storage";
         var fileSystem = new MockFileSystem(new Dictionary<string, MockFileData>(), storageRoot);
-        var services = BuildServiceProvider(fileSystem, storageRoot);
+        using var services = BuildServiceProvider(fileSystem, storageRoot);
         var migration = new ThisWeekMigration();
 
         // Act

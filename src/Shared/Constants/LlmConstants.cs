@@ -21,8 +21,8 @@ internal static class LlmConstants
     /// </summary>
     internal static class OpenAIModels
     {
-        internal const string GPTStandard = "gpt-5";
-        internal const string GPTStandardDisplayName = "GPT-5 Standard";
+        internal const string GPTStandard = "gpt-5.1";
+        internal const string GPTStandardDisplayName = "GPT-5.1";
         internal const string GPTStandardDescription = "Flagship model for coding, reasoning, and agentic tasks";
         internal const string GPTMini = "gpt-5-mini";
         internal const string GPTMiniDisplayName = "GPT-5 Mini";
@@ -41,8 +41,8 @@ internal static class LlmConstants
         internal const string ClaudeSonnet = "claude-sonnet-4-5";
         internal const string ClaudeSonnetDisplayName = "Claude Sonnet 4.5";
         internal const string ClaudeSonnetDescription = "Best model for complex agents and coding with highest intelligence";
-        internal const string ClaudeOpus = "claude-opus-4-1";
-        internal const string ClaudeOpusDisplayName = "Claude Opus 4.1";
+        internal const string ClaudeOpus = "claude-opus-4-5";
+        internal const string ClaudeOpusDisplayName = "Claude Opus 4.5";
         internal const string ClaudeOpusDescription = "Exceptional model for specialized complex tasks requiring advanced reasoning";
         internal const string ClaudeHaiku = "claude-haiku-4-5";
         internal const string ClaudeHaikuDisplayName = "Claude Haiku 4.5";

@@ -173,8 +173,8 @@ public sealed class LlmProviderFactoryTests : IDisposable
                 mockChatClient.Object,
                 mockOpenAILogger.Object,
                 "gpt-3.5-turbo-0301")); // Old deprecated model
-        
-        var serviceProvider = services.BuildServiceProvider();
+
+        using var serviceProvider = services.BuildServiceProvider();
         var scopeFactory = serviceProvider.GetRequiredService<IServiceScopeFactory>();
         var factory = new LlmProviderFactory(scopeFactory);
 
@@ -200,8 +200,8 @@ public sealed class LlmProviderFactoryTests : IDisposable
                 mockChatClient.Object,
                 mockOpenAILogger.Object,
                 "gpt-4o-mini")); // Use default model
-        
-        var serviceProvider = services.BuildServiceProvider();
+
+        using var serviceProvider = services.BuildServiceProvider();
         var scopeFactory = serviceProvider.GetRequiredService<IServiceScopeFactory>();
         var factory = new LlmProviderFactory(scopeFactory);
 

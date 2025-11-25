@@ -24,7 +24,7 @@ namespace TenSecondTom.IntegrationTests.Integration.Cli;
 /// Focus on template selection behavior with --use-default-template and --template flags.
 /// </summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("IDisposableAnalyzers.Correctness", "CA1001:Types that own disposable fields should be disposable", Justification = "Disposal is handled via IAsyncLifetime.DisposeAsync")]
-public sealed class TodayCommandNoEditTests : IAsyncLifetime
+public sealed class TodayCommandNoEditTests : IAsyncLifetime, IDisposable
 {
     private readonly TemporaryTestDirectory _testDirectory;
     private readonly ServiceProvider _serviceProvider;
@@ -50,6 +50,8 @@ public sealed class TodayCommandNoEditTests : IAsyncLifetime
         await _serviceProvider.DisposeAsync();
         _testDirectory.Dispose();
     }
+
+    void IDisposable.Dispose() => DisposeAsync().GetAwaiter().GetResult();
 
     [Fact]
     public async Task Handle_WithNoEditAndDefaultTemplate_CreatesEntryQuickly()

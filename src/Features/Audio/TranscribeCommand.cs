@@ -303,9 +303,10 @@ public static class TranscribeCommand
         }
 
         var extension = fileSystem.Path.GetExtension(fullPath);
-        if (!string.Equals(extension, ".wav", StringComparison.OrdinalIgnoreCase))
+        var supportedExtensions = new[] { ".wav", ".mp3", ".flac" };
+        if (!supportedExtensions.Any(ext => string.Equals(extension, ext, StringComparison.OrdinalIgnoreCase)))
         {
-            return Result<AudioLibraryItem>.Failure("Only .wav files are supported for transcription.");
+            return Result<AudioLibraryItem>.Failure("Only .wav, .mp3, and .flac files are supported for transcription.");
         }
 
         var fileInfo = fileSystem.FileInfo.New(fullPath);

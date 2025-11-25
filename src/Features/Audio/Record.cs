@@ -102,7 +102,7 @@ public static class Record
                 request.AudioConfig.SttProvider, recordingDir, maxDurationSeconds);
 
             // Step 1: Record audio - the recorder will save to a temp file first, then we move it
-            var tempAudioPath = _fileSystem.Path.Combine(_fileSystem.Path.GetTempPath(), $"tom-recording-{Guid.NewGuid()}.wav");
+            var tempAudioPath = _fileSystem.Path.Combine(_fileSystem.Path.GetTempPath(), $"tom-recording-{Guid.NewGuid()}.mp3");
 
             var recordCommand = new RecordAudio.Command
             {
@@ -187,9 +187,11 @@ public static class Record
             }
 
             // Step 2: Determine entry number for today and create consistent naming pattern
+            // Count both .mp3 and .wav files for backward compatibility
             var today = DateTimeOffset.UtcNow;
-            var existingFiles = _fileSystem.Directory.GetFiles(recordingDir, $"{today:MM-dd-yyyy}_*.wav");
-            var nextNumber = existingFiles.Length + 1;
+            var existingMp3Files = _fileSystem.Directory.GetFiles(recordingDir, $"{today:MM-dd-yyyy}_*.mp3");
+            var existingWavFiles = _fileSystem.Directory.GetFiles(recordingDir, $"{today:MM-dd-yyyy}_*.wav");
+            var nextNumber = existingMp3Files.Length + existingWavFiles.Length + 1;
             var filePrefix = $"{today:MM-dd-yyyy}_{nextNumber}";
 
             var transcribeLibraryCommand = new TranscribeLibraryAudio.Command

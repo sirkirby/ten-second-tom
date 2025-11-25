@@ -13,7 +13,7 @@ namespace TenSecondTom.Tests.Infrastructure.Auth;
 /// Tests verify SSH agent protocol communication, challenge-response authentication,
 /// and signature verification for secure authentication without accessing private key files.
 /// </summary>
-public sealed class SshAgentAuthenticationServiceTests
+public sealed class SshAgentAuthenticationServiceTests : IDisposable
 {
     private readonly Mock<ILogger<SshAgentAuthenticationService>> _mockLogger;
     private readonly Mock<ISshAgentClient> _mockAgentClient;
@@ -73,6 +73,11 @@ public sealed class SshAgentAuthenticationServiceTests
                 if (_lastChallenge == null) return new byte[64];
                 return SignatureAlgorithm.Ed25519.Sign(_testPrivateKey, _lastChallenge);
             });
+    }
+
+    public void Dispose()
+    {
+        _testPrivateKey?.Dispose();
     }
 
     [Fact]

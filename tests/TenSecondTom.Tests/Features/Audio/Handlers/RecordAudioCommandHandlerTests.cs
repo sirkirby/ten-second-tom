@@ -196,8 +196,12 @@ public sealed class RecordAudioCommandHandlerTests
     {
         // Arrange
         var command = new RecordAudio.Command { OutputPath = "/path/to/recording.wav" };
-        var cts = new CancellationTokenSource();
-        cts.Cancel();
+        CancellationToken token;
+        using (var cts = new CancellationTokenSource())
+        {
+            cts.Cancel();
+            token = cts.Token;
+        }
 
         _mockRecorder
             .Setup(r => r.RecordAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
@@ -206,7 +210,7 @@ public sealed class RecordAudioCommandHandlerTests
         var handler = CreateHandler();
 
         // Act
-        var act = () => handler.Handle(command, cts.Token);
+        var act = () => handler.Handle(command, token);
 
         // Assert
         await act.Should().ThrowAsync<OperationCanceledException>();

@@ -21,8 +21,14 @@ public sealed class TranscribeLibraryAudioHandlerTests
     private static readonly AudioOptions DefaultAudioOptions = new()
     {
         SttProvider = SttProviders.WhisperCpp,
-        SttBinaryPath = "whisper-cli",
-        SttModel = "/models/ggml-base.en.bin"
+        Providers = new Dictionary<string, Dictionary<string, string>>
+        {
+            [SttProviders.WhisperCpp] = new()
+            {
+                ["BinaryPath"] = "whisper-cli",
+                ["Model"] = "/models/ggml-base.en.bin"
+            }
+        }
     };
 
     private readonly Mock<IMediator> _mediator = new();
@@ -115,7 +121,9 @@ public sealed class TranscribeLibraryAudioHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        fileSystem.AllFiles.Count().Should().Be(2); // audio + transcript only
+        // 3 files: original .wav + converted .mp3 + transcript .md
+        // Handler always stores as .mp3, so even in-place recordings get converted
+        fileSystem.AllFiles.Count().Should().Be(3);
     }
 
     [Fact]

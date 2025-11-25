@@ -60,7 +60,7 @@ public static class SetupLocalLlm
             }
 
             // Determine Model Name
-            string modelName = request.ModelNameOverride ?? _llmOptions.Model ?? "local-model";
+            string modelName = request.ModelNameOverride ?? _llmOptions.GetModel() ?? "local-model";
 
             try
             {
@@ -79,7 +79,7 @@ public static class SetupLocalLlm
 
                 logger.LogInformation("Verifying local LLM at {Url}", modelsUrl);
 
-                var response = await client.GetAsync(modelsUrl, cancellationToken);
+                using var response = await client.GetAsync(modelsUrl, cancellationToken);
 
                 if (response.IsSuccessStatusCode)
                 {

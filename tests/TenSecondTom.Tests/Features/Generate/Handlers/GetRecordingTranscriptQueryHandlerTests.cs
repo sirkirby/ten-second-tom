@@ -111,7 +111,7 @@ public sealed class GetRecordingTranscriptQueryHandlerTests
     {
         // Arrange
         var transcriptPath = "/test/recording.md";
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
 
         _mockRecordingService
             .Setup(s => s.GetTranscriptContentAsync(transcriptPath, cts.Token))

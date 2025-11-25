@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
+using TenSecondTom.Shared.Abstractions.Models;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Infrastructure.Llm;
@@ -10,9 +11,9 @@ namespace TenSecondTom.Infrastructure.Llm;
 /// LLM provider implementation for local OpenAI-compatible APIs (e.g., llama.cpp, Ollama, LM Studio).
 /// Sends standard OpenAI Chat Completion JSON payloads to a configurable endpoint.
 /// </summary>
-public sealed class LocalOpenAiCompatibleLlmProvider : ILlmProvider
+public sealed class LocalOpenAiCompatibleLlmProvider : ILlmProvider, ISupportsModelManagement
 {
-    private readonly HttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<LocalOpenAiCompatibleLlmProvider> _logger;
     private readonly string _model;
     private readonly string _baseUrl;
@@ -20,17 +21,17 @@ public sealed class LocalOpenAiCompatibleLlmProvider : ILlmProvider
     /// <summary>
     /// Initializes a new instance of the <see cref="LocalOpenAiCompatibleLlmProvider"/> class.
     /// </summary>
-    /// <param name="httpClient">The HTTP client.</param>
+    /// <param name="httpClientFactory">The HTTP client factory.</param>
     /// <param name="logger">The logger instance.</param>
     /// <param name="model">The model name to use.</param>
     /// <param name="baseUrl">The base URL of the local server (e.g., "http://127.0.0.1:8080/v1").</param>
     public LocalOpenAiCompatibleLlmProvider(
-        HttpClient httpClient,
+        IHttpClientFactory httpClientFactory,
         ILogger<LocalOpenAiCompatibleLlmProvider> logger,
         string model,
         string baseUrl)
     {
-        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _model = model ?? throw new ArgumentNullException(nameof(model));
         _baseUrl = baseUrl?.TrimEnd('/') ?? throw new ArgumentNullException(nameof(baseUrl));
@@ -57,7 +58,7 @@ public sealed class LocalOpenAiCompatibleLlmProvider : ILlmProvider
         try
         {
             var requestUrl = $"{_baseUrl}/chat/completions";
-            
+
             _logger.LogDebug(
                 "Calling Local LLM API at {Url} with model {Model}, maxTokens: {MaxTokens}",
                 requestUrl,
@@ -75,7 +76,12 @@ public sealed class LocalOpenAiCompatibleLlmProvider : ILlmProvider
                 temperature = temperature
             };
 
-            var response = await _httpClient.PostAsJsonAsync(requestUrl, requestBody, cancellationToken).ConfigureAwait(false);
+            // Create HttpClient with 15-minute timeout for long-running operations
+            // Note: HttpClient from IHttpClientFactory is managed by the factory and must not be disposed by consumer
+            using var httpClient = _httpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromMinutes(15);
+
+            using var response = await httpClient.PostAsJsonAsync(requestUrl, requestBody, cancellationToken).ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -119,6 +125,71 @@ public sealed class LocalOpenAiCompatibleLlmProvider : ILlmProvider
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<IEnumerable<string>> ListModelsAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var requestUrl = $"{_baseUrl}/models";
+
+            _logger.LogDebug("Fetching available models from {Url}", requestUrl);
+
+            using var httpClient = _httpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(30);
+
+            using var response = await httpClient.GetAsync(requestUrl, cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                _logger.LogWarning("Failed to fetch models from {Url}: {StatusCode} - {Content}", requestUrl, response.StatusCode, errorContent);
+                return [];
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<OpenAiModelsResponse>(cancellationToken: cancellationToken);
+
+            if (result?.Data is null)
+            {
+                _logger.LogWarning("Models endpoint returned empty response");
+                return [];
+            }
+
+            var modelIds = result.Data.Select(m => m.Id ?? "unknown").ToList();
+            _logger.LogDebug("Found {Count} models: {Models}", modelIds.Count, string.Join(", ", modelIds));
+
+            return modelIds;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Network error fetching models from {BaseUrl}", _baseUrl);
+            return [];
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to list models");
+            return [];
+        }
+    }
+
+    /// <inheritdoc/>
+    public Task<Result> DownloadModelAsync(
+        string modelId,
+        Action<double>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        // OpenAI-compatible APIs don't support model downloads via API
+        // Users should use their provider's native tools (Ollama CLI, LM Studio UI, etc.)
+        _logger.LogInformation(
+            "Model download not supported for LocalOpenAiCompatible provider. Use your provider's native tools to download '{ModelId}'.",
+            modelId);
+
+        return Task.FromResult(Result.Failure(
+            $"Model downloads are not supported for OpenAI-compatible APIs. " +
+            $"Use your provider's native tools to download '{modelId}':\n" +
+            $"  • Ollama: ollama pull {modelId}\n" +
+            $"  • LM Studio: Use the Models tab in the UI"));
+    }
+
     // Internal DTOs for JSON deserialization
     private sealed class OpenAiChatCompletionResponse
     {
@@ -148,5 +219,18 @@ public sealed class LocalOpenAiCompatibleLlmProvider : ILlmProvider
 
         [JsonPropertyName("completion_tokens")]
         public int CompletionTokens { get; set; }
+    }
+
+    // DTOs for /v1/models endpoint
+    private sealed class OpenAiModelsResponse
+    {
+        [JsonPropertyName("data")]
+        public ModelData[]? Data { get; set; }
+    }
+
+    private sealed class ModelData
+    {
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
     }
 }

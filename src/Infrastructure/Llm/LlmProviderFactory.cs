@@ -52,7 +52,8 @@ public sealed class LlmProviderFactory : ILlmProviderFactory
             "OPENAI" => GetProvider<OpenAILlmProvider>(),
             "ANTHROPIC" => GetProvider<AnthropicLlmProvider>(),
             "LOCALOPENAICOMPATIBLE" => GetProvider<LocalOpenAiCompatibleLlmProvider>(),
-            _ => throw new ArgumentException($"Unsupported LLM provider: {providerName}. Supported providers are: OpenAI, Anthropic, LocalOpenAiCompatible", nameof(providerName))
+            "BUILTINLOCAL" => GetProvider<BuiltInLocalLlmProvider>(),
+            _ => throw new ArgumentException($"Unsupported LLM provider: {providerName}. Supported providers are: OpenAI, Anthropic, LocalOpenAiCompatible, BuiltInLocal", nameof(providerName))
         };
     }
 
