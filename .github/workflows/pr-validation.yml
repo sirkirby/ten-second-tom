@@ -10,6 +10,8 @@
 name: PR Validation
 
 on:
+  push:
+    branches: [main]  # Build on main to populate cache for PRs
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
@@ -98,15 +100,18 @@ jobs:
             ${{ runner.os }}-nuget-
       
       - name: Restore dependencies
-        run: dotnet restore
-      
+        run: dotnet restore -r linux-x64
+        # -r linux-x64: Avoid downloading Whisper.net.AllRuntimes (~2GB) by specifying target runtime
+
       - name: Build solution
         run: |
           dotnet build \
             --configuration Release \
             --no-restore \
+            -r linux-x64 \
             --warnaserror
         # --warnaserror: Treat warnings as errors to enforce clean code
+        # -r linux-x64: Match restore runtime to avoid package mismatch
 
   # Job 2: Test
   # Runs all unit and integration tests
@@ -135,13 +140,14 @@ jobs:
             ${{ runner.os }}-nuget-
       
       - name: Restore dependencies
-        run: dotnet restore
-      
+        run: dotnet restore -r linux-x64
+
       - name: Run tests
         run: |
           dotnet test \
             --configuration Release \
             --no-restore \
+            -r linux-x64 \
             --logger "trx;LogFileName=test-results.trx" \
             --verbosity normal
       
@@ -182,12 +188,13 @@ jobs:
             ${{ runner.os }}-nuget-
       
       - name: Restore dependencies
-        run: dotnet restore
-      
+        run: dotnet restore -r linux-x64
+
       - name: Run tests with coverage
         run: |
           dotnet test \
             --configuration Release \
+            -r linux-x64 \
             --collect:"XPlat Code Coverage" \
             --results-directory ./coverage
       
@@ -341,8 +348,8 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       
       - name: Restore dependencies
-        run: dotnet restore
-      
+        run: dotnet restore -r linux-x64
+
       - name: Build release executable (Linux x64)
         run: |
           dotnet publish src/TenSecondTom.csproj \
