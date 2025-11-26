@@ -108,10 +108,9 @@ jobs:
           dotnet build \
             --configuration Release \
             --no-restore \
-            -r linux-x64 \
             --warnaserror
         # --warnaserror: Treat warnings as errors to enforce clean code
-        # -r linux-x64: Match restore runtime to avoid package mismatch
+        # --no-restore: Uses packages from restore step (which specified -r linux-x64)
 
   # Job 2: Test
   # Runs all unit and integration tests
@@ -147,7 +146,6 @@ jobs:
           dotnet test \
             --configuration Release \
             --no-restore \
-            -r linux-x64 \
             --logger "trx;LogFileName=test-results.trx" \
             --verbosity normal
       
@@ -194,7 +192,7 @@ jobs:
         run: |
           dotnet test \
             --configuration Release \
-            -r linux-x64 \
+            --no-restore \
             --collect:"XPlat Code Coverage" \
             --results-directory ./coverage
       
