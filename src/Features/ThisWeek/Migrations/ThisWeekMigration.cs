@@ -44,7 +44,7 @@ public sealed class ThisWeekMigration : IFeatureMigration
         var storageOptions = services.GetRequiredService<IOptions<StorageOptions>>();
         var fileSystem = services.GetRequiredService<IFileSystem>();
 
-        string rootDirectory = storageOptions.Value.GetEffectiveStorageDirectory();
+        string rootDirectory = storageOptions.Value.EffectiveStorageDirectory;
         string legacyDirectory = fileSystem.Path.Combine(rootDirectory, DirectoryNames.ThisWeek);
         string noteDirectory = fileSystem.Path.Combine(rootDirectory, DirectoryNames.Note);
 

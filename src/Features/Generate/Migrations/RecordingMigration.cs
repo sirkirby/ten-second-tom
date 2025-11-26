@@ -35,7 +35,7 @@ public sealed class RecordingMigration(
         var fileSystem = services.GetRequiredService<IFileSystem>() ?? _fileSystem;
 
         // Get effective storage directory using centralized resolution logic
-        var storageDirectory = storageOptions.Value.GetEffectiveStorageDirectory();
+        var storageDirectory = storageOptions.Value.EffectiveStorageDirectory;
         var recordingDirectory = fileSystem.Path.Combine(storageDirectory, "recording");
 
         logger.LogDebug("Checking for legacy .txt recording files in: {RecordingDirectory}", recordingDirectory);

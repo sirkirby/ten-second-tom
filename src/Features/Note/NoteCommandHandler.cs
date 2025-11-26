@@ -250,7 +250,7 @@ public static class NoteCommandHandler
             AnsiConsole.Write(panel);
 
             // Show clickable file path
-            var rootDir = storageOptions.Value.GetEffectiveStorageDirectory();
+            var rootDir = storageOptions.Value.EffectiveStorageDirectory;
             string fullPath = Path.Combine(rootDir, note.FilePath);
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine($"[dim]Saved to:[/] [link]{fullPath.EscapeMarkup()}[/]");

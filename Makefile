@@ -9,7 +9,7 @@ extensions:
 
 dotnet: extensions
 	@echo "Building .NET Application..."
-	@dotnet build -f net9.0 src/TenSecondTom.csproj
+	@dotnet build -f net10.0 src/TenSecondTom.csproj
 
 clean:
 	@echo "Cleaning..."

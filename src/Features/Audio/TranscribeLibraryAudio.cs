@@ -79,7 +79,7 @@ public static class TranscribeLibraryAudio
         private readonly ILogger<Handler> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         private readonly string _storageRoot = (storageOptions ?? throw new ArgumentNullException(nameof(storageOptions)))
             .Value
-            .GetEffectiveStorageDirectory();
+            .EffectiveStorageDirectory;
 
         public async Task<Result<TranscribedLibraryRecording>> Handle(Command request, CancellationToken cancellationToken)
         {

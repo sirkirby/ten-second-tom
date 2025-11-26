@@ -6,7 +6,7 @@
 
 ## Overview
 
-This document describes the **multi-targeting approach required for Windows notification support**. The initial implementation focuses on **macOS only with single binary (net9.0)** to reduce complexity. When ready to add Windows support, follow this guide.
+This document describes the **multi-targeting approach required for Windows notification support**. The initial implementation focuses on **macOS only with single binary (net10.0)** to reduce complexity. When ready to add Windows support, follow this guide.
 
 ---
 
@@ -20,7 +20,7 @@ This document describes the **multi-targeting approach required for Windows noti
 - Toast notification activation callbacks
 - Action button support
 
-**These APIs are ONLY available when targeting `net9.0-windows10.0.19041.0` or later.**
+**These APIs are ONLY available when targeting `net10.0-windows10.0.19041.0` or later.**
 
 ### Alternative Approaches Considered
 
@@ -29,7 +29,7 @@ This document describes the **multi-targeting approach required for Windows noti
 | P/Invoke to native Windows APIs | ❌ Complex | Requires manual COM interop, no action button support |
 | PowerShell `New-BurntToastNotification` | ❌ Limited | External process, no callback mechanism, requires module install |
 | Windows Forms NotifyIcon | ❌ Wrong paradigm | System tray balloons, not Action Center notifications |
-| WinRT without multi-targeting | ❌ Not possible | WinRT APIs unavailable in net9.0 TFM |
+| WinRT without multi-targeting | ❌ Not possible | WinRT APIs unavailable in net10.0 TFM |
 
 **Conclusion**: Multi-targeting is the **only viable path** for full Windows notification support.
 
@@ -47,10 +47,10 @@ This document describes the **multi-targeting approach required for Windows noti
     <OutputType>Exe</OutputType>
 
     <!-- BEFORE: Single TFM -->
-    <!-- <TargetFramework>net9.0</TargetFramework> -->
+    <!-- <TargetFramework>net10.0</TargetFramework> -->
 
     <!-- AFTER: Multi-targeting -->
-    <TargetFrameworks>net9.0;net9.0-windows10.0.19041.0</TargetFrameworks>
+    <TargetFrameworks>net10.0;net10.0-windows10.0.19041.0</TargetFrameworks>
 
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -211,7 +211,7 @@ public sealed class WindowsNotificationProvider(
 
     public Task<Result> SendAsync(Notification notification, CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(Result.Failure("Windows notifications require net9.0-windows TFM"));
+        return Task.FromResult(Result.Failure("Windows notifications require net10.0-windows TFM"));
     }
 
     public Task<Result> DismissAsync(Guid notificationId, CancellationToken cancellationToken = default)
@@ -363,11 +363,11 @@ await app.RunAsync();
 With multi-targeting, you'll get **two build outputs**:
 
 ```
-bin/Release/net9.0/
+bin/Release/net10.0/
 ├── TenSecondTom (macOS/Linux)
 └── [dependencies]
 
-bin/Release/net9.0-windows10.0.19041.0/
+bin/Release/net10.0-windows10.0.19041.0/
 ├── TenSecondTom.exe (Windows)
 └── [dependencies + Microsoft.Toolkit.Uwp.Notifications]
 ```
@@ -376,10 +376,10 @@ bin/Release/net9.0-windows10.0.19041.0/
 
 ```bash
 # macOS/Linux build
-dotnet publish -c Release -f net9.0 -r osx-arm64 --self-contained
+dotnet publish -c Release -f net10.0 -r osx-arm64 --self-contained
 
 # Windows build
-dotnet publish -c Release -f net9.0-windows10.0.19041.0 -r win-x64 --self-contained
+dotnet publish -c Release -f net10.0-windows10.0.19041.0 -r win-x64 --self-contained
 ```
 
 ### CI/CD Updates
@@ -388,16 +388,16 @@ dotnet publish -c Release -f net9.0-windows10.0.19041.0 -r win-x64 --self-contai
 
 ```yaml
 - name: Build for macOS
-  run: dotnet build -c Release -f net9.0
+  run: dotnet build -c Release -f net10.0
 
 - name: Build for Windows
-  run: dotnet build -c Release -f net9.0-windows10.0.19041.0
+  run: dotnet build -c Release -f net10.0-windows10.0.19041.0
 
 - name: Publish macOS
-  run: dotnet publish -c Release -f net9.0 -r osx-arm64 --self-contained
+  run: dotnet publish -c Release -f net10.0 -r osx-arm64 --self-contained
 
 - name: Publish Windows
-  run: dotnet publish -c Release -f net9.0-windows10.0.19041.0 -r win-x64 --self-contained
+  run: dotnet publish -c Release -f net10.0-windows10.0.19041.0 -r win-x64 --self-contained
 ```
 
 ---
@@ -455,7 +455,7 @@ When ready to add Windows support:
 
 **Until Windows support is added:**
 
-1. **Single TFM**: `net9.0` (no multi-targeting)
+1. **Single TFM**: `net10.0` (no multi-targeting)
 2. **macOS Channel**: Fully implemented with osascript
 3. **Windows Channel**: Stub that returns "Unavailable" (runtime detection)
 4. **Architecture**: Fully extensible - adding Windows requires NO changes to abstractions

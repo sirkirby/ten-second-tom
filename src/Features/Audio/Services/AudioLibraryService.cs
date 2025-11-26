@@ -31,7 +31,7 @@ public sealed class AudioLibraryService : IAudioLibraryService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         ArgumentNullException.ThrowIfNull(storageOptions);
-        var storageRoot = storageOptions.Value.GetEffectiveStorageDirectory();
+        var storageRoot = storageOptions.Value.EffectiveStorageDirectory;
 
         _recordingDirectory = _fileSystem.Path.Combine(storageRoot, DirectoryNames.Recording);
         _noteDirectory = _fileSystem.Path.Combine(storageRoot, DirectoryNames.Note);

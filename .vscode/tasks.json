@@ -1,5 +1,5 @@
 {
-  // VS Code task definitions for Ten Second Tom (.NET 9 CLI)
+  // VS Code task definitions for Ten Second Tom (.NET 10 CLI)
   // Provides an explicit 'build' task referenced by launch.json.
   // Additional tasks (test, publish) can be added later.
   "version": "2.0.0",

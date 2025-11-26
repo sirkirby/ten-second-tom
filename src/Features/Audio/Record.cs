@@ -84,7 +84,7 @@ public static class Record
             }
 
             // Get the effective storage directory using extension method
-            var storageBaseDir = _storageOptions.GetEffectiveStorageDirectory();
+            var storageBaseDir = _storageOptions.EffectiveStorageDirectory;
 
             if (string.IsNullOrWhiteSpace(storageBaseDir))
             {

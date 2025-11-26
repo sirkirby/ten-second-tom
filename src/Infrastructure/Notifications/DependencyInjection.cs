@@ -44,7 +44,7 @@ public static class NotificationFeatureExtensions
     /// </para>
     /// <list type="bullet">
     /// <item>MacOsNotificationProvider - macOS native notifications (osascript)</item>
-    /// <item>WindowsNotificationProvider - Runtime stub (unavailable in net9.0 build)</item>
+    /// <item>WindowsNotificationProvider - Runtime stub (unavailable in net10.0 build)</item>
     /// </list>
     /// </remarks>
     public static IServiceCollection AddNotificationFeature(

@@ -15,7 +15,7 @@
 [![PR Validation](https://github.com/sirkirby/ten-second-tom/actions/workflows/pr-validation.yml/badge.svg)](https://github.com/sirkirby/ten-second-tom/actions/workflows/pr-validation.yml)
 [![Release](https://github.com/sirkirby/ten-second-tom/actions/workflows/release.yml/badge.svg)](https://github.com/sirkirby/ten-second-tom/actions/workflows/release.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![.NET Version](https://img.shields.io/badge/.NET-9.0-purple.svg)](https://dotnet.microsoft.com/)
+[![.NET Version](https://img.shields.io/badge/.NET-10.0-purple.svg)](https://dotnet.microsoft.com/)
 
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/sirkirby/ten-second-tom?sort=semver)
 [![brew install](https://img.shields.io/badge/brew_install-sirkirby/ten--second--tom/ten--second--tom-informational)](https://github.com/sirkirby/homebrew-ten-second-tom)
@@ -55,7 +55,7 @@ Perfect for sensitive work, offline environments, or privacy-conscious users.
 
 ### Core Requirements
 
-- **.NET 9 SDK** or later ([Download](https://dotnet.microsoft.com/download)) - for building from source
+- **.NET 10 SDK** or later ([Download](https://dotnet.microsoft.com/download)) - for building from source
 - **LLM Provider** (choose one):
   - **OpenAI API Key** - for cloud-based summaries with GPT models
   - **Anthropic API Key** - for cloud-based summaries with Claude models
@@ -1233,7 +1233,7 @@ Ten Second Tom follows modern software architecture principles:
 
 ### Technology Stack
 
-- **Language**: C# with .NET 9
+- **Language**: C# with .NET 10
 - **CLI Framework**: System.CommandLine
 - **LLM Providers**: OpenAI SDK, Anthropic.SDK
 - **Markdown**: Markdig
@@ -1249,7 +1249,7 @@ Ten Second Tom follows modern software architecture principles:
 
 ### Prerequisites
 
-- .NET 9 SDK
+- .NET 10 SDK
 - Git
 
 ### Building from Source
@@ -1300,7 +1300,7 @@ Contributions are welcome! To contribute:
 - Maintain 80%+ code coverage
 - Use conventional commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`)
 - Update documentation for user-facing changes
-- Follow C# and .NET 9 best practices
+- Follow C# and .NET 10 best practices
 
 ### Reporting Issues
 
@@ -1317,7 +1317,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - Named after "Ten Second Tom" from *50 First Dates*
-- Built with ❤️ using .NET 9 and modern C# practices
+- Built with ❤️ using .NET 10 and modern C# practices
 - Inspired by the need for better personal memory management and journaling tools
 
 ---
@@ -1340,4 +1340,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Happy memory building! 🧠✨**
 
-Made with ☕ and .NET 9
+Made with ☕ and .NET 10

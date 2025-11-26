@@ -44,7 +44,7 @@ public sealed partial class RecordingService : IRecordingService
         var options = storageOptions.Value;
 
         // Get the effective storage directory using extension method
-        var storageBaseDir = options.GetEffectiveStorageDirectory();
+        var storageBaseDir = options.EffectiveStorageDirectory;
         _recordingDirectory = Path.Combine(storageBaseDir, DirectoryNames.Recording);
     }
 
@@ -134,7 +134,7 @@ public sealed partial class RecordingService : IRecordingService
                     recordedAt = new DateTimeOffset(fileInfo.LastWriteTime);
                 }
 
-                recordedAt = recordedAt.ToUserLocalTime();
+                recordedAt = recordedAt.UserLocalTime;
                 var formattedDate = recordedAt.ToUserLocalDisplayString("MMM dd, yyyy h:mm tt", CultureInfo.InvariantCulture);
 
                 // Strip front matter for word count

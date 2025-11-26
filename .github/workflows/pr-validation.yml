@@ -23,7 +23,7 @@ concurrency:
 
 # Environment variables available to all jobs
 env:
-  DOTNET_VERSION: '9.0.x'
+  DOTNET_VERSION: '10.0.x'
   # Maximum allowed coverage decrease (percentage points)
   # PRs that decrease coverage by more than this will fail
   MAX_COVERAGE_DECREASE: 0.5

@@ -162,6 +162,6 @@ public sealed class DefaultStorageProvider : IStorageProvider
     /// </summary>
     private string GetBaseDirectory()
     {
-        return _options.Value.GetEffectiveStorageDirectory();
+        return _options.Value.EffectiveStorageDirectory;
     }
 }
