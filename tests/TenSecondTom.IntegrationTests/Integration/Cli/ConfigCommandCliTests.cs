@@ -8,17 +8,20 @@ namespace TenSecondTom.IntegrationTests.Integration.Cli;
 /// <summary>
 /// CLI smoke tests for config and core commands.
 /// Verifies basic command structure and help output without testing full scenarios.
+///
+/// These tests run the CLI via 'dotnet tom.dll' which works in all environments
+/// (local dev, CI) without requiring a self-contained executable.
 /// </summary>
 public sealed class ConfigCommandCliTests : IDisposable
 {
     private readonly ITestOutputHelper _output;
     private readonly string _projectRoot;
-    private readonly string _executablePath;
+    private readonly string _dllPath;
 
     public ConfigCommandCliTests(ITestOutputHelper output)
     {
         _output = output;
-        
+
         // Find project root (traverse up from test assembly location)
         var currentDir = Directory.GetCurrentDirectory();
         while (currentDir != null && !File.Exists(Path.Combine(currentDir, "TenSecondTom.sln")))
@@ -27,71 +30,34 @@ public sealed class ConfigCommandCliTests : IDisposable
         }
 
         _projectRoot = currentDir ?? throw new InvalidOperationException("Could not find project root");
-        
-        // Determine executable path based on build configuration
+
+        // Determine DLL path based on build configuration
         #if DEBUG
-        _executablePath = Path.Combine(_projectRoot, "src", "bin", "Debug", "net9.0", "tom");
+        _dllPath = Path.Combine(_projectRoot, "src", "bin", "Debug", "net9.0", "tom.dll");
         #else
-        _executablePath = Path.Combine(_projectRoot, "src", "bin", "Release", "net9.0", "tom");
+        _dllPath = Path.Combine(_projectRoot, "src", "bin", "Release", "net9.0", "tom.dll");
         #endif
 
-        // Verify executable exists, if not try to build it
-        if (!File.Exists(_executablePath) && !File.Exists(_executablePath + ".exe"))
+        // Verify DLL exists
+        if (!File.Exists(_dllPath))
         {
-            _output.WriteLine($"Executable not found at {_executablePath}, attempting to build...");
-            BuildProject();
-        }
-    }
-
-    private void BuildProject()
-    {
-        using var buildProcess = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                Arguments = "build src/TenSecondTom.csproj -c Debug",
-                WorkingDirectory = _projectRoot,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
-        };
-
-        buildProcess.Start();
-        buildProcess.WaitForExit(30000); // 30 second timeout
-
-        if (buildProcess.ExitCode != 0)
-        {
-            var error = buildProcess.StandardError.ReadToEnd();
-            throw new InvalidOperationException($"Failed to build project: {error}");
+            throw new FileNotFoundException(
+                $"CLI assembly not found at {_dllPath}. Run 'dotnet build' first.",
+                _dllPath);
         }
     }
 
     private Process CreateCliProcess(string arguments)
     {
-        var executablePath = _executablePath;
-        
-        // On Windows, add .exe extension if needed
-        if (OperatingSystem.IsWindows() && !executablePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-        {
-            executablePath += ".exe";
-        }
-
-        if (!File.Exists(executablePath))
-        {
-            throw new FileNotFoundException($"CLI executable not found at {executablePath}");
-        }
-
+        // Run via 'dotnet {dll}' - works everywhere without native executable
         return new Process
         {
             StartInfo = new ProcessStartInfo
             {
-                FileName = executablePath,
-                Arguments = arguments,
+                FileName = "dotnet",
+                Arguments = $"\"{_dllPath}\" {arguments}",
                 WorkingDirectory = _projectRoot,
-                RedirectStandardInput = true,  // Prevent blocking on stdin
+                RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -109,7 +75,6 @@ public sealed class ConfigCommandCliTests : IDisposable
         process.Start();
 
         // Close stdin immediately to prevent CLI from waiting for input
-        // This is critical under code coverage instrumentation
         process.StandardInput.Close();
 
         var outputTask = process.StandardOutput.ReadToEndAsync();
@@ -129,7 +94,7 @@ public sealed class ConfigCommandCliTests : IDisposable
         var output = await outputTask.ConfigureAwait(false);
         var error = await errorTask.ConfigureAwait(false);
 
-        _output.WriteLine($"Command: TenSecondTom {arguments}");
+        _output.WriteLine($"Command: dotnet tom.dll {arguments}");
         _output.WriteLine($"Exit Code: {process.ExitCode}");
         _output.WriteLine($"Output: {output}");
         if (!string.IsNullOrEmpty(error))
@@ -144,7 +109,7 @@ public sealed class ConfigCommandCliTests : IDisposable
     public async Task ConfigAllCommand_Help_DisplaysUsageInformation()
     {
         // Act
-        var (output, error, exitCode) = await RunCliCommandAsync("config all --help");
+        var (output, _, exitCode) = await RunCliCommandAsync("config all --help");
 
         // Assert
         exitCode.Should().Be(0, "help should always succeed");
@@ -156,7 +121,7 @@ public sealed class ConfigCommandCliTests : IDisposable
     public async Task ConfigCommand_Help_DisplaysUsageInformation()
     {
         // Act
-        var (output, error, exitCode) = await RunCliCommandAsync("config --help");
+        var (output, _, exitCode) = await RunCliCommandAsync("config --help");
 
         // Assert
         exitCode.Should().Be(0, "help should always succeed");
@@ -168,7 +133,7 @@ public sealed class ConfigCommandCliTests : IDisposable
     public async Task ConfigCommand_ShowSubcommand_IsRecognized()
     {
         // Act
-        var (output, error, exitCode) = await RunCliCommandAsync("config show --help");
+        var (output, _, exitCode) = await RunCliCommandAsync("config show --help");
 
         // Assert
         exitCode.Should().Be(0, "help with valid subcommand should succeed");
@@ -178,15 +143,14 @@ public sealed class ConfigCommandCliTests : IDisposable
     [Fact]
     public async Task ConfigCommand_InvalidSubcommand_ProducesError()
     {
-        // Act
-        var (output, error, exitCode) = await RunCliCommandAsync("config --invalid-subcommand");
+        // Act - use a clearly invalid subcommand (not a flag starting with --)
+        var (output, error, exitCode) = await RunCliCommandAsync("config invalidsubcommand");
 
         // Assert
         exitCode.Should().NotBe(0, "invalid subcommand should produce non-zero exit code");
         var combinedOutput = (output + error).ToLowerInvariant();
 
         // System.CommandLine may use different error messages across versions
-        // Check for common error indicators
         combinedOutput.Should().MatchRegex("(invalid|unrecognized|unknown|required command)",
             "output should indicate an error with the command");
     }
@@ -195,7 +159,7 @@ public sealed class ConfigCommandCliTests : IDisposable
     public async Task RootCommand_ListsAvailableCommands()
     {
         // Act
-        var (output, error, exitCode) = await RunCliCommandAsync("--help");
+        var (output, _, exitCode) = await RunCliCommandAsync("--help");
 
         // Assert
         exitCode.Should().Be(0, "help should always succeed");

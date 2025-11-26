@@ -34,6 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       linux: ${{ steps.detect.outputs.linux }}
+      is-self-hosted: ${{ steps.detect.outputs.is-self-hosted }}
 
     steps:
       - name: Detect available self-hosted runners
@@ -67,9 +68,11 @@ jobs:
           if [ "$LINUX_COUNT" -gt 0 ]; then
             echo "🤖 Found $LINUX_COUNT online self-hosted Linux runner(s); selecting self-hosted"
             echo "linux=self-hosted" >> "$GITHUB_OUTPUT"
+            echo "is-self-hosted=true" >> "$GITHUB_OUTPUT"
           else
             echo "☁️ No online self-hosted Linux runners found; using ubuntu-latest"
             echo "linux=ubuntu-latest" >> "$GITHUB_OUTPUT"
+            echo "is-self-hosted=false" >> "$GITHUB_OUTPUT"
           fi
 
   # Job 1: Build
@@ -92,16 +95,20 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       
       - name: Cache NuGet packages
+        # Skip for self-hosted runners - packages persist locally, no need for remote cache
+        if: needs.select-runner.outputs.is-self-hosted != 'true'
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          # v2: Fresh cache after fixing RuntimeIdentifier-based package selection
+          key: ${{ runner.os }}-nuget-v2-${{ hashFiles('**/*.csproj') }}
           restore-keys: |
-            ${{ runner.os }}-nuget-
-      
+            ${{ runner.os }}-nuget-v2-
+
       - name: Restore dependencies
         run: dotnet restore -r linux-x64
-        # -r linux-x64: Avoid downloading Whisper.net.AllRuntimes (~2GB) by specifying target runtime
+        # -r linux-x64: Triggers platform-specific Whisper.net.Runtime (~200MB)
+        # instead of Whisper.net.AllRuntimes (~2GB). See csproj RuntimeIdentifier conditions.
 
       - name: Build solution
         run: |
@@ -109,8 +116,8 @@ jobs:
             --configuration Release \
             --no-restore \
             --warnaserror
-        # --warnaserror: Treat warnings as errors to enforce clean code
-        # --no-restore: Uses packages from restore step (which specified -r linux-x64)
+        # --no-restore: Uses packages from restore step
+        # --warnaserror: Treat warnings as errors
 
   # Job 2: Test
   # Runs all unit and integration tests
@@ -131,15 +138,18 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       
       - name: Cache NuGet packages
+        if: needs.select-runner.outputs.is-self-hosted != 'true'
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          # v2: Fresh cache after fixing RuntimeIdentifier-based package selection
+          key: ${{ runner.os }}-nuget-v2-${{ hashFiles('**/*.csproj') }}
           restore-keys: |
-            ${{ runner.os }}-nuget-
-      
+            ${{ runner.os }}-nuget-v2-
+
       - name: Restore dependencies
         run: dotnet restore -r linux-x64
+        # -r linux-x64: Platform-specific packages. See csproj RuntimeIdentifier conditions.
 
       - name: Run tests
         run: |
@@ -148,7 +158,7 @@ jobs:
             --no-restore \
             --logger "trx;LogFileName=test-results.trx" \
             --verbosity normal
-      
+
       - name: Upload test results
         if: always()  # Upload even if tests fail for debugging
         uses: actions/upload-artifact@v4
@@ -178,15 +188,18 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       
       - name: Cache NuGet packages
+        if: needs.select-runner.outputs.is-self-hosted != 'true'
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          # v2: Fresh cache after fixing RuntimeIdentifier-based package selection
+          key: ${{ runner.os }}-nuget-v2-${{ hashFiles('**/*.csproj') }}
           restore-keys: |
-            ${{ runner.os }}-nuget-
-      
+            ${{ runner.os }}-nuget-v2-
+
       - name: Restore dependencies
         run: dotnet restore -r linux-x64
+        # -r linux-x64: Platform-specific packages. See csproj RuntimeIdentifier conditions.
 
       - name: Run tests with coverage
         run: |
@@ -347,16 +360,21 @@ jobs:
       
       - name: Restore dependencies
         run: dotnet restore -r linux-x64
+        # -r linux-x64: Platform-specific packages. See csproj RuntimeIdentifier conditions.
 
       - name: Build release executable (Linux x64)
         run: |
+          # Use PR number for PRs, run number for push to main
+          VERSION="0.0.0-pr.${{ github.event.pull_request.number || github.run_number }}"
+          echo "📦 Building with version: $VERSION"
+
           dotnet publish src/TenSecondTom.csproj \
             --configuration Release \
             --runtime linux-x64 \
             --self-contained true \
             --output ./publish \
             -p:PublishSingleFile=true \
-            -p:Version=0.0.0-pr.${{ github.event.pull_request.number }}
+            -p:Version=$VERSION
       
       - name: Verify build output
         run: |
