@@ -1,6 +1,5 @@
 using System.Text;
 using Microsoft.Extensions.Logging;
-using Spectre.Console;
 using TenSecondTom.Features.Shell.Models;
 
 namespace TenSecondTom.Features.Shell.Services;
@@ -75,7 +74,7 @@ public sealed class EnhancedInputReader(
             // Handle Enter key - submit input
             if (keyInfo.Key == ConsoleKey.Enter)
             {
-                Console.WriteLine(); // Move to next line
+                consoleKeyReader.WriteLine(); // Move to next line
                 return buffer.ToString();
             }
 
@@ -347,31 +346,31 @@ public sealed class EnhancedInputReader(
     /// <summary>
     /// Renders the prompt with current buffer and cursor position.
     /// </summary>
-    private static void RenderPrompt(string buffer, int cursorPosition)
+    private void RenderPrompt(string buffer, int cursorPosition)
     {
         // Clear current line and redraw
         ClearCurrentLine();
 
         // Write prompt with Spectre.Console markup
-        AnsiConsole.Markup(PromptText);
+        consoleKeyReader.WriteMarkup(PromptText);
 
         // Write buffer text
-        Console.Write(buffer);
+        consoleKeyReader.Write(buffer);
 
         // Position cursor
         var promptLength = GetVisibleLength(PromptText);
         var targetColumn = promptLength + cursorPosition;
-        Console.SetCursorPosition(targetColumn, Console.CursorTop);
+        consoleKeyReader.SetCursorPosition(targetColumn, consoleKeyReader.CursorTop);
     }
 
     /// <summary>
     /// Clears the current console line.
     /// </summary>
-    private static void ClearCurrentLine()
+    private void ClearCurrentLine()
     {
-        Console.Write('\r');
-        Console.Write(new string(' ', Console.WindowWidth - 1));
-        Console.Write('\r');
+        consoleKeyReader.Write('\r');
+        consoleKeyReader.Write(new string(' ', consoleKeyReader.WindowWidth - 1));
+        consoleKeyReader.Write('\r');
     }
 
     /// <summary>

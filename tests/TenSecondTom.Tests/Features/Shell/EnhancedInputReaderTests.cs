@@ -26,6 +26,15 @@ public sealed class EnhancedInputReaderTests
 
         // Default setup: interactive terminal available
         _mockKeyReader.Setup(k => k.IsInputRedirected).Returns(false);
+
+        // Setup output methods for testing (no-op implementations)
+        _mockKeyReader.Setup(k => k.WindowWidth).Returns(120);
+        _mockKeyReader.Setup(k => k.CursorTop).Returns(0);
+        _mockKeyReader.Setup(k => k.Write(It.IsAny<string>()));
+        _mockKeyReader.Setup(k => k.Write(It.IsAny<char>()));
+        _mockKeyReader.Setup(k => k.WriteLine());
+        _mockKeyReader.Setup(k => k.SetCursorPosition(It.IsAny<int>(), It.IsAny<int>()));
+        _mockKeyReader.Setup(k => k.WriteMarkup(It.IsAny<string>()));
     }
 
     private EnhancedInputReader CreateReader() => new(
