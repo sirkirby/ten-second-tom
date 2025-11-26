@@ -34,6 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       linux: ${{ steps.detect.outputs.linux }}
+      is-self-hosted: ${{ steps.detect.outputs.is-self-hosted }}
 
     steps:
       - name: Detect available self-hosted runners
@@ -67,9 +68,11 @@ jobs:
           if [ "$LINUX_COUNT" -gt 0 ]; then
             echo "🤖 Found $LINUX_COUNT online self-hosted Linux runner(s); selecting self-hosted"
             echo "linux=self-hosted" >> "$GITHUB_OUTPUT"
+            echo "is-self-hosted=true" >> "$GITHUB_OUTPUT"
           else
             echo "☁️ No online self-hosted Linux runners found; using ubuntu-latest"
             echo "linux=ubuntu-latest" >> "$GITHUB_OUTPUT"
+            echo "is-self-hosted=false" >> "$GITHUB_OUTPUT"
           fi
 
   # Job 1: Build
@@ -92,13 +95,16 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       
       - name: Cache NuGet packages
+        # Skip for self-hosted runners - packages persist locally, no need for remote cache
+        if: needs.select-runner.outputs.is-self-hosted != 'true'
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          # v2: Fresh cache after fixing RuntimeIdentifier-based package selection
+          key: ${{ runner.os }}-nuget-v2-${{ hashFiles('**/*.csproj') }}
           restore-keys: |
-            ${{ runner.os }}-nuget-
-      
+            ${{ runner.os }}-nuget-v2-
+
       - name: Restore dependencies
         run: dotnet restore -r linux-x64
         # -r linux-x64: Triggers platform-specific Whisper.net.Runtime (~200MB)
@@ -132,13 +138,15 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       
       - name: Cache NuGet packages
+        if: needs.select-runner.outputs.is-self-hosted != 'true'
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          # v2: Fresh cache after fixing RuntimeIdentifier-based package selection
+          key: ${{ runner.os }}-nuget-v2-${{ hashFiles('**/*.csproj') }}
           restore-keys: |
-            ${{ runner.os }}-nuget-
-      
+            ${{ runner.os }}-nuget-v2-
+
       - name: Restore dependencies
         run: dotnet restore -r linux-x64
         # -r linux-x64: Platform-specific packages. See csproj RuntimeIdentifier conditions.
@@ -180,13 +188,15 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       
       - name: Cache NuGet packages
+        if: needs.select-runner.outputs.is-self-hosted != 'true'
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          # v2: Fresh cache after fixing RuntimeIdentifier-based package selection
+          key: ${{ runner.os }}-nuget-v2-${{ hashFiles('**/*.csproj') }}
           restore-keys: |
-            ${{ runner.os }}-nuget-
-      
+            ${{ runner.os }}-nuget-v2-
+
       - name: Restore dependencies
         run: dotnet restore -r linux-x64
         # -r linux-x64: Platform-specific packages. See csproj RuntimeIdentifier conditions.
