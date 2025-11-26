@@ -8,7 +8,7 @@ namespace TenSecondTom.Infrastructure.Notifications.Channels.OS;
 /// <summary>
 /// Windows notification channel stub (unavailable in current build).
 /// This is a runtime stub that indicates Windows notifications are not supported
-/// in the current net9.0 single-target build.
+/// in the current net10.0 single-target build.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -76,16 +76,16 @@ public sealed class WindowsNotificationProvider : INotificationChannel
     /// <inheritdoc/>
     public Task<Result<bool>> IsAvailableAsync(CancellationToken cancellationToken)
     {
-        // This channel is never available in the net9.0 build
-        // Future multi-targeted builds (net9.0-windows) would check:
+        // This channel is never available in the net10.0 build
+        // Future multi-targeted builds (net10.0-windows) would check:
         // RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             _logger.LogInformation(
                 "Running on Windows but native notifications unavailable. " +
-                "Current build is net9.0 (cross-platform). " +
-                "Windows notifications require net9.0-windows build with WinRT support. " +
+                "Current build is net10.0 (cross-platform). " +
+                "Windows notifications require net10.0-windows build with WinRT support. " +
                 "See WINDOWS-IMPLEMENTATION.md for details.");
         }
         else

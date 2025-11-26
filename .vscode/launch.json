@@ -1,6 +1,6 @@
 {
     // Ten Second Tom debugging configurations.
-    // Modern .NET 9 CLI: we always launch the project (build on debug) and supply useful environment variables.
+    // Modern .NET 10 CLI: we always launch the project (build on debug) and supply useful environment variables.
     // DOTNET_ENVIRONMENT drives loading of appsettings.{Environment}.json via EnvironmentHelper.
     // You can override LLM provider/model per configuration without changing persisted config.
     "version": "0.2.0",
@@ -10,7 +10,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/src/bin/Debug/net9.0/TenSecondTom.dll",
+            "program": "${workspaceFolder}/src/bin/Debug/net10.0/TenSecondTom.dll",
             "args": [],
             "cwd": "${workspaceFolder}/src",
             "console": "integratedTerminal",
@@ -32,7 +32,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/src/bin/Debug/net9.0/TenSecondTom.dll",
+            "program": "${workspaceFolder}/src/bin/Debug/net10.0/TenSecondTom.dll",
             "args": ["today"],
             "cwd": "${workspaceFolder}/src",
             "console": "integratedTerminal",
@@ -48,7 +48,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/src/bin/Debug/net9.0/TenSecondTom.dll",
+            "program": "${workspaceFolder}/src/bin/Debug/net10.0/TenSecondTom.dll",
             "args": ["this-week", "--json"],
             "cwd": "${workspaceFolder}/src",
             "console": "integratedTerminal",
@@ -67,7 +67,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/src/bin/Debug/net9.0/TenSecondTom.dll",
+            "program": "${workspaceFolder}/src/bin/Debug/net10.0/TenSecondTom.dll",
             "args": ["setup", "--force"],
             "cwd": "${workspaceFolder}/src",
             "console": "integratedTerminal",
@@ -83,7 +83,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/src/bin/Debug/net9.0/TenSecondTom.dll",
+            "program": "${workspaceFolder}/src/bin/Debug/net10.0/TenSecondTom.dll",
             "args": ["today"],
             "cwd": "${workspaceFolder}/src",
             "console": "integratedTerminal",
@@ -98,9 +98,9 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/src/bin/Debug/net9.0/TenSecondTom.dll",
+            "program": "${workspaceFolder}/src/bin/Debug/net10.0/TenSecondTom.dll",
             "args": ["transcribe"],
-            "cwd": "${workspaceFolder}/src/bin/Debug/net9.0",
+            "cwd": "${workspaceFolder}/src/bin/Debug/net10.0",
             "console": "integratedTerminal",
             "internalConsoleOptions": "neverOpen",
             "env": {

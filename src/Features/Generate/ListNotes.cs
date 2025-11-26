@@ -22,7 +22,7 @@ public static class ListNotes
     {
         private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
         private readonly ILogger<Handler> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        private readonly string _noteDirectory = Path.Combine(storageOptions.Value.GetEffectiveStorageDirectory(), DirectoryNames.Note);
+        private readonly string _noteDirectory = Path.Combine(storageOptions.Value.EffectiveStorageDirectory, DirectoryNames.Note);
 
         public async Task<Result<IReadOnlyList<NoteListItem>>> Handle(Query request, CancellationToken cancellationToken)
         {
@@ -69,7 +69,7 @@ public static class ListNotes
                         lastModified = new DateTimeOffset(fileInfo.LastWriteTime);
                     }
 
-                    lastModified = lastModified.ToUserLocalTime();
+                    lastModified = lastModified.UserLocalTime;
 
                     notes.Add(new NoteListItem
                     {

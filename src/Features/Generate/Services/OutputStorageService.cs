@@ -32,7 +32,7 @@ public sealed class OutputStorageService : IOutputStorageService
         var options = storageOptions.Value;
 
         // Get the effective storage directory using extension method
-        var storageBaseDir = options.GetEffectiveStorageDirectory();
+        var storageBaseDir = options.EffectiveStorageDirectory;
         _recordingDirectory = Path.Combine(storageBaseDir, DirectoryNames.Recording);
         _noteDirectory = Path.Combine(storageBaseDir, DirectoryNames.Note);
     }

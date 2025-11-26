@@ -48,7 +48,7 @@ public sealed class GenerateOutputMigration : IFeatureMigration
         var fileSystem = services.GetRequiredService<IFileSystem>();
 
         // Get effective storage directory using centralized resolution logic
-        string storageDirectory = storageOptions.Value.GetEffectiveStorageDirectory();
+        string storageDirectory = storageOptions.Value.EffectiveStorageDirectory;
         string recordingDirectory = fileSystem.Path.Combine(storageDirectory, DirectoryNames.Recording);
 
         logger.LogDebug("Checking for generate output files to migrate in: {RecordingDirectory}", recordingDirectory);

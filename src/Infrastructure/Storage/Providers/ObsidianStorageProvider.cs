@@ -43,7 +43,7 @@ public sealed class ObsidianStorageProvider : IStorageProvider
 
         // Delegate to FileSystemStorageProvider for actual storage operations
         var innerLogger = loggerFactory.CreateLogger<FileSystemStorageProvider>();
-        string baseDirectory = options.Value.GetEffectiveStorageDirectory();
+        string baseDirectory = options.Value.EffectiveStorageDirectory;
         _innerProvider = new FileSystemStorageProvider(baseDirectory, innerLogger);
     }
 
@@ -62,7 +62,7 @@ public sealed class ObsidianStorageProvider : IStorageProvider
             }
 
             // Get effective storage directory (vault root or vault root + subdirectory)
-            string memoryDir = _options.Value.GetEffectiveStorageDirectory();
+            string memoryDir = _options.Value.EffectiveStorageDirectory;
 
             // Create TST memory directory if it doesn't exist
             // Feature-specific subdirectories (today/, thisweek/, recording/) will be created
@@ -117,7 +117,7 @@ public sealed class ObsidianStorageProvider : IStorageProvider
                     $"Vault is not writable: {ex.Message}"));
             }
 
-            string memoryDir = _options.Value.GetEffectiveStorageDirectory();
+            string memoryDir = _options.Value.EffectiveStorageDirectory;
             string subdirInfo = string.IsNullOrWhiteSpace(_options.Value.MemorySubdirectory)
                 ? "(root level)"
                 : $"(subdirectory: {_options.Value.MemorySubdirectory})";

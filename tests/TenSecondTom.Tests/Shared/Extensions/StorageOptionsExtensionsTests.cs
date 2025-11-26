@@ -5,7 +5,7 @@ using TenSecondTom.Shared.Options;
 namespace TenSecondTom.Tests.Shared.Extensions;
 
 /// <summary>
-/// Unit tests for StorageOptionsExtensions.GetEffectiveStorageDirectory() method.
+/// Unit tests for StorageOptionsExtensions.EffectiveStorageDirectory property.
 /// Tests verify the resolution priority (ProviderPath → RootDirectory → fallback),
 /// tilde expansion, MemorySubdirectory appending, and edge case handling.
 /// This is a critical path used throughout the application for storage path resolution.
@@ -26,7 +26,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be("/custom/vault");
@@ -43,7 +43,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be("/vault/path");
@@ -60,7 +60,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be("/vault/path");
@@ -81,7 +81,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be("/custom/root");
@@ -97,7 +97,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().StartWith(GetHomeDirectory());
@@ -115,7 +115,7 @@ public sealed class StorageOptionsExtensionsTests
         var options = new StorageOptions();
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be(FallbackDirectory);
@@ -131,7 +131,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be(FallbackDirectory);
@@ -147,7 +147,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         // Empty string RootDirectory is not treated as "not set" - it's returned as-is
@@ -164,7 +164,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         // Whitespace-only RootDirectory is not treated as "not set" - it's returned as-is
@@ -181,7 +181,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be(FallbackDirectory);
@@ -197,7 +197,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be(FallbackDirectory);
@@ -217,7 +217,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().StartWith(GetHomeDirectory());
@@ -236,7 +236,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().StartWith(GetHomeDirectory());
@@ -252,7 +252,7 @@ public sealed class StorageOptionsExtensionsTests
         var expectedFallback = Path.Combine(GetHomeDirectory(), "ten-second-tom");
 
         // Act
-        var result = options.GetEffectiveStorageDirectory();
+        var result = options.EffectiveStorageDirectory;
         var expandedFallback = result.Replace("~", GetHomeDirectory());
 
         // Assert
@@ -270,7 +270,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().StartWith(GetHomeDirectory());
@@ -289,7 +289,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be("/absolute/path/without/tilde");
@@ -305,7 +305,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be("./relative/path");
@@ -322,7 +322,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         // The implementation uses Replace, so all ~ are replaced
@@ -344,7 +344,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be(Path.Combine("/vault", "tst"));
@@ -363,7 +363,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be(Path.Combine("/root", "memory"));
@@ -381,7 +381,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be(Path.Combine(FallbackDirectory, "memory"));
@@ -400,7 +400,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be("/vault");
@@ -417,7 +417,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be("/vault");
@@ -434,7 +434,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be("/vault");
@@ -451,7 +451,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be(Path.Combine("/vault", "tst/memory/today"));
@@ -472,7 +472,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().StartWith(GetHomeDirectory());
@@ -492,7 +492,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().StartWith(GetHomeDirectory());
@@ -510,7 +510,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be("/var/data/notes");
@@ -523,7 +523,7 @@ public sealed class StorageOptionsExtensionsTests
         var options = new StorageOptions();
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be(FallbackDirectory);
@@ -540,7 +540,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().StartWith(GetHomeDirectory());
@@ -563,7 +563,7 @@ public sealed class StorageOptionsExtensionsTests
         StorageOptions? options = null;
 
         // Act & Assert
-        var exception = Record.Exception(() => options!.GetEffectiveStorageDirectory());
+        var exception = Record.Exception(() => options!.EffectiveStorageDirectory);
         exception.Should().BeOfType<ArgumentNullException>();
     }
 
@@ -578,7 +578,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         // ProviderPath whitespace triggers fallback to RootDirectory, which is returned as-is
@@ -597,7 +597,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be("/provider/path");
@@ -614,7 +614,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be("/path with spaces/my vault");
@@ -631,7 +631,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be("/path/with-special_chars.123");
@@ -647,7 +647,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().EndWith("/");
@@ -663,7 +663,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().Be("../relative/path");
@@ -684,7 +684,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         result.Should().StartWith(GetHomeDirectory());
@@ -703,7 +703,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         var expectedPath = Path.Combine(GetHomeDirectory(), "my-vault", "memory");
@@ -720,7 +720,7 @@ public sealed class StorageOptionsExtensionsTests
         };
 
         // Act
-        string result = options.GetEffectiveStorageDirectory();
+        string result = options.EffectiveStorageDirectory;
 
         // Assert
         // Fallback is "./ten-second-tom", no tilde to expand, just append subdirectory

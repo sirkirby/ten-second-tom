@@ -33,9 +33,9 @@ public sealed class ConfigCommandCliTests : IDisposable
 
         // Determine DLL path based on build configuration
         #if DEBUG
-        _dllPath = Path.Combine(_projectRoot, "src", "bin", "Debug", "net9.0", "tom.dll");
+        _dllPath = Path.Combine(_projectRoot, "src", "bin", "Debug", "net10.0", "tom.dll");
         #else
-        _dllPath = Path.Combine(_projectRoot, "src", "bin", "Release", "net9.0", "tom.dll");
+        _dllPath = Path.Combine(_projectRoot, "src", "bin", "Release", "net10.0", "tom.dll");
         #endif
 
         // Verify DLL exists

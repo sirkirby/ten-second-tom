@@ -3,8 +3,8 @@
 ## Core Principles
 
 ### I. Modern .NET & Idiomatic C#
-- **Target**: .NET 9 with C# 12+ modern features
-- **Required Features**: File-scoped namespaces, primary constructors, records, required properties, collection expressions
+- **Target**: .NET 10 with C# 14 modern features
+- **Required Features**: File-scoped namespaces, primary constructors, records, required properties, collection expressions, extension members, field-backed properties
 - **Pattern**: Nullable reference types enabled project-wide
 - **No Legacy Code**: Avoid outdated patterns (traditional constructors, verbose property initialization)
 
@@ -147,7 +147,7 @@ public static class [UseCase]
 ## Technology Stack
 
 ### Required Dependencies
-- **.NET 9** - Latest LTS runtime
+- **.NET 10** - Latest LTS runtime
 - **System.CommandLine 2.0-rc** - CLI framework
 - **MediatR 13.1+** - CQRS implementation
 - **FluentValidation 12.0+** - Input validation

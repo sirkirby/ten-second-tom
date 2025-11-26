@@ -128,7 +128,7 @@ public static class SearchCommandHandler
                 AnsiConsole.MarkupLine($"[green]Found {result.Value.Count} result(s)[/]\n");
 
                 // Get the effective storage directory for absolute path display
-                var storageBaseDir = storageOptions.GetEffectiveStorageDirectory();
+                var storageBaseDir = storageOptions.EffectiveStorageDirectory;
 
                 // Sort by date (newest first) and display each result
                 var sortedResults = result.Value.OrderByDescending(e => e.Timestamp).ToList();

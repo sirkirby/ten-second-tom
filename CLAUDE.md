@@ -4,7 +4,7 @@
 
 ## Project Overview
 
-Ten Second Tom is a modern CLI application built with **C# and .NET 9**, following **Vertical Slice Architecture (VSA)** with strict adherence to the principles defined in the constitution.
+Ten Second Tom is a modern CLI application built with **C# and .NET 10**, following **Vertical Slice Architecture (VSA)** with strict adherence to the principles defined in the constitution.
 
 ## Quick Links
 
@@ -14,7 +14,7 @@ Ten Second Tom is a modern CLI application built with **C# and .NET 9**, followi
 ## Core Technology Stack
 
 ```text
-Language:     C# 12+ with .NET 9
+Language:     C# 14 with .NET 10
 CLI:          System.CommandLine 2.0-rc
 UI:           Spectre.Console 0.51.1
 CQRS:         MediatR 13.1.0

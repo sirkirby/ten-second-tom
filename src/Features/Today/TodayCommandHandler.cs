@@ -472,7 +472,7 @@ public static class TodayCommandHandler
         var transcribeOptions = transcribeConfigQueryResult.Value;
 
         // Get the effective storage directory using extension method
-        var storageBaseDir = storageOptions.GetEffectiveStorageDirectory();
+        var storageBaseDir = storageOptions.EffectiveStorageDirectory;
 
         if (string.IsNullOrWhiteSpace(storageBaseDir))
         {

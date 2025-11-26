@@ -1,4 +1,4 @@
-# Ten Second Tom - .gitignore (C# / .NET 9 CLI)
+# Ten Second Tom - .gitignore (C# / .NET 10 CLI)
 # Reference base: GitHub's VisualStudio + Dotnet + macOS templates, trimmed & curated.
 # Only ignore what is safe to regenerate or machine/user specific.
 

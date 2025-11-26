@@ -139,7 +139,7 @@ public static class CreateNote
             try
             {
                 // Get the effective storage directory using extension method
-                var storageRoot = storageOptions.Value.GetEffectiveStorageDirectory();
+                var storageRoot = storageOptions.Value.EffectiveStorageDirectory;
 
                 // Build markdown content for the note
                 var markdownContent = BuildNoteMarkdown(note);

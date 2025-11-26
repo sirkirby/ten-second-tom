@@ -44,7 +44,7 @@ public sealed class NoteMigration : IFeatureMigration
         var fileSystem = services.GetRequiredService<IFileSystem>();
 
         // Get effective storage directory using centralized resolution logic
-        string rootDirectory = storageOptions.Value.GetEffectiveStorageDirectory();
+        string rootDirectory = storageOptions.Value.EffectiveStorageDirectory;
         logger.LogDebug("Effective storage directory resolved: {RootDirectory}", rootDirectory);
 
         try
