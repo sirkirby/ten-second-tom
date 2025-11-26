@@ -182,8 +182,8 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
             var errorMessage = $"FFmpeg not found. Please install FFmpeg to use voice recording.\n\n" +
                              $"Installation instructions:\n" +
                              $"  macOS:   brew install ffmpeg\n" +
-                             $"  Linux:   sudo apt install ffmpeg (Ubuntu/Debian) or sudo yum install ffmpeg (RHEL/CentOS)\n" +
-                             $"  Windows: Download from https://ffmpeg.org/download.html\n\n" +
+                             $"  Windows: winget install Gyan.FFmpeg\n" +
+                             $"  Linux:   sudo apt install ffmpeg (Ubuntu/Debian) or sudo yum install ffmpeg (RHEL/CentOS)\n\n" +
                              $"Configured path: {_config.Recorder.FfmpegPath}";
 
             return Result<AudioRecording>.Failure(errorMessage);

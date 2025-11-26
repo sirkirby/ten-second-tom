@@ -80,18 +80,13 @@ public sealed class WindowsNotificationProvider : INotificationChannel
         // Future multi-targeted builds (net10.0-windows) would check:
         // RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
 
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            _logger.LogInformation(
-                "Running on Windows but native notifications unavailable. " +
-                "Current build is net10.0 (cross-platform). " +
-                "Windows notifications require net10.0-windows build with WinRT support. " +
-                "See WINDOWS-IMPLEMENTATION.md for details.");
-        }
-        else
-        {
-            _logger.LogDebug("Windows notification channel not available: Not running on Windows platform");
-        }
+        // Log at Debug level to avoid noise on Windows where notifications aren't yet supported
+        // Users can enable verbose logging if they want to see this message
+        _logger.LogDebug(
+            "Windows notification channel not available: {Reason}",
+            RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? "Current build is net10.0 (cross-platform). Windows notifications require net10.0-windows build with WinRT support."
+                : "Not running on Windows platform");
 
         return Task.FromResult(Result<bool>.Failure("Windows notifications not supported in current build"));
     }

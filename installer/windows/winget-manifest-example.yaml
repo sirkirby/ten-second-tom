@@ -26,6 +26,12 @@ InstallerSwitches:
   Silent: /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
   SilentWithProgress: /SILENT /SUPPRESSMSGBOXES /NORESTART
 UpgradeBehavior: install
+# Note: Winget does NOT auto-install dependencies, it only warns the user
+# The app's error message tells users to run: winget install Gyan.FFmpeg
+Dependencies:
+  PackageDependencies:
+    - PackageIdentifier: Gyan.FFmpeg
+      MinimumVersion: "6.0"
 Installers:
   - Architecture: x64
     InstallerUrl: https://github.com/sirkirby/ten-second-tom/releases/download/v0.10.0/ten-second-tom-0.10.0-win-x64-setup.exe
