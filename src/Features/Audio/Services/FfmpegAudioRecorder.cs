@@ -117,8 +117,21 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
         var startTime = DateTimeOffset.UtcNow;
 
         // Determine platform-specific audio input device
-        string inputDevice = GetPlatformAudioInput();
+        string inputDevice;
         string inputFormat = GetPlatformInputFormat();
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            // On Windows, detect the actual microphone name since device names vary
+            var micResult = await GetWindowsDefaultMicrophoneAsync(cancellationToken);
+            var micName = micResult.IsSuccess ? micResult.Value : "Microphone";
+            inputDevice = $"audio=\"{micName}\"";
+            _logger.LogDebug("Windows audio device: {DeviceName}", micName);
+        }
+        else
+        {
+            inputDevice = GetPlatformAudioInput();
+        }
 
         // Resolve effective settings (overrides take precedence over config)
         var enableFrequencyFilters = overrides?.EnableFrequencyFilters ?? _config.Recorder.EnableFrequencyFilters;
@@ -451,8 +464,20 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
             await Task.Delay(100, CancellationToken.None);
 
             // Send 'q' to FFmpeg stdin to gracefully stop
-            await process.StandardInput.WriteAsync('q');
-            await process.StandardInput.FlushAsync(cancellationToken);
+            // Wrap in try-catch as the pipe may already be closed on Windows
+            try
+            {
+                if (!process.HasExited)
+                {
+                    await process.StandardInput.WriteAsync('q');
+                    await process.StandardInput.FlushAsync(cancellationToken);
+                }
+            }
+            catch (IOException ex)
+            {
+                // Pipe closed - FFmpeg may have already exited, which is fine
+                _logger.LogDebug(ex, "Could not send stop signal to FFmpeg (pipe closed). Process may have already exited.");
+            }
 
             // Wait for process to exit
             await process.WaitForExitAsync(cancellationToken);
@@ -476,6 +501,12 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
                     await process.StandardInput.FlushAsync(CancellationToken.None);
                     await process.WaitForExitAsync(CancellationToken.None);
                 }
+            }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException)
+            {
+                // Pipe closed or process already exited - kill as fallback
+                _logger.LogDebug(ex, "Could not gracefully stop FFmpeg, killing process");
+                try { process.Kill(); } catch { /* ignore */ }
             }
             catch
             {
