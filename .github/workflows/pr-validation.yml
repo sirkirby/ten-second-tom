@@ -101,7 +101,8 @@ jobs:
       
       - name: Restore dependencies
         run: dotnet restore -r linux-x64
-        # -r linux-x64: Avoid downloading Whisper.net.AllRuntimes (~2GB) by specifying target runtime
+        # -r linux-x64: Triggers platform-specific Whisper.net.Runtime (~200MB)
+        # instead of Whisper.net.AllRuntimes (~2GB). See csproj RuntimeIdentifier conditions.
 
       - name: Build solution
         run: |
@@ -109,8 +110,8 @@ jobs:
             --configuration Release \
             --no-restore \
             --warnaserror
-        # --warnaserror: Treat warnings as errors to enforce clean code
-        # --no-restore: Uses packages from restore step (which specified -r linux-x64)
+        # --no-restore: Uses packages from restore step
+        # --warnaserror: Treat warnings as errors
 
   # Job 2: Test
   # Runs all unit and integration tests
@@ -140,6 +141,7 @@ jobs:
       
       - name: Restore dependencies
         run: dotnet restore -r linux-x64
+        # -r linux-x64: Platform-specific packages. See csproj RuntimeIdentifier conditions.
 
       - name: Run tests
         run: |
@@ -148,7 +150,7 @@ jobs:
             --no-restore \
             --logger "trx;LogFileName=test-results.trx" \
             --verbosity normal
-      
+
       - name: Upload test results
         if: always()  # Upload even if tests fail for debugging
         uses: actions/upload-artifact@v4
@@ -187,6 +189,7 @@ jobs:
       
       - name: Restore dependencies
         run: dotnet restore -r linux-x64
+        # -r linux-x64: Platform-specific packages. See csproj RuntimeIdentifier conditions.
 
       - name: Run tests with coverage
         run: |
@@ -347,6 +350,7 @@ jobs:
       
       - name: Restore dependencies
         run: dotnet restore -r linux-x64
+        # -r linux-x64: Platform-specific packages. See csproj RuntimeIdentifier conditions.
 
       - name: Build release executable (Linux x64)
         run: |

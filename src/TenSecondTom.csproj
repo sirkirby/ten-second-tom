@@ -74,28 +74,28 @@
     <PackageReference Include="Microsoft.AI.Foundry.Local" Version="0.8.2.1" />
   </ItemGroup>
 
-  <!-- Whisper.NET: Platform-specific runtimes for optimized binary size -->
-  <!-- Release builds use platform-specific runtimes; dev builds use AllRuntimes -->
+  <!-- Whisper.NET: Platform-specific runtimes based on RuntimeIdentifier -->
+  <!-- Dev (no RID): AllRuntimes for cross-platform testing (~2GB) -->
+  <!-- CI/Release: Pass -r {rid} to get platform-specific runtime (~200MB) -->
   <ItemGroup>
     <!-- Core Whisper.NET library (required for all platforms) -->
     <PackageReference Include="Whisper.net" Version="1.9.0" />
 
-    <!-- Development: AllRuntimes when no RuntimeIdentifier specified AND not in CI -->
-    <!-- CI environments skip this to avoid ~2GB download; they use Linux runtime instead -->
+    <!-- Development: AllRuntimes when no RuntimeIdentifier specified -->
     <PackageReference Include="Whisper.net.AllRuntimes" Version="1.9.0"
-                      Condition="'$(RuntimeIdentifier)' == '' AND '$(CI)' != 'true'" />
+                      Condition="'$(RuntimeIdentifier)' == ''" />
 
-    <!-- Release: macOS CoreML for Apple Silicon hardware acceleration -->
+    <!-- macOS: CoreML for Apple Silicon hardware acceleration -->
     <PackageReference Include="Whisper.net.Runtime.CoreML" Version="1.9.0"
                       Condition="$(RuntimeIdentifier.StartsWith('osx-'))" />
 
-    <!-- Release: Windows CUDA for NVIDIA GPU acceleration -->
+    <!-- Windows: CUDA for NVIDIA GPU acceleration -->
     <PackageReference Include="Whisper.net.Runtime.Cuda" Version="1.9.0"
                       Condition="$(RuntimeIdentifier.StartsWith('win-'))" />
 
-    <!-- Release: Linux CPU runtime for release builds OR CI builds -->
+    <!-- Linux: CPU runtime -->
     <PackageReference Include="Whisper.net.Runtime" Version="1.9.0"
-                      Condition="$(RuntimeIdentifier.StartsWith('linux-')) OR '$(CI)' == 'true'" />
+                      Condition="$(RuntimeIdentifier.StartsWith('linux-'))" />
   </ItemGroup>
 
   <ItemGroup>
