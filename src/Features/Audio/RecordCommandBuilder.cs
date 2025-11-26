@@ -39,7 +39,45 @@ public sealed class RecordCommandBuilder : ICommandBuilder
             Description = "STT engine selection: auto (default), local, or openai."
         };
 
+        // Recording override options
+        var inputVolumeOption = new Option<double?>("--input-volume")
+        {
+            Description = "Input volume multiplier for this recording (0.0 to 2.0). Overrides configured default."
+        };
+
+        var noiseReductionOption = new Option<bool?>("--noise-reduction")
+        {
+            Description = "Enable/disable noise reduction for this recording. Overrides configured default."
+        };
+
+        var frequencyFiltersOption = new Option<bool?>("--frequency-filters")
+        {
+            Description = "Enable/disable frequency filters for this recording. Overrides configured default."
+        };
+
+        // Preprocessing override options
+        var removeSilenceOption = new Option<bool?>("--remove-silence")
+        {
+            Description = "Enable/disable silence removal for this recording. Overrides configured default."
+        };
+
+        var silenceThresholdOption = new Option<int?>("--silence-threshold-db")
+        {
+            Description = "Silence detection threshold in dB for this recording (-60 to -40). Overrides configured default."
+        };
+
+        var minSilenceDurationOption = new Option<int?>("--min-silence-duration-ms")
+        {
+            Description = "Minimum silence duration to remove in milliseconds for this recording (100 to 2000). Overrides configured default."
+        };
+
         recordCommand.Options.Add(sttOption);
+        recordCommand.Options.Add(inputVolumeOption);
+        recordCommand.Options.Add(noiseReductionOption);
+        recordCommand.Options.Add(frequencyFiltersOption);
+        recordCommand.Options.Add(removeSilenceOption);
+        recordCommand.Options.Add(silenceThresholdOption);
+        recordCommand.Options.Add(minSilenceDurationOption);
         recordCommand.Options.Add(jsonOutputOption);
 
         // Set action
@@ -47,6 +85,39 @@ public sealed class RecordCommandBuilder : ICommandBuilder
         {
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
             string? stt = parseResult.GetValue(sttOption);
+
+            // Parse recording overrides
+            double? inputVolume = parseResult.GetValue(inputVolumeOption);
+            bool? noiseReduction = parseResult.GetValue(noiseReductionOption);
+            bool? frequencyFilters = parseResult.GetValue(frequencyFiltersOption);
+
+            // Parse preprocessing overrides
+            bool? removeSilence = parseResult.GetValue(removeSilenceOption);
+            int? silenceThreshold = parseResult.GetValue(silenceThresholdOption);
+            int? minSilenceDuration = parseResult.GetValue(minSilenceDurationOption);
+
+            // Build override objects (only if any values were provided)
+            RecordingOverrides? recordingOverrides = null;
+            if (inputVolume.HasValue || noiseReduction.HasValue || frequencyFilters.HasValue)
+            {
+                recordingOverrides = new RecordingOverrides
+                {
+                    InputVolume = inputVolume,
+                    EnableNoiseReduction = noiseReduction,
+                    EnableFrequencyFilters = frequencyFilters
+                };
+            }
+
+            PreprocessingOverrides? preprocessingOverrides = null;
+            if (removeSilence.HasValue || silenceThreshold.HasValue || minSilenceDuration.HasValue)
+            {
+                preprocessingOverrides = new PreprocessingOverrides
+                {
+                    RemoveSilence = removeSilence,
+                    SilenceThresholdDb = silenceThreshold,
+                    MinSilenceDurationMs = minSilenceDuration
+                };
+            }
 
             var mediator = serviceProvider.GetRequiredService<IMediator>();
 
@@ -150,7 +221,9 @@ public sealed class RecordCommandBuilder : ICommandBuilder
             var command = new Record.Command
             {
                 TranscribeConfig = SttSelectionMapper.BuildTranscribeOptions(sttSelection, transcribeOptions),
-                MaxDurationSeconds = audioOptions.Timeouts.RecordSeconds  // Use configured timeout
+                MaxDurationSeconds = audioOptions.Timeouts.RecordSeconds,  // Use configured timeout
+                RecordingOverrides = recordingOverrides,
+                PreprocessingOverrides = preprocessingOverrides
             };
 
             var result = await handler.Handle(command, CancellationToken.None);

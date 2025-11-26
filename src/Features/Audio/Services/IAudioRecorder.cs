@@ -1,3 +1,4 @@
+using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Results;
 
@@ -36,6 +37,30 @@ public interface IAudioRecorder
     Task<Result<AudioRecording>> RecordAsync(
         string outputPath,
         int? maxDurationSeconds = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Starts recording audio to the specified output path with optional setting overrides.
+    /// Returns when the user stops recording (e.g., presses Enter) or timeout is reached.
+    /// </summary>
+    /// <param name="outputPath">The file path where the audio should be saved.</param>
+    /// <param name="maxDurationSeconds">Maximum recording duration in seconds. If null, records indefinitely. If specified, prompts user to continue when timeout is reached.</param>
+    /// <param name="overrides">Optional recording settings overrides for this session only.</param>
+    /// <param name="cancellationToken">Cancellation token for async operation.</param>
+    /// <returns>
+    /// A result containing the <see cref="AudioRecording"/> if successful,
+    /// or an error message if recording failed.
+    /// </returns>
+    /// <remarks>
+    /// This is a blocking operation that waits for user input to stop recording.
+    /// The implementation should provide visual feedback to the user during recording.
+    /// When maxDurationSeconds is reached, the user is prompted to continue or stop.
+    /// Override values take precedence over configured defaults for this recording only.
+    /// </remarks>
+    Task<Result<AudioRecording>> RecordAsync(
+        string outputPath,
+        int? maxDurationSeconds,
+        RecordingOverrides? overrides,
         CancellationToken cancellationToken = default);
 
     /// <summary>

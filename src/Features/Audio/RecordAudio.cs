@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Features.Audio.Services;
 using MediatR;
 using TenSecondTom.Shared.Models;
@@ -27,6 +28,12 @@ public static class RecordAudio
         /// If specified, prompts user to continue when timeout is reached.
         /// </summary>
         public int? MaxDurationSeconds { get; init; }
+
+        /// <summary>
+        /// Gets optional recording settings overrides for this session only.
+        /// When specified, these values override the configured defaults.
+        /// </summary>
+        public RecordingOverrides? Overrides { get; init; }
     }
 
     /// <summary>
@@ -58,7 +65,11 @@ public static class RecordAudio
                 request.OutputPath,
                 request.MaxDurationSeconds?.ToString() ?? "unlimited");
 
-            var result = await recorder.RecordAsync(request.OutputPath, request.MaxDurationSeconds, cancellationToken);
+            var result = await recorder.RecordAsync(
+                request.OutputPath,
+                request.MaxDurationSeconds,
+                request.Overrides,
+                cancellationToken);
 
             if (result.IsSuccess)
             {

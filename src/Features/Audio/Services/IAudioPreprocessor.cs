@@ -1,3 +1,4 @@
+using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Features.Audio.Services;
@@ -28,6 +29,24 @@ public interface IAudioPreprocessor
     Task<Result<PreprocessingResult>> PreprocessAsync(
         string audioFilePath,
         bool replaceOriginal = true,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Preprocesses an audio file by applying filters with optional setting overrides.
+    /// Creates a new preprocessed file and optionally replaces the original.
+    /// </summary>
+    /// <param name="audioFilePath">Path to the audio file to preprocess.</param>
+    /// <param name="replaceOriginal">If true, replaces the original file with the preprocessed version. Default: true.</param>
+    /// <param name="overrides">Optional preprocessing settings overrides for this operation only.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>
+    /// Result containing the path to the preprocessed file (may be the same as input if replaceOriginal is true)
+    /// and preprocessing statistics.
+    /// </returns>
+    Task<Result<PreprocessingResult>> PreprocessAsync(
+        string audioFilePath,
+        bool replaceOriginal,
+        PreprocessingOverrides? overrides,
         CancellationToken cancellationToken = default);
 }
 

@@ -38,6 +38,18 @@ public static class Record
         public int? MaxDurationSeconds { get; init; }
 
         /// <summary>
+        /// Gets optional recording settings overrides for this session only.
+        /// When specified, these values override the configured defaults.
+        /// </summary>
+        public Models.RecordingOverrides? RecordingOverrides { get; init; }
+
+        /// <summary>
+        /// Gets optional preprocessing settings overrides for this session only.
+        /// When specified, these values override the configured defaults.
+        /// </summary>
+        public Models.PreprocessingOverrides? PreprocessingOverrides { get; init; }
+
+        /// <summary>
         /// Validates the command.
         /// </summary>
         /// <returns>True if valid; otherwise, false.</returns>
@@ -107,7 +119,8 @@ public static class Record
             var recordCommand = new RecordAudio.Command
             {
                 OutputPath = tempAudioPath,
-                MaxDurationSeconds = maxDurationSeconds
+                MaxDurationSeconds = maxDurationSeconds,
+                Overrides = request.RecordingOverrides
             };
 
             var recordResult = await mediator.Send(recordCommand, cancellationToken);
@@ -154,6 +167,7 @@ public static class Record
             var preprocessResult = await audioPreprocessor.PreprocessAsync(
                 recording.FilePath,
                 replaceOriginal: true,
+                request.PreprocessingOverrides,
                 cancellationToken);
 
             if (!preprocessResult.IsSuccess)
