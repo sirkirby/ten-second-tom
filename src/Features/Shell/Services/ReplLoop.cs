@@ -28,6 +28,7 @@ public sealed class ReplLoop : IReplLoop
     private readonly ISessionManager _sessionManager;
     private readonly IAutocompleteEngine _autocompleteEngine;
     private readonly IOutputPaginator _paginator;
+    private readonly IEnhancedInputReader _inputReader;
     private readonly ILogger<ReplLoop> _logger;
     private readonly CommandAutoCompleteSource _autoCompleteSource;
 
@@ -36,12 +37,14 @@ public sealed class ReplLoop : IReplLoop
         ISessionManager sessionManager,
         IAutocompleteEngine autocompleteEngine,
         IOutputPaginator paginator,
+        IEnhancedInputReader inputReader,
         ILogger<ReplLoop> logger)
     {
         _scopeFactory = scopeFactory;
         _sessionManager = sessionManager;
         _autocompleteEngine = autocompleteEngine;
         _paginator = paginator;
+        _inputReader = inputReader;
         _logger = logger;
         _autoCompleteSource = new CommandAutoCompleteSource(autocompleteEngine);
     }
@@ -65,8 +68,8 @@ public sealed class ReplLoop : IReplLoop
             {
                 try
                 {
-                    // Read input with autocomplete support
-                    string? input = ReadInput();
+                    // Read input with Tab completion, history navigation, and escape support
+                    string? input = await ReadInputAsync(cancellationToken).ConfigureAwait(false);
 
                     // Skip empty input
                     if (string.IsNullOrWhiteSpace(input))
@@ -166,11 +169,18 @@ public sealed class ReplLoop : IReplLoop
     }
 
     /// <summary>
-    /// Reads user input with autocomplete support.
+    /// Reads user input with Tab completion, history navigation, and escape key support.
+    /// Falls back to TextPrompt if enhanced input is unavailable (e.g., non-interactive terminal).
     /// </summary>
-    private string? ReadInput()
+    private async Task<string?> ReadInputAsync(CancellationToken cancellationToken)
     {
-        // Show helpful hint on first line
+        // Try enhanced input reader first (supports Tab, Arrow keys, Escape)
+        if (_inputReader.IsAvailable())
+        {
+            return await _inputReader.ReadInputAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        // Fallback to TextPrompt for non-interactive terminals
         var prompt = new TextPrompt<string>("[cyan]>[/] [dim](Type /help for commands)[/]")
             .AllowEmpty()
             .ShowDefaultValue(false);
@@ -181,8 +191,8 @@ public sealed class ReplLoop : IReplLoop
         if (!string.IsNullOrWhiteSpace(input) && input.StartsWith('/') && input.Length > 1)
         {
             var suggestions = _autoCompleteSource.GetSuggestions(input).ToList();
-            
-            // Show suggestions if we have matches (changed from <=3 to show all matches)
+
+            // Show suggestions if we have matches
             if (suggestions.Count > 0)
             {
                 AnsiConsole.MarkupLine($"[dim]  💡 Did you mean: {string.Join(" | ", suggestions)}[/]");

@@ -306,6 +306,55 @@ jobs:
           du -sh ./publish/*.dll 2>/dev/null || true
           du -sh ./publish/runtimes 2>/dev/null || true
 
+      - name: Build Windows Installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $VERSION = "${{ needs.validate-version.outputs.version }}"
+          Write-Host "📦 Building Windows installer for version $VERSION"
+
+          # Create output directory
+          New-Item -ItemType Directory -Force -Path ".\artifacts\installer" | Out-Null
+
+          # Download and install Inno Setup
+          Write-Host "⬇️ Installing Inno Setup..."
+          $innoUrl = "https://jrsoftware.org/download.php/is.exe"
+          $innoInstaller = "$env:TEMP\innosetup.exe"
+          Invoke-WebRequest -Uri $innoUrl -OutFile $innoInstaller
+          Start-Process -FilePath $innoInstaller -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
+
+          # Add Inno Setup to PATH
+          $innoPath = "${env:ProgramFiles(x86)}\Inno Setup 6"
+          $env:PATH = "$innoPath;$env:PATH"
+
+          # Build installer
+          Write-Host "🔨 Compiling installer..."
+          & "$innoPath\ISCC.exe" /DMyAppVersion=$VERSION `
+            /O".\artifacts\installer" `
+            /F"ten-second-tom-$VERSION-win-x64-setup" `
+            ".\installer\windows\installer.iss"
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "❌ Installer build failed"
+            exit 1
+          }
+
+          Write-Host "✅ Installer built successfully"
+          Get-ChildItem ".\artifacts\installer" | Format-Table Name, Length
+
+      - name: Calculate installer checksum
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          INSTALLER="./artifacts/installer/ten-second-tom-${VERSION}-win-x64-setup.exe"
+
+          if [ -f "$INSTALLER" ]; then
+            sha256sum "$INSTALLER" > "${INSTALLER}.sha256"
+            echo "📝 Installer SHA256:"
+            cat "${INSTALLER}.sha256"
+          fi
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -318,6 +367,14 @@ jobs:
             ./publish/*.metal
             ./publish/runtimes/**/*
             ./publish/TenSecondTom.Extensions.MacOS.app/**/*
+          retention-days: 90
+
+      - name: Upload Windows installer
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ten-second-tom-win-x64-installer
+          path: ./artifacts/installer/*.exe
           retention-days: 90
 
   # Job 3: Create GitHub Release
@@ -342,11 +399,17 @@ jobs:
         with:
           pattern: ten-second-tom-*-release
           path: ./artifacts
-      
+
+      - name: Download Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: ten-second-tom-win-x64-installer
+          path: ./artifacts/installer
+
       - name: Package artifacts for distribution
         run: |
           VERSION="${{ needs.validate-version.outputs.version }}"
-          
+
           echo "📦 Creating distribution packages for version ${VERSION}"
           mkdir -p ./release-packages
 
@@ -356,12 +419,17 @@ jobs:
           tar czf ../../release-packages/ten-second-tom-${VERSION}-osx-arm64.tar.gz *
           cd ../..
 
-          # Package Windows x64
-          echo "Packaging Windows x64..."
+          # Package Windows x64 ZIP (for manual install)
+          echo "Packaging Windows x64 ZIP..."
           cd ./artifacts/ten-second-tom-win-x64-release
-          zip -r ../../release-packages/ten-second-tom-${VERSION}-win-x64.zip *
+          # Exclude Linux runtime files from Windows package
+          zip -r ../../release-packages/ten-second-tom-${VERSION}-win-x64.zip * -x "runtimes/cuda/linux-x64/*"
           cd ../..
-          
+
+          # Copy Windows installer
+          echo "Copying Windows installer..."
+          cp ./artifacts/installer/*.exe ./release-packages/
+
           echo "✅ Distribution packages created:"
           ls -lh ./release-packages/
       
@@ -384,7 +452,8 @@ jobs:
           Choose the appropriate package for your platform:
 
           - **macOS (Apple Silicon)**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-arm64.tar.gz\`
-          - **Windows**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-win-x64.zip\`
+          - **Windows (Installer)**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-win-x64-setup.exe\` ⭐ Recommended
+          - **Windows (Portable)**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-win-x64.zip\`
 
           ### 🚀 Installation
 
@@ -395,14 +464,17 @@ jobs:
           ./tom --version
           \`\`\`
 
-          **Windows:**
+          **Windows (Recommended):**
+          Run the installer (\`*-setup.exe\`). It will add \`tom\` to your PATH automatically.
+
+          **Windows (Portable):**
           Extract the zip file and run \`tom.exe\` from the extracted folder."
           else
             echo "📝 Generating changelog from $PREV_TAG to $VERSION"
-            
+
             # Generate commit log
             COMMITS=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges)
-            
+
             NOTES="## 📋 Changes
 
           $COMMITS
@@ -412,7 +484,8 @@ jobs:
           Choose the appropriate package for your platform:
 
           - **macOS (Apple Silicon)**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-osx-arm64.tar.gz\`
-          - **Windows**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-win-x64.zip\`
+          - **Windows (Installer)**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-win-x64-setup.exe\` ⭐ Recommended
+          - **Windows (Portable)**: \`ten-second-tom-${{ needs.validate-version.outputs.version }}-win-x64.zip\`
 
           ### 🚀 Installation
 
@@ -423,7 +496,10 @@ jobs:
           ./tom --version
           \`\`\`
 
-          **Windows:**
+          **Windows (Recommended):**
+          Run the installer (\`*-setup.exe\`). It will add \`tom\` to your PATH automatically.
+
+          **Windows (Portable):**
           Extract the zip file and run \`tom.exe\` from the extracted folder."
           fi
           

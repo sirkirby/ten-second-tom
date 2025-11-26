@@ -18,10 +18,15 @@ public static class ShellFeatureExtensions
         // Shell services (Singletons for session persistence during app lifetime)
         services.AddSingleton<IReplLoop, ReplLoop>();
         services.AddSingleton<ICommandRouter, CommandRouter>();
+        services.AddSingleton<IHistoryStore, HistoryStore>();
         services.AddSingleton<ISessionManager, SessionManager>();
         services.AddSingleton<IAutocompleteEngine, AutocompleteEngine>();
         services.AddSingleton<IOutputPaginator, OutputPaginator>();
-        
+
+        // Enhanced input reader services (for Tab completion, history navigation, escape)
+        services.AddSingleton<IConsoleKeyReader, SystemConsoleKeyReader>();
+        services.AddSingleton<IEnhancedInputReader, EnhancedInputReader>();
+
         return services;
     }
 }
