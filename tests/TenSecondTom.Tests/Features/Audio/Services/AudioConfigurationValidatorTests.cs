@@ -14,7 +14,7 @@ public sealed class AudioConfigurationValidatorTests
     public void IsAudioConfigured_WithBuiltInLocalProviderAndModel_ReturnsTrue()
     {
         // Arrange - built-in local requires a model
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = SttProviders.BuiltInLocal,
             Providers = new Dictionary<string, Dictionary<string, string>>
@@ -37,7 +37,7 @@ public sealed class AudioConfigurationValidatorTests
     public void IsAudioConfigured_WithBuiltInLocalProviderWithoutModel_ReturnsFalse()
     {
         // Arrange - built-in local without model should fail
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = SttProviders.BuiltInLocal
         };
@@ -53,7 +53,7 @@ public sealed class AudioConfigurationValidatorTests
     public void IsAudioConfigured_WithWhisperCppProviderAndBinaryAndModel_ReturnsTrue()
     {
         // Arrange - whisper.cpp requires binary path and model
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = SttProviders.WhisperCpp,
             Providers = new Dictionary<string, Dictionary<string, string>>
@@ -77,7 +77,7 @@ public sealed class AudioConfigurationValidatorTests
     public void IsAudioConfigured_WithWhisperCppProviderWithoutBinary_ReturnsFalse()
     {
         // Arrange - whisper.cpp without binary path should fail
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = SttProviders.WhisperCpp
         };
@@ -93,7 +93,7 @@ public sealed class AudioConfigurationValidatorTests
     public void IsAudioConfigured_WithOpenAiProviderAndApiKeyAndModel_ReturnsTrue()
     {
         // Arrange - OpenAI requires API key and model
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = SttProviders.OpenAI,
             Providers = new Dictionary<string, Dictionary<string, string>>
@@ -117,7 +117,7 @@ public sealed class AudioConfigurationValidatorTests
     public void IsAudioConfigured_WithOpenAiProviderAndNoApiKey_ReturnsFalse()
     {
         // Arrange - OpenAI without API key should fail
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = SttProviders.OpenAI
         };
@@ -133,7 +133,7 @@ public sealed class AudioConfigurationValidatorTests
     public void IsAudioConfigured_WithOpenAiProviderAndEmptyApiKey_ReturnsFalse()
     {
         // Arrange - OpenAI with empty API key should fail
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = SttProviders.OpenAI,
             Providers = new Dictionary<string, Dictionary<string, string>>
@@ -156,7 +156,7 @@ public sealed class AudioConfigurationValidatorTests
     public void GetMissingConfiguration_WithFullyConfiguredWhisperCpp_ReturnsEmpty()
     {
         // Arrange - whisper.cpp requires binary path and model
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = SttProviders.WhisperCpp,
             Providers = new Dictionary<string, Dictionary<string, string>>
@@ -180,7 +180,7 @@ public sealed class AudioConfigurationValidatorTests
     public void GetMissingConfiguration_WithFullyConfiguredBuiltInLocal_ReturnsEmpty()
     {
         // Arrange - built-in local requires a model
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = SttProviders.BuiltInLocal,
             Providers = new Dictionary<string, Dictionary<string, string>>
@@ -203,7 +203,7 @@ public sealed class AudioConfigurationValidatorTests
     public void GetMissingConfiguration_WithOpenAiAndNoApiKey_ReturnsConfigItem()
     {
         // Arrange
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = SttProviders.OpenAI
         };
@@ -220,7 +220,7 @@ public sealed class AudioConfigurationValidatorTests
     public void GetMissingConfiguration_WithEmptyProvider_ReturnsProviderItem()
     {
         // Arrange
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = ""
         };
@@ -237,7 +237,7 @@ public sealed class AudioConfigurationValidatorTests
     public void GetMissingConfiguration_WithNullProvider_ReturnsProviderItem()
     {
         // Arrange
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = null!
         };
@@ -254,7 +254,7 @@ public sealed class AudioConfigurationValidatorTests
     public void GetMissingConfiguration_WithOpenAiAndValidApiKeyAndModel_ReturnsEmpty()
     {
         // Arrange - OpenAI requires both API key and model
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = SttProviders.OpenAI,
             Providers = new Dictionary<string, Dictionary<string, string>>

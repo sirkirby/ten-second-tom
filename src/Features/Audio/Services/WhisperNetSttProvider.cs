@@ -18,7 +18,8 @@ namespace TenSecondTom.Features.Audio.Services;
 /// </summary>
 public sealed class WhisperNetSttProvider : ISttProvider, ISupportsModelManagement
 {
-    private readonly AudioOptions _config;
+    private readonly TranscribeOptions _transcribeConfig;
+    private readonly AudioOptions _audioConfig;
     private readonly IWhisperNetModelManager _modelManager;
     private readonly ILogger<WhisperNetSttProvider> _logger;
 
@@ -26,11 +27,13 @@ public sealed class WhisperNetSttProvider : ISttProvider, ISupportsModelManageme
     /// Initializes a new instance of the <see cref="WhisperNetSttProvider"/> class.
     /// </summary>
     public WhisperNetSttProvider(
-        IOptions<AudioOptions> config,
+        IOptions<TranscribeOptions> transcribeConfig,
+        IOptions<AudioOptions> audioConfig,
         IWhisperNetModelManager modelManager,
         ILogger<WhisperNetSttProvider> logger)
     {
-        _config = config?.Value ?? throw new ArgumentNullException(nameof(config));
+        _transcribeConfig = transcribeConfig?.Value ?? throw new ArgumentNullException(nameof(transcribeConfig));
+        _audioConfig = audioConfig?.Value ?? throw new ArgumentNullException(nameof(audioConfig));
         _modelManager = modelManager ?? throw new ArgumentNullException(nameof(modelManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -43,7 +46,7 @@ public sealed class WhisperNetSttProvider : ISttProvider, ISupportsModelManageme
     /// </summary>
     private string? GetModelPath()
     {
-        return _config.GetSttModel(SttProviders.WhisperCpp);
+        return _transcribeConfig.GetSttModel(SttProviders.WhisperCpp);
     }
 
     /// <inheritdoc/>
@@ -204,7 +207,7 @@ public sealed class WhisperNetSttProvider : ISttProvider, ISupportsModelManageme
     private async Task<string?> ConvertToWavAsync(string audioFilePath, CancellationToken cancellationToken)
     {
         var tempWavPath = Path.Combine(Path.GetTempPath(), $"tom-whisper-{Guid.NewGuid()}.wav");
-        var ffmpegPath = _config.Recorder.FfmpegPath;
+        var ffmpegPath = _audioConfig.Recorder.FfmpegPath;
 
         // Convert to 16kHz mono WAV (optimal for Whisper)
         var arguments = $"-i \"{audioFilePath}\" -ar 16000 -ac 1 -c:a pcm_s16le \"{tempWavPath}\" -y";

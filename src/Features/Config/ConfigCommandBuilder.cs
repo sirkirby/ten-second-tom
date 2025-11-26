@@ -1,4 +1,5 @@
 using System.CommandLine;
+using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
 using TenSecondTom.Infrastructure.Cli;
@@ -193,6 +194,49 @@ public sealed class ConfigCommandBuilder : ICommandBuilder
             }
         });
 
+        // All subcommand - runs the complete setup wizard via MediatR
+        // Features communicate via MediatR which is VSA compliant
+        var allCommand = new Command("all", "Run the complete setup wizard to configure all settings");
+        var forceOption = new Option<bool>("--force")
+        {
+            Description = "Force re-configuration even if already configured"
+        };
+        allCommand.Options.Add(forceOption);
+        allCommand.Options.Add(jsonOutputOption);
+
+        allCommand.SetAction(async (parseResult) =>
+        {
+            bool force = parseResult.GetValue(forceOption);
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
+
+            var mediator = serviceProvider.GetRequiredService<IMediator>();
+
+            var result = await mediator.Send(new Setup.Setup.Command { Force = force }, CancellationToken.None)
+                .ConfigureAwait(false);
+
+            if (result.IsSuccess)
+            {
+                if (jsonOutput)
+                {
+                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { success = true, message = "Setup completed successfully" }));
+                }
+                // Success message is handled by the setup wizard itself
+                return 0;
+            }
+            else
+            {
+                if (jsonOutput)
+                {
+                    AnsiConsole.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { success = false, error = result.Error }));
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]✗[/] {result.Error.EscapeMarkup()}");
+                }
+                return 1;
+            }
+        });
+
         // Discover and register config subcommands from feature slices via assembly scanning
         var subcommandBuilders = DiscoverConfigSubcommandBuilders();
         foreach (var builder in subcommandBuilders)
@@ -204,6 +248,7 @@ public sealed class ConfigCommandBuilder : ICommandBuilder
             }
         }
 
+        configCommand.Subcommands.Add(allCommand);
         configCommand.Subcommands.Add(showCommand);
         configCommand.Subcommands.Add(setCommand);
         configCommand.Subcommands.Add(validateCommand);
@@ -307,26 +352,27 @@ public sealed class ConfigCommandBuilder : ICommandBuilder
             : config.Optional.RetentionDays.ToString(System.Globalization.CultureInfo.InvariantCulture));
         table.AddRow("  Telemetry", config.Optional.EnableTelemetry ? "Enabled" : "Disabled");
 
-        // Audio Configuration
-        table.AddRow("[yellow]Audio Configuration[/]", "");
-        table.AddRow("  STT Provider", config.Audio.SttProvider);
+        // Transcription Configuration (STT)
+        table.AddRow("[yellow]Transcription Configuration[/]", "");
+        table.AddRow("  STT Provider", config.Transcribe.SttProvider);
 
-        if (!string.IsNullOrWhiteSpace(config.Audio.SttApiKey))
+        if (!string.IsNullOrWhiteSpace(config.Transcribe.SttApiKey))
         {
             string sttApiKeyDisplay = showSecrets
-                ? config.Audio.SttApiKey
-                : MaskApiKey(config.Audio.SttApiKey);
+                ? config.Transcribe.SttApiKey
+                : MaskApiKey(config.Transcribe.SttApiKey);
             table.AddRow("  STT API Key", sttApiKeyDisplay);
         }
 
-        if (!string.IsNullOrWhiteSpace(config.Audio.SttModel))
+        if (!string.IsNullOrWhiteSpace(config.Transcribe.SttModel))
         {
-            table.AddRow("  STT Model", config.Audio.SttModel);
+            table.AddRow("  STT Model", config.Transcribe.SttModel);
         }
 
-        table.AddRow("  Keep Files", config.Audio.KeepFiles ? "Yes" : "No");
+        table.AddRow("  Keep Files", config.Transcribe.KeepFiles ? "Yes" : "No");
 
-        // Audio Recorder Configuration
+        // Audio Recording Configuration
+        table.AddRow("[yellow]Audio Recording Configuration[/]", "");
         table.AddRow("  [dim]Recorder:[/]", "");
         table.AddRow("    Input Volume", config.Audio.Recorder.InputVolume.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture));
         table.AddRow("    Noise Reduction", config.Audio.Recorder.EnableNoiseReduction ? "Enabled" : "Disabled");

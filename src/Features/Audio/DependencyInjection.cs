@@ -72,6 +72,11 @@ public static class AudioFeatureExtensions
         services.AddScoped<TranscribeLibraryAudio.Handler>();
         services.AddScoped<GetAudioConfiguration.Handler>();
         services.AddScoped<UpdateAudioConfiguration.Handler>();
+        services.AddScoped<GetTranscribeConfiguration.Handler>();
+        services.AddScoped<UpdateTranscribeConfiguration.Handler>();
+
+        // Register config command builder for subcommand resolution
+        services.AddSingleton<AudioConfigCommandBuilder>();
 
         return services;
     }

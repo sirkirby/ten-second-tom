@@ -1,13 +1,30 @@
 namespace TenSecondTom.Shared.Models;
 
 /// <summary>
-/// Audio recording and preprocessing configuration (display model for config show)
+/// Audio recording and preprocessing configuration (display model for config show).
+/// STT-related settings are now in <see cref="TranscribeConfigurationDisplay"/>.
 /// </summary>
 public sealed record AudioConfigurationDisplay
 {
     /// <summary>
+    /// Gets the audio recorder configuration
+    /// </summary>
+    public RecorderConfigurationDisplay Recorder { get; init; } = new();
+
+    /// <summary>
+    /// Gets the audio preprocessing configuration
+    /// </summary>
+    public PreprocessingConfigurationDisplay Preprocessing { get; init; } = new();
+}
+
+/// <summary>
+/// Transcription (Speech-to-Text) configuration (display model for config show).
+/// </summary>
+public sealed record TranscribeConfigurationDisplay
+{
+    /// <summary>
     /// Gets the speech-to-text provider.
-    /// Default: "built-in-local" (local AI via Microsoft Foundry).
+    /// Default: "built-in-local" (local AI via Whisper.NET).
     /// </summary>
     public string SttProvider { get; init; } = "built-in-local";
 
@@ -25,16 +42,6 @@ public sealed record AudioConfigurationDisplay
     /// Gets whether to keep audio files after transcription
     /// </summary>
     public bool KeepFiles { get; init; } = true;
-
-    /// <summary>
-    /// Gets the audio recorder configuration
-    /// </summary>
-    public RecorderConfigurationDisplay Recorder { get; init; } = new();
-
-    /// <summary>
-    /// Gets the audio preprocessing configuration
-    /// </summary>
-    public PreprocessingConfigurationDisplay Preprocessing { get; init; } = new();
 }
 
 /// <summary>

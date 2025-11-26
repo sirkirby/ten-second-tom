@@ -41,7 +41,7 @@ public sealed class SttProviderFactoryTests
     {
         // Arrange - built-in local always returns without availability check
         var factory = CreateFactory();
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = SttProviders.BuiltInLocal
         };
@@ -66,7 +66,7 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(true);
 
         var factory = CreateFactory();
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = SttProviders.WhisperCpp
         };
@@ -90,7 +90,7 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(false);
 
         var factory = CreateFactory();
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = SttProviders.WhisperCpp
         };
@@ -112,7 +112,7 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(true);
 
         var factory = CreateFactory();
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = SttProviders.OpenAI
         };
@@ -136,7 +136,7 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(false);
 
         var factory = CreateFactory();
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = SttProviders.OpenAI
         };
@@ -154,7 +154,7 @@ public sealed class SttProviderFactoryTests
     {
         // Arrange
         var factory = CreateFactory();
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = "invalid-provider"
         };
@@ -172,7 +172,7 @@ public sealed class SttProviderFactoryTests
     {
         // Arrange
         var factory = CreateFactory();
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = SttProviders.BuiltInLocal
         };
@@ -193,7 +193,7 @@ public sealed class SttProviderFactoryTests
             .ReturnsAsync(false);
 
         var factory = CreateFactory();
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = SttProviders.WhisperCpp
         };
@@ -254,7 +254,7 @@ public sealed class SttProviderFactoryTests
             .ThrowsAsync(new OperationCanceledException());
 
         var factory = CreateFactory();
-        var config = new AudioOptions
+        var config = new TranscribeOptions
         {
             SttProvider = SttProviders.WhisperCpp
         };

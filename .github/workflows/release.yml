@@ -44,10 +44,10 @@ on:
         type: boolean
         default: false
       skip_winget:
-        description: 'Skip Winget publication (for PR testing)'
+        description: 'Skip Winget publication (set to false once winget package is live)'
         required: false
         type: boolean
-        default: false
+        default: true  # TODO: Change to false once winget PR is merged
       dry_run:
         description: 'Dry run - skip release creation (logs only)'
         required: false
@@ -238,15 +238,6 @@ jobs:
           
           echo "✅ Extension verified in publish directory"
           ls -lh "$EXTENSION_PATH"
-      
-      - name: Rename executable to 'tom' or 'tom.exe'
-        shell: bash
-        run: |
-          if [ "${{ matrix.platform }}" = "win-x64" ]; then
-            mv ./publish/TenSecondTom.exe ./publish/tom.exe
-          else
-            mv ./publish/TenSecondTom ./publish/tom
-          fi
       
       - name: Verify artifact size
         shell: bash

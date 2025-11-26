@@ -15,7 +15,7 @@ public sealed class LocalWhisperSttProviderTests
 {
     private readonly Mock<ILogger<LocalWhisperSttProvider>> _mockLogger = new();
     private readonly Mock<IWhisperCppModelManager> _mockModelManager = new();
-    private readonly AudioOptions _config = new()
+    private readonly TranscribeOptions _config = new()
     {
         SttProvider = SttProviders.WhisperCpp,
         Providers = new Dictionary<string, Dictionary<string, string>>
@@ -36,7 +36,7 @@ public sealed class LocalWhisperSttProviderTests
         provider.Engine.Should().Be(SttEngine.Local);
     }
 
-    private LocalWhisperSttProvider CreateProvider(AudioOptions? config = null)
+    private LocalWhisperSttProvider CreateProvider(TranscribeOptions? config = null)
     {
         config ??= _config;
         return new LocalWhisperSttProvider(

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
 
@@ -60,9 +61,19 @@ public sealed class FfmpegAudioPreprocessor : IAudioPreprocessor
     }
 
     /// <inheritdoc/>
-    public async Task<Result<PreprocessingResult>> PreprocessAsync(
+    public Task<Result<PreprocessingResult>> PreprocessAsync(
         string audioFilePath,
         bool replaceOriginal = true,
+        CancellationToken cancellationToken = default)
+    {
+        return PreprocessAsync(audioFilePath, replaceOriginal, overrides: null, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    public async Task<Result<PreprocessingResult>> PreprocessAsync(
+        string audioFilePath,
+        bool replaceOriginal,
+        PreprocessingOverrides? overrides,
         CancellationToken cancellationToken = default)
     {
         // Validate input
@@ -76,8 +87,13 @@ public sealed class FfmpegAudioPreprocessor : IAudioPreprocessor
             return Result<PreprocessingResult>.Failure($"Audio file not found: {audioFilePath}");
         }
 
+        // Resolve effective settings (overrides take precedence over config)
+        var removeSilence = overrides?.RemoveSilence ?? _config.Preprocessing.RemoveSilence;
+        var silenceThresholdDb = overrides?.SilenceThresholdDb ?? _config.Preprocessing.SilenceThresholdDb;
+        var minSilenceDurationMs = overrides?.MinSilenceDurationMs ?? _config.Preprocessing.MinimumSilenceDurationMs;
+
         // If silence removal is disabled, return success without processing
-        if (!_config.Preprocessing.RemoveSilence)
+        if (!removeSilence)
         {
             var fileInfo = new FileInfo(audioFilePath);
             var noDuration = CalculateAudioDuration(fileInfo.Length, audioFilePath);
@@ -121,7 +137,7 @@ public sealed class FfmpegAudioPreprocessor : IAudioPreprocessor
         }
 
         // Build FFmpeg silenceremove filter arguments
-        var filterArgs = BuildSilenceRemoveFilter();
+        var filterArgs = BuildSilenceRemoveFilter(silenceThresholdDb, minSilenceDurationMs);
 
         // Determine output codec based on input format (preserve format)
         var extension = Path.GetExtension(audioFilePath).ToLowerInvariant();
@@ -261,13 +277,15 @@ public sealed class FfmpegAudioPreprocessor : IAudioPreprocessor
     }
 
     /// <summary>
-    /// Builds the FFmpeg silenceremove filter string based on configuration.
+    /// Builds the FFmpeg silenceremove filter string based on provided settings.
     /// </summary>
+    /// <param name="thresholdDb">Silence threshold in decibels.</param>
+    /// <param name="minSilenceDurationMs">Minimum silence duration in milliseconds.</param>
     /// <returns>FFmpeg audio filter string.</returns>
-    private string BuildSilenceRemoveFilter()
+    private static string BuildSilenceRemoveFilter(int thresholdDb, int minSilenceDurationMs)
     {
-        var threshold = _config.Preprocessing.SilenceThresholdDb;
-        var minSilenceDuration = _config.Preprocessing.MinimumSilenceDurationMs / 1000.0; // Convert to seconds
+        var threshold = thresholdDb;
+        var minSilenceDuration = minSilenceDurationMs / 1000.0; // Convert to seconds
 
         // Comprehensive silence removal strategy using RMS detection:
         // RMS (Root Mean Square) is better than peak for detecting true silence because:

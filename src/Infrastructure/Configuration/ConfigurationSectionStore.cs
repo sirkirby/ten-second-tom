@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Infrastructure.Configuration.Constants;
 using TenSecondTom.Shared.Results;
@@ -290,6 +291,46 @@ public sealed class ConfigurationSectionStore : IConfigurationSectionStore, IDis
         {
             _logger.LogError(ex, "Failed to write multiple configuration sections atomically");
             return Result<string>.Failure($"Failed to write configuration sections: {ex.Message}");
+        }
+        finally
+        {
+            _fileLock.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<string>> WriteFullConfigAsync(
+        JsonObject config,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+
+        await _fileLock.WaitAsync(cancellationToken);
+        try
+        {
+            _logger.LogInformation("Writing full configuration to {Path}", _configPath);
+
+            // Ensure config directory exists
+            var configDir = Path.GetDirectoryName(_configPath);
+            if (!string.IsNullOrEmpty(configDir))
+            {
+                Directory.CreateDirectory(configDir);
+            }
+
+            // Write atomically: temp file + move
+            var tempPath = _configPath + ".tmp";
+            var json = config.ToJsonString(JsonOptions);
+            await File.WriteAllTextAsync(tempPath, json, cancellationToken);
+
+            File.Move(tempPath, _configPath, overwrite: true);
+
+            _logger.LogInformation("Successfully wrote full configuration to {Path}", _configPath);
+            return Result<string>.Success(_configPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to write full configuration");
+            return Result<string>.Failure($"Failed to write configuration: {ex.Message}");
         }
         finally
         {

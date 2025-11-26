@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
@@ -96,9 +97,19 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
     }
 
     /// <inheritdoc/>
-    public async Task<Result<AudioRecording>> RecordAsync(
+    public Task<Result<AudioRecording>> RecordAsync(
         string outputPath,
         int? maxDurationSeconds = null,
+        CancellationToken cancellationToken = default)
+    {
+        return RecordAsync(outputPath, maxDurationSeconds, overrides: null, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    public async Task<Result<AudioRecording>> RecordAsync(
+        string outputPath,
+        int? maxDurationSeconds,
+        RecordingOverrides? overrides,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
@@ -109,21 +120,26 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
         string inputDevice = GetPlatformAudioInput();
         string inputFormat = GetPlatformInputFormat();
 
-        // Build audio filter chain based on configuration
+        // Resolve effective settings (overrides take precedence over config)
+        var enableFrequencyFilters = overrides?.EnableFrequencyFilters ?? _config.Recorder.EnableFrequencyFilters;
+        var inputVolume = overrides?.InputVolume ?? _config.Recorder.InputVolume;
+        var enableNoiseReduction = overrides?.EnableNoiseReduction ?? _config.Recorder.EnableNoiseReduction;
+
+        // Build audio filter chain based on effective settings
         var filters = new List<string>();
 
         // Add frequency filters if enabled (recommended for voice)
-        if (_config.Recorder.EnableFrequencyFilters)
+        if (enableFrequencyFilters)
         {
             filters.Add("highpass=f=80");  // Remove low-frequency rumble
             filters.Add("lowpass=f=8000"); // Remove high-frequency hiss
         }
 
         // Add volume adjustment
-        filters.Add($"volume={_config.Recorder.InputVolume}");
+        filters.Add($"volume={inputVolume}");
 
         // Add noise reduction if enabled
-        if (_config.Recorder.EnableNoiseReduction)
+        if (enableNoiseReduction)
         {
             filters.Add("anlmdn"); // Adaptive noise reduction
         }

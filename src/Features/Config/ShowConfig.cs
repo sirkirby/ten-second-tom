@@ -167,9 +167,14 @@ public static class ShowConfig
                     "TenSecondTom:Optional",
                     cancellationToken).ConfigureAwait(false);
 
-                // Read Audio config
+                // Read Audio config (recording settings only)
                 var audioOptionsResult = await sectionStore.ReadSectionAsync<AudioOptions>(
                     AudioOptions.SectionPath,
+                    cancellationToken).ConfigureAwait(false);
+
+                // Read Transcribe config (STT provider settings)
+                var transcribeOptionsResult = await sectionStore.ReadSectionAsync<TranscribeOptions>(
+                    TranscribeOptions.SectionPath,
                     cancellationToken).ConfigureAwait(false);
 
                 // Read Configuration metadata
@@ -199,6 +204,7 @@ public static class ShowConfig
                     Storage = storageResult.Value ?? new StorageSettings(),
                     Optional = optionalResult.Value ?? new OptionalConfiguration(),
                     Audio = MapAudioOptions(audioOptionsResult.Value),
+                    Transcribe = MapTranscribeOptions(transcribeOptionsResult.Value),
                     CreatedAt = metadataResult.Value?.CreatedAt ?? DateTime.UtcNow,
                     LastModifiedAt = metadataResult.Value?.LastModifiedAt,
                     ConfigurationVersion = metadataResult.Value?.Version ?? "1.0"
@@ -215,7 +221,8 @@ public static class ShowConfig
         }
 
         /// <summary>
-        /// Maps AudioOptions to AudioConfigurationDisplay using accessor methods.
+        /// Maps AudioOptions to AudioConfigurationDisplay (recording and preprocessing only).
+        /// STT settings are mapped separately via MapTranscribeOptions.
         /// </summary>
         private static AudioConfigurationDisplay MapAudioOptions(AudioOptions? audioOptions)
         {
@@ -226,10 +233,6 @@ public static class ShowConfig
 
             return new AudioConfigurationDisplay
             {
-                SttProvider = audioOptions.SttProvider,
-                SttApiKey = audioOptions.GetSttApiKey(),
-                SttModel = audioOptions.GetSttModel(),
-                KeepFiles = audioOptions.KeepFiles,
                 Recorder = new RecorderConfigurationDisplay
                 {
                     InputVolume = audioOptions.Recorder.InputVolume,
@@ -242,6 +245,25 @@ public static class ShowConfig
                     SilenceThresholdDb = audioOptions.Preprocessing.SilenceThresholdDb,
                     MinimumSilenceDurationMs = audioOptions.Preprocessing.MinimumSilenceDurationMs
                 }
+            };
+        }
+
+        /// <summary>
+        /// Maps TranscribeOptions to TranscribeConfigurationDisplay.
+        /// </summary>
+        private static TranscribeConfigurationDisplay MapTranscribeOptions(TranscribeOptions? transcribeOptions)
+        {
+            if (transcribeOptions == null)
+            {
+                return new TranscribeConfigurationDisplay();
+            }
+
+            return new TranscribeConfigurationDisplay
+            {
+                SttProvider = transcribeOptions.SttProvider,
+                SttApiKey = transcribeOptions.GetSttApiKey(),
+                SttModel = transcribeOptions.GetSttModel(),
+                KeepFiles = transcribeOptions.KeepFiles
             };
         }
 

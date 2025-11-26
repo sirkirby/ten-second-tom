@@ -5,12 +5,12 @@ namespace TenSecondTom.Features.Audio.Models;
 /// <summary>
 /// Represents STT engine selection strategy for audio transcription.
 /// This enum provides the CLI interface for STT provider selection and maps to the underlying
-/// AudioOptions.SttProvider setting.
+/// TranscribeOptions.SttProvider setting.
 /// </summary>
 /// <remarks>
 /// Mapping to configuration:
 /// <list type="bullet">
-/// <item><see cref="Auto"/>: SttProvider = "built-in-local" (default, uses Microsoft AI Foundry)</item>
+/// <item><see cref="Auto"/>: SttProvider = "built-in-local" (default, uses Whisper.NET)</item>
 /// <item><see cref="Local"/>: SttProvider = "whisper-cpp" (external whisper.cpp binary)</item>
 /// <item><see cref="OpenAI"/>: SttProvider = "openai" (cloud-based OpenAI Whisper API)</item>
 /// </list>

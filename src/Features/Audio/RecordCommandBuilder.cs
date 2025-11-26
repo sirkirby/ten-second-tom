@@ -5,10 +5,7 @@ using Spectre.Console;
 using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Cli;
-using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
-using TenSecondTom.Shared.Models;
-using TenSecondTom.Shared.Options;
 
 namespace TenSecondTom.Features.Audio;
 
@@ -42,13 +39,45 @@ public sealed class RecordCommandBuilder : ICommandBuilder
             Description = "STT engine selection: auto (default), local, or openai."
         };
 
-        var listOption = new Option<bool>("--list")
+        // Recording override options
+        var inputVolumeOption = new Option<double?>("--input-volume")
         {
-            Description = "List all available recordings and exit."
+            Description = "Input volume multiplier for this recording (0.0 to 2.0). Overrides configured default."
+        };
+
+        var noiseReductionOption = new Option<bool?>("--noise-reduction")
+        {
+            Description = "Enable/disable noise reduction for this recording. Overrides configured default."
+        };
+
+        var frequencyFiltersOption = new Option<bool?>("--frequency-filters")
+        {
+            Description = "Enable/disable frequency filters for this recording. Overrides configured default."
+        };
+
+        // Preprocessing override options
+        var removeSilenceOption = new Option<bool?>("--remove-silence")
+        {
+            Description = "Enable/disable silence removal for this recording. Overrides configured default."
+        };
+
+        var silenceThresholdOption = new Option<int?>("--silence-threshold-db")
+        {
+            Description = "Silence detection threshold in dB for this recording (-60 to -40). Overrides configured default."
+        };
+
+        var minSilenceDurationOption = new Option<int?>("--min-silence-duration-ms")
+        {
+            Description = "Minimum silence duration to remove in milliseconds for this recording (100 to 2000). Overrides configured default."
         };
 
         recordCommand.Options.Add(sttOption);
-        recordCommand.Options.Add(listOption);
+        recordCommand.Options.Add(inputVolumeOption);
+        recordCommand.Options.Add(noiseReductionOption);
+        recordCommand.Options.Add(frequencyFiltersOption);
+        recordCommand.Options.Add(removeSilenceOption);
+        recordCommand.Options.Add(silenceThresholdOption);
+        recordCommand.Options.Add(minSilenceDurationOption);
         recordCommand.Options.Add(jsonOutputOption);
 
         // Set action
@@ -56,71 +85,42 @@ public sealed class RecordCommandBuilder : ICommandBuilder
         {
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
             string? stt = parseResult.GetValue(sttOption);
-            bool listRecordings = parseResult.GetValue(listOption);
+
+            // Parse recording overrides
+            double? inputVolume = parseResult.GetValue(inputVolumeOption);
+            bool? noiseReduction = parseResult.GetValue(noiseReductionOption);
+            bool? frequencyFilters = parseResult.GetValue(frequencyFiltersOption);
+
+            // Parse preprocessing overrides
+            bool? removeSilence = parseResult.GetValue(removeSilenceOption);
+            int? silenceThreshold = parseResult.GetValue(silenceThresholdOption);
+            int? minSilenceDuration = parseResult.GetValue(minSilenceDurationOption);
+
+            // Build override objects (only if any values were provided)
+            RecordingOverrides? recordingOverrides = null;
+            if (inputVolume.HasValue || noiseReduction.HasValue || frequencyFilters.HasValue)
+            {
+                recordingOverrides = new RecordingOverrides
+                {
+                    InputVolume = inputVolume,
+                    EnableNoiseReduction = noiseReduction,
+                    EnableFrequencyFilters = frequencyFilters
+                };
+            }
+
+            PreprocessingOverrides? preprocessingOverrides = null;
+            if (removeSilence.HasValue || silenceThreshold.HasValue || minSilenceDuration.HasValue)
+            {
+                preprocessingOverrides = new PreprocessingOverrides
+                {
+                    RemoveSilence = removeSilence,
+                    SilenceThresholdDb = silenceThreshold,
+                    MinSilenceDurationMs = minSilenceDuration
+                };
+            }
 
             var mediator = serviceProvider.GetRequiredService<IMediator>();
 
-            // Handle --list option: display recordings and exit
-            if (listRecordings)
-            {
-                // Use MediatR to query recordings (VSA pattern - no cross-feature dependencies)
-                var listResult = await mediator.Send(
-                    new TenSecondTom.Features.Generate.ListRecordings.Query(),
-                    CancellationToken.None);
-
-                if (!listResult.IsSuccess)
-                {
-                    CommandOutputFormatter.WriteError(listResult.Error ?? "Failed to list recordings", jsonOutput);
-                    return 1;
-                }
-
-                var recordings = listResult.Value;
-
-                if (jsonOutput)
-                {
-                    var json = System.Text.Json.JsonSerializer.Serialize(
-                        new
-                        {
-                            success = true,
-                            recordings = recordings.Select(r => new
-                            {
-                                filename = r.RecordingBaseName,
-                                recorded_at = r.RecordedAt,
-                                formatted_date = r.FormattedDate,
-                                word_count = r.WordCount,
-                                file_size_bytes = r.FileSizeBytes
-                            })
-                        },
-                        SnakeCaseJsonOptions);
-                    Console.WriteLine(json);
-                }
-                else
-                {
-                    AnsiConsole.MarkupLine("[bold cyan]Available Recordings:[/]");
-                    AnsiConsole.WriteLine();
-
-                    var table = new Spectre.Console.Table()
-                        .AddColumn("Filename")
-                        .AddColumn("Recorded At")
-                        .AddColumn("Words")
-                        .AddColumn("Size");
-
-                    foreach (var r in recordings)
-                    {
-                        table.AddRow(
-                            r.RecordingBaseName.EscapeMarkup(),
-                            r.FormattedDate.EscapeMarkup(),
-                            r.WordCount.ToString(),
-                            $"{r.FileSizeBytes / 1024.0:F1} KB");
-                    }
-
-                    AnsiConsole.Write(table);
-                    AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine($"[dim]Total: {recordings.Count} recording(s)[/]");
-                }
-
-                return 0;
-            }
             var audioOptionsResult = await mediator.Send(new GetAudioConfiguration.Query(), CancellationToken.None)
                 .ConfigureAwait(false);
 
@@ -133,6 +133,19 @@ public sealed class RecordCommandBuilder : ICommandBuilder
             }
 
             var audioOptions = audioOptionsResult.Value;
+
+            var transcribeOptionsResult = await mediator.Send(new GetTranscribeConfiguration.Query(), CancellationToken.None)
+                .ConfigureAwait(false);
+
+            if (!transcribeOptionsResult.IsSuccess || transcribeOptionsResult.Value is null)
+            {
+                CommandOutputFormatter.WriteError(
+                    transcribeOptionsResult.Error ?? "Transcription configuration is unavailable.",
+                    jsonOutput);
+                return 1;
+            }
+
+            var transcribeOptions = transcribeOptionsResult.Value;
 
             if (!SttSelectionMapper.TryParse(stt, out var sttSelection, out var sttError))
             {
@@ -161,11 +174,11 @@ public sealed class RecordCommandBuilder : ICommandBuilder
                 return 1; // Authentication failed
             }
 
-            // Validate audio configuration
+            // Validate transcription configuration
             var audioValidator = serviceProvider.GetRequiredService<TenSecondTom.Features.Audio.Services.IAudioConfigurationValidator>();
             var audioConfigResult = TenSecondTom.Features.Audio.AudioConfigurationHelper.EnsureAudioConfigured(
                 audioValidator,
-                audioOptions,
+                transcribeOptions,
                 CommandNames.Record,
                 jsonOutput);
 
@@ -207,8 +220,10 @@ public sealed class RecordCommandBuilder : ICommandBuilder
             // Execute command with configured timeout
             var command = new Record.Command
             {
-                AudioConfig = SttSelectionMapper.BuildAudioOptions(sttSelection, audioOptions),
-                MaxDurationSeconds = audioOptions.Timeouts.RecordSeconds  // Use configured timeout
+                TranscribeConfig = SttSelectionMapper.BuildTranscribeOptions(sttSelection, transcribeOptions),
+                MaxDurationSeconds = audioOptions.Timeouts.RecordSeconds,  // Use configured timeout
+                RecordingOverrides = recordingOverrides,
+                PreprocessingOverrides = preprocessingOverrides
             };
 
             var result = await handler.Handle(command, CancellationToken.None);

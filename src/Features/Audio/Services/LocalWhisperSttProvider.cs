@@ -16,18 +16,18 @@ namespace TenSecondTom.Features.Audio.Services;
 /// </summary>
 public sealed class LocalWhisperSttProvider : ISttProvider, ISupportsModelManagement
 {
-    private readonly AudioOptions _config;
+    private readonly TranscribeOptions _config;
     private readonly IWhisperCppModelManager _modelManager;
     private readonly ILogger<LocalWhisperSttProvider> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LocalWhisperSttProvider"/> class.
     /// </summary>
-    /// <param name="config">Audio configuration options.</param>
+    /// <param name="config">Transcribe configuration options.</param>
     /// <param name="modelManager">Whisper.cpp model manager for model operations.</param>
     /// <param name="logger">Logger instance.</param>
     public LocalWhisperSttProvider(
-        IOptions<AudioOptions> config,
+        IOptions<TranscribeOptions> config,
         IWhisperCppModelManager modelManager,
         ILogger<LocalWhisperSttProvider> logger)
     {

@@ -6,16 +6,16 @@ using Xunit.Abstractions;
 namespace TenSecondTom.IntegrationTests.Integration.Cli;
 
 /// <summary>
-/// CLI smoke tests for setup and config commands.
+/// CLI smoke tests for config and core commands.
 /// Verifies basic command structure and help output without testing full scenarios.
 /// </summary>
-public sealed class SetupCommandCliTests : IDisposable
+public sealed class ConfigCommandCliTests : IDisposable
 {
     private readonly ITestOutputHelper _output;
     private readonly string _projectRoot;
     private readonly string _executablePath;
 
-    public SetupCommandCliTests(ITestOutputHelper output)
+    public ConfigCommandCliTests(ITestOutputHelper output)
     {
         _output = output;
         
@@ -30,9 +30,9 @@ public sealed class SetupCommandCliTests : IDisposable
         
         // Determine executable path based on build configuration
         #if DEBUG
-        _executablePath = Path.Combine(_projectRoot, "src", "bin", "Debug", "net9.0", "TenSecondTom");
+        _executablePath = Path.Combine(_projectRoot, "src", "bin", "Debug", "net9.0", "tom");
         #else
-        _executablePath = Path.Combine(_projectRoot, "src", "bin", "Release", "net9.0", "TenSecondTom");
+        _executablePath = Path.Combine(_projectRoot, "src", "bin", "Release", "net9.0", "tom");
         #endif
 
         // Verify executable exists, if not try to build it
@@ -141,42 +141,15 @@ public sealed class SetupCommandCliTests : IDisposable
     }
 
     [Fact]
-    public async Task SetupCommand_Help_DisplaysUsageInformation()
+    public async Task ConfigAllCommand_Help_DisplaysUsageInformation()
     {
         // Act
-        var (output, error, exitCode) = await RunCliCommandAsync("setup --help");
+        var (output, error, exitCode) = await RunCliCommandAsync("config all --help");
 
         // Assert
         exitCode.Should().Be(0, "help should always succeed");
-        output.Should().Contain("setup", "help should mention the setup command");
+        output.Should().Contain("all", "help should mention the all subcommand");
         output.Should().NotBeNullOrWhiteSpace("help output should not be empty");
-    }
-
-    [Fact]
-    public async Task SetupCommand_InvalidFlag_ProducesError()
-    {
-        // Act
-        var (output, error, exitCode) = await RunCliCommandAsync("setup --invalid-flag");
-
-        // Assert
-        exitCode.Should().NotBe(0, "invalid flag should produce non-zero exit code");
-        var combinedOutput = (output + error).ToLowerInvariant();
-
-        // System.CommandLine may use different error messages across versions
-        // Check for common error indicators
-        combinedOutput.Should().MatchRegex("(invalid|unrecognized|unknown)",
-            "output should indicate an error with the flag");
-    }
-
-    [Fact]
-    public async Task SetupCommand_ForceFlag_IsRecognized()
-    {
-        // Act
-        var (output, error, exitCode) = await RunCliCommandAsync("setup --force --help");
-
-        // Assert
-        exitCode.Should().Be(0, "help with valid flag should succeed");
-        output.Should().Contain("force", "help should document the force flag");
     }
 
     [Fact]
@@ -192,14 +165,14 @@ public sealed class SetupCommandCliTests : IDisposable
     }
 
     [Fact]
-    public async Task ConfigCommand_Show_IsRecognized()
+    public async Task ConfigCommand_ShowSubcommand_IsRecognized()
     {
         // Act
-        var (output, error, exitCode) = await RunCliCommandAsync("config --show --help");
+        var (output, error, exitCode) = await RunCliCommandAsync("config show --help");
 
         // Assert
-        exitCode.Should().Be(0, "help with valid flag should succeed");
-        output.Should().Contain("show", "help should document the show flag");
+        exitCode.Should().Be(0, "help with valid subcommand should succeed");
+        output.Should().Contain("show", "help should document the show subcommand");
     }
 
     [Fact]
@@ -226,8 +199,9 @@ public sealed class SetupCommandCliTests : IDisposable
 
         // Assert
         exitCode.Should().Be(0, "help should always succeed");
-        output.Should().Contain("setup", "root help should list setup command");
         output.Should().Contain("config", "root help should list config command");
+        output.Should().Contain("record", "root help should list record command");
+        output.Should().Contain("generate", "root help should list generate command");
     }
 
     public void Dispose()

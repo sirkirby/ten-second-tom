@@ -314,7 +314,7 @@ public sealed class ApplicationBootstrapper
     /// <summary>
     /// Runs the setup command with the specified options.
     /// </summary>
-    private async Task<Result<Models.SetupResult>> RunSetupAsync(bool force, CancellationToken cancellationToken)
+    private async Task<Result<SetupResult>> RunSetupAsync(bool force, CancellationToken cancellationToken)
     {
         var setupCommand = new Setup.Command { Force = force };
         var setupHandler = _serviceProvider.GetRequiredService<Setup.Handler>();

@@ -23,7 +23,7 @@ namespace TenSecondTom.Tests.Features.Audio.Handlers;
 /// </summary>
 public sealed class RecordHandlerTests
 {
-    private static readonly AudioOptions DefaultAudioOptions = new()
+    private static readonly TranscribeOptions DefaultTranscribeOptions = new()
     {
         SttProvider = SttProviders.WhisperCpp,
         Providers = new Dictionary<string, Dictionary<string, string>>
@@ -82,7 +82,7 @@ public sealed class RecordHandlerTests
             var handler = CreateHandler(storageRoot);
             var command = new RecordFeature.Command
             {
-                AudioConfig = DefaultAudioOptions,
+                TranscribeConfig = DefaultTranscribeOptions,
                 MaxDurationSeconds = 10
             };
 

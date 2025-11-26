@@ -10,6 +10,8 @@
 name: PR Validation
 
 on:
+  push:
+    branches: [main]  # Build on main to populate cache for PRs
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
@@ -98,8 +100,9 @@ jobs:
             ${{ runner.os }}-nuget-
       
       - name: Restore dependencies
-        run: dotnet restore
-      
+        run: dotnet restore -r linux-x64
+        # -r linux-x64: Avoid downloading Whisper.net.AllRuntimes (~2GB) by specifying target runtime
+
       - name: Build solution
         run: |
           dotnet build \
@@ -107,6 +110,7 @@ jobs:
             --no-restore \
             --warnaserror
         # --warnaserror: Treat warnings as errors to enforce clean code
+        # --no-restore: Uses packages from restore step (which specified -r linux-x64)
 
   # Job 2: Test
   # Runs all unit and integration tests
@@ -135,8 +139,8 @@ jobs:
             ${{ runner.os }}-nuget-
       
       - name: Restore dependencies
-        run: dotnet restore
-      
+        run: dotnet restore -r linux-x64
+
       - name: Run tests
         run: |
           dotnet test \
@@ -182,12 +186,13 @@ jobs:
             ${{ runner.os }}-nuget-
       
       - name: Restore dependencies
-        run: dotnet restore
-      
+        run: dotnet restore -r linux-x64
+
       - name: Run tests with coverage
         run: |
           dotnet test \
             --configuration Release \
+            --no-restore \
             --collect:"XPlat Code Coverage" \
             --results-directory ./coverage
       
@@ -341,8 +346,8 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       
       - name: Restore dependencies
-        run: dotnet restore
-      
+        run: dotnet restore -r linux-x64
+
       - name: Build release executable (Linux x64)
         run: |
           dotnet publish src/TenSecondTom.csproj \
@@ -355,25 +360,25 @@ jobs:
       
       - name: Verify build output
         run: |
-          if [ ! -f "./publish/TenSecondTom" ]; then
+          if [ ! -f "./publish/tom" ]; then
             echo "❌ Error: Release build did not produce executable"
             exit 1
           fi
-          
-          SIZE=$(stat -c%s ./publish/TenSecondTom)
+
+          SIZE=$(stat -c%s ./publish/tom)
           SIZE_MB=$((SIZE / 1024 / 1024))
           echo "📦 Executable size: ${SIZE_MB}MB"
-          
+
           if [ $SIZE_MB -gt 50 ]; then
             echo "⚠️  Warning: Executable size exceeds 50MB"
           fi
-          
+
           echo "✅ Release build verification passed"
-      
+
       - name: Smoke test
         run: |
-          chmod +x ./publish/TenSecondTom
-          ./publish/TenSecondTom --version
+          chmod +x ./publish/tom
+          ./publish/tom --version
           
           if [ $? -eq 0 ]; then
             echo "✅ Release executable runs successfully"

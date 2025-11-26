@@ -26,10 +26,10 @@
 
 - 🧠 **Simplified Daily Reflections**: Single free-form text entry to capture your thoughts
 - 📝 **Quick Capture**: Save notes instantly without AI processing for raw thoughts and meeting notes
-- 🎤 **Voice Entry**: Record audio notes with local-first speech-to-text transcription
-- 🔁 **Standalone Transcription**: Re-run STT on saved recordings or note audio with a dedicated command
+- 🎤 **Audio Recording**: Record audio with local-first speech-to-text transcription via `/record`
+- 🔁 **Standalone Transcription**: Transcribe audio files with `/transcribe` command
 - 📊 **Weekly Reviews**: AI-generated summaries of your week with themes and patterns
-- 🔍 **Searchable Archive**: Full-text search across all your memories (including voice transcripts)
+- 🔍 **Searchable Archive**: Full-text search across all your memories (including transcripts)
 - 🤖 **Multiple AI Providers**: Support for OpenAI, Anthropic, and local LLMs (Ollama, LM Studio, etc.)
 - 📝 **Custom Templates**: Create and edit prompt templates to personalize your summaries
 - 📁 **Markdown Storage**: Human-readable files in configured memory directory
@@ -62,7 +62,7 @@ Perfect for sensitive work, offline environments, or privacy-conscious users.
   - **Local LLM** ([Ollama](https://ollama.ai/), [LM Studio](https://lmstudio.ai/), etc.) - for private, offline summaries (no API key needed)
 - **SSH Key** (Ed25519 or RSA) in `~/.ssh/` - for secure authentication
 
-### Voice Entry Requirements (Optional)
+### Audio Recording Requirements (Optional)
 
 - **FFmpeg** ([Download](https://ffmpeg.org/)) - **REQUIRED** for audio recording
   - macOS: `brew install ffmpeg` (automatically installed with Homebrew tom package)
@@ -72,8 +72,8 @@ Perfect for sensitive work, offline environments, or privacy-conscious users.
   - Ten Second Tom includes Whisper.NET for local, privacy-focused transcription
   - Models are downloaded automatically on first use, or via CLI:
     ```bash
-    tom transcribe --list-models              # See available models
-    tom transcribe --download-model base.en   # Download a specific model (142 MB)
+    tom transcribe models                     # See available models
+    tom transcribe models --download base.en  # Download a specific model (142 MB)
     ```
   - Models are stored in `~/.cache/whisper-net/`
 
@@ -94,20 +94,17 @@ Arguments:
   content                      Note content (optional). If omitted, opens interactive editor.
 
 Options:
-  --voice                      Record voice note (wav) with automatic speech-to-text transcription
-  --stt <engine>              STT engine: auto (default), local, or openai (only used with --voice)
   --no-edit                    Skip interactive editor, use content from command line
-  --list                       List all available notes and exit
   --output-json                Output results in JSON format
+
+Subcommands:
+  tom note list                List all available notes
 
 Examples:
   tom note                                            # Interactive mode (opens editor)
-  tom note --voice                                    # Voice note with auto STT
-  tom note --voice --stt local                        # Voice note with local whisper.cpp
-  tom note --voice --stt openai                       # Voice note with OpenAI Whisper API
   tom note "Quick thought" --no-edit                  # Quick capture mode
-  tom note --list                                     # List all available notes
-  tom note --list --output-json                       # List notes in JSON format
+  tom note list                                       # List all available notes
+  tom note list --output-json                         # List notes in JSON format
 ```
 
 **Storage**: Notes are saved to `<memory-dir>/note/` directory with filename `MM-DD-YYYY_N.md` where N is an incremental counter for that day.
@@ -117,42 +114,34 @@ Examples:
 - Quick capture without waiting for AI processing
 - Meeting notes that don't need summarization
 - Raw thoughts you want to preserve exactly as written
-- Voice notes with transcription (no AI summary)
 
-**Difference from `/today`**: The `/note` command saves your input immediately without AI processing, while `/today` also generates an AI-powered summary using prompt templates.
+**Note**: For audio recording with transcription, use the `/record` command instead.
 
-### today Command
+### generate Command
 
-Capture daily reflections with AI-powered summarization. Opens an interactive editor, then processes your input using a prompt template to generate structured summaries.
+Generate AI-powered summaries from notes or recordings using prompt templates. The workflow is interactive: select your source, choose a template, then receive the generated output.
 
 ```bash
-tom today [notes] [options]
+tom generate <subcommand> [options]
 
-Arguments:
-  notes                        Notes for today (optional). If omitted, opens interactive editor.
+Subcommands:
+  tom generate note            Generate from a note (interactive selection)
+  tom generate recording       Generate from a recording (interactive selection)
 
-Options:
-  --voice                      Record voice note (wav) with automatic speech-to-text transcription
-  --stt <engine>              STT engine: auto (default), local, or openai (only used with --voice)
-  --no-edit                    Skip interactive editor, use notes from command line
-  --use-default-template       Automatically use default template (no prompt)
-  --template <name>            Use specific template by name (without .md)
-  --provider <provider>        Override LLM provider (OpenAI or Anthropic)
+Options (for both subcommands):
+  --template <id>              Use specific template by ID (skips template selection)
   --output-json                Output results in JSON format
 
 Examples:
-  tom today                                             # Interactive mode with AI processing
-  tom today --voice                                     # Voice entry with auto STT + AI summary
-  tom today --voice --stt local                         # Voice with local whisper.cpp + AI summary
-  tom today "Quick note" --no-edit                      # Quick entry with AI summary
-  tom today "Note" --no-edit --use-default-template     # Fastest AI mode (< 3 seconds)
-  tom today "Note" --no-edit --template "standup"       # Use specific template
+  tom generate note                          # Select note → select template → generate
+  tom generate recording                     # Select recording → select template → generate
+  tom generate note --template daily-summary # Select note, use specific template
+  tom generate recording --template organize # Select recording, use specific template
 ```
 
-**Storage**: Creates two files in `<memory-dir>/note/`:
+**Workflow**: Each subcommand presents an interactive list to select your source (note or recording), then a template selection, then generates the output using your configured LLM provider.
 
-- `MM-DD-YYYY_N.md` - Your raw input (same format as `/note` command)
-- `MM-DD-YYYY_N_generated.md` - AI-generated summary using selected template
+**Storage**: Output is saved alongside the source file with a `_generated` suffix (e.g., `01-21-2025_1_generated.md`).
 
 **Available Templates**:
 
@@ -163,32 +152,31 @@ Examples:
 - `weekly-review` - Weekly retrospective
 - `business-meeting` - Meeting summaries
 
-### Voice Entry
+### Audio Recording
 
-Both `/note` and `/today` commands support voice recording with automatic speech-to-text transcription:
+Use the `/record` command to record audio with automatic speech-to-text transcription:
 
 ```bash
-# Voice note (no AI processing)
-tom note --voice                          # Auto STT selection
-tom note --voice --stt local             # Force local whisper.cpp
-tom note --voice --stt openai            # Force OpenAI Whisper API
+# Start recording with transcription
+tom record                                # Auto STT selection
+tom record --stt local                    # Force local Whisper.NET
+tom record --stt openai                   # Force OpenAI Whisper API
 
-# Voice + AI summary
-tom today --voice                         # Auto STT + AI processing
-tom today --voice --stt local            # Force local + AI summary
-tom today --voice --stt openai           # Force OpenAI + AI summary
+# List existing recordings
+tom record list                           # List all recordings
+tom record list --output-json             # List in JSON format
 ```
 
 **STT Engine Selection:**
 
-- `auto` (default): Uses configured local provider (whisper-cpp or built-in-local)
+- `auto` (default): Uses configured local provider (whisper-net or whisper-cpp)
 - `local`: Forces local provider (privacy-focused, no API calls)
 - `openai`: Forces OpenAI Whisper API (cloud-based)
 
-**Key Difference:**
+**Workflow:**
 
-- `/note --voice`: Saves transcript directly (no LLM processing)
-- `/today --voice`: Transcript + AI-generated summary
+1. Use `/record` to capture audio with transcription
+2. Use `/generate` to create AI-powered summaries from recordings
 
 **Prerequisites:**
 
@@ -201,7 +189,7 @@ tom today --voice --stt openai           # Force OpenAI + AI summary
 
 **Legal Guidance:** Ten Second Tom is designed for single-user personal use on your own device. Do not record conversations without consent.
 
-### Standalone Recording
+### record Command
 
 Record and save audio with transcription for later use with the `generate` command:
 
@@ -209,15 +197,28 @@ Record and save audio with transcription for later use with the `generate` comma
 tom record [options]
 
 Options:
-  --stt <engine>    STT engine: auto (default), local, or openai
-  --list            List all available recordings and exit
-  --output-json     Output results in JSON format
+  --stt <engine>               STT engine: auto (default), local, or openai
+  --output-json                Output results in JSON format
+
+  # Per-recording audio overrides (override configured defaults):
+  --input-volume <float>       Input volume multiplier (0.0 to 2.0)
+  --noise-reduction <bool>     Enable/disable noise reduction
+  --frequency-filters <bool>   Enable/disable frequency filters
+  --remove-silence <bool>      Enable/disable silence removal
+  --silence-threshold-db <int> Silence detection threshold in dB (-60 to -40)
+  --min-silence-duration-ms <int> Minimum silence duration to remove (100 to 2000)
+
+Subcommands:
+  tom record list   List all available recordings
 
 Examples:
-  tom record                    # Start recording with auto STT
-  tom record --stt local        # Record with local whisper.cpp
-  tom record --list             # List all recordings
-  tom record --list --output-json  # List recordings in JSON format
+  tom record                           # Start recording with auto STT
+  tom record --stt local               # Record with local Whisper.NET
+  tom record --noise-reduction false   # Disable noise reduction for this recording
+  tom record --remove-silence false    # Disable silence removal for this recording
+  tom record --input-volume 1.5        # Boost input volume for this recording
+  tom record list                      # List all recordings
+  tom record list --output-json        # List recordings in JSON format
 
 Files saved to:
   <memory-dir>/recording/MM-dd-yyyy_N.wav
@@ -228,41 +229,75 @@ Files saved to:
 
 ### transcribe Command
 
-Transcribe any saved audio file—whether it originated from `/note --voice`, `tom record`, or an external `.wav`—without creating a new recording session.
+Transcribe any saved audio file—whether it originated from `tom record` or an external `.wav`—without creating a new recording session. Also manages STT model downloads and transcription configuration.
 
 ```bash
 tom transcribe [options]
 
 Options:
-  --note <name>         Note base name (without extension) to transcribe (reads from note/ directory)
   --recording <name>    Recording base name to re-transcribe (reads from recording/ directory)
   --file <path>         Import an arbitrary .wav file from anywhere on disk
   --name <name>         Override the destination recording name (defaults to source base name)
   --stt <engine>        STT engine: auto (default), local, or openai
-  --list                List available note/recording audio files and exit
   --force               Overwrite existing transcript/audio if the destination already exists
   --output-json         Output results in JSON format
 
+Subcommands:
+  tom transcribe list              List available recording audio files
+  tom transcribe models            List and download STT models
+  tom transcribe config            Configure transcription settings (STT provider, keep files, etc.)
+
 Examples:
-  tom transcribe --note 10-24-2025_1             # Transcribe a voice note into the recording library
   tom transcribe --recording 10-20-2025_2 --force # Re-run STT on an existing recording
-  tom transcribe --file ~/Desktop/meeting.wav    # Import a standalone WAV file
-  tom transcribe --list --output-json            # Enumerate available audio in JSON format
+  tom transcribe --file ~/Desktop/meeting.wav     # Import a standalone WAV file
+  tom transcribe list                             # List available recordings
+  tom transcribe list --output-json               # List in JSON format
+  tom transcribe models                           # List available STT models
+  tom transcribe models --download base.en        # Download a specific model
+  tom transcribe config                           # Configure STT settings interactively
 ```
 
 **Storage:** Transcripts are written to `<memory-dir>/recording/<name>.md` with YAML frontmatter, matching the files expected by the `/generate` workflow.
 
+### audio Command
+
+View and configure audio recording settings:
+
+```bash
+tom audio [options]
+
+Options:
+  --output-json         Output results in JSON format
+
+Subcommands:
+  tom audio config      Configure audio recording settings interactively
+
+Examples:
+  tom audio                   # Show current audio configuration
+  tom audio --output-json     # Show config in JSON format
+  tom audio config            # Configure audio settings interactively
+  tom audio config --input-volume 0.8   # Set input volume directly
+```
+
+**Available Config Options:**
+
+- `--record-timeout` - Recording timeout in seconds (60-86400)
+- `--input-volume` - Input volume multiplier (0.0 to 2.0)
+- `--noise-reduction` - Enable/disable noise reduction (true/false)
+- `--frequency-filters` - Enable/disable frequency filters (true/false)
+
 ### Audio Configuration
 
-Ten Second Tom provides extensive audio configuration for different microphone types and recording scenarios. All settings can be configured via:
+Ten Second Tom provides extensive audio configuration for different microphone types and recording scenarios. Configuration is split between:
 
-1. **Interactive setup wizard** (`tom config audio`) - Recommended for most users
-2. **Environment variables** - For advanced users and CI/CD
-3. **Configuration file** (`~/ten-second-tom/config/config.json`) - Automatically managed by setup wizard
+1. **Audio recording settings** (`tom audio config`) - Input volume, noise reduction, frequency filters, silence removal
+2. **Transcription settings** (`tom transcribe config`) - STT provider selection, model management, keep files option
+3. **Environment variables** - For advanced users and CI/CD
+4. **Configuration file** (`~/ten-second-tom/config/config.json`) - Automatically managed by setup wizards
 
 #### Key Features
 
-- **STT Fallback Provider**: Configure automatic fallback from local to cloud STT if primary provider fails
+- **STT Provider Selection**: Choose between built-in Whisper.NET, external whisper-cpp, or OpenAI API (configure via `tom transcribe config`)
 - **Microphone Optimization**: Presets for laptop/built-in mics, professional dynamic mics, condenser/USB mics, and studio setups
 - **Silence Removal**: Automatically compress long silence gaps in recordings (enabled by default)
 - **Noise Reduction**: Adaptive noise reduction during recording (enabled by default for laptop mics)
@@ -274,22 +309,36 @@ Ten Second Tom provides extensive audio configuration for different microphone t
 
 ```bash
 # No configuration needed - optimized by default!
-tom today --voice
+tom record
 ```
 
-**For Professional Dynamic Microphones:**
+**Per-Recording Overrides (CLI Flags):**
 
 ```bash
+# Disable noise reduction for this recording only
+tom record --noise-reduction false
+
+# Disable silence removal for this recording only
+tom record --remove-silence false
+
+# Adjust input volume for quiet microphone
+tom record --input-volume 1.5
+
+# Combine multiple overrides
+tom record --noise-reduction false --frequency-filters false --remove-silence false
+```
+
+**Permanent Configuration (Environment Variables):**
+
+```bash
+# For professional dynamic microphones (permanent setting)
 export TenSecondTom__Audio__Recorder__InputVolume=0.75
 export TenSecondTom__Audio__Recorder__EnableNoiseReduction=false
-tom today --voice
-```
+tom record
 
-**Adjust Silence Removal Sensitivity:**
-
-```bash
-export TenSecondTom__Audio__Preprocessing__SilenceThresholdDb=-60  # More aggressive
-tom today --voice
+# More aggressive silence removal (permanent setting)
+export TenSecondTom__Audio__Preprocessing__SilenceThresholdDb=-60
+tom record
 ```
 
 #### Available Settings
@@ -344,7 +393,7 @@ dotnet publish -c Release -o /usr/local/bin/tom
 
 Ten Second Tom supports multiple Large Language Model (LLM) providers including cloud-based and local options. You can configure both the provider and model using any of these methods:
 
-1. Interactive setup wizard (`tom setup`)
+1. Interactive setup wizard (`tom config all`)
 2. Configuration command (`tom config llm`)
 3. Environment variables (advanced / CI)
 
@@ -353,7 +402,7 @@ Ten Second Tom supports multiple Large Language Model (LLM) providers including 
 Run either the setup wizard or the config command:
 
 ```bash
-tom setup         # Guided initial configuration (includes provider + model selection)
+tom config all    # Guided initial configuration (includes provider + model selection)
 tom config llm    # Re-run provider/model selection any time
 ```
 
@@ -461,7 +510,8 @@ Ten Second Tom supports running **completely offline** using local LLM servers t
 3. **Use Tom offline:**
 
    ```bash
-   tom today --voice  # Voice + local STT + local LLM = 100% offline!
+   tom record  # Record with local STT + local LLM = 100% offline!
+   tom generate --recording 10-21-2025_1  # Generate summary from recording
    ```
 
 **Configuration via Command Line:**
@@ -532,14 +582,14 @@ export TenSecondTom__Anthropic__ApiKey="sk-ant-your-anthropic-key"
 On first run, Ten Second Tom will automatically launch a guided setup wizard:
 
 ```bash
-tom today
+tom record
 # → Setup wizard launches automatically if not configured
 ```
 
 Or manually run the setup wizard:
 
 ```bash
-tom setup
+tom config all
 ```
 
 The setup wizard will guide you through:
@@ -603,10 +653,10 @@ Ten Second Tom supports **multiple storage providers** to fit your workflow. Cho
 
 #### Selecting a Storage Provider
 
-During initial setup (`tom setup`), you'll be prompted to choose your storage provider:
+During initial setup (`tom config all`), you'll be prompted to choose your storage provider:
 
 ```bash
-$ tom setup
+$ tom config all
 
 Step 4 of 10: Storage Provider Selection
 
@@ -673,7 +723,7 @@ Automatic purging can be enabled/disabled independently from the retention polic
 When you run Ten Second Tom for the first time, it will automatically launch the setup wizard:
 
 ```bash
-$ tom today
+$ tom record
 
  _____               ____                           _   _____
 |_   _|__ _ __      / ___|  ___  ___ ___  _ __   __| | |_   _|__  _ __ ___
@@ -685,7 +735,7 @@ $ tom today
 
 Welcome to Ten Second Tom! Let's get you set up.
 
-Step 1 of 5: SSH Key Configuration
+Step 1 of 6: SSH Key Configuration
 ...
 ```
 
@@ -706,7 +756,7 @@ For detailed authentication configuration (SSH agents, key management, etc.), se
 To reconfigure your settings at any time:
 
 ```bash
-tom setup
+tom config all
 ```
 
 Or view/update individual settings:
@@ -716,61 +766,46 @@ tom config show               # View current configuration
 tom config set api-key "..."  # Update specific setting
 ```
 
-### Daily Reflection
+### Recording with AI Summary
 
-Capture your day with a simplified single-prompt flow:
+Capture your thoughts with audio recording and generate AI-powered summaries:
 
 ```bash
-$ tom today
+$ tom record           # Record audio with transcription
+$ tom generate --recording 10-03-2025_1  # Generate AI summary
 ```
 
-**Example Session:**
+**Example Workflow:**
 
-```markdown
-📅 Daily Reflection - October 3, 2025
+1. Start a recording session:
+```bash
+$ tom record
+🎤 Recording started... Press Enter to stop.
+✅ Recording saved: ~/ten-second-tom/recording/10-03-2025_1.wav
+⏳ Transcribing audio...
+✅ Transcription saved: ~/ten-second-tom/recording/10-03-2025_1.md
+```
 
-📝 What would you like to remember from today?
-
-> Had a productive meeting with the team about the new feature.
-  Made significant progress on the design document.
-
-  Tomorrow I'll finalize the architecture and start implementation.
-
-  Still need to review John's pull request before end of day.
-
+2. Generate an AI summary from the recording:
+```bash
+$ tom generate --recording 10-03-2025_1 --template daily-summary
 ⏳ Generating summary...
-
-✨ Daily Summary
-
-## Key Events
-- Productive team meeting about new feature
-- Significant progress on design document
-
-## Themes
-- Collaboration & teamwork
-- Feature development momentum
-
-## To-Do Items
-- [ ] Review John's pull request
-- [ ] Finalize architecture design
-- [ ] Start implementation tomorrow
-
-✅ Daily entry saved: ~/ten-second-tom/note/10-03-2025_1_generated.md
+✅ Summary saved: ~/ten-second-tom/recording/10-03-2025_1_generated.md
 ```
 
-### Quick Entry Mode
+### Quick Note Capture
 
-Skip the interactive editor and provide your notes directly from the command line:
+Save notes instantly with the `/note` command:
 
 ```bash
-# Quick entry without editor
-$ tom today "Completed OAuth integration. Fixed rate limiting issues." --no-edit
+# Quick note without editor
+$ tom note "Completed OAuth integration. Fixed rate limiting issues." --no-edit
 
-# Quick entry with default template (fastest mode)
-$ tom today "Shipped feature X today" --no-edit --use-default-template
+# Interactive note (opens editor)
+$ tom note
 
-# Quick entry with specific template
-$ tom today "Daily standup notes" --no-edit --template "engineering-standup"
+# List all notes
+$ tom note list
 ```
 
 ### Multi-line Notes from CLI
@@ -779,26 +814,12 @@ You can include formatted multi-line notes directly:
 
 ```bash
 # Using quotes with line breaks (bash/zsh)
-$ tom today "Line 1: Completed task A
+$ tom note "Line 1: Completed task A
 Line 2: Working on task B
 Line 3: Blocked on task C" --no-edit
 
 # Using echo with pipe
-$ echo -e "Today's highlights:\n- Fixed critical bug\n- Deployed to production" | tom today --no-edit
-```
-
-### Weekly Review
-
-Generate a weekly summary from your daily entries:
-
-```bash
-$ tom thisweek
-```
-
-**Custom Date Range:**
-
-```bash
-$ tom thisweek --from-date 2025-09-15 --to-date 2025-09-22
+$ echo -e "Today's highlights:\n- Fixed critical bug\n- Deployed to production" | tom note --no-edit
 ```
 
 ### Search Memories
@@ -820,7 +841,8 @@ $ tom search "project" --from-date 2025-09-01 --to-date 2025-09-30
 All commands support `--output-json` for programmatic consumption:
 
 ```bash
-$ tom today --output-json
+$ tom note list --output-json
+$ tom record list --output-json
 $ tom search "meeting" --output-json
 ```
 
@@ -874,9 +896,15 @@ All commands in shell mode use a slash prefix:
 | Command | Description | Example |
 |---------|-------------|---------|
 | `/note` | Capture quick note without AI processing | `/note` |
-| `/today` | Capture today's reflection with AI summary | `/today` |
-| `/thisweek` | Generate weekly review | `/thisweek` |
+| `/record` | Record audio with transcription | `/record` |
+| `/generate` | Generate AI summary from note or recording | `/generate note` |
+| `/transcribe` | Transcribe audio files or manage STT models | `/transcribe --file meeting.wav` |
+| `/audio` | Audio configuration and management | `/audio config` |
 | `/search` | Search memory entries | `/search meeting` |
+| `/config` | View and manage configuration | `/config` |
+| `/llm` | Manage LLM models and configuration | `/llm config` |
+| `/auth` | Authentication management | `/auth` |
+| `/storage` | Storage management | `/storage` |
 | `/login` | Authenticate with SSH key | `/login` |
 | `/logout` | End current session | `/logout` |
 | `/help` | Display available commands | `/help` |
@@ -906,7 +934,8 @@ tom           # Launches interactive shell
 **Single Command Mode** (with arguments):
 
 ```bash
-tom today     # Executes command and exits
+tom record    # Executes command and exits
+tom note      # Executes command and exits
 ```
 
 Use shell mode for:
@@ -923,7 +952,7 @@ Use single command mode for:
 
 ---
 
-## �📁 File Structure
+## 📁 File Structure
 
 Your memories are stored as plain markdown files in your configured memory directory:
 
@@ -936,41 +965,51 @@ Your memories are stored as plain markdown files in your configured memory direc
 │   ├── weekly-review.md   # Default weekly template
 │   └── my-custom.md       # Your custom templates
 ├── note/
-│   ├── 10-01-2025_1.md           # Quick note (no AI processing)
-│   ├── 10-01-2025_2.md           # Raw input from /today command
-│   ├── 10-01-2025_2_generated.md # AI-processed from /today command
-│   ├── 10-02-2025_1.md           # Quick note
-│   └── 10-03-2025_1_generated.md # AI-processed daily entry
+│   ├── 10-01-2025_1.md           # Quick note (from /note command)
+│   ├── 10-01-2025_2.md           # Another quick note
+│   └── 10-02-2025_1.md           # Quick note
 ├── thisweek/
 │   ├── 2025-40-Mon-1.md          # Week 40 of 2025, Monday, entry 1
 │   └── 2025-41-Fri-1.md          # Week 41 of 2025, Friday, entry 1
-└── recording/                     # Voice recordings (if using --voice or record)
+└── recording/                     # Audio recordings (from /record command)
     ├── 10-21-2025_1.wav          # Audio file
-    ├── 10-21-2025_1.txt          # Transcription with metadata
+    ├── 10-21-2025_1.md           # Transcription with metadata
     ├── 10-21-2025_1_generated.md # AI-processed from /generate command
     └── 10-21-2025_2.wav          # Multiple recordings per day supported
 ```
 
-**File Format:**
+**File Format (Recording):**
 
 ```markdown
 ---
-command: today
+command: record
 timestamp: 2025-10-03T14:30:00Z
 entry-number: 1
-llm-provider: OpenAI
-llm-model: gpt-5-mini
+duration: 120
+stt-provider: whisper-net
+word-count: 250
 ---
 
-# User Input
-
-## What happened today?
 Had a productive meeting with the team...
+```
 
-# LLM Summary
+**File Format (Generated Summary):**
+
+```markdown
+---
+command: generate
+timestamp: 2025-10-03T14:35:00Z
+source: 10-03-2025_1
+llm-provider: OpenAI
+llm-model: gpt-5-mini
+template: daily-summary
+---
 
 ## Key Events
 - Productive team meeting...
+
+## Themes
+- Collaboration & teamwork...
 ```
 
 ---
@@ -1042,7 +1081,7 @@ Use these variables in your template content:
 
 ### Template Selection
 
-When you run `tom today` or `tom thisweek`, Ten Second Tom will:
+When you run `tom generate`, Ten Second Tom will:
 
 1. **Auto-select** if only one template is available (no prompt shown)
 2. **Show selection prompt** if multiple templates exist:
@@ -1147,7 +1186,7 @@ Templates are reloaded on every command run - **no restart required!**
 
 1. Edit the template file with any text editor
 2. Save your changes
-3. Run `tom today` or `tom thisweek`
+3. Run `tom generate note` or `tom generate recording`
 4. Changes take effect immediately ✨
 
 ### Restoring Default Templates
@@ -1164,7 +1203,7 @@ Default templates are never overwritten, so feel free to customize them!
 **Template not appearing in selection?**
 
 - Check YAML front matter is valid (use a YAML validator)
-- Ensure `templateType` matches command type (`daily` for `tom today`)
+- Ensure `templateType` matches command type (`daily` for `tom generate`)
 - Check file extension is `.md`
 - Review logs for validation errors
 
@@ -1237,7 +1276,7 @@ dotnet test --collect:"XPlat Code Coverage"
 ### Running Locally
 
 ```bash
-dotnet run --project src -- today
+dotnet run --project src -- record
 ```
 
 ---

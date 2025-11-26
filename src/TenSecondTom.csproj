@@ -7,6 +7,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UserSecretsId>ten-second-tom-secrets</UserSecretsId>
+    <!-- Set output name to 'tom' so help text shows 'tom' instead of 'TenSecondTom' -->
+    <AssemblyName>tom</AssemblyName>
     
     <!-- Trimming configuration for self-contained publishing -->
     <PublishTrimmed>true</PublishTrimmed>
@@ -32,7 +34,7 @@
     <TrimmerRootAssembly Include="Anthropic.SDK" />
     <TrimmerRootAssembly Include="MediatR" />
     <TrimmerRootAssembly Include="FluentValidation" />
-    <TrimmerRootAssembly Include="TenSecondTom" />
+    <TrimmerRootAssembly Include="tom" />
     <!-- Microsoft AI Foundry Local SDK and dependencies (uses reflection for model loading) -->
     <TrimmerRootAssembly Include="Microsoft.AI.Foundry.Local" />
     <TrimmerRootAssembly Include="Betalgo.Ranul.OpenAI" />
@@ -78,9 +80,10 @@
     <!-- Core Whisper.NET library (required for all platforms) -->
     <PackageReference Include="Whisper.net" Version="1.9.0" />
 
-    <!-- Development: AllRuntimes when no RuntimeIdentifier specified (dotnet build/run) -->
+    <!-- Development: AllRuntimes when no RuntimeIdentifier specified AND not in CI -->
+    <!-- CI environments skip this to avoid ~2GB download; they use Linux runtime instead -->
     <PackageReference Include="Whisper.net.AllRuntimes" Version="1.9.0"
-                      Condition="'$(RuntimeIdentifier)' == ''" />
+                      Condition="'$(RuntimeIdentifier)' == '' AND '$(CI)' != 'true'" />
 
     <!-- Release: macOS CoreML for Apple Silicon hardware acceleration -->
     <PackageReference Include="Whisper.net.Runtime.CoreML" Version="1.9.0"
@@ -90,9 +93,9 @@
     <PackageReference Include="Whisper.net.Runtime.Cuda" Version="1.9.0"
                       Condition="$(RuntimeIdentifier.StartsWith('win-'))" />
 
-    <!-- Release: Linux CPU runtime with AVX2/FMA optimization -->
+    <!-- Release: Linux CPU runtime for release builds OR CI builds -->
     <PackageReference Include="Whisper.net.Runtime" Version="1.9.0"
-                      Condition="$(RuntimeIdentifier.StartsWith('linux-'))" />
+                      Condition="$(RuntimeIdentifier.StartsWith('linux-')) OR '$(CI)' == 'true'" />
   </ItemGroup>
 
   <ItemGroup>

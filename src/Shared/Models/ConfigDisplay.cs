@@ -35,9 +35,14 @@ public sealed record ConfigDisplay
     public OptionalConfiguration Optional { get; init; } = new();
 
     /// <summary>
-    /// Gets the audio configuration display.
+    /// Gets the audio configuration display (recording and preprocessing).
     /// </summary>
     public AudioConfigurationDisplay Audio { get; init; } = new();
+
+    /// <summary>
+    /// Gets the transcription configuration display (STT provider and settings).
+    /// </summary>
+    public TranscribeConfigurationDisplay Transcribe { get; init; } = new();
 
     /// <summary>
     /// Gets the timestamp when the configuration was created.

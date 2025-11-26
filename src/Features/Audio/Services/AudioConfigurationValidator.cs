@@ -4,19 +4,19 @@ using TenSecondTom.Shared.Options;
 namespace TenSecondTom.Features.Audio.Services;
 
 /// <summary>
-/// Validates audio configuration completeness for features requiring audio setup.
+/// Validates transcription (STT) configuration completeness for features requiring transcription setup.
 /// </summary>
 public sealed class AudioConfigurationValidator : IAudioConfigurationValidator
 {
     /// <inheritdoc/>
-    public bool IsAudioConfigured(AudioOptions configuration)
+    public bool IsAudioConfigured(TranscribeOptions configuration)
     {
-        // Delegate to AudioOptions.IsConfigured() which knows provider-specific requirements
+        // Delegate to TranscribeOptions.IsConfigured() which knows provider-specific requirements
         return configuration.IsConfigured();
     }
 
     /// <inheritdoc/>
-    public IReadOnlyList<string> GetMissingConfiguration(AudioOptions configuration)
+    public IReadOnlyList<string> GetMissingConfiguration(TranscribeOptions configuration)
     {
         var missing = new List<string>();
 
@@ -27,7 +27,7 @@ public sealed class AudioConfigurationValidator : IAudioConfigurationValidator
             return missing.AsReadOnly();
         }
 
-        // Delegate provider-specific validation to AudioOptions.IsConfigured()
+        // Delegate provider-specific validation to TranscribeOptions.IsConfigured()
         // and provide user-friendly messages based on provider type
         if (!configuration.IsConfigured())
         {

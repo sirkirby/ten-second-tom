@@ -26,16 +26,28 @@ public static class Record
     public sealed record Command : IRequest<Result<StoredRecording>>
     {
         /// <summary>
-        /// Gets the audio configuration for STT provider selection.
-        /// This includes the STT provider, API key, and fallback settings.
+        /// Gets the transcription configuration for STT provider selection.
+        /// This includes the STT provider, API key, and model settings.
         /// </summary>
-        public required AudioOptions AudioConfig { get; init; }
+        public required TranscribeOptions TranscribeConfig { get; init; }
 
         /// <summary>
         /// Gets the maximum recording duration in seconds.
         /// If not specified, uses the configured default from Audio:Timeouts:RecordSeconds.
         /// </summary>
         public int? MaxDurationSeconds { get; init; }
+
+        /// <summary>
+        /// Gets optional recording settings overrides for this session only.
+        /// When specified, these values override the configured defaults.
+        /// </summary>
+        public Models.RecordingOverrides? RecordingOverrides { get; init; }
+
+        /// <summary>
+        /// Gets optional preprocessing settings overrides for this session only.
+        /// When specified, these values override the configured defaults.
+        /// </summary>
+        public Models.PreprocessingOverrides? PreprocessingOverrides { get; init; }
 
         /// <summary>
         /// Validates the command.
@@ -99,7 +111,7 @@ public static class Record
             int? maxDurationSeconds = request.MaxDurationSeconds ?? currentAudioOptions.Timeouts.RecordSeconds;
 
             logger.LogInformation("Starting record command with STT provider: {Provider}, Target directory: {RecordingDir}, Max duration: {MaxDuration}s",
-                request.AudioConfig.SttProvider, recordingDir, maxDurationSeconds);
+                request.TranscribeConfig.SttProvider, recordingDir, maxDurationSeconds);
 
             // Step 1: Record audio - the recorder will save to a temp file first, then we move it
             var tempAudioPath = _fileSystem.Path.Combine(_fileSystem.Path.GetTempPath(), $"tom-recording-{Guid.NewGuid()}.wav");
@@ -107,7 +119,8 @@ public static class Record
             var recordCommand = new RecordAudio.Command
             {
                 OutputPath = tempAudioPath,
-                MaxDurationSeconds = maxDurationSeconds
+                MaxDurationSeconds = maxDurationSeconds,
+                Overrides = request.RecordingOverrides
             };
 
             var recordResult = await mediator.Send(recordCommand, cancellationToken);
@@ -154,6 +167,7 @@ public static class Record
             var preprocessResult = await audioPreprocessor.PreprocessAsync(
                 recording.FilePath,
                 replaceOriginal: true,
+                request.PreprocessingOverrides,
                 cancellationToken);
 
             if (!preprocessResult.IsSuccess)
@@ -198,7 +212,7 @@ public static class Record
             {
                 AudioFilePath = recording.FilePath,
                 RecordingBaseName = filePrefix,
-                AudioConfig = request.AudioConfig,
+                TranscribeConfig = request.TranscribeConfig,
                 Source = AudioLibraryScope.Recording
             };
 

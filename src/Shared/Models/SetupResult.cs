@@ -1,4 +1,4 @@
-namespace TenSecondTom.Features.Setup.Models;
+namespace TenSecondTom.Shared.Models;
 
 /// <summary>
 /// Result of running the setup wizard.

@@ -44,19 +44,19 @@ public sealed class AutocompleteEngineTests
         var engine = new AutocompleteEngine();
 
         // Act
-        var upperCase = engine.GetSuggestions("/TODAY").ToList();
-        var lowerCase = engine.GetSuggestions("/today").ToList();
-        var mixedCase = engine.GetSuggestions("/ToDaY").ToList();
+        var upperCase = engine.GetSuggestions("/NOTE").ToList();
+        var lowerCase = engine.GetSuggestions("/note").ToList();
+        var mixedCase = engine.GetSuggestions("/NoTe").ToList();
 
         // Assert
         upperCase.Should().NotBeEmpty("uppercase should match");
         lowerCase.Should().NotBeEmpty("lowercase should match");
         mixedCase.Should().NotBeEmpty("mixed case should match");
-        
+
         // All should find the same command
-        upperCase.Should().Contain(s => s.CommandName == "/today");
-        lowerCase.Should().Contain(s => s.CommandName == "/today");
-        mixedCase.Should().Contain(s => s.CommandName == "/today");
+        upperCase.Should().Contain(s => s.CommandName == "/note");
+        lowerCase.Should().Contain(s => s.CommandName == "/note");
+        mixedCase.Should().Contain(s => s.CommandName == "/note");
     }
 
     [Fact]
@@ -105,12 +105,12 @@ public sealed class AutocompleteEngineTests
         var engine = new AutocompleteEngine();
 
         // Act
-        var suggestions = engine.GetSuggestions("/tod").ToList();
+        var suggestions = engine.GetSuggestions("/not").ToList();
 
         // Assert
         suggestions.Should().NotBeEmpty();
-        var todaySuggestion = suggestions.First(s => s.CommandName == "/today");
-        todaySuggestion.MatchScore.Should().BeGreaterThan(80, "exact prefix match should have high score");
+        var noteSuggestion = suggestions.First(s => s.CommandName == "/note");
+        noteSuggestion.MatchScore.Should().BeGreaterThan(80, "exact prefix match should have high score");
     }
 
     [Fact]

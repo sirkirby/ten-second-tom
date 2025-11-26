@@ -8,8 +8,6 @@ using TenSecondTom.Features.Search;
 using TenSecondTom.Features.Setup;
 using TenSecondTom.Features.Shell;
 using TenSecondTom.Features.Templates;
-using TenSecondTom.Features.ThisWeek;
-using TenSecondTom.Features.Today;
 using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.DependencyInjection;
 using Xunit;
@@ -35,8 +33,7 @@ public sealed class CommandRegistryTests : IDisposable
         services.AddInfrastructureServices();
 
         // Feature slices (vertical slice architecture)
-        services.AddTodayFeature();
-        services.AddThisWeekFeature();
+        // Note: /today and /thisweek commands removed - use /note command with date ranges
         services.AddSearchFeature();
         services.AddAuthFeature();
         services.AddTemplatesFeature();
@@ -55,44 +52,50 @@ public sealed class CommandRegistryTests : IDisposable
 
         // Assert
         var subcommandNames = rootCommand.Subcommands.Select(c => c.Name).ToList();
-        
+
         subcommandNames.Should().Contain("note", "note command should be registered");
-        subcommandNames.Should().Contain("today", "today command should be registered");
-        subcommandNames.Should().Contain("thisweek", "thisweek command should be registered");
         subcommandNames.Should().Contain("search", "search command should be registered");
         subcommandNames.Should().Contain("record", "record command should be registered");
         subcommandNames.Should().Contain("transcribe", "transcribe command should be registered");
         subcommandNames.Should().Contain("generate", "generate command should be registered");
         subcommandNames.Should().Contain("login", "login command should be registered");
         subcommandNames.Should().Contain("logout", "logout command should be registered");
-        subcommandNames.Should().Contain("setup", "setup command should be registered");
         subcommandNames.Should().Contain("config", "config command should be registered");
         subcommandNames.Should().Contain("shell", "shell command should be registered");
         subcommandNames.Should().Contain("help", "help command should be registered");
         subcommandNames.Should().Contain("version", "version command should be registered");
+        subcommandNames.Should().Contain("audio", "audio parent command should be registered");
+        subcommandNames.Should().Contain("auth", "auth parent command should be registered");
+        subcommandNames.Should().Contain("storage", "storage parent command should be registered");
+        subcommandNames.Should().Contain("llm", "llm parent command should be registered");
+
+        // Removed commands: today, thisweek, setup (replaced by /config all)
     }
 
     [Fact]
-    public void BuildRootCommand_ShouldHaveExactlyFifteenCommands()
+    public void BuildRootCommand_ShouldHaveExpectedCommandCount()
     {
         // Arrange & Act
         var rootCommand = CommandRegistry.BuildRootCommand(_serviceProvider);
 
-        // Assert
+        // Assert - 15 commands: note, search, record, transcribe, generate,
+        // login, logout, config, llm, shell, help, version, audio, auth, storage
+        // Removed: today, thisweek, setup (setup replaced by /config all)
         rootCommand.Subcommands.Should().HaveCount(15,
-            "root command should have exactly 15 subcommands: note, today, thisweek, search, record, transcribe, generate, login, logout, setup, config, llm, shell, help, version");
+            "root command should have 15 subcommands");
     }
 
     [Fact]
-    public void BuildRootCommand_SetupCommand_ShouldBeRegistered()
+    public void BuildRootCommand_ConfigAllCommand_ShouldRunSetupWizard()
     {
         // Arrange & Act
         var rootCommand = CommandRegistry.BuildRootCommand(_serviceProvider);
-        var setupCommand = rootCommand.Subcommands.FirstOrDefault(c => c.Name == "setup");
+        var configCommand = rootCommand.Subcommands.FirstOrDefault(c => c.Name == "config");
+        var allCommand = configCommand?.Subcommands.FirstOrDefault(c => c.Name == "all");
 
         // Assert
-        setupCommand.Should().NotBeNull("setup command should be registered");
-        setupCommand!.Description.Should().Contain("setup wizard", "should describe setup command");
+        allCommand.Should().NotBeNull("config all command should be registered");
+        allCommand!.Description.Should().Contain("setup wizard", "should describe the setup wizard functionality");
     }
 
     [Fact]
