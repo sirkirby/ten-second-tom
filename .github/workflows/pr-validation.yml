@@ -350,13 +350,17 @@ jobs:
 
       - name: Build release executable (Linux x64)
         run: |
+          # Use PR number for PRs, run number for push to main
+          VERSION="0.0.0-pr.${{ github.event.pull_request.number || github.run_number }}"
+          echo "📦 Building with version: $VERSION"
+
           dotnet publish src/TenSecondTom.csproj \
             --configuration Release \
             --runtime linux-x64 \
             --self-contained true \
             --output ./publish \
             -p:PublishSingleFile=true \
-            -p:Version=0.0.0-pr.${{ github.event.pull_request.number }}
+            -p:Version=$VERSION
       
       - name: Verify build output
         run: |

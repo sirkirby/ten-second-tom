@@ -178,8 +178,8 @@ public sealed class ConfigCommandCliTests : IDisposable
     [Fact]
     public async Task ConfigCommand_InvalidSubcommand_ProducesError()
     {
-        // Act
-        var (output, error, exitCode) = await RunCliCommandAsync("config --invalid-subcommand");
+        // Act - use a clearly invalid subcommand (not a flag starting with --)
+        var (output, error, exitCode) = await RunCliCommandAsync("config invalidsubcommand");
 
         // Assert
         exitCode.Should().NotBe(0, "invalid subcommand should produce non-zero exit code");
