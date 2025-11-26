@@ -708,11 +708,13 @@ jobs:
   # 2. Manually submit first version using wingetcreate:
   #    wingetcreate new https://github.com/sirkirby/ten-second-tom/releases/download/v1.0.0/ten-second-tom-1.0.0-win-x64.zip
   # 3. After first version is merged, automation handles all future updates
+  #
+  # TODO: Remove 'false &&' once SirKirby.TenSecondTom PR is merged into winget-pkgs
   publish-winget:
     name: Publish to Winget
     runs-on: ubuntu-latest
     needs: [validate-version, create-github-release]
-    if: ${{ github.event.inputs.skip_winget != 'true' && github.event.inputs.dry_run != 'true' }}
+    if: ${{ false && github.event.inputs.skip_winget != 'true' && github.event.inputs.dry_run != 'true' }}
     environment:
       name: production
 
