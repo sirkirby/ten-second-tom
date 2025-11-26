@@ -1,35 +1,31 @@
 using System.CommandLine;
+using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
+using TenSecondTom.Features.Generate;
 using TenSecondTom.Infrastructure.Cli;
-using TenSecondTom.Shared.Models;
 
 namespace TenSecondTom.Features.Note;
 
 /// <summary>
-/// Provides the /note command via ICommandBuilder discovery.
-/// Creates quick notes without LLM processing.
+/// Builds the <c>note</c> CLI command with subcommands:
+/// <list type="bullet">
+///   <item><c>note</c> (default) - Create a quick note</item>
+///   <item><c>note list</c> - List all available notes</item>
+/// </list>
 /// </summary>
 public sealed class NoteCliCommandBuilder : ICommandBuilder
 {
-    private static readonly System.Text.Json.JsonSerializerOptions SnakeCaseJsonOptions = new()
+    private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower
     };
 
-    /// <summary>
-    /// Gets the priority for this command builder.
-    /// Priority 15 ensures note command appears before today (20) in help output.
-    /// </summary>
+    /// <inheritdoc />
     public int Priority => 15;
 
-    /// <summary>
-    /// Builds the 'note' command with its options and handler.
-    /// </summary>
-    /// <param name="serviceProvider">Service provider for dependency injection.</param>
-    /// <param name="jsonOutputOption">Shared JSON output option.</param>
-    /// <returns>The configured note command.</returns>
+    /// <inheritdoc />
     public Command? BuildCommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
     {
         ArgumentNullException.ThrowIfNull(serviceProvider);
@@ -48,103 +44,100 @@ public sealed class NoteCliCommandBuilder : ICommandBuilder
             Description = "Skip interactive editor and use content from command line argument."
         };
 
-        var voiceOption = new Option<bool>("--voice")
-        {
-            Description = "Capture note using voice recording."
-        };
-
-        var sttOption = new Option<string?>("--stt")
-        {
-            Description = "STT engine selection: auto (default), local, or openai. Only used with --voice."
-        };
-
-        var listOption = new Option<bool>("--list")
-        {
-            Description = "List all available notes and exit."
-        };
-
         noteCommand.Arguments.Add(contentArgument);
         noteCommand.Options.Add(noEditOption);
-        noteCommand.Options.Add(voiceOption);
-        noteCommand.Options.Add(sttOption);
-        noteCommand.Options.Add(listOption);
         noteCommand.Options.Add(jsonOutputOption);
 
+        // Default action: create a note
         noteCommand.SetAction(async parseResult =>
         {
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
             string? content = parseResult.GetValue(contentArgument);
             bool noEdit = parseResult.GetValue(noEditOption);
-            bool useVoice = parseResult.GetValue(voiceOption);
-            string? stt = parseResult.GetValue(sttOption);
-            bool listNotes = parseResult.GetValue(listOption);
-
-            // Handle --list option: display notes and exit
-            if (listNotes)
-            {
-                var mediator = serviceProvider.GetRequiredService<MediatR.IMediator>();
-                var listResult = await mediator.Send(new TenSecondTom.Features.Generate.ListNotes.Query(), CancellationToken.None);
-
-                if (!listResult.IsSuccess)
-                {
-                    TenSecondTom.Infrastructure.Cli.CommandOutputFormatter.WriteError(
-                        listResult.Error ?? "Failed to list notes",
-                        jsonOutput);
-                    return 1;
-                }
-
-                var notes = listResult.Value;
-
-                if (jsonOutput)
-                {
-                    var json = System.Text.Json.JsonSerializer.Serialize(
-                        new
-                        {
-                            success = true,
-                            notes = notes.Select(n => new
-                            {
-                                filename = n.FileName,
-                                last_modified = n.LastModified
-                            })
-                        },
-                        SnakeCaseJsonOptions);
-                    Console.WriteLine(json);
-                }
-                else
-                {
-                    AnsiConsole.MarkupLine("[bold cyan]Available Notes:[/]");
-                    AnsiConsole.WriteLine();
-
-                    var table = new Table()
-                        .AddColumn(new TableColumn("Filename"))
-                        .AddColumn(new TableColumn("Last Modified"));
-
-                    foreach (var n in notes)
-                    {
-                        table.AddRow(
-                            Markup.Escape(n.FileName),
-                            n.LastModified.ToString("MMM dd, yyyy h:mm tt"));
-                    }
-
-                    AnsiConsole.Write(table);
-                    AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine($"[dim]Total: {notes.Count} note(s)[/]");
-                }
-
-                return 0;
-            }
 
             await NoteCommandHandler.ExecuteAsync(
                 serviceProvider,
                 content,
                 noEdit,
-                useVoice,
-                stt,
                 jsonOutput).ConfigureAwait(false);
 
             return 0;
         });
 
+        // Add list subcommand
+        noteCommand.Subcommands.Add(BuildListSubcommand(serviceProvider, jsonOutputOption));
+
         return noteCommand;
+    }
+
+    private static Command BuildListSubcommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
+    {
+        var listCommand = new Command("list", "List all available notes");
+        listCommand.Options.Add(jsonOutputOption);
+
+        listCommand.SetAction(async parseResult =>
+        {
+            bool jsonOutput = parseResult.GetValue(jsonOutputOption);
+            var mediator = serviceProvider.GetRequiredService<IMediator>();
+
+            var listResult = await mediator.Send(new ListNotes.Query(), CancellationToken.None);
+
+            if (!listResult.IsSuccess)
+            {
+                CommandOutputFormatter.WriteError(
+                    listResult.Error ?? "Failed to list notes",
+                    jsonOutput);
+                return 1;
+            }
+
+            var notes = listResult.Value;
+
+            if (jsonOutput)
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(
+                    new
+                    {
+                        success = true,
+                        notes = notes.Select(n => new
+                        {
+                            filename = n.FileName,
+                            last_modified = n.LastModified
+                        })
+                    },
+                    JsonOptions);
+                Console.WriteLine(json);
+            }
+            else
+            {
+                if (notes.Count == 0)
+                {
+                    AnsiConsole.MarkupLine("[dim]No notes found. Create one with 'tom note'.[/]");
+                    return 0;
+                }
+
+                AnsiConsole.MarkupLine("[bold cyan]Available Notes:[/]");
+                AnsiConsole.WriteLine();
+
+                var table = new Table()
+                    .Border(TableBorder.Rounded)
+                    .AddColumn("Filename")
+                    .AddColumn("Last Modified");
+
+                foreach (var n in notes)
+                {
+                    table.AddRow(
+                        n.FileName.EscapeMarkup(),
+                        n.LastModified.ToString("MMM dd, yyyy h:mm tt"));
+                }
+
+                AnsiConsole.Write(table);
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine($"[dim]Total: {notes.Count} note(s)[/]");
+            }
+
+            return 0;
+        });
+
+        return listCommand;
     }
 }

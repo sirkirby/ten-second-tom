@@ -7,6 +7,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UserSecretsId>ten-second-tom-secrets</UserSecretsId>
+    <!-- Set output name to 'tom' so help text shows 'tom' instead of 'TenSecondTom' -->
+    <AssemblyName>tom</AssemblyName>
     
     <!-- Trimming configuration for self-contained publishing -->
     <PublishTrimmed>true</PublishTrimmed>
@@ -32,7 +34,7 @@
     <TrimmerRootAssembly Include="Anthropic.SDK" />
     <TrimmerRootAssembly Include="MediatR" />
     <TrimmerRootAssembly Include="FluentValidation" />
-    <TrimmerRootAssembly Include="TenSecondTom" />
+    <TrimmerRootAssembly Include="tom" />
     <!-- Microsoft AI Foundry Local SDK and dependencies (uses reflection for model loading) -->
     <TrimmerRootAssembly Include="Microsoft.AI.Foundry.Local" />
     <TrimmerRootAssembly Include="Betalgo.Ranul.OpenAI" />

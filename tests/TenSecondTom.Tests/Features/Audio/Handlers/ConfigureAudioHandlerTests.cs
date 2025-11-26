@@ -3,8 +3,6 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using TenSecondTom.Features.Audio;
 using TenSecondTom.Infrastructure.Configuration;
-using TenSecondTom.Shared.Abstractions.Audio;
-using TenSecondTom.Shared.Abstractions.LocalAi;
 using TenSecondTom.Shared.Abstractions.UI;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
@@ -41,7 +39,7 @@ public sealed class ConfigureAudioHandlerTests
 
         var sectionStore = new Mock<IConfigurationSectionStore>();
 
-        // Mock ReadSectionAsync to return current config
+        // Mock ReadSectionAsync to return current audio config
         sectionStore
             .Setup(s => s.ReadSectionAsync<AudioOptions>(AudioOptions.SectionPath, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<AudioOptions>.Success(currentAudio));
@@ -60,8 +58,6 @@ public sealed class ConfigureAudioHandlerTests
         var handler = new ConfigureAudio.Handler(
             sectionStore.Object,
             wizard.Object,
-            Mock.Of<ILocalAiEngine>(),
-            Mock.Of<IWhisperNetModelManager>(),
             logger);
 
         var command = new ConfigureAudio.Command
@@ -75,7 +71,7 @@ public sealed class ConfigureAudioHandlerTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeNull();
-        result.Value!.Timeouts.RecordSeconds.Should().Be(3600);
+        result.Value!.Audio.Timeouts.RecordSeconds.Should().Be(3600);
 
         sectionStore.Verify(s => s.WriteSectionAsync(
                 AudioOptions.SectionPath,
@@ -83,11 +79,9 @@ public sealed class ConfigureAudioHandlerTests
                 It.IsAny<CancellationToken>()),
             Times.Once);
 
+        // Verify no interactive prompts were shown (since we provided CLI override)
         wizard.Verify(w => w.PromptForInputVolumeAsync(It.IsAny<double?>(), It.IsAny<CancellationToken>()), Times.Never);
         wizard.Verify(w => w.PromptForBooleanAsync(It.IsAny<string>(), It.IsAny<bool?>(), It.IsAny<CancellationToken>()), Times.Never);
         wizard.Verify(w => w.PromptForIntAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
-        wizard.Verify(w => w.PromptForSttProviderAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
-        wizard.Verify(w => w.PromptForSttApiKeyAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }
-

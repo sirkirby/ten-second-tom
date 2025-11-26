@@ -35,9 +35,9 @@ public static class SttSelectionMapper
     }
 
     /// <summary>
-    /// Builds an <see cref="AudioOptions"/> instance that honors the CLI selection.
+    /// Builds a <see cref="TranscribeOptions"/> instance that honors the CLI selection.
     /// </summary>
-    public static AudioOptions BuildAudioOptions(SttSelection selection, AudioOptions baseOptions)
+    public static TranscribeOptions BuildTranscribeOptions(SttSelection selection, TranscribeOptions baseOptions)
     {
         ArgumentNullException.ThrowIfNull(baseOptions);
 
@@ -46,32 +46,23 @@ public static class SttSelectionMapper
 
         return selection switch
         {
-            SttSelection.Auto => new AudioOptions
+            SttSelection.Auto => new TranscribeOptions
             {
                 SttProvider = baseOptions.SttProvider,
                 Providers = providers,
-                KeepFiles = baseOptions.KeepFiles,
-                Recorder = baseOptions.Recorder,
-                Preprocessing = baseOptions.Preprocessing,
-                Timeouts = baseOptions.Timeouts
+                KeepFiles = baseOptions.KeepFiles
             },
-            SttSelection.Local => new AudioOptions
+            SttSelection.Local => new TranscribeOptions
             {
                 SttProvider = baseOptions.SttProvider,
                 Providers = providers,
-                KeepFiles = baseOptions.KeepFiles,
-                Recorder = baseOptions.Recorder,
-                Preprocessing = baseOptions.Preprocessing,
-                Timeouts = baseOptions.Timeouts
+                KeepFiles = baseOptions.KeepFiles
             },
-            SttSelection.OpenAI => new AudioOptions
+            SttSelection.OpenAI => new TranscribeOptions
             {
                 SttProvider = SttProviders.OpenAI,
                 Providers = providers,
-                KeepFiles = baseOptions.KeepFiles,
-                Recorder = baseOptions.Recorder,
-                Preprocessing = baseOptions.Preprocessing,
-                Timeouts = baseOptions.Timeouts
+                KeepFiles = baseOptions.KeepFiles
             },
             _ => throw new ArgumentOutOfRangeException(nameof(selection), selection, "Unsupported STT selection")
         };

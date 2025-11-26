@@ -23,6 +23,9 @@ public static class AuthFeatureExtensions
         services.AddTransient<Login.Handler>();
         services.AddTransient<Logout.Handler>();
 
+        // Register config command builder for subcommand resolution
+        services.AddSingleton<AuthConfigCommandBuilder>();
+
         return services;
     }
 }

@@ -24,7 +24,7 @@ public sealed class TranscribeAudioCommandHandlerTests
     private readonly Mock<ISttProviderFactory> _mockFactory;
     private readonly Mock<ISttProvider> _mockLocalProvider;
     private readonly Mock<ISttProvider> _mockOpenAiProvider;
-    private readonly Mock<IOptions<AudioOptions>> _mockAudioConfig;
+    private readonly Mock<IOptions<TranscribeOptions>> _mockTranscribeConfig;
     private readonly Mock<ILogger<TranscribeAudio.Handler>> _mockLogger;
 
     public TranscribeAudioCommandHandlerTests()
@@ -32,14 +32,14 @@ public sealed class TranscribeAudioCommandHandlerTests
         _mockFactory = new Mock<ISttProviderFactory>();
         _mockLocalProvider = new Mock<ISttProvider>();
         _mockOpenAiProvider = new Mock<ISttProvider>();
-        _mockAudioConfig = new Mock<IOptions<AudioOptions>>();
+        _mockTranscribeConfig = new Mock<IOptions<TranscribeOptions>>();
         _mockLogger = new Mock<ILogger<TranscribeAudio.Handler>>();
 
         _mockLocalProvider.Setup(p => p.Engine).Returns(SttEngine.Local);
         _mockOpenAiProvider.Setup(p => p.Engine).Returns(SttEngine.OpenAI);
 
-        // Setup default audio configuration
-        _mockAudioConfig.Setup(c => c.Value).Returns(CreateDefaultAudioOptions());
+        // Setup default transcribe configuration
+        _mockTranscribeConfig.Setup(c => c.Value).Returns(CreateDefaultTranscribeOptions());
     }
 
     [Fact]
@@ -50,14 +50,14 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
-            AudioConfig = CreateTestAudioConfig()
+            TranscribeConfig = CreateTestTranscribeConfig()
         };
 
         var transcription = CreateSampleTranscription(audioPath, SttEngine.Local);
 
         _mockFactory
             .Setup(f => f.GetProviderAsync(
-                It.IsAny<AudioOptions>(),
+                It.IsAny<TranscribeOptions>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(_mockLocalProvider.Object);
 
@@ -75,7 +75,7 @@ public sealed class TranscribeAudioCommandHandlerTests
         result.Value.SttEngine.Should().Be(SttEngine.Local);
         _mockFactory.Verify(
             f => f.GetProviderAsync(
-                It.IsAny<AudioOptions>(),
+                It.IsAny<TranscribeOptions>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -88,14 +88,14 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
-            AudioConfig = CreateTestAudioConfig(sttProvider: SttProviders.WhisperCpp)
+            TranscribeConfig = CreateTestTranscribeConfig(sttProvider: SttProviders.WhisperCpp)
         };
 
         var transcription = CreateSampleTranscription(audioPath, SttEngine.Local);
 
         _mockFactory
             .Setup(f => f.GetProviderAsync(
-                It.Is<AudioOptions>(c => c.SttProvider == SttProviders.WhisperCpp),
+                It.Is<TranscribeOptions>(c => c.SttProvider == SttProviders.WhisperCpp),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(_mockLocalProvider.Object);
 
@@ -121,14 +121,14 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
-            AudioConfig = CreateTestAudioConfig(sttProvider: SttProviders.OpenAI)
+            TranscribeConfig = CreateTestTranscribeConfig(sttProvider: SttProviders.OpenAI)
         };
 
         var transcription = CreateSampleTranscription(audioPath, SttEngine.OpenAI);
 
         _mockFactory
             .Setup(f => f.GetProviderAsync(
-                It.Is<AudioOptions>(c => c.SttProvider == SttProviders.OpenAI),
+                It.Is<TranscribeOptions>(c => c.SttProvider == SttProviders.OpenAI),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(_mockOpenAiProvider.Object);
 
@@ -153,11 +153,11 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = "/path/to/audio.wav",
-            AudioConfig = CreateTestAudioConfig()
+            TranscribeConfig = CreateTestTranscribeConfig()
         };
 
         _mockFactory
-            .Setup(f => f.GetProviderAsync(It.IsAny<AudioOptions>(), It.IsAny<CancellationToken>()))
+            .Setup(f => f.GetProviderAsync(It.IsAny<TranscribeOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ISttProvider?)null);
 
         var handler = CreateHandler();
@@ -179,11 +179,11 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
-            AudioConfig = CreateTestAudioConfig()
+            TranscribeConfig = CreateTestTranscribeConfig()
         };
 
         _mockFactory
-            .Setup(f => f.GetProviderAsync(It.IsAny<AudioOptions>(), It.IsAny<CancellationToken>()))
+            .Setup(f => f.GetProviderAsync(It.IsAny<TranscribeOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(_mockLocalProvider.Object);
 
         _mockLocalProvider
@@ -208,13 +208,13 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
-            AudioConfig = CreateTestAudioConfig()
+            TranscribeConfig = CreateTestTranscribeConfig()
         };
 
         var transcription = CreateSampleTranscription(audioPath, SttEngine.Local);
 
         _mockFactory
-            .Setup(f => f.GetProviderAsync(It.IsAny<AudioOptions>(), It.IsAny<CancellationToken>()))
+            .Setup(f => f.GetProviderAsync(It.IsAny<TranscribeOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(_mockLocalProvider.Object);
 
         _mockLocalProvider
@@ -240,13 +240,13 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
-            AudioConfig = CreateTestAudioConfig()
+            TranscribeConfig = CreateTestTranscribeConfig()
         };
 
         var transcription = CreateSampleTranscription(audioPath, SttEngine.Local);
 
         _mockFactory
-            .Setup(f => f.GetProviderAsync(It.IsAny<AudioOptions>(), It.IsAny<CancellationToken>()))
+            .Setup(f => f.GetProviderAsync(It.IsAny<TranscribeOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(_mockLocalProvider.Object);
 
         _mockLocalProvider
@@ -273,7 +273,7 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
-            AudioConfig = CreateTestAudioConfig()
+            TranscribeConfig = CreateTestTranscribeConfig()
         };
 
         var transcription = new TranscriptionResult
@@ -288,7 +288,7 @@ public sealed class TranscribeAudioCommandHandlerTests
         };
 
         _mockFactory
-            .Setup(f => f.GetProviderAsync(It.IsAny<AudioOptions>(), It.IsAny<CancellationToken>()))
+            .Setup(f => f.GetProviderAsync(It.IsAny<TranscribeOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(_mockLocalProvider.Object);
 
         _mockLocalProvider
@@ -314,13 +314,13 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = audioPath,
-            AudioConfig = CreateTestAudioConfig()
+            TranscribeConfig = CreateTestTranscribeConfig()
         };
 
         var transcription = CreateSampleTranscription(audioPath, SttEngine.Local);
 
         _mockFactory
-            .Setup(f => f.GetProviderAsync(It.IsAny<AudioOptions>(), It.IsAny<CancellationToken>()))
+            .Setup(f => f.GetProviderAsync(It.IsAny<TranscribeOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(_mockLocalProvider.Object);
 
         _mockLocalProvider
@@ -345,7 +345,7 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = "/path/to/audio.wav",
-            AudioConfig = CreateTestAudioConfig()
+            TranscribeConfig = CreateTestTranscribeConfig()
         };
 
         CancellationToken token;
@@ -356,7 +356,7 @@ public sealed class TranscribeAudioCommandHandlerTests
         }
 
         _mockFactory
-            .Setup(f => f.GetProviderAsync(It.IsAny<AudioOptions>(), It.IsAny<CancellationToken>()))
+            .Setup(f => f.GetProviderAsync(It.IsAny<TranscribeOptions>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new OperationCanceledException());
 
         var handler = CreateHandler();
@@ -375,7 +375,7 @@ public sealed class TranscribeAudioCommandHandlerTests
         var command = new TranscribeAudio.Command
         {
             AudioFilePath = string.Empty,
-            AudioConfig = CreateTestAudioConfig()
+            TranscribeConfig = CreateTestTranscribeConfig()
         };
 
         var handler = CreateHandler();
@@ -390,12 +390,12 @@ public sealed class TranscribeAudioCommandHandlerTests
 
     private TranscribeAudio.Handler CreateHandler()
     {
-        return new TranscribeAudio.Handler(_mockFactory.Object, _mockAudioConfig.Object, _mockLogger.Object);
+        return new TranscribeAudio.Handler(_mockFactory.Object, _mockTranscribeConfig.Object, _mockLogger.Object);
     }
 
-    private static AudioOptions CreateDefaultAudioOptions()
+    private static TranscribeOptions CreateDefaultTranscribeOptions()
     {
-        return new AudioOptions
+        return new TranscribeOptions
         {
             SttProvider = SttProviders.WhisperCpp,
             Providers = new Dictionary<string, Dictionary<string, string>>
@@ -406,40 +406,19 @@ public sealed class TranscribeAudioCommandHandlerTests
                     ["Model"] = "models/ggml-base.en.bin"
                 }
             },
-            KeepFiles = true,
-            Recorder = new RecorderOptions(),
-            Preprocessing = new PreprocessingOptions(),
-            Timeouts = new RecordingTimeoutsOptions()
+            KeepFiles = true
         };
     }
 
-    private static AudioOptions CreateTestAudioConfig(
+    private static TranscribeOptions CreateTestTranscribeConfig(
         string sttProvider = SttProviders.WhisperCpp,
         string? sttApiKey = null)
     {
-        var options = new AudioOptions
+        var options = new TranscribeOptions
         {
             SttProvider = sttProvider,
             Providers = new Dictionary<string, Dictionary<string, string>>(),
-            KeepFiles = false,
-            Recorder = new RecorderOptions
-            {
-                FfmpegPath = "ffmpeg",
-                InputVolume = 1.0,
-                EnableNoiseReduction = true,
-                EnableFrequencyFilters = true
-            },
-            Preprocessing = new PreprocessingOptions
-            {
-                RemoveSilence = true,
-                SilenceThresholdDb = -50,
-                MinimumSilenceDurationMs = 500
-            },
-            Timeouts = new RecordingTimeoutsOptions
-            {
-                TodaySeconds = 300,
-                RecordSeconds = 600
-            }
+            KeepFiles = false
         };
 
         // Set provider-specific config based on provider type

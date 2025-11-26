@@ -24,10 +24,10 @@ public static class TranscribeAudio
         public required string AudioFilePath { get; init; }
 
         /// <summary>
-        /// Gets the audio configuration for STT provider selection.
-        /// This includes the STT provider, API key, and fallback settings.
+        /// Gets the transcribe configuration for STT provider selection.
+        /// This includes the STT provider, API key, and model settings.
         /// </summary>
-        public required AudioOptions AudioConfig { get; init; }
+        public required TranscribeOptions TranscribeConfig { get; init; }
     }
 
     /// <summary>
@@ -36,10 +36,10 @@ public static class TranscribeAudio
     /// </summary>
     public sealed class Handler(
         ISttProviderFactory providerFactory,
-        IOptions<AudioOptions> audioConfig,
+        IOptions<TranscribeOptions> transcribeConfig,
         ILogger<Handler> logger) : IRequestHandler<Command, Result<TranscriptionResult>>
     {
-        private readonly AudioOptions _audioConfig = audioConfig.Value;
+        private readonly TranscribeOptions _transcribeConfig = transcribeConfig.Value;
 
         /// <summary>
         /// Handles the TranscribeAudio command to transcribe an audio file.
@@ -61,15 +61,15 @@ public static class TranscribeAudio
             logger.LogInformation(
                 "Transcribing audio file {AudioFile} using provider {Provider}",
                 request.AudioFilePath,
-                request.AudioConfig.SttProvider);
+                request.TranscribeConfig.SttProvider);
 
             // Get the appropriate STT provider based on configuration
-            var provider = await providerFactory.GetProviderAsync(request.AudioConfig, cancellationToken);
+            var provider = await providerFactory.GetProviderAsync(request.TranscribeConfig, cancellationToken);
 
             if (provider == null)
             {
                 return Result<TranscriptionResult>.Failure(
-                    $"No STT provider available for provider: {request.AudioConfig.SttProvider}");
+                    $"No STT provider available for provider: {request.TranscribeConfig.SttProvider}");
             }
 
             logger.LogInformation("Using STT engine: {SttEngine}", provider.Engine);

@@ -53,7 +53,7 @@ public sealed class SttProviderFactory : ISttProviderFactory
 
     /// <inheritdoc/>
     public async Task<ISttProvider?> GetProviderAsync(
-        AudioOptions configuration,
+        TranscribeOptions configuration,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(configuration);

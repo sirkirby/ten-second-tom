@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using TenSecondTom.Shared.Results;
 
 namespace TenSecondTom.Infrastructure.Configuration;
@@ -104,6 +105,29 @@ public interface IConfigurationSectionStore : IDisposable
     /// </remarks>
     Task<Result<string>> WriteMultipleSectionsAsync(
         Dictionary<string, object> sections,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Writes the entire configuration from a JsonObject, replacing all content.
+    /// </summary>
+    /// <param name="config">The complete configuration as a JsonObject.</param>
+    /// <param name="cancellationToken">Cancellation token for async operation.</param>
+    /// <returns>
+    /// Success with the config file path on successful write.
+    /// Failure if write operation fails.
+    /// </returns>
+    /// <remarks>
+    /// This method is used for migrations and advanced scenarios where
+    /// sections need to be removed or the entire structure needs to be rewritten.
+    /// Use with caution as it replaces the entire configuration file.
+    ///
+    /// Write process:
+    /// 1. Serializes the JsonObject to formatted JSON
+    /// 2. Writes to temp file atomically
+    /// 3. Moves temp file over original (atomic operation)
+    /// </remarks>
+    Task<Result<string>> WriteFullConfigAsync(
+        JsonObject config,
         CancellationToken cancellationToken = default);
 
     /// <summary>

@@ -10,9 +10,9 @@ namespace TenSecondTom.Features.Audio.Services;
 public interface ISttProviderFactory
 {
     /// <summary>
-    /// Gets the appropriate STT provider based on the audio configuration.
+    /// Gets the appropriate STT provider based on the transcribe configuration.
     /// </summary>
-    /// <param name="configuration">The audio configuration containing provider settings.</param>
+    /// <param name="configuration">The transcription configuration containing provider settings.</param>
     /// <param name="cancellationToken">Cancellation token for async operation.</param>
     /// <returns>
     /// The selected STT provider instance, or null if no suitable provider is available.
@@ -26,7 +26,7 @@ public interface ISttProviderFactory
     /// </list>
     /// </remarks>
     Task<ISttProvider?> GetProviderAsync(
-        AudioOptions configuration,
+        TranscribeOptions configuration,
         CancellationToken cancellationToken = default);
 
     /// <summary>

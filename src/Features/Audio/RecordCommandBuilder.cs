@@ -5,10 +5,7 @@ using Spectre.Console;
 using TenSecondTom.Features.Audio.Models;
 using TenSecondTom.Infrastructure.Auth;
 using TenSecondTom.Infrastructure.Cli;
-using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Constants;
-using TenSecondTom.Shared.Models;
-using TenSecondTom.Shared.Options;
 
 namespace TenSecondTom.Features.Audio;
 
@@ -42,13 +39,7 @@ public sealed class RecordCommandBuilder : ICommandBuilder
             Description = "STT engine selection: auto (default), local, or openai."
         };
 
-        var listOption = new Option<bool>("--list")
-        {
-            Description = "List all available recordings and exit."
-        };
-
         recordCommand.Options.Add(sttOption);
-        recordCommand.Options.Add(listOption);
         recordCommand.Options.Add(jsonOutputOption);
 
         // Set action
@@ -56,71 +47,9 @@ public sealed class RecordCommandBuilder : ICommandBuilder
         {
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
             string? stt = parseResult.GetValue(sttOption);
-            bool listRecordings = parseResult.GetValue(listOption);
 
             var mediator = serviceProvider.GetRequiredService<IMediator>();
 
-            // Handle --list option: display recordings and exit
-            if (listRecordings)
-            {
-                // Use MediatR to query recordings (VSA pattern - no cross-feature dependencies)
-                var listResult = await mediator.Send(
-                    new TenSecondTom.Features.Generate.ListRecordings.Query(),
-                    CancellationToken.None);
-
-                if (!listResult.IsSuccess)
-                {
-                    CommandOutputFormatter.WriteError(listResult.Error ?? "Failed to list recordings", jsonOutput);
-                    return 1;
-                }
-
-                var recordings = listResult.Value;
-
-                if (jsonOutput)
-                {
-                    var json = System.Text.Json.JsonSerializer.Serialize(
-                        new
-                        {
-                            success = true,
-                            recordings = recordings.Select(r => new
-                            {
-                                filename = r.RecordingBaseName,
-                                recorded_at = r.RecordedAt,
-                                formatted_date = r.FormattedDate,
-                                word_count = r.WordCount,
-                                file_size_bytes = r.FileSizeBytes
-                            })
-                        },
-                        SnakeCaseJsonOptions);
-                    Console.WriteLine(json);
-                }
-                else
-                {
-                    AnsiConsole.MarkupLine("[bold cyan]Available Recordings:[/]");
-                    AnsiConsole.WriteLine();
-
-                    var table = new Spectre.Console.Table()
-                        .AddColumn("Filename")
-                        .AddColumn("Recorded At")
-                        .AddColumn("Words")
-                        .AddColumn("Size");
-
-                    foreach (var r in recordings)
-                    {
-                        table.AddRow(
-                            r.RecordingBaseName.EscapeMarkup(),
-                            r.FormattedDate.EscapeMarkup(),
-                            r.WordCount.ToString(),
-                            $"{r.FileSizeBytes / 1024.0:F1} KB");
-                    }
-
-                    AnsiConsole.Write(table);
-                    AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine($"[dim]Total: {recordings.Count} recording(s)[/]");
-                }
-
-                return 0;
-            }
             var audioOptionsResult = await mediator.Send(new GetAudioConfiguration.Query(), CancellationToken.None)
                 .ConfigureAwait(false);
 
@@ -133,6 +62,19 @@ public sealed class RecordCommandBuilder : ICommandBuilder
             }
 
             var audioOptions = audioOptionsResult.Value;
+
+            var transcribeOptionsResult = await mediator.Send(new GetTranscribeConfiguration.Query(), CancellationToken.None)
+                .ConfigureAwait(false);
+
+            if (!transcribeOptionsResult.IsSuccess || transcribeOptionsResult.Value is null)
+            {
+                CommandOutputFormatter.WriteError(
+                    transcribeOptionsResult.Error ?? "Transcription configuration is unavailable.",
+                    jsonOutput);
+                return 1;
+            }
+
+            var transcribeOptions = transcribeOptionsResult.Value;
 
             if (!SttSelectionMapper.TryParse(stt, out var sttSelection, out var sttError))
             {
@@ -161,11 +103,11 @@ public sealed class RecordCommandBuilder : ICommandBuilder
                 return 1; // Authentication failed
             }
 
-            // Validate audio configuration
+            // Validate transcription configuration
             var audioValidator = serviceProvider.GetRequiredService<TenSecondTom.Features.Audio.Services.IAudioConfigurationValidator>();
             var audioConfigResult = TenSecondTom.Features.Audio.AudioConfigurationHelper.EnsureAudioConfigured(
                 audioValidator,
-                audioOptions,
+                transcribeOptions,
                 CommandNames.Record,
                 jsonOutput);
 
@@ -207,7 +149,7 @@ public sealed class RecordCommandBuilder : ICommandBuilder
             // Execute command with configured timeout
             var command = new Record.Command
             {
-                AudioConfig = SttSelectionMapper.BuildAudioOptions(sttSelection, audioOptions),
+                TranscribeConfig = SttSelectionMapper.BuildTranscribeOptions(sttSelection, transcribeOptions),
                 MaxDurationSeconds = audioOptions.Timeouts.RecordSeconds  // Use configured timeout
             };
 

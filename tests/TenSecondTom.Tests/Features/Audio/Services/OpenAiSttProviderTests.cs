@@ -22,9 +22,9 @@ public sealed class OpenAiSttProviderTests
         provider.Engine.Should().Be(SttEngine.OpenAI);
     }
 
-    private OpenAiSttProvider CreateProvider(AudioOptions? audioConfig = null)
+    private OpenAiSttProvider CreateProvider(TranscribeOptions? transcribeConfig = null)
     {
-        audioConfig ??= new AudioOptions
+        transcribeConfig ??= new TranscribeOptions
         {
             SttProvider = SttProviders.OpenAI,
             Providers = new Dictionary<string, Dictionary<string, string>>
@@ -37,7 +37,7 @@ public sealed class OpenAiSttProviderTests
             }
         };
 
-        return new OpenAiSttProvider(Options.Create(audioConfig), _mockLogger.Object);
+        return new OpenAiSttProvider(Options.Create(transcribeConfig), _mockLogger.Object);
     }
 }
 

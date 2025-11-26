@@ -26,7 +26,7 @@ public static class CommandRegistry
     public static RootCommand BuildRootCommand(IServiceProvider serviceProvider)
     {
         var rootCommand = new RootCommand("Ten Second Tom - Personal Memory Assistant");
-        
+
         // Add global --output-json option
         var jsonOutputOption = new Option<bool>("--output-json")
         {

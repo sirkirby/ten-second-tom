@@ -26,10 +26,10 @@ public static class Record
     public sealed record Command : IRequest<Result<StoredRecording>>
     {
         /// <summary>
-        /// Gets the audio configuration for STT provider selection.
-        /// This includes the STT provider, API key, and fallback settings.
+        /// Gets the transcription configuration for STT provider selection.
+        /// This includes the STT provider, API key, and model settings.
         /// </summary>
-        public required AudioOptions AudioConfig { get; init; }
+        public required TranscribeOptions TranscribeConfig { get; init; }
 
         /// <summary>
         /// Gets the maximum recording duration in seconds.
@@ -99,7 +99,7 @@ public static class Record
             int? maxDurationSeconds = request.MaxDurationSeconds ?? currentAudioOptions.Timeouts.RecordSeconds;
 
             logger.LogInformation("Starting record command with STT provider: {Provider}, Target directory: {RecordingDir}, Max duration: {MaxDuration}s",
-                request.AudioConfig.SttProvider, recordingDir, maxDurationSeconds);
+                request.TranscribeConfig.SttProvider, recordingDir, maxDurationSeconds);
 
             // Step 1: Record audio - the recorder will save to a temp file first, then we move it
             var tempAudioPath = _fileSystem.Path.Combine(_fileSystem.Path.GetTempPath(), $"tom-recording-{Guid.NewGuid()}.wav");
@@ -198,7 +198,7 @@ public static class Record
             {
                 AudioFilePath = recording.FilePath,
                 RecordingBaseName = filePrefix,
-                AudioConfig = request.AudioConfig,
+                TranscribeConfig = request.TranscribeConfig,
                 Source = AudioLibraryScope.Recording
             };
 

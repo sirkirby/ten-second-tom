@@ -8,32 +8,32 @@ using TenSecondTom.Shared.Results;
 namespace TenSecondTom.Features.Audio;
 
 /// <summary>
-/// Validates audio configuration completeness.
+/// Validates transcription (STT) configuration completeness.
 /// Provides cross-feature access to audio validation via CQRS pattern.
 /// </summary>
 public static class ValidateAudioConfiguration
 {
     /// <summary>
-    /// Query to validate audio configuration.
+    /// Query to validate transcription configuration.
     /// Returns AudioValidationResult from Shared/Models for cross-feature compatibility.
     /// </summary>
     public sealed record Query : IRequest<Result<AudioValidationResult>>;
 
     /// <summary>
-    /// Handler for audio configuration validation query.
+    /// Handler for transcription configuration validation query.
     /// </summary>
     public sealed class Handler(
-        IOptions<AudioOptions> audioOptions,
+        IOptions<TranscribeOptions> transcribeOptions,
         IAudioConfigurationValidator validator) : IRequestHandler<Query, Result<AudioValidationResult>>
     {
-        private readonly AudioOptions _audioOptions = audioOptions.Value;
+        private readonly TranscribeOptions _transcribeOptions = transcribeOptions.Value;
 
         public Task<Result<AudioValidationResult>> Handle(Query request, CancellationToken cancellationToken)
         {
-            var isConfigured = validator.IsAudioConfigured(_audioOptions);
+            var isConfigured = validator.IsAudioConfigured(_transcribeOptions);
             var missingItems = isConfigured
                 ? Array.Empty<string>()
-                : validator.GetMissingConfiguration(_audioOptions);
+                : validator.GetMissingConfiguration(_transcribeOptions);
 
             var response = new AudioValidationResult
             {

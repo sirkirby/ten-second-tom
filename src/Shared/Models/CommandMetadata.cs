@@ -39,21 +39,34 @@ public sealed record CommandMetadata
 
     /// <summary>
     /// Static catalog of all available commands.
+    /// Note: /today, /thisweek removed - use /note for quick notes
+    /// Note: /setup removed - use /config all instead
     /// </summary>
     public static readonly CommandMetadata[] CommandCatalog =
     [
-        new() { Name = "/note", HelpText = "Capture a quick note without AI processing", RequiresAuthentication = true },
-        new() { Name = "/today", HelpText = "Capture today's reflection with 3-5 prompts", RequiresAuthentication = true },
-        new() { Name = "/thisweek", HelpText = "Generate a weekly review from recent daily entries", RequiresAuthentication = true },
+        // Core commands
+        new() { Name = "/note", HelpText = "Capture a quick note without AI processing (list)", RequiresAuthentication = true },
         new() { Name = "/search", HelpText = "Search memory entries by text query", RequiresAuthentication = true },
+        new() { Name = "/generate", HelpText = "Generate output from notes or recordings (note, recording)", RequiresAuthentication = true },
+
+        // Audio commands
+        new() { Name = "/audio", HelpText = "Audio configuration and management (config)", RequiresAuthentication = false },
         new() { Name = "/record", HelpText = "Record audio with transcription and save to library", RequiresAuthentication = true },
-        new() { Name = "/transcribe", HelpText = "Transcribe existing note/recording audio into the library", RequiresAuthentication = true },
+        new() { Name = "/transcribe", HelpText = "Transcribe recordings or external audio files", RequiresAuthentication = true },
+
+        // Configuration commands (parent command with subcommands)
+        new() { Name = "/config", HelpText = "View and manage configuration (show, set, all, llm, audio, storage)", RequiresAuthentication = false },
         new() { Name = "/llm", HelpText = "List and download models for configured LLM provider", RequiresAuthentication = true },
-        new() { Name = "/generate", HelpText = "Generate output from a recording using a prompt template", RequiresAuthentication = true },
-        new() { Name = "/setup", HelpText = "Run guided setup wizard to configure Ten Second Tom", RequiresAuthentication = false },
-        new() { Name = "/config", HelpText = "View and manage configuration settings", RequiresAuthentication = false },
+
+        // Auth commands (parent command with subcommands)
+        new() { Name = "/auth", HelpText = "Authentication management (login, logout, config)", RequiresAuthentication = false },
         new() { Name = "/login", HelpText = "Authenticate with SSH key and create a session", RequiresAuthentication = false },
         new() { Name = "/logout", HelpText = "Log out and invalidate the current session", RequiresAuthentication = true },
+
+        // Storage commands (parent command with subcommands)
+        new() { Name = "/storage", HelpText = "Storage management (config, list-providers)", RequiresAuthentication = false },
+
+        // Shell commands
         new() { Name = "/quit", HelpText = "Exit the shell", RequiresAuthentication = false, Aliases = ["/exit"] },
         new() { Name = "/help", HelpText = "Display available commands with descriptions", RequiresAuthentication = false },
         new() { Name = "/version", HelpText = "Display version information", RequiresAuthentication = false }

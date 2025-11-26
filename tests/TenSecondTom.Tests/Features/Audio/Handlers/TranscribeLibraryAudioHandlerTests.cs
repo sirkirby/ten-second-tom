@@ -18,7 +18,7 @@ namespace TenSecondTom.Tests.Features.Audio.Handlers;
 /// </summary>
 public sealed class TranscribeLibraryAudioHandlerTests
 {
-    private static readonly AudioOptions DefaultAudioOptions = new()
+    private static readonly TranscribeOptions DefaultTranscribeOptions = new()
     {
         SttProvider = SttProviders.WhisperCpp,
         Providers = new Dictionary<string, Dictionary<string, string>>
@@ -190,7 +190,7 @@ public sealed class TranscribeLibraryAudioHandlerTests
         {
             AudioFilePath = audioPath,
             RecordingBaseName = "10-21-2025_1",
-            AudioConfig = DefaultAudioOptions,
+            TranscribeConfig = DefaultTranscribeOptions,
             Source = scope,
             ForceOverwrite = false,
             ExistingTranscription = existingTranscription

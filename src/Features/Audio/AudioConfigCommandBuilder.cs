@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
 using TenSecondTom.Features.Audio.Constants;
 using TenSecondTom.Infrastructure.Cli;
-using TenSecondTom.Shared.Constants;
 
 namespace TenSecondTom.Features.Audio;
 
@@ -24,15 +23,10 @@ public sealed class AudioConfigCommandBuilder : IConfigSubcommandBuilder
     public Command? BuildConfigSubcommand(IServiceProvider serviceProvider, Option<bool> jsonOutputOption)
     {
         var audioCommand = new Command("audio", "Configure audio recording and processing settings interactively");
-        
-        var todayTimeoutOption = new Option<int?>("--today-timeout")
-        {
-            Description = $"Timeout in seconds for 'today --voice' recording ({AudioConstants.MinTodayTimeoutSeconds}-{AudioConstants.MaxTodayTimeoutSeconds} seconds). When provided, skips the interactive prompt for this setting."
-        };
 
         var recordTimeoutOption = new Option<int?>("--record-timeout")
         {
-            Description = $"Timeout in seconds for 'record' command ({AudioConstants.MinRecordTimeoutSeconds}-{AudioConstants.MaxRecordTimeoutSeconds} seconds). When provided, skips the interactive prompt for this setting."
+            Description = $"Recording timeout in seconds ({AudioConstants.MinRecordTimeoutSeconds}-{AudioConstants.MaxRecordTimeoutSeconds} seconds). When provided, skips the interactive prompt for this setting."
         };
 
         var inputVolumeOption = new Option<double?>("--input-volume")
@@ -50,7 +44,6 @@ public sealed class AudioConfigCommandBuilder : IConfigSubcommandBuilder
             Description = "Enable frequency filters during recording (true/false). Removes rumble and hiss. Recommended for most scenarios. When provided, skips the interactive prompt for this setting."
         };
 
-        audioCommand.Options.Add(todayTimeoutOption);
         audioCommand.Options.Add(recordTimeoutOption);
         audioCommand.Options.Add(inputVolumeOption);
         audioCommand.Options.Add(noiseReductionOption);
@@ -60,7 +53,6 @@ public sealed class AudioConfigCommandBuilder : IConfigSubcommandBuilder
         audioCommand.SetAction(async (parseResult) =>
         {
             bool jsonOutput = parseResult.GetValue(jsonOutputOption);
-            int? todayTimeout = parseResult.GetValue(todayTimeoutOption);
             int? recordTimeout = parseResult.GetValue(recordTimeoutOption);
             double? inputVolume = parseResult.GetValue(inputVolumeOption);
             bool? noiseReduction = parseResult.GetValue(noiseReductionOption);
@@ -70,7 +62,6 @@ public sealed class AudioConfigCommandBuilder : IConfigSubcommandBuilder
             var mediator = serviceProvider.GetRequiredService<IMediator>();
             var configureAudioCommand = new ConfigureAudio.Command
             {
-                TodayTimeoutSeconds = todayTimeout,
                 RecordTimeoutSeconds = recordTimeout,
                 InputVolume = inputVolume,
                 EnableNoiseReduction = noiseReduction,
@@ -109,4 +100,3 @@ public sealed class AudioConfigCommandBuilder : IConfigSubcommandBuilder
         return audioCommand;
     }
 }
-

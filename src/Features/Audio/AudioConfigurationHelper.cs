@@ -7,27 +7,27 @@ using TenSecondTom.Shared.Results;
 namespace TenSecondTom.Features.Audio;
 
 /// <summary>
-/// Provides reusable audio configuration validation logic for CLI commands.
+/// Provides reusable transcription (STT) configuration validation logic for CLI commands.
 /// Handles configuration checks, user prompts, and error formatting.
 /// </summary>
 /// <remarks>
-/// Use this helper at the start of any command that requires audio functionality.
-/// It will validate audio configuration and prompt users to run setup if needed.
+/// Use this helper at the start of any command that requires transcription functionality.
+/// It will validate transcription configuration and prompt users to run setup if needed.
 /// </remarks>
 public static class AudioConfigurationHelper
 {
     /// <summary>
-    /// Ensures audio configuration is complete, prompting user to run setup if needed.
+    /// Ensures transcription configuration is complete, prompting user to run setup if needed.
     /// Handles both JSON and text output modes.
     /// </summary>
-    /// <param name="validator">The audio configuration validator.</param>
-    /// <param name="configuration">The audio configuration to validate.</param>
-    /// <param name="commandName">Name of the command requiring audio configuration (for error messages).</param>
+    /// <param name="validator">The transcription configuration validator.</param>
+    /// <param name="configuration">The transcription configuration to validate.</param>
+    /// <param name="commandName">Name of the command requiring transcription configuration (for error messages).</param>
     /// <param name="jsonOutput">Whether to output errors in JSON format.</param>
     /// <returns>Success result if configured, failure result with error message if not.</returns>
     public static Result<bool> EnsureAudioConfigured(
         IAudioConfigurationValidator validator,
-        AudioOptions configuration,
+        TranscribeOptions configuration,
         string commandName,
         bool jsonOutput)
     {
@@ -35,7 +35,7 @@ public static class AudioConfigurationHelper
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(commandName);
 
-        // Check if audio is configured
+        // Check if transcription is configured
         if (validator.IsAudioConfigured(configuration))
         {
             return Result<bool>.Success(true);
@@ -98,8 +98,8 @@ public static class AudioConfigurationHelper
         AnsiConsole.WriteLine();
 
         // Show helpful guidance
-        AnsiConsole.MarkupLine("[dim]Configure audio settings with:[/]");
-        AnsiConsole.MarkupLine("  [cyan]tom config audio[/]");
+        AnsiConsole.MarkupLine("[dim]Configure transcription settings with:[/]");
+        AnsiConsole.MarkupLine("  [cyan]tom transcribe config[/]");
         AnsiConsole.WriteLine();
     }
 }

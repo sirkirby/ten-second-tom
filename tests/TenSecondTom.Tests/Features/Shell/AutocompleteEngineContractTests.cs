@@ -16,13 +16,13 @@ public sealed class AutocompleteEngineContractTests
     {
         // Arrange
         var engine = new AutocompleteEngine();
-        
+
         // Act
-        var suggestions = engine.GetSuggestions("/to");
-        
+        var suggestions = engine.GetSuggestions("/no");
+
         // Assert
         suggestions.Should().NotBeEmpty();
-        suggestions.Should().Contain(s => s.CommandName == "/today");
+        suggestions.Should().Contain(s => s.CommandName == "/note");
     }
 
     [Fact]
@@ -43,10 +43,10 @@ public sealed class AutocompleteEngineContractTests
     {
         // Arrange
         var engine = new AutocompleteEngine();
-        
+
         // Act
-        var suggestions = engine.GetSuggestions("today");
-        
+        var suggestions = engine.GetSuggestions("note");
+
         // Assert
         suggestions.Should().BeEmpty();
     }
@@ -83,13 +83,13 @@ public sealed class AutocompleteEngineContractTests
     {
         // Arrange
         var engine = new AutocompleteEngine();
-        
+
         // Act
-        var suggestions = engine.GetSuggestions("/today");
-        
+        var suggestions = engine.GetSuggestions("/note");
+
         // Assert
         suggestions.Should().HaveCount(1);
-        suggestions[0].CommandName.Should().Be("/today");
+        suggestions[0].CommandName.Should().Be("/note");
         suggestions[0].MatchScore.Should().Be(100);
     }
 

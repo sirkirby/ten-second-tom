@@ -15,11 +15,11 @@ namespace TenSecondTom.Features.Audio.Services;
 public sealed class BuiltInLocalSttProvider : ISttProvider, ISupportsModelManagement
 {
     private readonly ILocalAiEngine _localAiEngine;
-    private readonly AudioOptions _options;
+    private readonly TranscribeOptions _options;
 
     public BuiltInLocalSttProvider(
         ILocalAiEngine localAiEngine,
-        IOptions<AudioOptions> options)
+        IOptions<TranscribeOptions> options)
     {
         _localAiEngine = localAiEngine;
         _options = options.Value;

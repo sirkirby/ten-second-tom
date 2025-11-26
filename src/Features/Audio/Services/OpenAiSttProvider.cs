@@ -16,19 +16,19 @@ namespace TenSecondTom.Features.Audio.Services;
 /// </summary>
 public sealed class OpenAiSttProvider : ISttProvider
 {
-    private readonly AudioOptions _audioConfig;
+    private readonly TranscribeOptions _transcribeConfig;
     private readonly ILogger<OpenAiSttProvider> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="OpenAiSttProvider"/> class.
     /// </summary>
-    /// <param name="audioConfig">Audio configuration (for STT provider and API key).</param>
+    /// <param name="transcribeConfig">Transcribe configuration (for STT provider and API key).</param>
     /// <param name="logger">Logger instance.</param>
     public OpenAiSttProvider(
-        IOptions<AudioOptions> audioConfig,
+        IOptions<TranscribeOptions> transcribeConfig,
         ILogger<OpenAiSttProvider> logger)
     {
-        _audioConfig = audioConfig?.Value ?? throw new ArgumentNullException(nameof(audioConfig));
+        _transcribeConfig = transcribeConfig?.Value ?? throw new ArgumentNullException(nameof(transcribeConfig));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -39,13 +39,13 @@ public sealed class OpenAiSttProvider : ISttProvider
     public Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
     {
         // Only available if STT provider is OpenAI and API key is configured
-        if (_audioConfig.SttProvider != SttProviders.OpenAI)
+        if (_transcribeConfig.SttProvider != SttProviders.OpenAI)
         {
-            _logger.LogDebug("OpenAI STT not available: Provider is {Provider}, not OpenAI", _audioConfig.SttProvider);
+            _logger.LogDebug("OpenAI STT not available: Provider is {Provider}, not OpenAI", _transcribeConfig.SttProvider);
             return Task.FromResult(false);
         }
 
-        var apiKey = _audioConfig.GetSttApiKey();
+        var apiKey = _transcribeConfig.GetSttApiKey();
         var isAvailable = !string.IsNullOrWhiteSpace(apiKey);
 
         if (!isAvailable)
@@ -69,20 +69,20 @@ public sealed class OpenAiSttProvider : ISttProvider
         }
 
         // Verify STT provider is OpenAI
-        if (_audioConfig.SttProvider != SttProviders.OpenAI)
+        if (_transcribeConfig.SttProvider != SttProviders.OpenAI)
         {
             return Result<TranscriptionResult>.Failure(
-                $"Cannot use OpenAI STT: Current STT provider is {_audioConfig.SttProvider}. Change to OpenAI in 'tom config audio'.");
+                $"Cannot use OpenAI STT: Current STT provider is {_transcribeConfig.SttProvider}. Change to OpenAI in 'tom config audio'.");
         }
 
-        var apiKey = _audioConfig.GetSttApiKey();
+        var apiKey = _transcribeConfig.GetSttApiKey();
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             return Result<TranscriptionResult>.Failure("OpenAI STT API key not configured. Run 'tom config audio' to configure your API key.");
         }
 
         // Get STT model from audio config or use default
-        var model = _audioConfig.GetSttModel() ?? SttProviders.OpenAIDefaultSTTModel;
+        var model = _transcribeConfig.GetSttModel() ?? SttProviders.OpenAIDefaultSTTModel;
 
         var startTime = DateTimeOffset.UtcNow;
         var stopwatch = Stopwatch.StartNew();

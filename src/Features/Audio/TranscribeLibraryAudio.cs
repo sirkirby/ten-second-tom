@@ -34,9 +34,9 @@ public static class TranscribeLibraryAudio
         public required string RecordingBaseName { get; init; }
 
         /// <summary>
-        /// Configured audio options (provider/model selection, fallbacks).
+        /// Configured transcribe options (STT provider/model selection).
         /// </summary>
-        public required AudioOptions AudioConfig { get; init; }
+        public required TranscribeOptions TranscribeConfig { get; init; }
 
         /// <summary>
         /// Indicates where the audio came from (note/recording/external) for logging and metrics.
@@ -152,7 +152,7 @@ public static class TranscribeLibraryAudio
                     var transcribeCommand = new TranscribeAudio.Command
                     {
                         AudioFilePath = audioDestination,
-                        AudioConfig = request.AudioConfig
+                        TranscribeConfig = request.TranscribeConfig
                     };
 
                     transcriptionResult = await _mediator.Send(transcribeCommand, cancellationToken);

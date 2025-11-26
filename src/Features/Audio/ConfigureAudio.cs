@@ -3,14 +3,10 @@ using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using TenSecondTom.Infrastructure.Configuration;
-using TenSecondTom.Shared.Abstractions.Audio;
-using TenSecondTom.Shared.Abstractions.LocalAi;
 using TenSecondTom.Shared.Abstractions.UI;
-using TenSecondTom.Shared.Constants;
+using TenSecondTom.Shared.Models;
 using TenSecondTom.Shared.Options;
 using TenSecondTom.Shared.Results;
-using TenSecondTom.Features.Audio.Models;
-using static TenSecondTom.Shared.Constants.SttProviders;
 
 namespace TenSecondTom.Features.Audio;
 
@@ -24,14 +20,8 @@ public static class ConfigureAudio
     /// Command to configure audio settings.
     /// Supports both interactive prompts and direct value assignment via arguments.
     /// </summary>
-    public sealed record Command : IRequest<Result<AudioOptions>>
+    public sealed record Command : IRequest<Result<AudioConfigurationResult>>
     {
-        /// <summary>
-        /// Gets the timeout in seconds for 'today --voice' recording.
-        /// When provided, skips the interactive prompt for this setting.
-        /// </summary>
-        public int? TodayTimeoutSeconds { get; init; }
-
         /// <summary>
         /// Gets the timeout in seconds for 'record' command.
         /// When provided, skips the interactive prompt for this setting.
@@ -64,11 +54,6 @@ public static class ConfigureAudio
     {
         public Validator()
         {
-            RuleFor(x => x.TodayTimeoutSeconds)
-                .InclusiveBetween(AudioConstants.MinTodayTimeoutSeconds, AudioConstants.MaxTodayTimeoutSeconds)
-                .When(x => x.TodayTimeoutSeconds.HasValue)
-                .WithMessage($"Today timeout must be between {AudioConstants.MinTodayTimeoutSeconds} and {AudioConstants.MaxTodayTimeoutSeconds} seconds.");
-
             RuleFor(x => x.RecordTimeoutSeconds)
                 .InclusiveBetween(AudioConstants.MinRecordTimeoutSeconds, AudioConstants.MaxRecordTimeoutSeconds)
                 .When(x => x.RecordTimeoutSeconds.HasValue)
@@ -88,36 +73,33 @@ public static class ConfigureAudio
     public sealed class Handler(
         IConfigurationSectionStore sectionStore,
         ISetupWizardUI setupWizard,
-        ILocalAiEngine localAiEngine,
-        IWhisperNetModelManager whisperNetModelManager,
         ILogger<Handler> logger)
-        : IRequestHandler<Command, Result<AudioOptions>>
+        : IRequestHandler<Command, Result<AudioConfigurationResult>>
     {
-        public async Task<Result<AudioOptions>> Handle(
+        public async Task<Result<AudioConfigurationResult>> Handle(
             Command request,
             CancellationToken cancellationToken)
         {
             logger.LogInformation("Starting audio configuration");
 
-            // Read current audio configuration directly from config.json to get the latest saved values
-            // Cannot use IOptions/IOptionsSnapshot as they read from appsettings.json, not the user's config.json
-            var currentConfigResult = await sectionStore.ReadSectionAsync<AudioOptions>(
+            // Read current audio configuration (recording settings)
+            var audioConfigResult = await sectionStore.ReadSectionAsync<AudioOptions>(
                 AudioOptions.SectionPath,
                 cancellationToken);
 
-            if (!currentConfigResult.IsSuccess)
+            if (!audioConfigResult.IsSuccess)
             {
-                return Result<AudioOptions>.Failure($"Failed to load current audio configuration: {currentConfigResult.Error}");
+                return Result<AudioConfigurationResult>.Failure($"Failed to load current audio configuration: {audioConfigResult.Error}");
             }
 
-            var currentAudio = currentConfigResult.Value;
+            var currentAudio = audioConfigResult.Value;
 
             if (HasCommandLineOverrides(request))
             {
                 return await ApplyCommandLineOverridesAsync(request, currentAudio, cancellationToken);
             }
 
-            const int totalSteps = 9;
+            const int totalSteps = 7;
 
             // Step 1: Input Volume
             double? inputVolume;
@@ -136,7 +118,7 @@ public static class ConfigureAudio
 
                 if (!inputVolume.HasValue)
                 {
-                    return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
+                    return Result<AudioConfigurationResult>.Failure("Audio configuration cancelled. No changes were made.");
                 }
             }
 
@@ -158,7 +140,7 @@ public static class ConfigureAudio
 
                 if (!noiseReduction.HasValue)
                 {
-                    return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
+                    return Result<AudioConfigurationResult>.Failure("Audio configuration cancelled. No changes were made.");
                 }
             }
 
@@ -180,7 +162,7 @@ public static class ConfigureAudio
 
                 if (!frequencyFilters.HasValue)
                 {
-                    return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
+                    return Result<AudioConfigurationResult>.Failure("Audio configuration cancelled. No changes were made.");
                 }
             }
 
@@ -193,7 +175,7 @@ public static class ConfigureAudio
 
             if (!removeSilence.HasValue)
             {
-                return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
+                return Result<AudioConfigurationResult>.Failure("Audio configuration cancelled. No changes were made.");
             }
 
             // Step 5: Silence Threshold (only if silence removal enabled)
@@ -210,7 +192,7 @@ public static class ConfigureAudio
 
                 if (!threshold.HasValue)
                 {
-                    return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
+                    return Result<AudioConfigurationResult>.Failure("Audio configuration cancelled. No changes were made.");
                 }
                 silenceThresholdDb = threshold.Value;
             }
@@ -234,7 +216,7 @@ public static class ConfigureAudio
 
                 if (!duration.HasValue)
                 {
-                    return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
+                    return Result<AudioConfigurationResult>.Failure("Audio configuration cancelled. No changes were made.");
                 }
                 minSilenceDurationMs = duration.Value;
             }
@@ -244,189 +226,20 @@ public static class ConfigureAudio
                 setupWizard.ShowStatus("Skipped (silence removal disabled)");
             }
 
-            // Step 7: Speech-to-Text Provider
-            setupWizard.ShowStepHeader(7, totalSteps, "Speech-to-Text Provider");
-            var sttProvider = await setupWizard.PromptForSttProviderAsync(
-                currentAudio.SttProvider,
-                cancellationToken);
-
-            if (sttProvider == null)
-            {
-                return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
-            }
-
-            // Step 7a: Provider-specific configuration
-            string? sttApiKey = currentAudio.GetSttApiKey(sttProvider);
-            string? sttModel = currentAudio.GetSttModel(sttProvider);
-
-            if (sttProvider == SttProviders.BuiltInLocal)
-            {
-                // Built-in Local STT - select and download whisper model
-                setupWizard.ShowStatus("Fetching available whisper models from AI Foundry catalog...");
-
-                var availableModels = (await localAiEngine.ListAvailableModelsAsync(cancellationToken))
-                    .Where(m => m.Contains("whisper", StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-
-                if (availableModels.Count == 0)
-                {
-                    setupWizard.ShowWarning("No whisper models found in the AI Foundry catalog.");
-                    setupWizard.ShowStatus("The built-in local STT requires whisper models to be available.");
-                    return Result<AudioOptions>.Failure("No whisper models available for built-in local STT provider.");
-                }
-
-                var selectedModel = await setupWizard.PromptForSelectionAsync(
-                    "Select a whisper model for speech-to-text:",
-                    availableModels,
-                    m => m,
-                    cancellationToken);
-
-                if (string.IsNullOrEmpty(selectedModel))
-                {
-                    return Result<AudioOptions>.Failure("Model selection cancelled. No changes were made.");
-                }
-
-                sttModel = selectedModel;
-
-                // Ensure the model is downloaded with progress bar
-                Result? downloadResult = null;
-                await setupWizard.RunWithProgressAsync(
-                    $"Downloading whisper model '{sttModel}'...",
-                    async progress =>
-                    {
-                        downloadResult = await localAiEngine.EnsureModelAvailableAsync(
-                            sttModel,
-                            progress,
-                            cancellationToken);
-                    },
-                    cancellationToken);
-
-                if (downloadResult?.IsSuccess != true)
-                {
-                    setupWizard.ShowError($"Failed to download model: {downloadResult?.Error ?? "Unknown error"}");
-                    return Result<AudioOptions>.Failure($"Failed to ensure whisper model is available: {downloadResult?.Error ?? "Unknown error"}");
-                }
-
-                setupWizard.ShowSuccess($"✓ Whisper model '{sttModel}' is ready");
-            }
-            else if (sttProvider == SttProviders.WhisperCpp)
-            {
-                // Whisper.NET - no external binary installation required!
-                // Select and optionally download model using built-in Hugging Face downloader
-                setupWizard.ShowStatus("Available Whisper models (powered by Whisper.NET):");
-
-                var availableModels = whisperNetModelManager.ListAvailableModels();
-                var downloadedModels = await whisperNetModelManager.ListDownloadedModelsAsync(cancellationToken);
-                var downloadedIds = downloadedModels.Select(d => d.ModelId).ToHashSet();
-
-                // Format choices with download status
-                var modelChoices = availableModels
-                    .Select(m =>
-                    {
-                        var status = downloadedIds.Contains(m.Id) ? " (downloaded)" : "";
-                        var recommended = m.Recommended ? " ★" : "";
-                        return $"{m.Id} ({m.SizeMb} MB){recommended}{status}";
-                    })
-                    .ToList();
-
-                var selectedChoice = await setupWizard.PromptForSelectionAsync(
-                    "Select a whisper model for speech-to-text:",
-                    modelChoices,
-                    m => m,
-                    cancellationToken);
-
-                if (string.IsNullOrEmpty(selectedChoice))
-                {
-                    return Result<AudioOptions>.Failure("Model selection cancelled. No changes were made.");
-                }
-
-                // Extract model ID from choice string (format: "model-id (size MB)...")
-                var selectedModelId = selectedChoice.Split(' ')[0];
-                sttModel = whisperNetModelManager.GetModelPath(selectedModelId);
-
-                // If model not downloaded, download it automatically
-                if (sttModel == null)
-                {
-                    setupWizard.ShowStatus($"Downloading model '{selectedModelId}' from Hugging Face...");
-
-                    Result<string>? downloadResult = null;
-                    await setupWizard.RunWithProgressAsync(
-                        $"Downloading Whisper model '{selectedModelId}'...",
-                        async progress =>
-                        {
-                            downloadResult = await whisperNetModelManager.DownloadModelAsync(
-                                selectedModelId,
-                                progress,
-                                cancellationToken);
-                        },
-                        cancellationToken);
-
-                    if (downloadResult == null || !downloadResult.Value.IsSuccess)
-                    {
-                        setupWizard.ShowError($"Failed to download model: {downloadResult?.Error ?? "Unknown error"}");
-                        return Result<AudioOptions>.Failure($"Failed to download whisper model: {downloadResult?.Error ?? "Unknown error"}");
-                    }
-
-                    sttModel = downloadResult.Value.Value;
-                    setupWizard.ShowSuccess($"✓ Model downloaded to {sttModel}");
-                }
-                else
-                {
-                    setupWizard.ShowSuccess($"✓ Model '{selectedModelId}' is ready at {sttModel}");
-                }
-            }
-            else if (sttProvider == SttProviders.OpenAI)
-            {
-                sttApiKey = await setupWizard.PromptForSttApiKeyAsync(
-                    sttProvider,
-                    sttApiKey,
-                    cancellationToken);
-
-                if (sttApiKey == null)
-                {
-                    return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
-                }
-            }
-
-            // Step 8: Today Voice Timeout
-            int? todayTimeout;
-            if (request.TodayTimeoutSeconds.HasValue)
-            {
-                setupWizard.ShowStepHeader(8, totalSteps, "Today Voice Recording Timeout");
-                setupWizard.ShowStatus($"Using provided value: {request.TodayTimeoutSeconds.Value} seconds");
-                todayTimeout = request.TodayTimeoutSeconds.Value;
-            }
-            else
-            {
-                setupWizard.ShowStepHeader(8, totalSteps, "Today Voice Recording Timeout");
-                setupWizard.ShowStatus("When this duration is reached, you'll be prompted to continue or finish recording.");
-                todayTimeout = await setupWizard.PromptForIntAsync(
-                    $"Time before prompting to continue 'today --voice' (seconds, {AudioConstants.MinTodayTimeoutSeconds}-{AudioConstants.MaxTodayTimeoutSeconds}):",
-                    currentAudio.Timeouts.TodaySeconds,
-                    AudioConstants.MinTodayTimeoutSeconds,
-                    AudioConstants.MaxTodayTimeoutSeconds,
-                    cancellationToken);
-
-                if (!todayTimeout.HasValue)
-                {
-                    return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
-                }
-            }
-
-            // Step 9: Record Command Timeout
+            // Step 7: Record Command Timeout
             int? recordTimeout;
             if (request.RecordTimeoutSeconds.HasValue)
             {
-                setupWizard.ShowStepHeader(9, totalSteps, "Record Command Timeout");
+                setupWizard.ShowStepHeader(7, totalSteps, "Record Command Timeout");
                 setupWizard.ShowStatus($"Using provided value: {request.RecordTimeoutSeconds.Value} seconds");
                 recordTimeout = request.RecordTimeoutSeconds.Value;
             }
             else
             {
-                setupWizard.ShowStepHeader(9, totalSteps, "Record Command Timeout");
+                setupWizard.ShowStepHeader(7, totalSteps, "Record Command Timeout");
                 setupWizard.ShowStatus("When this duration is reached, you'll be prompted to continue or finish recording.");
                 recordTimeout = await setupWizard.PromptForIntAsync(
-                    $"Time before prompting to continue 'record' (seconds, {AudioConstants.MinRecordTimeoutSeconds}-{AudioConstants.MaxRecordTimeoutSeconds}):",
+                    $"Recording timeout (seconds, {AudioConstants.MinRecordTimeoutSeconds}-{AudioConstants.MaxRecordTimeoutSeconds}):",
                     currentAudio.Timeouts.RecordSeconds,
                     AudioConstants.MinRecordTimeoutSeconds,
                     AudioConstants.MaxRecordTimeoutSeconds,
@@ -434,17 +247,13 @@ public static class ConfigureAudio
 
                 if (!recordTimeout.HasValue)
                 {
-                    return Result<AudioOptions>.Failure("Audio configuration cancelled. No changes were made.");
+                    return Result<AudioConfigurationResult>.Failure("Audio configuration cancelled. No changes were made.");
                 }
             }
 
-            // Build updated audio configuration using AudioOptions
+            // Build updated audio configuration (recording settings only)
             var updatedAudio = new AudioOptions
             {
-                SttProvider = sttProvider,
-                Providers = new Dictionary<string, Dictionary<string, string>>(
-                    currentAudio.Providers ?? new Dictionary<string, Dictionary<string, string>>()),
-                KeepFiles = currentAudio.KeepFiles,
                 Recorder = new RecorderOptions
                 {
                     FfmpegPath = currentAudio.Recorder.FfmpegPath,
@@ -460,34 +269,20 @@ public static class ConfigureAudio
                 },
                 Timeouts = new RecordingTimeoutsOptions
                 {
-                    TodaySeconds = todayTimeout.Value,
+                    TodaySeconds = currentAudio.Timeouts.TodaySeconds, // Preserve existing value (legacy)
                     RecordSeconds = recordTimeout.Value
                 }
             };
 
-            // Update provider-specific configuration using accessor methods
-            if (!string.IsNullOrEmpty(sttModel))
-            {
-                updatedAudio.SetSttProviderConfig(sttProvider, "Model", sttModel);
-            }
-
-            // Note: Whisper.NET doesn't need a binary path - it uses native bindings
-
-            if (sttProvider == SttProviders.OpenAI && !string.IsNullOrEmpty(sttApiKey))
-            {
-                updatedAudio.SetSttProviderConfig(sttProvider, "ApiKey", sttApiKey);
-            }
-
-
-            // Save configuration directly to config.json
-            var saveResult = await sectionStore.WriteSectionAsync(
+            // Save audio configuration
+            var audioSaveResult = await sectionStore.WriteSectionAsync(
                 AudioOptions.SectionPath,
                 updatedAudio,
                 cancellationToken);
 
-            if (!saveResult.IsSuccess)
+            if (!audioSaveResult.IsSuccess)
             {
-                return Result<AudioOptions>.Failure($"Failed to save audio configuration: {saveResult.Error}. Changes were not applied.");
+                return Result<AudioConfigurationResult>.Failure($"Failed to save audio configuration: {audioSaveResult.Error}. Changes were not applied.");
             }
 
             logger.LogInformation("Audio configuration updated successfully");
@@ -503,30 +298,23 @@ public static class ConfigureAudio
                 setupWizard.ShowStatus($"  • Silence threshold: {silenceThresholdDb} dB");
                 setupWizard.ShowStatus($"  • Min silence duration: {minSilenceDurationMs} ms");
             }
-            var sttProviderDisplay = sttProvider == SttProviders.WhisperCpp ? "whisper.cpp (local)" :
-                                     sttProvider == SttProviders.BuiltInLocal ? "Local (Built-in)" : "OpenAI Whisper API (cloud)";
-            setupWizard.ShowStatus($"  • STT provider: {sttProviderDisplay}");
-            if ((sttProvider == SttProviders.BuiltInLocal || sttProvider == SttProviders.WhisperCpp) && !string.IsNullOrEmpty(sttModel))
-            {
-                setupWizard.ShowStatus($"  • Whisper model: {sttModel}");
-            }
-
-            setupWizard.ShowStatus($"  • Today timeout: {todayTimeout}s");
             setupWizard.ShowStatus($"  • Record timeout: {recordTimeout}s");
 
-            return Result<AudioOptions>.Success(updatedAudio);
+            return Result<AudioConfigurationResult>.Success(new AudioConfigurationResult
+            {
+                Audio = updatedAudio
+            });
         }
 
         private static bool HasCommandLineOverrides(Command request)
         {
-            return request.TodayTimeoutSeconds.HasValue ||
-                   request.RecordTimeoutSeconds.HasValue ||
+            return request.RecordTimeoutSeconds.HasValue ||
                    request.InputVolume.HasValue ||
                    request.EnableNoiseReduction.HasValue ||
                    request.EnableFrequencyFilters.HasValue;
         }
 
-        private async Task<Result<AudioOptions>> ApplyCommandLineOverridesAsync(
+        private async Task<Result<AudioConfigurationResult>> ApplyCommandLineOverridesAsync(
             Command request,
             AudioOptions currentAudio,
             CancellationToken cancellationToken)
@@ -540,23 +328,22 @@ public static class ConfigureAudio
 
             if (!saveResult.IsSuccess)
             {
-                return Result<AudioOptions>.Failure($"Failed to save audio configuration: {saveResult.Error}. Changes were not applied.");
+                return Result<AudioConfigurationResult>.Failure($"Failed to save audio configuration: {saveResult.Error}. Changes were not applied.");
             }
 
             logger.LogInformation("Audio configuration updated via CLI arguments");
             ShowOverrideSummary(request);
 
-            return Result<AudioOptions>.Success(updatedAudio);
+            return Result<AudioConfigurationResult>.Success(new AudioConfigurationResult
+            {
+                Audio = updatedAudio
+            });
         }
 
         private static AudioOptions BuildOverriddenAudioOptions(AudioOptions currentAudio, Command request)
         {
             return new AudioOptions
             {
-                SttProvider = currentAudio.SttProvider,
-                Providers = new Dictionary<string, Dictionary<string, string>>(
-                    currentAudio.Providers ?? new Dictionary<string, Dictionary<string, string>>()),
-                KeepFiles = currentAudio.KeepFiles,
                 Recorder = new RecorderOptions
                 {
                     FfmpegPath = currentAudio.Recorder.FfmpegPath,
@@ -572,7 +359,7 @@ public static class ConfigureAudio
                 },
                 Timeouts = new RecordingTimeoutsOptions
                 {
-                    TodaySeconds = request.TodayTimeoutSeconds ?? currentAudio.Timeouts.TodaySeconds,
+                    TodaySeconds = currentAudio.Timeouts.TodaySeconds, // Preserve existing value (legacy)
                     RecordSeconds = request.RecordTimeoutSeconds ?? currentAudio.Timeouts.RecordSeconds
                 }
             };
@@ -597,11 +384,6 @@ public static class ConfigureAudio
                 setupWizard.ShowStatus($"  • Frequency filters: {(request.EnableFrequencyFilters.Value ? "Enabled" : "Disabled")}");
             }
 
-            if (request.TodayTimeoutSeconds.HasValue)
-            {
-                setupWizard.ShowStatus($"  • Today timeout: {request.TodayTimeoutSeconds.Value}s");
-            }
-
             if (request.RecordTimeoutSeconds.HasValue)
             {
                 setupWizard.ShowStatus($"  • Record timeout: {request.RecordTimeoutSeconds.Value}s");
@@ -609,4 +391,3 @@ public static class ConfigureAudio
         }
     }
 }
-

@@ -3,14 +3,14 @@ using TenSecondTom.Shared.Options;
 namespace TenSecondTom.Features.Audio.Services;
 
 /// <summary>
-/// Validates audio configuration completeness for features requiring audio setup.
+/// Validates transcription (STT) configuration completeness for features requiring transcription setup.
 /// </summary>
 public interface IAudioConfigurationValidator
 {
     /// <summary>
-    /// Checks if audio configuration is complete and valid for use.
+    /// Checks if transcription configuration is complete and valid for use.
     /// </summary>
-    /// <param name="configuration">The audio configuration to validate.</param>
+    /// <param name="configuration">The transcription configuration to validate.</param>
     /// <returns>True if configuration is complete; otherwise false.</returns>
     /// <remarks>
     /// Validates:
@@ -18,12 +18,12 @@ public interface IAudioConfigurationValidator
     /// - If using cloud provider, API key is configured
     /// - If fallback is enabled, fallback provider and key are configured
     /// </remarks>
-    bool IsAudioConfigured(AudioOptions configuration);
+    bool IsAudioConfigured(TranscribeOptions configuration);
 
     /// <summary>
     /// Gets a list of missing configuration items.
     /// </summary>
-    /// <param name="configuration">The audio configuration to validate.</param>
+    /// <param name="configuration">The transcription configuration to validate.</param>
     /// <returns>List of missing configuration items, or empty if complete.</returns>
-    IReadOnlyList<string> GetMissingConfiguration(AudioOptions configuration);
+    IReadOnlyList<string> GetMissingConfiguration(TranscribeOptions configuration);
 }

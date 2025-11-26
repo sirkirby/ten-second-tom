@@ -451,6 +451,26 @@ public static class TodayCommandHandler
 
         var audioOptions = audioConfigQueryResult.Value;
 
+        // Query transcribe configuration via CQRS (use interface type for VSA compliance)
+        IRequest<Result<TranscribeOptions>> transcribeConfigQuery = new GetTranscribeConfiguration.Query();
+        var transcribeConfigQueryResult = await mediator.Send(transcribeConfigQuery, CancellationToken.None).ConfigureAwait(false);
+
+        if (!transcribeConfigQueryResult.IsSuccess)
+        {
+            var error = "Failed to load transcription configuration";
+            if (jsonOutput)
+            {
+                Console.WriteLine(JsonOutputFormatter.FormatFailure(CommandNames.Today, error, DateTimeOffset.UtcNow));
+            }
+            else
+            {
+                AnsiConsole.MarkupLine($"[red]Error:[/] {error}");
+            }
+            return;
+        }
+
+        var transcribeOptions = transcribeConfigQueryResult.Value;
+
         // Get the effective storage directory using extension method
         var storageBaseDir = storageOptions.GetEffectiveStorageDirectory();
 
@@ -517,7 +537,7 @@ public static class TodayCommandHandler
             // The recording returned is already preprocessed according to audio configuration
 
             // Build transcription configuration based on CLI selection
-            var transcribeConfig = BuildTranscriptionConfig(sttSelection, audioOptions);
+            var transcribeConfig = BuildTranscriptionConfig(sttSelection, transcribeOptions);
 
             // Step 2: Transcribe audio
             if (!jsonOutput)
@@ -536,7 +556,7 @@ public static class TodayCommandHandler
             IRequest<Result<TranscriptionResult>> transcribeCommand = new TranscribeAudio.Command
             {
                 AudioFilePath = audioFilePath,
-                AudioConfig = transcribeConfig
+                TranscribeConfig = transcribeConfig
             };
 
             Result<TranscriptionResult> transcribeResult;
@@ -679,7 +699,7 @@ public static class TodayCommandHandler
             }
 
             string? persistedAudioPath = null;
-            if (!audioOptions.KeepFiles)
+            if (!transcribeOptions.KeepFiles)
             {
                 try
                 {
@@ -771,7 +791,7 @@ public static class TodayCommandHandler
                     AnsiConsole.MarkupLine($"[dim]Full entry:[/] [link]{fullPath.EscapeMarkup()}[/]");
                 }
 
-                if (audioOptions.KeepFiles)
+                if (transcribeOptions.KeepFiles)
                 {
                     AnsiConsole.WriteLine();
                     AnsiConsole.MarkupLine($"[dim]Audio saved: {entry.AudioFilename}[/]");
@@ -821,49 +841,40 @@ public static class TodayCommandHandler
     }
 
     /// <summary>
-    /// Builds transcription configuration based on CLI STT selection and AudioOptions.
+    /// Builds transcription configuration based on CLI STT selection and TranscribeOptions.
     /// Maps user-friendly CLI options (auto/local/openai) to the proper configuration.
     /// </summary>
-    private static TenSecondTom.Shared.Options.AudioOptions BuildTranscriptionConfig(
+    private static TenSecondTom.Shared.Options.TranscribeOptions BuildTranscriptionConfig(
         string? sttSelection,
-        TenSecondTom.Shared.Options.AudioOptions audioOptions)
+        TenSecondTom.Shared.Options.TranscribeOptions transcribeOptions)
     {
         var normalizedSelection = sttSelection?.ToLowerInvariant();
-        var providers = audioOptions.Providers ?? new Dictionary<string, Dictionary<string, string>>();
+        var providers = transcribeOptions.Providers ?? new Dictionary<string, Dictionary<string, string>>();
 
         return normalizedSelection switch
         {
             // "auto" or null: Use configured provider
-            "auto" or null => new TenSecondTom.Shared.Options.AudioOptions
+            "auto" or null => new TenSecondTom.Shared.Options.TranscribeOptions
             {
-                SttProvider = audioOptions.SttProvider,
+                SttProvider = transcribeOptions.SttProvider,
                 Providers = providers,
-                KeepFiles = audioOptions.KeepFiles,
-                Recorder = audioOptions.Recorder,
-                Preprocessing = audioOptions.Preprocessing,
-                Timeouts = audioOptions.Timeouts
+                KeepFiles = transcribeOptions.KeepFiles
             },
 
             // "local": Use local provider
-            "local" => new TenSecondTom.Shared.Options.AudioOptions
+            "local" => new TenSecondTom.Shared.Options.TranscribeOptions
             {
                 SttProvider = SttProviders.WhisperCpp,
                 Providers = providers,
-                KeepFiles = audioOptions.KeepFiles,
-                Recorder = audioOptions.Recorder,
-                Preprocessing = audioOptions.Preprocessing,
-                Timeouts = audioOptions.Timeouts
+                KeepFiles = transcribeOptions.KeepFiles
             },
 
             // "openai": Force OpenAI provider
-            "openai" => new TenSecondTom.Shared.Options.AudioOptions
+            "openai" => new TenSecondTom.Shared.Options.TranscribeOptions
             {
                 SttProvider = SttProviders.OpenAI,
                 Providers = providers,
-                KeepFiles = audioOptions.KeepFiles,
-                Recorder = audioOptions.Recorder,
-                Preprocessing = audioOptions.Preprocessing,
-                Timeouts = audioOptions.Timeouts
+                KeepFiles = transcribeOptions.KeepFiles
             },
 
             _ => throw new ArgumentException(

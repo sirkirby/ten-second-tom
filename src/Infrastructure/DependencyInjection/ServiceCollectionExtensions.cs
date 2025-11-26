@@ -81,6 +81,10 @@ public static class ServiceCollectionExtensions
         // Register AudioOptions with Options Pattern
         services.Configure<AudioOptions>(configuration.GetSection(AudioOptions.SectionPath));
 
+        // Register TranscribeOptions with validation (STT configuration split from AudioOptions)
+        services.Configure<TranscribeOptions>(configuration.GetSection(TranscribeOptions.SectionPath));
+        services.AddSingleton<IValidateOptions<TranscribeOptions>, TranscribeOptionsValidator>();
+
         // Register SecurityOptions with validation
         // NOTE: Don't use ValidateOnStart() - allow unconfigured state during first-time setup
         services.Configure<SecurityOptions>(configuration.GetSection(SecurityOptions.SectionPath));

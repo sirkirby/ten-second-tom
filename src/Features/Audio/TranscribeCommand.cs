@@ -73,6 +73,15 @@ public static class TranscribeCommand
             return 1;
         }
 
+        var transcribeOptionsResult = await mediator.Send(new GetTranscribeConfiguration.Query(), CancellationToken.None)
+            .ConfigureAwait(false);
+
+        if (!transcribeOptionsResult.IsSuccess || transcribeOptionsResult.Value is null)
+        {
+            CommandOutputFormatter.WriteError(transcribeOptionsResult.Error ?? "Transcription configuration unavailable.", jsonOutput);
+            return 1;
+        }
+
         if (!SttSelectionMapper.TryParse(sttSelection, out var sttChoice, out var sttError))
         {
             CommandOutputFormatter.WriteValidationError("STT selection", sttError!, jsonOutput);
@@ -98,7 +107,7 @@ public static class TranscribeCommand
 
         var configResult = AudioConfigurationHelper.EnsureAudioConfigured(
             audioValidator,
-            audioOptionsResult.Value,
+            transcribeOptionsResult.Value,
             CommandNames.Transcribe,
             jsonOutput);
 
@@ -168,7 +177,7 @@ public static class TranscribeCommand
         {
             AudioFilePath = selection.AudioFilePath,
             RecordingBaseName = selection.BaseName,
-            AudioConfig = SttSelectionMapper.BuildAudioOptions(sttChoice, audioOptionsResult.Value),
+            TranscribeConfig = SttSelectionMapper.BuildTranscribeOptions(sttChoice, transcribeOptionsResult.Value),
             Source = selection.Scope,
             ForceOverwrite = effectiveForceOverwrite
         };

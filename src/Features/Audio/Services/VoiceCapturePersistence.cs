@@ -45,14 +45,14 @@ internal static class VoiceCapturePersistence
         IMediator mediator,
         string audioFilePath,
         string recordingBaseName,
-        AudioOptions audioConfig,
+        TranscribeOptions transcribeConfig,
         AudioLibraryScope scope,
         TranscriptionResult transcription,
         ILogger logger,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(mediator);
-        ArgumentNullException.ThrowIfNull(audioConfig);
+        ArgumentNullException.ThrowIfNull(transcribeConfig);
         ArgumentNullException.ThrowIfNull(transcription);
         ArgumentNullException.ThrowIfNull(logger);
 
@@ -60,7 +60,7 @@ internal static class VoiceCapturePersistence
         {
             AudioFilePath = audioFilePath,
             RecordingBaseName = recordingBaseName,
-            AudioConfig = audioConfig,
+            TranscribeConfig = transcribeConfig,
             Source = scope,
             ForceOverwrite = true,
             ExistingTranscription = transcription
