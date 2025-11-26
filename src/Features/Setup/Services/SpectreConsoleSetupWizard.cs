@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Spectre.Console;
 using TenSecondTom.Features.Audio;
 using TenSecondTom.Features.Setup.Constants;
+using TenSecondTom.Infrastructure.Cli;
 using TenSecondTom.Infrastructure.Configuration;
 using TenSecondTom.Shared.Abstractions.UI;
 using TenSecondTom.Shared.Constants;
@@ -36,6 +37,38 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         _console = console ?? throw new ArgumentNullException(nameof(console));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+    }
+
+    /// <summary>
+    /// Prompts for a selection with escape key support. Returns null if escape was pressed.
+    /// </summary>
+    private static T? PromptSelectionWithEscape<T>(SelectionPrompt<T> prompt) where T : class
+    {
+        var console = new EscapeCancellableConsole();
+        try
+        {
+            return console.Prompt(prompt);
+        }
+        catch (PromptCancelledException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Prompts for text input with escape key support. Returns null if escape was pressed.
+    /// </summary>
+    private static string? PromptTextWithEscape(TextPrompt<string> prompt)
+    {
+        var console = new EscapeCancellableConsole();
+        try
+        {
+            return console.Prompt(prompt);
+        }
+        catch (PromptCancelledException)
+        {
+            return null;
+        }
     }
 
     public Task<SshKeyInfo?> PromptForSshKeyAsync(
@@ -72,7 +105,8 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             prompt.HighlightStyle(new Style(Color.Green));
         }
 
-        var selected = _console.Prompt(prompt);
+        var selected = PromptSelectionWithEscape(prompt);
+        if (selected is null) return Task.FromResult<SshKeyInfo?>(null);
         return Task.FromResult<SshKeyInfo?>(choices[selected]);
     }
 
@@ -101,7 +135,8 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             }
         }
 
-        var selected = _console.Prompt(prompt);
+        var selected = PromptSelectionWithEscape(prompt);
+        if (selected is null) return Task.FromResult<LlmProvider?>(null);
         return Task.FromResult<LlmProvider?>(choices[selected]);
     }
 
@@ -149,7 +184,8 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             }
         }
 
-        var selected = _console.Prompt(prompt);
+        var selected = PromptSelectionWithEscape(prompt);
+        if (selected is null) return Task.FromResult<SupportedModel?>(null);
 
         // Find the model using the dictionary mapping
         if (choiceToModel.TryGetValue(selected, out var selectedModel))
@@ -180,8 +216,8 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             prompt.DefaultValue(currentApiKey);
         }
 
-        var apiKey = _console.Prompt(prompt);
-        return Task.FromResult<string?>(apiKey);
+        var apiKey = PromptTextWithEscape(prompt);
+        return Task.FromResult(apiKey);
     }
 
     public Task<string?> PromptForMemoryDirectoryAsync(
@@ -196,8 +232,8 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             .DefaultValue(defaultDir)
             .AllowEmpty();
 
-        var directory = _console.Prompt(prompt);
-        return Task.FromResult<string?>(directory);
+        var directory = PromptTextWithEscape(prompt);
+        return Task.FromResult(directory);
     }
 
     public Task<Microsoft.Extensions.Logging.LogLevel?> PromptForLogLevelAsync(
@@ -208,7 +244,8 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             .Title("Select logging level:")
             .AddChoices(LogLevelChoices);
 
-        var selected = _console.Prompt(prompt);
+        var selected = PromptSelectionWithEscape(prompt);
+        if (selected is null) return Task.FromResult<Microsoft.Extensions.Logging.LogLevel?>(null);
 
         var logLevel = selected switch
         {
@@ -236,7 +273,8 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
                 : SetupConstants.RetentionKeywords.Unlimited)
             .AllowEmpty();
 
-        var input = _console.Prompt(prompt);
+        var input = PromptTextWithEscape(prompt);
+        if (input is null) return Task.FromResult<int?>(null);
 
         // Parse input: "unlimited", "forever", "0" -> -1, otherwise parse as number
         if (string.IsNullOrWhiteSpace(input) ||
@@ -348,11 +386,11 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         _console.MarkupLine("[grey]   • Condenser/USB mics: 0.9-1.0[/]");
         _console.WriteLine();
 
-        var prompt = new TextPrompt<string>("Enter input volume (0.0 - 2.0):")
+        var input = CancellablePrompt.Text("Enter input volume (0.0 - 2.0):", p => p
             .DefaultValue((currentValue ?? 1.0).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))
-            .Validate(input =>
+            .Validate(val =>
             {
-                if (double.TryParse(input, System.Globalization.NumberStyles.Float,
+                if (double.TryParse(val, System.Globalization.NumberStyles.Float,
                     System.Globalization.CultureInfo.InvariantCulture, out var volume))
                 {
                     if (volume >= 0.0 && volume <= 2.0)
@@ -360,9 +398,13 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
                     return Spectre.Console.ValidationResult.Error("[red]Volume must be between 0.0 and 2.0[/]");
                 }
                 return Spectre.Console.ValidationResult.Error("[red]Please enter a valid number[/]");
-            });
+            }));
 
-        var input = _console.Prompt(prompt);
+        if (input is null)
+        {
+            return Task.FromResult<double?>(null); // Escape pressed
+        }
+
         if (double.TryParse(input, System.Globalization.NumberStyles.Float,
             System.Globalization.CultureInfo.InvariantCulture, out var result))
         {
@@ -378,13 +420,16 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         CancellationToken cancellationToken)
     {
         var choices = new[] { "Enabled", "Disabled" };
-        var defaultChoice = (currentValue ?? true) ? "Enabled" : "Disabled";
 
-        var selectionPrompt = new SelectionPrompt<string>()
+        var selected = CancellablePrompt.Selection<string>(p => p
             .Title(prompt)
-            .AddChoices(choices);
+            .AddChoices(choices));
 
-        var selected = _console.Prompt(selectionPrompt);
+        if (selected is null)
+        {
+            return Task.FromResult<bool?>(null); // Escape pressed
+        }
+
         return Task.FromResult<bool?>(selected == "Enabled");
     }
 
@@ -395,20 +440,24 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         int max,
         CancellationToken cancellationToken)
     {
-        var textPrompt = new TextPrompt<string>(prompt)
+        var input = CancellablePrompt.Text(prompt, p => p
             .DefaultValue((currentValue ?? min).ToString(System.Globalization.CultureInfo.InvariantCulture))
-            .Validate(input =>
+            .Validate(val =>
             {
-                if (int.TryParse(input, out var value))
+                if (int.TryParse(val, out var value))
                 {
                     if (value >= min && value <= max)
                         return Spectre.Console.ValidationResult.Success();
                     return Spectre.Console.ValidationResult.Error($"[red]Value must be between {min} and {max}[/]");
                 }
                 return Spectre.Console.ValidationResult.Error("[red]Please enter a valid integer[/]");
-            });
+            }));
 
-        var input = _console.Prompt(textPrompt);
+        if (input is null)
+        {
+            return Task.FromResult<int?>(null); // Escape pressed
+        }
+
         if (int.TryParse(input, out var result))
         {
             return Task.FromResult<int?>(result);
@@ -442,7 +491,8 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             }
         }
 
-        var selected = _console.Prompt(prompt);
+        var selected = PromptSelectionWithEscape(prompt);
+        if (selected is null) return Task.FromResult<string?>(null);
         return Task.FromResult<string?>(choices[selected]);
     }
 
@@ -461,8 +511,8 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             prompt.DefaultValue(currentApiKey);
         }
 
-        var apiKey = _console.Prompt(prompt);
-        return Task.FromResult<string?>(apiKey);
+        var apiKey = PromptTextWithEscape(prompt);
+        return Task.FromResult(apiKey);
     }
 
 
@@ -483,8 +533,8 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             .DefaultValue(defaultDir)
             .AllowEmpty();
 
-        var directory = _console.Prompt(prompt);
-        return Task.FromResult<string?>(directory);
+        var directory = PromptTextWithEscape(prompt);
+        return Task.FromResult(directory);
     }
 
     public Task<Infrastructure.Storage.StorageProviderMetadata?> PromptForStorageProviderAsync(
@@ -525,7 +575,8 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             }
         }
 
-        var selected = _console.Prompt(prompt);
+        var selected = PromptSelectionWithEscape(prompt);
+        if (selected is null) return Task.FromResult<Infrastructure.Storage.StorageProviderMetadata?>(null);
         return Task.FromResult<Infrastructure.Storage.StorageProviderMetadata?>(choices[selected]);
     }
 
@@ -545,7 +596,8 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             .DefaultValue(defaultPath)
             .AllowEmpty();
 
-        var vaultPath = _console.Prompt(prompt);
+        var vaultPath = PromptTextWithEscape(prompt);
+        if (vaultPath is null) return Task.FromResult<string?>(null);
 
         // Basic validation - check if .obsidian directory exists
         if (!string.IsNullOrWhiteSpace(vaultPath))
@@ -580,7 +632,8 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             .DefaultValue(currentValue ?? "ten-second-tom")
             .AllowEmpty();
 
-        var subdirectory = _console.Prompt(textPrompt);
+        var subdirectory = PromptTextWithEscape(textPrompt);
+        if (subdirectory is null) return Task.FromResult<string?>(null);
 
         // Return null if empty (root level)
         return Task.FromResult(string.IsNullOrWhiteSpace(subdirectory) ? null : subdirectory);
@@ -602,15 +655,17 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         string? defaultValue,
         CancellationToken cancellationToken)
     {
-        var promptObj = new TextPrompt<string>(prompt)
-            .AllowEmpty();
-
-        if (!string.IsNullOrEmpty(defaultValue))
+        var result = CancellablePrompt.Text(prompt, p =>
         {
-            promptObj.DefaultValue(defaultValue);
-        }
+            p.AllowEmpty();
 
-        return Task.FromResult<string?>(AnsiConsole.Prompt(promptObj));
+            if (!string.IsNullOrEmpty(defaultValue))
+            {
+                p.DefaultValue(defaultValue);
+            }
+        });
+
+        return Task.FromResult(result);
     }
 
     public Task<T?> PromptForSelectionAsync<T>(
@@ -618,16 +673,16 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
         IReadOnlyList<T> options,
         Func<T, string> displaySelector,
         CancellationToken cancellationToken)
-        where T : notnull
+        where T : class
     {
-        var selectionPrompt = new SelectionPrompt<T>()
+        var result = CancellablePrompt.Selection<T>(p => p
             .Title(prompt)
             .PageSize(10)
             .MoreChoicesText("[grey](Move up and down to reveal more options)[/]")
             .UseConverter(displaySelector)
-            .AddChoices(options);
+            .AddChoices(options));
 
-        return Task.FromResult<T?>(AnsiConsole.Prompt(selectionPrompt));
+        return Task.FromResult(result);
     }
 
     public async Task<(string baseUrl, string modelName)?> PromptForLocalLlmConfigurationAsync(
@@ -672,7 +727,12 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
             .DefaultValue(defaultBaseUrl)
             .AllowEmpty();
 
-        var baseUrl = _console.Prompt(baseUrlPrompt);
+        var baseUrl = PromptTextWithEscape(baseUrlPrompt);
+
+        if (baseUrl is null)
+        {
+            return null; // Escape pressed
+        }
 
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
@@ -770,7 +830,8 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
 
             selectionPrompt.AddChoices(modelChoices);
 
-            var selectedModel = _console.Prompt(selectionPrompt);
+            var selectedModel = PromptSelectionWithEscape(selectionPrompt);
+            if (selectedModel is null) return null;
 
             string modelName;
             if (selectedModel == customOption)
@@ -780,7 +841,9 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
                     .DefaultValue(currentModel ?? "local-model")
                     .AllowEmpty();
 
-                modelName = _console.Prompt(customPrompt);
+                var customModelName = PromptTextWithEscape(customPrompt);
+                if (customModelName is null) return null;
+                modelName = customModelName;
                 if (string.IsNullOrWhiteSpace(modelName))
                 {
                     modelName = "local-model";
@@ -811,7 +874,8 @@ public sealed class SpectreConsoleSetupWizard : ISetupWizardUI
                     .DefaultValue(currentModel ?? "local-model")
                     .AllowEmpty();
 
-                var modelName = _console.Prompt(modelPrompt);
+                var modelName = PromptTextWithEscape(modelPrompt);
+                if (modelName is null) return null;
                 return (baseUrl, modelName ?? "local-model");
             }
 

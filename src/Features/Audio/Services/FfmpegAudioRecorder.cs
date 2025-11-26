@@ -303,57 +303,79 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
                     if (pipeResult.IsSuccess)
                     {
                         // Race between keyboard and notification button
-                        using var responseCts = new CancellationTokenSource();
-                        var pipeSignalTask = pipeListener.WaitForSignalAsync(30, responseCts.Token);
+                        // Link to main cancellation token so Ctrl+C works
+                        using var responseCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-                        // Poll for Y/N keypresses (can be cancelled)
+                        // IMPORTANT: Wrap in Task.Run because WaitForSignalAsync's FileStream open
+                        // blocks synchronously on named pipes until a writer connects
+                        var pipeSignalTask = Task.Run(
+                            async () => await pipeListener.WaitForSignalAsync(30, responseCts.Token),
+                            responseCts.Token);
+
+                        // Poll for Y/N/Escape keypresses (can be cancelled)
                         var keyboardTask = Task.Run(async () =>
                         {
-                            var endTime = DateTimeOffset.UtcNow.AddSeconds(30);
-                            while (DateTimeOffset.UtcNow < endTime && !responseCts.Token.IsCancellationRequested)
+                            try
                             {
-                                if (Console.KeyAvailable)
+                                var endTime = DateTimeOffset.UtcNow.AddSeconds(30);
+                                while (DateTimeOffset.UtcNow < endTime && !responseCts.Token.IsCancellationRequested)
                                 {
-                                    var key = Console.ReadKey(intercept: true);
-                                    if (key.Key == ConsoleKey.Y)
+                                    if (Console.KeyAvailable)
                                     {
-                                        Console.WriteLine("y");
-                                        return "y";
+                                        var key = Console.ReadKey(intercept: true);
+                                        if (key.Key == ConsoleKey.Y)
+                                        {
+                                            Console.WriteLine("y");
+                                            return "y";
+                                        }
+                                        else if (key.Key == ConsoleKey.N || key.Key == ConsoleKey.Escape)
+                                        {
+                                            Console.WriteLine(key.Key == ConsoleKey.Escape ? "(cancelled)" : "n");
+                                            return "n";
+                                        }
                                     }
-                                    else if (key.Key == ConsoleKey.N)
-                                    {
-                                        Console.WriteLine("n");
-                                        return "n";
-                                    }
+                                    await Task.Delay(50, responseCts.Token).ConfigureAwait(false);
                                 }
-                                await Task.Delay(50, responseCts.Token).ConfigureAwait(false);
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                // Cancelled by Ctrl+C or timeout - treat as "stop recording"
                             }
                             return null;
-                        }, responseCts.Token);
+                        }, CancellationToken.None); // Don't cancel task creation, handle internally
 
-                        var completedTask = await Task.WhenAny(keyboardTask, pipeSignalTask);
-                        responseCts.Cancel();
-
-                        if (completedTask == keyboardTask)
+                        try
                         {
-                            var response = await keyboardTask;
-                            continueRecording = response == "y";
-                            _logger.LogInformation("Keyboard response: {Response}", response);
-                        }
-                        else
-                        {
-                            var signal = await pipeSignalTask;
-                            continueRecording = signal == "record.continue";
-                            _logger.LogInformation("Notification action: {Signal}", signal ?? "none");
+                            var completedTask = await Task.WhenAny(keyboardTask, pipeSignalTask);
+                            await responseCts.CancelAsync();
 
-                            if (continueRecording)
+                            if (completedTask == keyboardTask)
                             {
-                                Console.WriteLine("✓ Notification action: Continue recording");
+                                var response = await keyboardTask;
+                                continueRecording = response == "y";
+                                _logger.LogInformation("Keyboard response: {Response}", response);
                             }
                             else
                             {
-                                Console.WriteLine("✓ Notification action: Stop recording");
+                                var signal = await pipeSignalTask;
+                                continueRecording = signal == "record.continue";
+                                _logger.LogInformation("Notification action: {Signal}", signal ?? "none");
+
+                                if (continueRecording)
+                                {
+                                    Console.WriteLine("✓ Notification action: Continue recording");
+                                }
+                                else
+                                {
+                                    Console.WriteLine("✓ Notification action: Stop recording");
+                                }
                             }
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            // Cancelled - stop recording
+                            _logger.LogInformation("Recording prompt cancelled");
+                            continueRecording = false;
                         }
                     }
                     else
@@ -371,9 +393,9 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
                                     continueRecording = true;
                                     break;
                                 }
-                                else if (key.Key == ConsoleKey.N)
+                                else if (key.Key == ConsoleKey.N || key.Key == ConsoleKey.Escape)
                                 {
-                                    Console.WriteLine("n");
+                                    Console.WriteLine(key.Key == ConsoleKey.Escape ? "(cancelled)" : "n");
                                     continueRecording = false;
                                     break;
                                 }

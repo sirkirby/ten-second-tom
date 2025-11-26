@@ -238,7 +238,7 @@ public interface ISetupWizardUI
         IReadOnlyList<T> options,
         Func<T, string> displaySelector,
         CancellationToken cancellationToken)
-        where T : notnull;
+        where T : class;
     /// <summary>
     /// Prompts user for local LLM configuration with inline connectivity verification.
     /// Similar to PromptForObsidianVaultPathAsync, this validates the configuration before returning.

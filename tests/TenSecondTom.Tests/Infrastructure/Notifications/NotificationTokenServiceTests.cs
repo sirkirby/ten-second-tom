@@ -104,8 +104,13 @@ public sealed class NotificationTokenServiceTests
         var actionId = "test-action";
         var token = _tokenService.GenerateToken(notificationId, actionId);
 
-        // Tamper with the token by modifying a character in the payload
-        var tamperedToken = token.Replace("A", "B");
+        // Tamper with the token by flipping a character in the signature portion
+        // Token format is "payload.signature" - modify the last character of signature
+        var chars = token.ToCharArray();
+        var lastChar = chars[^1];
+        // Flip the character: if it's alphanumeric, change it to something else
+        chars[^1] = lastChar == 'X' ? 'Y' : 'X';
+        var tamperedToken = new string(chars);
 
         // Act
         var result = _tokenService.ValidateToken(tamperedToken, notificationId, actionId);

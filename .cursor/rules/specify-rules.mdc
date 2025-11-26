@@ -6,6 +6,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-13
 - C# (modern features) on .NET 9 + System.CommandLine (existing), Spectre.Console (existing), Serilog (existing), Terminal.Gui (new, pinned), FluentValidation (existing) (006-improved-text-editing)
 - C# 12 with .NET 9 (008-add-voice-entry)
 - File system (markdown with YAML frontmatter, WAV audio files, TXT transcripts) (008-add-voice-entry)
+- C# 14 with .NET 10 + Spectre.Console 0.51.1, System.CommandLine 2.0-rc, MediatR 13.1.0 (no new external dependencies - custom implementation using Console.ReadKey) (001-cli-repl-updates)
+- In-memory only (no persistence) - uses existing `ISessionManager` with circular buffer (001-cli-repl-updates)
 
 ## Project Structure
 ```
@@ -20,6 +22,7 @@ tests/
 C# (modern features) on .NET 9: Follow standard conventions
 
 ## Recent Changes
+- 001-cli-repl-updates: Added C# 14 with .NET 10 + Spectre.Console 0.51.1, System.CommandLine 2.0-rc, MediatR 13.1.0 (no new external dependencies - custom implementation using Console.ReadKey)
 - 008-add-voice-entry: Added C# 12 with .NET 9
 - 006-improved-text-editing: Added C# (modern features) on .NET 9 + System.CommandLine (existing), Spectre.Console (existing), Serilog (existing), Terminal.Gui (new, pinned), FluentValidation (existing)
 

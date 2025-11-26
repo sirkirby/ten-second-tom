@@ -917,6 +917,12 @@ All commands in shell mode use a slash prefix:
 - Session remains active throughout shell lifetime
 - Commands execute immediately
 
+⎋ **Escape Key Support**: Press Escape to cancel wizards and prompts
+
+- Cancels multi-step configuration wizards (e.g., `/audio config`, `/config all`)
+- Returns to the REPL prompt without exiting the shell
+- Works in selection prompts, text inputs, and confirmation dialogs
+
 🛑 **Graceful Interruption**: Press Ctrl+C to cancel running commands
 
 - First Ctrl+C: Cancels current command, returns to prompt
