@@ -124,9 +124,18 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
         {
             // On Windows, detect the actual microphone name since device names vary
             var micResult = await GetWindowsDefaultMicrophoneAsync(cancellationToken);
-            var micName = micResult.IsSuccess ? micResult.Value : "Microphone";
-            inputDevice = $"audio=\"{micName}\"";
-            _logger.LogDebug("Windows audio device: {DeviceName}", micName);
+            if (!micResult.IsSuccess)
+            {
+                _logger.LogError("Failed to detect Windows audio device: {Error}", micResult.Error);
+                return Result<AudioRecording>.Failure(
+                    $"No audio input device found.\n\n" +
+                    $"Please ensure:\n" +
+                    $"  1. A microphone is connected and enabled\n" +
+                    $"  2. Microphone permissions are granted to apps\n\n" +
+                    $"To see available devices, run:\n" +
+                    $"  ffmpeg -list_devices true -f dshow -i dummy");
+            }
+            inputDevice = $"audio=\"{micResult.Value}\"";
         }
         else
         {
@@ -630,55 +639,76 @@ public sealed class FfmpegAudioRecorder : IAudioRecorder
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var startInfo = new ProcessStartInfo
+        try
         {
-            FileName = _config.Recorder.FfmpegPath,
-            Arguments = "-list_devices true -f dshow -i dummy",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var process = Process.Start(startInfo);
-        if (process == null)
-        {
-            return Result<string>.Failure("Failed to start FFmpeg for device listing");
-        }
-
-        // FFmpeg outputs device list to stderr
-        var stderr = await process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-
-        // Parse stderr for audio devices
-        // Example output:
-        // [dshow @ 0x...] DirectShow audio devices
-        // [dshow @ 0x...] "Microphone (Realtek High Definition Audio)"
-
-        var lines = stderr.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        var audioDevicesStarted = false;
-
-        foreach (var line in lines)
-        {
-            if (line.Contains("DirectShow audio devices"))
+            var startInfo = new ProcessStartInfo
             {
-                audioDevicesStarted = true;
-                continue;
+                FileName = _config.Recorder.FfmpegPath,
+                Arguments = "-list_devices true -f dshow -i dummy",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(startInfo);
+            if (process == null)
+            {
+                return Result<string>.Failure("Failed to start FFmpeg for device listing");
             }
 
-            if (audioDevicesStarted && line.Contains('"'))
+            // FFmpeg outputs device list to stderr
+            var stderr = await process.StandardError.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitAsync(cancellationToken);
+
+            _logger.LogDebug("FFmpeg device listing output:\n{Output}", stderr);
+
+            // Parse stderr for audio devices
+            // FFmpeg 8.x format:
+            // [dshow @ 0x...] "Microphone (High Definition Audio Device)" (audio)
+            // [dshow @ 0x...]   Alternative name "@device_cm_{...}"
+            // [dshow @ 0x...] "Camera Name" (video)
+
+            var lines = stderr.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            var foundDevices = new List<string>();
+
+            foreach (var line in lines)
             {
-                // Extract device name between quotes
-                var match = System.Text.RegularExpressions.Regex.Match(line, "\"([^\"]+)\"");
-                if (match.Success)
+                // Skip alternative name lines
+                if (line.Contains("Alternative name"))
                 {
-                    return Result<string>.Success(match.Groups[1].Value);
+                    continue;
+                }
+
+                // Look for audio devices: lines containing "(audio)" and a quoted device name
+                if (line.Contains("(audio)") && line.Contains('"'))
+                {
+                    // Extract device name between quotes
+                    var match = System.Text.RegularExpressions.Regex.Match(line, "\"([^\"]+)\"");
+                    if (match.Success)
+                    {
+                        var deviceName = match.Groups[1].Value;
+                        foundDevices.Add(deviceName);
+                        _logger.LogDebug("Found audio device: {DeviceName}", deviceName);
+                    }
                 }
             }
-        }
 
-        // If we couldn't parse a specific device, return a generic name
-        return Result<string>.Success("Default Microphone");
+            if (foundDevices.Count > 0)
+            {
+                // Return the first audio device found
+                _logger.LogInformation("Using Windows audio device: {DeviceName}", foundDevices[0]);
+                return Result<string>.Success(foundDevices[0]);
+            }
+
+            _logger.LogWarning("No audio devices found in FFmpeg output. Run 'ffmpeg -list_devices true -f dshow -i dummy' to see available devices.");
+            return Result<string>.Failure("No audio input devices found. Please check your microphone is connected and enabled.");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Failed to detect Windows audio devices");
+            return Result<string>.Failure($"Failed to detect audio devices: {ex.Message}");
+        }
     }
 
     /// <summary>
