@@ -3,6 +3,8 @@ import { Box, Text, useApp, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { Command } from 'commander';
 import { render } from 'ink';
+import { join } from 'node:path';
+import { unlinkSync } from 'node:fs';
 import { ConfigManager } from '@ten-second-tom/core';
 import type { EntryAnalysis } from '@ten-second-tom/core';
 import { SentimentDisplay } from '../components/SentimentDisplay.js';
@@ -89,6 +91,7 @@ function NoteCommand() {
   const [error, setError] = useState<string | null>(null);
   const [dictationWarning, setDictationWarning] = useState<string | null>(null);
   const servicesRef = useRef<RecordingPipelineServices | null>(null);
+  const audioBaseDirRef = useRef<string>('');
 
   // -------------------------------------------------------------------------
   // On mount: check setup guard
@@ -127,6 +130,7 @@ function NoteCommand() {
       }
 
       const config = configManager.load()!;
+      audioBaseDirRef.current = configManager.audioPath;
       let svcs = servicesRef.current;
       if (svcs === null) {
         svcs = buildServicesFromConfig(config, configManager);
@@ -187,8 +191,16 @@ function NoteCommand() {
 
     try {
       if (svcs.audio.isRecording()) {
-        // Discard the audio file path — we only want the transcribed text
-        await svcs.audio.stopRecording();
+        // Stop recording — get the file path so we can delete the orphaned file
+        const audioRelPath = await svcs.audio.stopRecording();
+        // Delete the orphaned WAV file since we only want the transcribed text
+        if (audioRelPath && audioBaseDirRef.current) {
+          try {
+            unlinkSync(join(audioBaseDirRef.current, audioRelPath));
+          } catch {
+            // Best effort — file may not exist
+          }
+        }
       }
     } catch {
       // Best effort — continue regardless
@@ -214,12 +226,20 @@ function NoteCommand() {
   async function handleSubmit(text: string) {
     if (!text.trim()) return; // ignore empty
 
-    // If still in dictation mode, stop the audio first (discard the file)
+    // If still in dictation mode, stop the audio and delete the orphaned file
     if (inputMode === 'dictated') {
       const svcs = servicesRef.current;
       if (svcs !== null && svcs.audio.isRecording()) {
         try {
-          await svcs.audio.stopRecording();
+          const audioRelPath = await svcs.audio.stopRecording();
+          // Delete orphaned WAV — we only want the transcribed text
+          if (audioRelPath && audioBaseDirRef.current) {
+            try {
+              unlinkSync(join(audioBaseDirRef.current, audioRelPath));
+            } catch {
+              // Best effort
+            }
+          }
         } catch {
           // Best effort
         }
@@ -229,9 +249,14 @@ function NoteCommand() {
     setPhase('analyzing');
 
     try {
-      const configManager = new ConfigManager();
-      const config = configManager.load()!;
-      const services = buildServicesFromConfig(config, configManager);
+      // Reuse services from dictation if available, otherwise build new ones
+      let services = servicesRef.current;
+      if (services === null) {
+        const configManager = new ConfigManager();
+        const config = configManager.load()!;
+        services = buildServicesFromConfig(config, configManager);
+        servicesRef.current = services;
+      }
 
       const result = await runAnalysisPipeline(text.trim(), undefined, services, {
         entryType: 'note',
@@ -239,6 +264,7 @@ function NoteCommand() {
       });
 
       services.storage.close();
+      servicesRef.current = null;
 
       setAnalysis(result.analysis);
       setWarnings(result.warnings);
