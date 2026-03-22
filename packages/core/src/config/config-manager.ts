@@ -9,6 +9,9 @@ export class ConfigManager {
 
   private readonly configFilePath: string;
 
+  /** Instance-level cache. `null` means "not loaded yet". */
+  private cachedConfig: AppConfig | undefined | null = null;
+
   constructor(homePath?: string) {
     this.homePath =
       homePath ??
@@ -28,15 +31,21 @@ export class ConfigManager {
     AppConfigSchema.parse(config);
     this.ensureDirectories();
     writeFileSync(this.configFilePath, JSON.stringify(config, null, 2), 'utf-8');
+    this.cachedConfig = config;
   }
 
   load(): AppConfig | undefined {
+    if (this.cachedConfig !== null) return this.cachedConfig;
+
     if (!existsSync(this.configFilePath)) {
+      this.cachedConfig = undefined;
       return undefined;
     }
     const raw = readFileSync(this.configFilePath, 'utf-8');
     const parsed: unknown = JSON.parse(raw);
-    return AppConfigSchema.parse(parsed);
+    const result = AppConfigSchema.parse(parsed);
+    this.cachedConfig = result;
+    return result;
   }
 
   isSetupComplete(): boolean {
