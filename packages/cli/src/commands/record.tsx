@@ -34,10 +34,16 @@ export interface RecordingPipelineServices {
 export interface PipelineResult {
   entryId: string;
   transcript: string;
-  audioPath: string;
+  audioPath: string | undefined;
   analysis: EntryAnalysis | null;
   embeddingStored: boolean;
   warnings: string[];
+}
+
+export interface PipelineOptions {
+  entryType?: 'recording' | 'note';
+  inputMethod?: 'recorded' | 'typed' | 'dictated';
+  audioPath?: string;
 }
 
 /**
@@ -79,23 +85,36 @@ export function buildServicesFromConfig(
 }
 
 /**
- * Run the post-recording analysis pipeline.
+ * Run the post-recording/note analysis pipeline.
  * Returns the analysis result (or null) and any warnings.
  * Exported for testing.
+ *
+ * @param transcript - The text content to analyse.
+ * @param audioPathOrOptions - For recordings: the audio file path (string).
+ *   For notes: pass undefined or a PipelineOptions object.
+ * @param services - The pipeline services.
+ * @param options - Optional pipeline options (used when audioPathOrOptions is undefined).
  */
 export async function runAnalysisPipeline(
   transcript: string,
-  audioPath: string,
+  audioPathOrOptions: string | undefined,
   services: RecordingPipelineServices,
+  options?: PipelineOptions,
 ): Promise<PipelineResult> {
   const warnings: string[] = [];
 
+  // Resolve audioPath and entry metadata from overloaded argument.
+  const audioPath =
+    typeof audioPathOrOptions === 'string' ? audioPathOrOptions : options?.audioPath;
+  const entryType = options?.entryType ?? 'recording';
+  const inputMethod = options?.inputMethod ?? 'recorded';
+
   // Save the entry first — capture always succeeds if the mic worked.
   const entry = await services.storage.saveEntry({
-    type: 'recording',
+    type: entryType,
     content: transcript,
     audioPath,
-    inputMethod: 'recorded',
+    inputMethod,
   });
 
   // Run analysis + embedding in parallel, degrading gracefully on failure.
