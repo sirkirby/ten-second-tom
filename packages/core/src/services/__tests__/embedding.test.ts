@@ -43,6 +43,24 @@ describe('OllamaEmbeddingService', () => {
     await expect(service.embed('Hello')).rejects.toThrow('Network error');
   });
 
+  it('throws when the API returns a non-ok response', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const service = new OllamaEmbeddingService({
+      model: 'nomic-embed-text',
+      endpoint: 'http://localhost:11434',
+    });
+
+    await expect(service.embed('Hello')).rejects.toThrow(
+      'Embedding request failed: 500 Internal Server Error',
+    );
+  });
+
   it('reports availability via health check', async () => {
     const mockFetch = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal('fetch', mockFetch);
@@ -55,7 +73,9 @@ describe('OllamaEmbeddingService', () => {
     const available = await service.isAvailable();
 
     expect(available).toBe(true);
-    expect(mockFetch).toHaveBeenCalledWith('http://localhost:11434');
+    expect(mockFetch).toHaveBeenCalledWith('http://localhost:11434', {
+      signal: expect.any(AbortSignal),
+    });
   });
 
   it('reports unavailable when health check fails', async () => {
@@ -84,6 +104,26 @@ describe('OllamaEmbeddingService', () => {
     const available = await service.isAvailable();
 
     expect(available).toBe(false);
+  });
+
+  it('caches availability result for subsequent calls', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const service = new OllamaEmbeddingService({
+      model: 'nomic-embed-text',
+      endpoint: 'http://localhost:11434',
+    });
+
+    // First call hits the network
+    const first = await service.isAvailable();
+    expect(first).toBe(true);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    // Second call returns cached result — no new fetch
+    const second = await service.isAvailable();
+    expect(second).toBe(true);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -12,6 +12,10 @@ export class OllamaEmbeddingService implements IEmbeddingService {
   private readonly model: string;
   private readonly endpoint: string;
 
+  /** Cached availability result: [value, expiresAt] */
+  private availabilityCache: [boolean, number] | null = null;
+  private static readonly AVAILABILITY_CACHE_MS = 30_000;
+
   constructor({ model, endpoint }: OllamaEmbeddingConfig) {
     this.model = model;
     this.endpoint = endpoint;
@@ -23,15 +27,39 @@ export class OllamaEmbeddingService implements IEmbeddingService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: this.model, prompt: text }),
     });
+    if (!response.ok) {
+      throw new Error(
+        `Embedding request failed: ${response.status} ${response.statusText}`,
+      );
+    }
     const data = (await response.json()) as { embedding: number[] };
     return new Float32Array(data.embedding);
   }
 
   async isAvailable(): Promise<boolean> {
+    // Return cached result if still valid
+    if (
+      this.availabilityCache !== null &&
+      Date.now() < this.availabilityCache[1]
+    ) {
+      return this.availabilityCache[0];
+    }
+
     try {
-      const response = await fetch(this.endpoint);
-      return response.ok;
+      const response = await fetch(this.endpoint, {
+        signal: AbortSignal.timeout(3000),
+      });
+      const available = response.ok;
+      this.availabilityCache = [
+        available,
+        Date.now() + OllamaEmbeddingService.AVAILABILITY_CACHE_MS,
+      ];
+      return available;
     } catch {
+      this.availabilityCache = [
+        false,
+        Date.now() + OllamaEmbeddingService.AVAILABILITY_CACHE_MS,
+      ];
       return false;
     }
   }
