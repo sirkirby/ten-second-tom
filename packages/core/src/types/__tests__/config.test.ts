@@ -45,4 +45,37 @@ describe('AppConfigSchema', () => {
     const result = AppConfigSchema.safeParse(config);
     expect(result.success).toBe(false);
   });
+
+  it('rejects cloud LLM provider without apiKey', () => {
+    const config = {
+      llm: { provider: 'cloud' },
+      stt: { engine: 'whisper', modelPath: '/tmp/model' },
+      embedding: { provider: 'none', model: '' },
+      storage: { dbPath: '/tmp/tom.db' },
+    };
+    const result = AppConfigSchema.safeParse(config);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects local LLM provider without endpoint', () => {
+    const config = {
+      llm: { provider: 'local', modelId: 'qwen2.5:7b' },
+      stt: { engine: 'whisper', modelPath: '/tmp/model' },
+      embedding: { provider: 'none', model: '' },
+      storage: { dbPath: '/tmp/tom.db' },
+    };
+    const result = AppConfigSchema.safeParse(config);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects ollama embedding provider without endpoint', () => {
+    const config = {
+      llm: { provider: 'cloud' as const, apiKey: 'sk-ant-test-key' },
+      stt: { engine: 'whisper', modelPath: '/tmp/model' },
+      embedding: { provider: 'ollama', model: 'nomic-embed-text' },
+      storage: { dbPath: '/tmp/tom.db' },
+    };
+    const result = AppConfigSchema.safeParse(config);
+    expect(result.success).toBe(false);
+  });
 });

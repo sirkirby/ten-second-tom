@@ -1,22 +1,37 @@
 import { z } from 'zod';
 
-export const LlmConfigSchema = z.object({
-  provider: z.enum(['cloud', 'local']),
-  apiKey: z.string().optional(),
-  localEndpoint: z.string().url().optional(),
-  modelId: z.string().optional(),
-});
+export const LlmConfigSchema = z.discriminatedUnion('provider', [
+  z.object({
+    provider: z.literal('cloud'),
+    apiKey: z.string().min(1),
+  }),
+  z.object({
+    provider: z.literal('local'),
+    localEndpoint: z.string().url(),
+    modelId: z.string().min(1),
+  }),
+]);
 
 export const SttConfigSchema = z.object({
   engine: z.string().min(1),
   modelPath: z.string().min(1),
 });
 
-export const EmbeddingConfigSchema = z.object({
-  provider: z.enum(['ollama', 'cloud', 'none']),
-  model: z.string(),
-  endpoint: z.string().url().optional(),
-});
+export const EmbeddingConfigSchema = z.discriminatedUnion('provider', [
+  z.object({
+    provider: z.literal('ollama'),
+    model: z.string().min(1),
+    endpoint: z.string().url(),
+  }),
+  z.object({
+    provider: z.literal('cloud'),
+    model: z.string().min(1),
+  }),
+  z.object({
+    provider: z.literal('none'),
+    model: z.literal(''),
+  }),
+]);
 
 export const StorageConfigSchema = z.object({
   dbPath: z.string().min(1),
