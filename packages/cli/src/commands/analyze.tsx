@@ -53,12 +53,19 @@ export async function runAnalyzePipeline(entryId: string): Promise<AnalyzePipeli
       return { ...empty, error: `Entry not found: ${entryId}` };
     }
 
-    // Analysis is required — this is an explicit user action, not silent degradation.
-    let analysis: EntryAnalysis;
-    try {
-      analysis = await services.agent.analyze(entry.content);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+    // Run analysis + embedding in parallel.
+    // Analysis is required (explicit user action), embedding is best-effort.
+    const [analysisResult, embeddingResult] = await Promise.allSettled([
+      services.agent.analyze(entry.content),
+      services.embedding.embed(entry.content),
+    ]);
+
+    // Analysis failure is an error — this is an explicit re-analysis, not silent degradation.
+    if (analysisResult.status === 'rejected') {
+      const msg =
+        analysisResult.reason instanceof Error
+          ? analysisResult.reason.message
+          : String(analysisResult.reason);
       return {
         ...empty,
         entryId: entry.id,
@@ -66,16 +73,18 @@ export async function runAnalyzePipeline(entryId: string): Promise<AnalyzePipeli
       };
     }
 
+    const analysis = analysisResult.value;
     await services.storage.updateEntryAnalysis(entry.id, analysis);
 
     // Embedding is best-effort — failure does not block the analysis result.
     let embeddingStored = false;
-    try {
-      const embedding = await services.embedding.embed(entry.content);
-      await services.storage.updateEntryEmbedding(entry.id, embedding);
-      embeddingStored = true;
-    } catch {
-      // Non-fatal — entry analysis already saved above.
+    if (embeddingResult.status === 'fulfilled') {
+      try {
+        await services.storage.updateEntryEmbedding(entry.id, embeddingResult.value);
+        embeddingStored = true;
+      } catch {
+        // Non-fatal — entry analysis already saved above.
+      }
     }
 
     return {
