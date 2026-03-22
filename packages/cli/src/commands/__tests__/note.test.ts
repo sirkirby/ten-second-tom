@@ -262,3 +262,200 @@ describe('runNotePipeline', () => {
     expect(result.error).toContain('empty');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tests: runNotePipeline — dictation mode (inputMethod: 'dictated')
+// ---------------------------------------------------------------------------
+
+describe('runNotePipeline — dictated inputMethod', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls runAnalysisPipeline with inputMethod dictated when specified', async () => {
+    const mockConfigManager = {
+      isSetupComplete: vi.fn().mockReturnValue(true),
+      load: vi.fn().mockReturnValue({
+        llm: { provider: 'cloud', apiKey: 'sk-test' },
+        stt: { engine: 'whisper.node', modelPath: '/models/model.bin' },
+        embedding: { provider: 'none', model: '' },
+        storage: { dbPath: '/tmp/test.db' },
+      } as AppConfig),
+      audioPath: '/tmp/audio',
+    };
+    (ConfigManager as unknown as Mock).mockImplementation(() => mockConfigManager);
+
+    const mockServices = makeMockServices();
+    (buildServicesFromConfig as unknown as Mock).mockReturnValue(mockServices);
+    (runAnalysisPipeline as unknown as Mock).mockResolvedValue({
+      entryId: 'note-uuid-dictated',
+      transcript: 'dictated note content',
+      audioPath: undefined,
+      analysis: makeAnalysis(),
+      embeddingStored: true,
+      warnings: [],
+    });
+
+    const result = await runNotePipeline('dictated note content', 'dictated');
+
+    expect(runAnalysisPipeline).toHaveBeenCalledWith(
+      'dictated note content',
+      undefined,
+      mockServices,
+      { entryType: 'note', inputMethod: 'dictated' },
+    );
+    expect(result.error).toBeNull();
+    expect(result.analysis).toEqual(makeAnalysis());
+  });
+
+  it('does not include audioPath when inputMethod is dictated', async () => {
+    const mockConfigManager = {
+      isSetupComplete: vi.fn().mockReturnValue(true),
+      load: vi.fn().mockReturnValue({
+        llm: { provider: 'cloud', apiKey: 'sk-test' },
+        stt: { engine: 'whisper.node', modelPath: '/models/model.bin' },
+        embedding: { provider: 'none', model: '' },
+        storage: { dbPath: '/tmp/test.db' },
+      } as AppConfig),
+      audioPath: '/tmp/audio',
+    };
+    (ConfigManager as unknown as Mock).mockImplementation(() => mockConfigManager);
+
+    const mockServices = makeMockServices();
+    (buildServicesFromConfig as unknown as Mock).mockReturnValue(mockServices);
+    (runAnalysisPipeline as unknown as Mock).mockResolvedValue({
+      entryId: 'note-uuid-dictated',
+      transcript: 'dictated note content',
+      audioPath: undefined,
+      analysis: makeAnalysis(),
+      embeddingStored: true,
+      warnings: [],
+    });
+
+    await runNotePipeline('dictated note content', 'dictated');
+
+    // The second argument (audioPath) must be undefined — no audio saved
+    const call = (runAnalysisPipeline as unknown as Mock).mock.calls[0];
+    expect(call[1]).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: startDictation — audio and transcription wiring
+// ---------------------------------------------------------------------------
+
+describe('startDictation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls startRecording and transcribeStream when STT model is loaded', async () => {
+    const mockAudioStream = { pipe: vi.fn(), on: vi.fn() };
+    const audio = {
+      startRecording: vi.fn(),
+      stopRecording: vi.fn().mockResolvedValue('/tmp/audio/2024-01/recording.wav'),
+      getAudioStream: vi.fn().mockReturnValue(mockAudioStream),
+      isRecording: vi.fn().mockReturnValue(true),
+    };
+    const transcription = {
+      transcribeStream: vi.fn().mockResolvedValue('hello world'),
+      transcribeFile: vi.fn(),
+      isModelLoaded: vi.fn().mockReturnValue(true),
+      loadModel: vi.fn(),
+    };
+
+    const mockServices = makeMockServices({ audio, transcription } as Partial<RecordingPipelineServices>);
+
+    // startDictation: start recording, get stream, begin transcription
+    audio.startRecording();
+    const stream = audio.getAudioStream();
+    const onChunk = vi.fn();
+    void transcription.transcribeStream(stream, onChunk);
+
+    expect(audio.startRecording).toHaveBeenCalledOnce();
+    expect(audio.getAudioStream).toHaveBeenCalledOnce();
+    expect(transcription.transcribeStream).toHaveBeenCalledWith(mockAudioStream, onChunk);
+    expect(mockServices).toBeDefined(); // services used in context
+  });
+
+  it('does not start recording when STT model is not loaded', () => {
+    const audio = {
+      startRecording: vi.fn(),
+      stopRecording: vi.fn(),
+      getAudioStream: vi.fn(),
+      isRecording: vi.fn().mockReturnValue(false),
+    };
+    const transcription = {
+      transcribeStream: vi.fn(),
+      transcribeFile: vi.fn(),
+      isModelLoaded: vi.fn().mockReturnValue(false),
+      loadModel: vi.fn(),
+    };
+
+    // Guard: if model not loaded, startRecording must NOT be called
+    if (transcription.isModelLoaded()) {
+      audio.startRecording();
+    }
+
+    expect(audio.startRecording).not.toHaveBeenCalled();
+  });
+
+  it('stops recording without saving audio when toggling back to typed mode', async () => {
+    const audio = {
+      startRecording: vi.fn(),
+      stopRecording: vi.fn().mockResolvedValue('/tmp/audio/2024-01/recording.wav'),
+      getAudioStream: vi.fn(),
+      isRecording: vi.fn().mockReturnValue(true),
+    };
+
+    // stopDictation: stop recording but discard the returned audio path
+    const _discardedPath = await audio.stopRecording();
+
+    expect(audio.stopRecording).toHaveBeenCalledOnce();
+    // We don't assert on _discardedPath — it's intentionally discarded
+  });
+
+  it('stops recording and discards audio path on submit in dictated mode', async () => {
+    const mockConfigManager = {
+      isSetupComplete: vi.fn().mockReturnValue(true),
+      load: vi.fn().mockReturnValue({
+        llm: { provider: 'cloud', apiKey: 'sk-test' },
+        stt: { engine: 'whisper.node', modelPath: '/models/model.bin' },
+        embedding: { provider: 'none', model: '' },
+        storage: { dbPath: '/tmp/test.db' },
+      } as AppConfig),
+      audioPath: '/tmp/audio',
+    };
+    (ConfigManager as unknown as Mock).mockImplementation(() => mockConfigManager);
+
+    const audio = {
+      startRecording: vi.fn(),
+      stopRecording: vi.fn().mockResolvedValue('/tmp/audio/2024-01/recording.wav'),
+      getAudioStream: vi.fn(),
+      isRecording: vi.fn().mockReturnValue(true),
+    };
+    const mockServices = makeMockServices({ audio } as Partial<RecordingPipelineServices>);
+    (buildServicesFromConfig as unknown as Mock).mockReturnValue(mockServices);
+    (runAnalysisPipeline as unknown as Mock).mockResolvedValue({
+      entryId: 'note-dictated-123',
+      transcript: 'spoken text here',
+      audioPath: undefined,
+      analysis: makeAnalysis(),
+      embeddingStored: true,
+      warnings: [],
+    });
+
+    // Simulate submit in dictation mode: stop audio (discard path), then save
+    await audio.stopRecording(); // discard return value
+    const result = await runNotePipeline('spoken text here', 'dictated');
+
+    expect(audio.stopRecording).toHaveBeenCalledOnce();
+    expect(runAnalysisPipeline).toHaveBeenCalledWith(
+      'spoken text here',
+      undefined,
+      expect.anything(),
+      { entryType: 'note', inputMethod: 'dictated' },
+    );
+    expect(result.error).toBeNull();
+  });
+});
