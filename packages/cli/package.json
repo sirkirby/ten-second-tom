@@ -1,0 +1,27 @@
+{
+  "name": "@ten-second-tom/cli",
+  "version": "2.0.0",
+  "type": "module",
+  "bin": {
+    "tom": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsup src/cli.ts --format esm",
+    "dev": "tsup src/cli.ts --format esm --watch",
+    "start": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@ten-second-tom/core": "workspace:*",
+    "ink": "^5.1.0",
+    "ink-select-input": "^6.0.0",
+    "ink-text-input": "^6.0.0",
+    "ink-spinner": "^5.0.0",
+    "react": "^18.3.0",
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.4.0",
+    "@types/react": "^18.3.0",
+    "ink-testing-library": "^4.0.0"
+  }
+}
