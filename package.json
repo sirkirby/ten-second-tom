@@ -1,0 +1,26 @@
+{
+  "name": "ten-second-tom",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint packages/",
+    "format": "prettier --write \"packages/**/*.{ts,tsx,json}\"",
+    "format:check": "prettier --check \"packages/**/*.{ts,tsx,json}\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9",
+    "prettier": "^3.8.1",
+    "typescript": "^5.7",
+    "typescript-eslint": "^8.57.1",
+    "vitest": "^3.0"
+  }
+}
