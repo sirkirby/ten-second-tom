@@ -1,4 +1,3 @@
 // Core package barrel export
-// Types and services are exported as they are built
 
-export {};
+export * from './types/index.js';
