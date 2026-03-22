@@ -4,6 +4,7 @@ import { setupCommand } from './commands/setup.js';
 import { recordCommand } from './commands/record.js';
 import { noteCommand } from './commands/note.js';
 import { searchCommand } from './commands/search.js';
+import { analyzeCommand } from './commands/analyze.js';
 
 const program = new Command();
 
@@ -16,5 +17,6 @@ program.addCommand(setupCommand);
 program.addCommand(recordCommand);
 program.addCommand(noteCommand);
 program.addCommand(searchCommand);
+program.addCommand(analyzeCommand);
 
 program.parse();

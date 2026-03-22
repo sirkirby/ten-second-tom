@@ -150,8 +150,14 @@ function NoteCommand() {
       try {
         svcs.audio.startRecording();
       } catch (err) {
+        const hint =
+          process.platform === 'darwin'
+            ? 'Grant permission in System Settings > Privacy & Security > Microphone'
+            : process.platform === 'win32'
+              ? 'Check Settings > Privacy > Microphone'
+              : 'Check your audio device settings.';
         const msg = err instanceof Error ? err.message : String(err);
-        setDictationWarning(`Microphone unavailable: ${msg}`);
+        setDictationWarning(`Microphone access denied. ${hint} (${msg})`);
         return;
       }
 

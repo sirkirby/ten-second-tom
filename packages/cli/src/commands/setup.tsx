@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Box, Text, useApp } from 'ink';
+import React, { useState, useEffect } from 'react';
+import { Box, Text, useApp, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
 import { Command } from 'commander';
@@ -58,6 +58,21 @@ function SetupWizard() {
 
   const configManager = new ConfigManager();
 
+  // Auto-exit after error with a short delay; allow q/Enter to exit immediately
+  useEffect(() => {
+    if (step === 'error') {
+      const timer = setTimeout(() => exit(), 5000);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [step, exit]);
+
+  useInput((input, key) => {
+    if ((input === 'q' || key.return) && step === 'error') {
+      exit();
+    }
+  });
+
   function handleLlmProviderSelect(item: { value: 'cloud' | 'local' }) {
     setState((s) => ({ ...s, llmProvider: item.value }));
     if (item.value === 'cloud') {
@@ -68,8 +83,17 @@ function SetupWizard() {
   }
 
   function handleApiKeySubmit(value: string) {
-    if (value.trim().length === 0) return;
-    setState((s) => ({ ...s, apiKey: value.trim() }));
+    const trimmed = value.trim();
+    if (trimmed.length === 0) return;
+    if (!trimmed.startsWith('sk-ant-')) {
+      setState((s) => ({
+        ...s,
+        errorMessage: 'Invalid API key format. Anthropic API keys start with "sk-ant-". Get your key at https://console.anthropic.com',
+      }));
+      setStep('error');
+      return;
+    }
+    setState((s) => ({ ...s, apiKey: trimmed }));
     setStep('embedding-provider');
   }
 
@@ -139,7 +163,13 @@ function SetupWizard() {
         exit();
       }, 1500);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const code = (err as NodeJS.ErrnoException).code;
+      const message =
+        code === 'EACCES' || code === 'EPERM'
+          ? `Permission denied writing to ${configManager.homePath}. Check that you have write access to that directory.`
+          : err instanceof Error
+            ? err.message
+            : String(err);
       setState((s) => ({ ...s, errorMessage: message }));
       setStep('error');
     }
@@ -283,7 +313,10 @@ function SetupWizard() {
           <Text color="red" bold>
             Setup failed
           </Text>
-          <Text>{state.errorMessage}</Text>
+          <Text color="red">{state.errorMessage}</Text>
+          <Box marginTop={1}>
+            <Text dimColor>Press Enter or q to exit.</Text>
+          </Box>
         </Box>
       )}
     </Box>

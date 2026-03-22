@@ -210,13 +210,13 @@ function RecordCommand() {
           svcs.audio.startRecording();
         } catch (err) {
           const hint =
-            process.platform === 'win32'
-              ? 'Ensure a microphone is connected and check Windows sound settings.'
-              : process.platform === 'darwin'
-                ? 'Ensure microphone access is granted in System Settings > Privacy.'
-                : 'Ensure a microphone is connected and accessible.';
+            process.platform === 'darwin'
+              ? 'Grant permission in System Settings > Privacy & Security > Microphone'
+              : process.platform === 'win32'
+                ? 'Check Settings > Privacy > Microphone'
+                : 'Check your audio device settings.';
           const msg = err instanceof Error ? err.message : String(err);
-          setError(`Microphone unavailable: ${msg}\n${hint}`);
+          setError(`Microphone access denied. ${hint}\n(${msg})`);
           setPhase('error');
           return;
         }
