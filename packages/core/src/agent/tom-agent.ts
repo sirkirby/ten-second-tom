@@ -48,9 +48,18 @@ export class TomAgent {
       throw new Error('No text response from model');
     }
 
-    const parsed = JSON.parse(textBlock.text) as Record<string, unknown>;
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(textBlock.text) as Record<string, unknown>;
+    } catch {
+      throw new Error('Failed to parse analysis response from LLM');
+    }
 
-    const sentimentRaw = parsed['sentiment'] as Record<string, unknown>;
+    const sentimentRaw = parsed['sentiment'] as Record<string, unknown> | undefined;
+    if (!sentimentRaw || typeof sentimentRaw !== 'object') {
+      throw new Error('Failed to parse analysis response from LLM');
+    }
+
     const score = Math.max(-1, Math.min(1, Number(sentimentRaw['score'])));
     const confidence = Math.max(0, Math.min(1, Number(sentimentRaw['confidence'])));
 
