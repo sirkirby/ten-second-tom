@@ -19,6 +19,9 @@ import {
 import type { AppConfig, EntryAnalysis } from '@ten-second-tom/core';
 import { RecordingUI } from '../components/RecordingUI.js';
 import { SentimentDisplay } from '../components/SentimentDisplay.js';
+import { ErrorDisplay } from '../components/ErrorDisplay.js';
+import { useAutoExit } from '../hooks/useAutoExit.js';
+import { checkSetupComplete } from '../hooks/useSetupGuard.js';
 
 // ---------------------------------------------------------------------------
 // Pipeline types & orchestration (extracted for testability)
@@ -59,15 +62,7 @@ export function buildServicesFromConfig(
 
   const transcription = new WhisperTranscriptionService();
 
-  const agentConfig =
-    config.llm.provider === 'cloud'
-      ? { provider: 'cloud' as const, apiKey: config.llm.apiKey }
-      : {
-          provider: 'local' as const,
-          localEndpoint: config.llm.localEndpoint,
-          modelId: config.llm.modelId,
-        };
-  const agent = new TomAgent(agentConfig);
+  const agent = new TomAgent(config.llm);
 
   const embedding =
     config.embedding.provider === 'ollama'
@@ -181,15 +176,14 @@ function RecordCommand() {
   useEffect(() => {
     async function init() {
       try {
-        const configManager = new ConfigManager();
-
-        if (!configManager.isSetupComplete()) {
-          setError('Setup not complete. Run `tom setup` first.');
+        const guard = checkSetupComplete();
+        if (!guard.ok) {
+          setError(guard.error);
           setPhase('error');
           return;
         }
 
-        const config = configManager.load()!;
+        const { config, configManager } = guard;
         const svcs = buildServicesFromConfig(config, configManager);
         audioBaseDirRef.current = configManager.audioPath;
 
@@ -338,26 +332,13 @@ function RecordCommand() {
   // -------------------------------------------------------------------------
   // Exit after done/error with a short delay
   // -------------------------------------------------------------------------
-  useEffect(() => {
-    if (phase === 'done' || phase === 'error') {
-      const timer = setTimeout(() => exit(), 5000);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [phase, exit]);
+  useAutoExit(phase === 'done' || phase === 'error');
 
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
   if (phase === 'error') {
-    return (
-      <Box flexDirection="column" paddingY={1}>
-        <Text color="red" bold>
-          Error
-        </Text>
-        <Text color="red">{error}</Text>
-      </Box>
-    );
+    return <ErrorDisplay message={error ?? 'Unknown error'} />;
   }
 
   if (phase === 'init') {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
@@ -7,6 +7,7 @@ import { render } from 'ink';
 import { join } from 'node:path';
 import { ConfigManager } from '@ten-second-tom/core';
 import type { AppConfig, LlmConfig, EmbeddingConfig } from '@ten-second-tom/core';
+import { useAutoExit } from '../hooks/useAutoExit.js';
 
 type Step =
   | 'llm-provider'
@@ -60,13 +61,7 @@ function SetupWizard() {
   const configManager = new ConfigManager();
 
   // Auto-exit after error with a short delay; allow q/Enter to exit immediately
-  useEffect(() => {
-    if (step === 'error') {
-      const timer = setTimeout(() => exit(), 5000);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [step, exit]);
+  useAutoExit(step === 'error');
 
   useInput((input, key) => {
     if ((input === 'q' || key.return) && step === 'error') {

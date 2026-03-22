@@ -36,6 +36,11 @@ vi.mock('react', () => ({
 
 // Mock the local UI components so their imports don't explode
 vi.mock('../../components/SentimentDisplay.js', () => ({ SentimentDisplay: vi.fn() }));
+vi.mock('../../components/ErrorDisplay.js', () => ({ ErrorDisplay: vi.fn() }));
+vi.mock('../../hooks/useAutoExit.js', () => ({ useAutoExit: vi.fn() }));
+vi.mock('../../hooks/useSetupGuard.js', () => ({
+  checkSetupComplete: vi.fn(() => ({ ok: true, config: {}, configManager: {} })),
+}));
 
 // Mock the record module so we can spy on buildServicesFromConfig
 vi.mock('../record.js', async (importOriginal) => {
@@ -59,6 +64,7 @@ import type { TomAgent } from '@ten-second-tom/core';
 import { buildServicesFromConfig } from '../record.js';
 import type { RecordingPipelineServices } from '../record.js';
 import { runAnalyzePipeline } from '../analyze.js';
+import { checkSetupComplete } from '../../hooks/useSetupGuard.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -125,17 +131,25 @@ function makeMockServices(overrides: Partial<RecordingPipelineServices> = {}): R
   return { audio, transcription, agent, embedding, storage, ...overrides } as RecordingPipelineServices;
 }
 
-function makeConfigManager(isComplete = true): Record<string, unknown> {
-  return {
-    isSetupComplete: vi.fn().mockReturnValue(isComplete),
-    load: vi.fn().mockReturnValue({
-      llm: { provider: 'cloud', apiKey: 'sk-test' },
-      stt: { engine: 'whisper.node', modelPath: '/models/model.bin' },
-      embedding: { provider: 'none', model: '' },
-      storage: { dbPath: '/tmp/test.db' },
-    } as AppConfig),
-    audioPath: '/tmp/audio',
-  };
+function mockSetupGuard(isComplete = true): void {
+  if (isComplete) {
+    const mockConfigManager = { audioPath: '/tmp/audio' };
+    (checkSetupComplete as unknown as Mock).mockReturnValue({
+      ok: true,
+      config: {
+        llm: { provider: 'cloud', apiKey: 'sk-test' },
+        stt: { engine: 'whisper.node', modelPath: '/models/model.bin' },
+        embedding: { provider: 'none', model: '' },
+        storage: { dbPath: '/tmp/test.db' },
+      } as AppConfig,
+      configManager: mockConfigManager,
+    });
+  } else {
+    (checkSetupComplete as unknown as Mock).mockReturnValue({
+      ok: false,
+      error: 'Tom is not configured. Run `tom setup` first.',
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -148,7 +162,7 @@ describe('runAnalyzePipeline — setup guard', () => {
   });
 
   it('returns an error result when setup is not complete', async () => {
-    (ConfigManager as unknown as Mock).mockImplementation(() => makeConfigManager(false));
+    mockSetupGuard(false);
 
     const result = await runAnalyzePipeline('some-entry-id');
 
@@ -167,7 +181,7 @@ describe('runAnalyzePipeline — entry lookup', () => {
   });
 
   it('returns an error result when the entry is not found', async () => {
-    (ConfigManager as unknown as Mock).mockImplementation(() => makeConfigManager(true));
+    mockSetupGuard(true);
 
     const mockServices = makeMockServices({
       storage: {
@@ -201,7 +215,7 @@ describe('runAnalyzePipeline — successful re-analysis', () => {
   });
 
   it('loads the entry, runs TomAgent.analyze, updates analysis, and returns result', async () => {
-    (ConfigManager as unknown as Mock).mockImplementation(() => makeConfigManager(true));
+    mockSetupGuard(true);
 
     const entry = makeEntry({ id: 'entry-uuid-1234', content: 'hello world' });
     const mockServices = makeMockServices({
@@ -239,7 +253,7 @@ describe('runAnalyzePipeline — successful re-analysis', () => {
   });
 
   it('also runs embedding and updates it when embedding service returns a result', async () => {
-    (ConfigManager as unknown as Mock).mockImplementation(() => makeConfigManager(true));
+    mockSetupGuard(true);
 
     const entry = makeEntry({ id: 'entry-uuid-1234', content: 'hello world' });
     const mockServices = makeMockServices({
@@ -268,7 +282,7 @@ describe('runAnalyzePipeline — successful re-analysis', () => {
   });
 
   it('overwrites an entry that already has analysis (re-analyze means re-analyze)', async () => {
-    (ConfigManager as unknown as Mock).mockImplementation(() => makeConfigManager(true));
+    mockSetupGuard(true);
 
     const existingAnalysis: EntryAnalysis = {
       sentiment: { score: -0.5, label: 'negative', confidence: 0.8 },
@@ -317,7 +331,7 @@ describe('runAnalyzePipeline — LLM unavailable', () => {
   });
 
   it('returns an error when TomAgent.analyze rejects (explicit re-analysis must not degrade silently)', async () => {
-    (ConfigManager as unknown as Mock).mockImplementation(() => makeConfigManager(true));
+    mockSetupGuard(true);
 
     const entry = makeEntry({ id: 'entry-uuid-1234', content: 'hello world' });
     const mockServices = makeMockServices({

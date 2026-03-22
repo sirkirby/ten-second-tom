@@ -1,15 +1,10 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { EntryAnalysis } from '@ten-second-tom/core';
+import { getSentimentColor } from '../utils/sentiment.js';
 
 interface SentimentDisplayProps {
   analysis: EntryAnalysis;
-}
-
-function getSentimentColor(score: number): string {
-  if (score > 0.2) return 'green';
-  if (score < -0.2) return 'red';
-  return 'yellow';
 }
 
 function formatScore(score: number): string {

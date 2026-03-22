@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import type { Entry } from '@ten-second-tom/core';
+import { getSentimentColor, getSentimentEmoji } from '../utils/sentiment.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -24,18 +25,6 @@ function formatDateTime(isoString: string): string {
     minute: '2-digit',
     hour12: true,
   });
-}
-
-function getSentimentCircle(score: number): string {
-  if (score > 0.2) return '\u{1F7E2}'; // green circle
-  if (score < -0.2) return '\u{1F534}'; // red circle
-  return '\u{1F7E1}'; // yellow circle
-}
-
-function getSentimentCircleColor(score: number): string {
-  if (score > 0.2) return 'green';
-  if (score < -0.2) return 'red';
-  return 'yellow';
 }
 
 function getTypeEmoji(type: Entry['type']): string {
@@ -83,7 +72,7 @@ function EntryDetail({ entry, onBack }: EntryDetailProps) {
       {entry.analysis && (
         <Box marginTop={1} paddingLeft={2} flexDirection="column">
           <Text bold>{'📊 Sentiment: '}
-            <Text color={getSentimentCircleColor(entry.analysis.sentiment.score)}>
+            <Text color={getSentimentColor(entry.analysis.sentiment.score)}>
               {entry.analysis.sentiment.label}
             </Text>
             {` \u2014 ${entry.analysis.summary} (${entry.analysis.sentiment.score >= 0 ? '+' : ''}${entry.analysis.sentiment.score.toFixed(2)})`}
@@ -116,18 +105,22 @@ export function SearchResults({ results, onSelect }: SearchResultsProps) {
     );
   }
 
-  const items: SelectItem[] = results.map((entry) => {
-    const typeEmoji = getTypeEmoji(entry.type);
-    const dateStr = formatDateTime(entry.createdAt);
-    const sentimentPart = entry.analysis
-      ? `  ${getSentimentCircle(entry.analysis.sentiment.score)}  `
-      : '  ';
-    const excerpt = getExcerpt(entry.content);
-    return {
-      label: `${typeEmoji} ${dateStr}${sentimentPart}${excerpt}`,
-      value: entry.id,
-    };
-  });
+  const items = useMemo<SelectItem[]>(
+    () =>
+      results.map((entry) => {
+        const typeEmoji = getTypeEmoji(entry.type);
+        const dateStr = formatDateTime(entry.createdAt);
+        const sentimentPart = entry.analysis
+          ? `  ${getSentimentEmoji(entry.analysis.sentiment.score)}  `
+          : '  ';
+        const excerpt = getExcerpt(entry.content);
+        return {
+          label: `${typeEmoji} ${dateStr}${sentimentPart}${excerpt}`,
+          value: entry.id,
+        };
+      }),
+    [results],
+  );
 
   function handleSelect(item: SelectItem) {
     const entry = results.find((e) => e.id === item.value);

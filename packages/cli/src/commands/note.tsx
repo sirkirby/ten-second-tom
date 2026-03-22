@@ -8,6 +8,9 @@ import { unlinkSync } from 'node:fs';
 import { ConfigManager } from '@ten-second-tom/core';
 import type { EntryAnalysis } from '@ten-second-tom/core';
 import { SentimentDisplay } from '../components/SentimentDisplay.js';
+import { ErrorDisplay } from '../components/ErrorDisplay.js';
+import { useAutoExit } from '../hooks/useAutoExit.js';
+import { checkSetupComplete } from '../hooks/useSetupGuard.js';
 import { buildServicesFromConfig, runAnalysisPipeline } from './record.js';
 import type { RecordingPipelineServices } from './record.js';
 
@@ -44,16 +47,12 @@ export async function runNotePipeline(
     return { ...empty, error: 'Note text is empty — nothing to save.' };
   }
 
-  const configManager = new ConfigManager();
-
-  if (!configManager.isSetupComplete()) {
-    return {
-      ...empty,
-      error: 'Tom is not configured. Run `tom setup` first.',
-    };
+  const guard = checkSetupComplete();
+  if (!guard.ok) {
+    return { ...empty, error: guard.error };
   }
 
-  const config = configManager.load()!;
+  const { config, configManager } = guard;
   const services = buildServicesFromConfig(config, configManager);
 
   try {
@@ -97,9 +96,9 @@ function NoteCommand() {
   // On mount: check setup guard
   // -------------------------------------------------------------------------
   useEffect(() => {
-    const configManager = new ConfigManager();
-    if (!configManager.isSetupComplete()) {
-      setError('Tom is not configured. Run `tom setup` first.');
+    const guard = checkSetupComplete();
+    if (!guard.ok) {
+      setError(guard.error);
       setPhase('error');
     }
   }, []);
@@ -107,13 +106,7 @@ function NoteCommand() {
   // -------------------------------------------------------------------------
   // Auto-exit after done / error
   // -------------------------------------------------------------------------
-  useEffect(() => {
-    if (phase === 'done' || phase === 'error') {
-      const timer = setTimeout(() => exit(), 5000);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [phase, exit]);
+  useAutoExit(phase === 'done' || phase === 'error');
 
   // -------------------------------------------------------------------------
   // Start dictation: load services, check STT model, begin recording
@@ -122,14 +115,13 @@ function NoteCommand() {
     setDictationWarning(null);
 
     try {
-      const configManager = new ConfigManager();
-
-      if (!configManager.isSetupComplete()) {
-        setDictationWarning('Tom is not configured. Run `tom setup` first.');
+      const guard = checkSetupComplete();
+      if (!guard.ok) {
+        setDictationWarning(guard.error);
         return;
       }
 
-      const config = configManager.load()!;
+      const { config, configManager } = guard;
       audioBaseDirRef.current = configManager.audioPath;
       let svcs = servicesRef.current;
       if (svcs === null) {
@@ -296,14 +288,7 @@ function NoteCommand() {
   // Render
   // -------------------------------------------------------------------------
   if (phase === 'error') {
-    return (
-      <Box flexDirection="column" paddingY={1}>
-        <Text color="red" bold>
-          Error
-        </Text>
-        <Text color="red">{error}</Text>
-      </Box>
-    );
+    return <ErrorDisplay message={error ?? 'Unknown error'} />;
   }
 
   if (phase === 'input') {

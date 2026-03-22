@@ -36,6 +36,11 @@ vi.mock('react', () => ({
 
 // Mock the local UI components so their imports don't explode
 vi.mock('../../components/SentimentDisplay.js', () => ({ SentimentDisplay: vi.fn() }));
+vi.mock('../../components/ErrorDisplay.js', () => ({ ErrorDisplay: vi.fn() }));
+vi.mock('../../hooks/useAutoExit.js', () => ({ useAutoExit: vi.fn() }));
+vi.mock('../../hooks/useSetupGuard.js', () => ({
+  checkSetupComplete: vi.fn(() => ({ ok: true, config: {}, configManager: {} })),
+}));
 
 // Mock ink-text-input
 vi.mock('ink-text-input', () => ({ default: vi.fn() }));
@@ -64,6 +69,7 @@ import type { TomAgent } from '@ten-second-tom/core';
 import { runAnalysisPipeline, buildServicesFromConfig } from '../record.js';
 import type { RecordingPipelineServices } from '../record.js';
 import { runNotePipeline } from '../note.js';
+import { checkSetupComplete } from '../../hooks/useSetupGuard.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -136,12 +142,10 @@ describe('runNotePipeline', () => {
   });
 
   it('returns an error result when setup is not complete', async () => {
-    const mockConfigManager = {
-      isSetupComplete: vi.fn().mockReturnValue(false),
-      load: vi.fn(),
-      audioPath: '/tmp/audio',
-    };
-    (ConfigManager as unknown as Mock).mockImplementation(() => mockConfigManager);
+    (checkSetupComplete as unknown as Mock).mockReturnValue({
+      ok: false,
+      error: 'Tom is not configured. Run `tom setup` first.',
+    });
 
     const result = await runNotePipeline('some note text');
 
@@ -150,17 +154,18 @@ describe('runNotePipeline', () => {
   });
 
   it('calls runAnalysisPipeline with note text, no audioPath, type note, inputMethod typed', async () => {
-    const mockConfigManager = {
-      isSetupComplete: vi.fn().mockReturnValue(true),
-      load: vi.fn().mockReturnValue({
-        llm: { provider: 'cloud', apiKey: 'sk-test' },
-        stt: { engine: 'whisper.node', modelPath: '/models/model.bin' },
-        embedding: { provider: 'none', model: '' },
-        storage: { dbPath: '/tmp/test.db' },
-      } as AppConfig),
-      audioPath: '/tmp/audio',
-    };
-    (ConfigManager as unknown as Mock).mockImplementation(() => mockConfigManager);
+    const mockConfig = {
+      llm: { provider: 'cloud', apiKey: 'sk-test' },
+      stt: { engine: 'whisper.node', modelPath: '/models/model.bin' },
+      embedding: { provider: 'none', model: '' },
+      storage: { dbPath: '/tmp/test.db' },
+    } as AppConfig;
+    const mockConfigManager = { audioPath: '/tmp/audio' };
+    (checkSetupComplete as unknown as Mock).mockReturnValue({
+      ok: true,
+      config: mockConfig,
+      configManager: mockConfigManager,
+    });
 
     const mockServices = makeMockServices();
     (buildServicesFromConfig as unknown as Mock).mockReturnValue(mockServices);
@@ -187,17 +192,18 @@ describe('runNotePipeline', () => {
   });
 
   it('returns null analysis and a warning when TomAgent is unavailable', async () => {
-    const mockConfigManager = {
-      isSetupComplete: vi.fn().mockReturnValue(true),
-      load: vi.fn().mockReturnValue({
-        llm: { provider: 'cloud', apiKey: 'sk-test' },
-        stt: { engine: 'whisper.node', modelPath: '/models/model.bin' },
-        embedding: { provider: 'none', model: '' },
-        storage: { dbPath: '/tmp/test.db' },
-      } as AppConfig),
-      audioPath: '/tmp/audio',
-    };
-    (ConfigManager as unknown as Mock).mockImplementation(() => mockConfigManager);
+    const mockConfig = {
+      llm: { provider: 'cloud', apiKey: 'sk-test' },
+      stt: { engine: 'whisper.node', modelPath: '/models/model.bin' },
+      embedding: { provider: 'none', model: '' },
+      storage: { dbPath: '/tmp/test.db' },
+    } as AppConfig;
+    const mockConfigManager = { audioPath: '/tmp/audio' };
+    (checkSetupComplete as unknown as Mock).mockReturnValue({
+      ok: true,
+      config: mockConfig,
+      configManager: mockConfigManager,
+    });
 
     const mockServices = makeMockServices();
     (buildServicesFromConfig as unknown as Mock).mockReturnValue(mockServices);
@@ -218,17 +224,18 @@ describe('runNotePipeline', () => {
   });
 
   it('returns a warning when embedding service is unavailable', async () => {
-    const mockConfigManager = {
-      isSetupComplete: vi.fn().mockReturnValue(true),
-      load: vi.fn().mockReturnValue({
-        llm: { provider: 'cloud', apiKey: 'sk-test' },
-        stt: { engine: 'whisper.node', modelPath: '/models/model.bin' },
-        embedding: { provider: 'none', model: '' },
-        storage: { dbPath: '/tmp/test.db' },
-      } as AppConfig),
-      audioPath: '/tmp/audio',
-    };
-    (ConfigManager as unknown as Mock).mockImplementation(() => mockConfigManager);
+    const mockConfig = {
+      llm: { provider: 'cloud', apiKey: 'sk-test' },
+      stt: { engine: 'whisper.node', modelPath: '/models/model.bin' },
+      embedding: { provider: 'none', model: '' },
+      storage: { dbPath: '/tmp/test.db' },
+    } as AppConfig;
+    const mockConfigManager = { audioPath: '/tmp/audio' };
+    (checkSetupComplete as unknown as Mock).mockReturnValue({
+      ok: true,
+      config: mockConfig,
+      configManager: mockConfigManager,
+    });
 
     const mockServices = makeMockServices();
     (buildServicesFromConfig as unknown as Mock).mockReturnValue(mockServices);
@@ -249,13 +256,6 @@ describe('runNotePipeline', () => {
   });
 
   it('ignores empty input and does not call runAnalysisPipeline', async () => {
-    const mockConfigManager = {
-      isSetupComplete: vi.fn().mockReturnValue(true),
-      load: vi.fn(),
-      audioPath: '/tmp/audio',
-    };
-    (ConfigManager as unknown as Mock).mockImplementation(() => mockConfigManager);
-
     const result = await runNotePipeline('   ');
 
     expect(runAnalysisPipeline).not.toHaveBeenCalled();
@@ -273,17 +273,18 @@ describe('runNotePipeline — dictated inputMethod', () => {
   });
 
   it('calls runAnalysisPipeline with inputMethod dictated when specified', async () => {
-    const mockConfigManager = {
-      isSetupComplete: vi.fn().mockReturnValue(true),
-      load: vi.fn().mockReturnValue({
-        llm: { provider: 'cloud', apiKey: 'sk-test' },
-        stt: { engine: 'whisper.node', modelPath: '/models/model.bin' },
-        embedding: { provider: 'none', model: '' },
-        storage: { dbPath: '/tmp/test.db' },
-      } as AppConfig),
-      audioPath: '/tmp/audio',
-    };
-    (ConfigManager as unknown as Mock).mockImplementation(() => mockConfigManager);
+    const mockConfig = {
+      llm: { provider: 'cloud', apiKey: 'sk-test' },
+      stt: { engine: 'whisper.node', modelPath: '/models/model.bin' },
+      embedding: { provider: 'none', model: '' },
+      storage: { dbPath: '/tmp/test.db' },
+    } as AppConfig;
+    const mockConfigManager = { audioPath: '/tmp/audio' };
+    (checkSetupComplete as unknown as Mock).mockReturnValue({
+      ok: true,
+      config: mockConfig,
+      configManager: mockConfigManager,
+    });
 
     const mockServices = makeMockServices();
     (buildServicesFromConfig as unknown as Mock).mockReturnValue(mockServices);
@@ -309,17 +310,18 @@ describe('runNotePipeline — dictated inputMethod', () => {
   });
 
   it('does not include audioPath when inputMethod is dictated', async () => {
-    const mockConfigManager = {
-      isSetupComplete: vi.fn().mockReturnValue(true),
-      load: vi.fn().mockReturnValue({
-        llm: { provider: 'cloud', apiKey: 'sk-test' },
-        stt: { engine: 'whisper.node', modelPath: '/models/model.bin' },
-        embedding: { provider: 'none', model: '' },
-        storage: { dbPath: '/tmp/test.db' },
-      } as AppConfig),
-      audioPath: '/tmp/audio',
-    };
-    (ConfigManager as unknown as Mock).mockImplementation(() => mockConfigManager);
+    const mockConfig = {
+      llm: { provider: 'cloud', apiKey: 'sk-test' },
+      stt: { engine: 'whisper.node', modelPath: '/models/model.bin' },
+      embedding: { provider: 'none', model: '' },
+      storage: { dbPath: '/tmp/test.db' },
+    } as AppConfig;
+    const mockConfigManager = { audioPath: '/tmp/audio' };
+    (checkSetupComplete as unknown as Mock).mockReturnValue({
+      ok: true,
+      config: mockConfig,
+      configManager: mockConfigManager,
+    });
 
     const mockServices = makeMockServices();
     (buildServicesFromConfig as unknown as Mock).mockReturnValue(mockServices);
@@ -416,17 +418,18 @@ describe('startDictation', () => {
   });
 
   it('stops recording and discards audio path on submit in dictated mode', async () => {
-    const mockConfigManager = {
-      isSetupComplete: vi.fn().mockReturnValue(true),
-      load: vi.fn().mockReturnValue({
-        llm: { provider: 'cloud', apiKey: 'sk-test' },
-        stt: { engine: 'whisper.node', modelPath: '/models/model.bin' },
-        embedding: { provider: 'none', model: '' },
-        storage: { dbPath: '/tmp/test.db' },
-      } as AppConfig),
-      audioPath: '/tmp/audio',
-    };
-    (ConfigManager as unknown as Mock).mockImplementation(() => mockConfigManager);
+    const mockConfig = {
+      llm: { provider: 'cloud', apiKey: 'sk-test' },
+      stt: { engine: 'whisper.node', modelPath: '/models/model.bin' },
+      embedding: { provider: 'none', model: '' },
+      storage: { dbPath: '/tmp/test.db' },
+    } as AppConfig;
+    const mockConfigManager = { audioPath: '/tmp/audio' };
+    (checkSetupComplete as unknown as Mock).mockReturnValue({
+      ok: true,
+      config: mockConfig,
+      configManager: mockConfigManager,
+    });
 
     const audio = {
       startRecording: vi.fn(),

@@ -37,6 +37,11 @@ vi.mock('react', () => ({
 // Mock the local UI components so their imports don't explode
 vi.mock('../../components/RecordingUI.js', () => ({ RecordingUI: vi.fn() }));
 vi.mock('../../components/SentimentDisplay.js', () => ({ SentimentDisplay: vi.fn() }));
+vi.mock('../../components/ErrorDisplay.js', () => ({ ErrorDisplay: vi.fn() }));
+vi.mock('../../hooks/useAutoExit.js', () => ({ useAutoExit: vi.fn() }));
+vi.mock('../../hooks/useSetupGuard.js', () => ({
+  checkSetupComplete: vi.fn(() => ({ ok: true, config: {}, configManager: {} })),
+}));
 
 import {
   ConfigManager,

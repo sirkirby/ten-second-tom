@@ -10,6 +10,9 @@ import {
 import type { Entry } from '@ten-second-tom/core';
 import { buildServicesFromConfig } from './record.js';
 import { SearchResultsWithDetail } from '../components/SearchResults.js';
+import { ErrorDisplay } from '../components/ErrorDisplay.js';
+import { useAutoExit } from '../hooks/useAutoExit.js';
+import { checkSetupComplete } from '../hooks/useSetupGuard.js';
 
 // ---------------------------------------------------------------------------
 // Pipeline (extracted for testability)
@@ -31,13 +34,12 @@ export async function runSearchPipeline(query: string): Promise<SearchPipelineRe
     return { ...empty, error: 'Search query is empty — nothing to search.' };
   }
 
-  const configManager = new ConfigManager();
-
-  if (!configManager.isSetupComplete()) {
-    return { ...empty, error: 'Tom is not configured. Run `tom setup` first.' };
+  const guard = checkSetupComplete();
+  if (!guard.ok) {
+    return { ...empty, error: guard.error };
   }
 
-  const config = configManager.load()!;
+  const { config, configManager } = guard;
   const services = buildServicesFromConfig(config, configManager);
 
   const searchService = new SearchService(services.storage, services.embedding);
@@ -71,9 +73,9 @@ function SearchCommand() {
   // On mount: check setup guard
   // -------------------------------------------------------------------------
   useEffect(() => {
-    const configManager = new ConfigManager();
-    if (!configManager.isSetupComplete()) {
-      setError('Tom is not configured. Run `tom setup` first.');
+    const guard = checkSetupComplete();
+    if (!guard.ok) {
+      setError(guard.error);
       setPhase('error');
     }
   }, []);
@@ -81,13 +83,7 @@ function SearchCommand() {
   // -------------------------------------------------------------------------
   // Auto-exit after error
   // -------------------------------------------------------------------------
-  useEffect(() => {
-    if (phase === 'error') {
-      const timer = setTimeout(() => exit(), 5000);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [phase, exit]);
+  useAutoExit(phase === 'error');
 
   // -------------------------------------------------------------------------
   // Keyboard: allow 'q' or Escape to exit from results phase
@@ -122,14 +118,7 @@ function SearchCommand() {
   // Render
   // -------------------------------------------------------------------------
   if (phase === 'error') {
-    return (
-      <Box flexDirection="column" paddingY={1}>
-        <Text color="red" bold>
-          Error
-        </Text>
-        <Text color="red">{error}</Text>
-      </Box>
-    );
+    return <ErrorDisplay message={error ?? 'Unknown error'} />;
   }
 
   if (phase === 'input') {

@@ -5,6 +5,9 @@ import { render } from 'ink';
 import { ConfigManager } from '@ten-second-tom/core';
 import type { EntryAnalysis } from '@ten-second-tom/core';
 import { SentimentDisplay } from '../components/SentimentDisplay.js';
+import { ErrorDisplay } from '../components/ErrorDisplay.js';
+import { useAutoExit } from '../hooks/useAutoExit.js';
+import { checkSetupComplete } from '../hooks/useSetupGuard.js';
 import { buildServicesFromConfig } from './record.js';
 
 // ---------------------------------------------------------------------------
@@ -34,16 +37,12 @@ export async function runAnalyzePipeline(entryId: string): Promise<AnalyzePipeli
     error: null,
   };
 
-  const configManager = new ConfigManager();
-
-  if (!configManager.isSetupComplete()) {
-    return {
-      ...empty,
-      error: 'Tom is not configured. Run `tom setup` first.',
-    };
+  const guard = checkSetupComplete();
+  if (!guard.ok) {
+    return { ...empty, error: guard.error };
   }
 
-  const config = configManager.load()!;
+  const { config, configManager } = guard;
   const services = buildServicesFromConfig(config, configManager);
 
   try {
@@ -140,13 +139,7 @@ function AnalyzeCommand({ entryId }: { entryId: string }) {
   // -------------------------------------------------------------------------
   // Auto-exit after done / error
   // -------------------------------------------------------------------------
-  useEffect(() => {
-    if (phase === 'done' || phase === 'error') {
-      const timer = setTimeout(() => exit(), 5000);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [phase, exit]);
+  useAutoExit(phase === 'done' || phase === 'error');
 
   // -------------------------------------------------------------------------
   // Keyboard: allow Enter or q to exit after done / error
@@ -161,14 +154,7 @@ function AnalyzeCommand({ entryId }: { entryId: string }) {
   // Render
   // -------------------------------------------------------------------------
   if (phase === 'error') {
-    return (
-      <Box flexDirection="column" paddingY={1}>
-        <Text color="red" bold>
-          Error
-        </Text>
-        <Text color="red">{error}</Text>
-      </Box>
-    );
+    return <ErrorDisplay message={error ?? 'Unknown error'} />;
   }
 
   if (phase === 'init' || phase === 'analyzing') {

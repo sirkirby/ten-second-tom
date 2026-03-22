@@ -44,6 +44,11 @@ vi.mock('../../components/SearchResults.js', () => ({
 }));
 vi.mock('../../components/RecordingUI.js', () => ({ RecordingUI: vi.fn() }));
 vi.mock('../../components/SentimentDisplay.js', () => ({ SentimentDisplay: vi.fn() }));
+vi.mock('../../components/ErrorDisplay.js', () => ({ ErrorDisplay: vi.fn() }));
+vi.mock('../../hooks/useAutoExit.js', () => ({ useAutoExit: vi.fn() }));
+vi.mock('../../hooks/useSetupGuard.js', () => ({
+  checkSetupComplete: vi.fn(() => ({ ok: true, config: {}, configManager: {} })),
+}));
 
 // Mock the record module so we can spy on buildServicesFromConfig
 vi.mock('../record.js', async (importOriginal) => {
@@ -65,6 +70,7 @@ import type { Entry, AppConfig } from '@ten-second-tom/core';
 
 import { buildServicesFromConfig } from '../record.js';
 import { runSearchPipeline } from '../search.js';
+import { checkSetupComplete } from '../../hooks/useSetupGuard.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -94,14 +100,20 @@ function makeConfig(): AppConfig {
 function mockSetup(
   isSetupComplete: boolean,
   config?: AppConfig,
-): ReturnType<typeof vi.fn> {
-  const mockConfigManager = {
-    isSetupComplete: vi.fn().mockReturnValue(isSetupComplete),
-    load: vi.fn().mockReturnValue(config ?? makeConfig()),
-    audioPath: '/tmp/audio',
-  };
-  (ConfigManager as unknown as Mock).mockImplementation(() => mockConfigManager);
-  return mockConfigManager as unknown as ReturnType<typeof vi.fn>;
+): void {
+  if (isSetupComplete) {
+    const mockConfigManager = { audioPath: '/tmp/audio' };
+    (checkSetupComplete as unknown as Mock).mockReturnValue({
+      ok: true,
+      config: config ?? makeConfig(),
+      configManager: mockConfigManager,
+    });
+  } else {
+    (checkSetupComplete as unknown as Mock).mockReturnValue({
+      ok: false,
+      error: 'Tom is not configured. Run `tom setup` first.',
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
