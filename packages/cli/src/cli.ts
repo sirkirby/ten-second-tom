@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import { setupCommand } from './commands/setup.js';
 
 const program = new Command();
 
@@ -8,6 +9,6 @@ program
   .description('Ten-Second Tom — intelligence-first voice capture and analysis')
   .version('2.0.0');
 
-// Commands will be registered here as they are built
+program.addCommand(setupCommand);
 
 program.parse();
