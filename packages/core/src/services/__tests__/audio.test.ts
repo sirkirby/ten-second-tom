@@ -5,17 +5,19 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 // Mock node-record-lpcm16 before importing the module under test
+const { mockRecordFn } = vi.hoisted(() => {
+  const mockRecordFn = vi.fn();
+  return { mockRecordFn };
+});
+
 vi.mock('node-record-lpcm16', () => {
   return {
-    record: vi.fn(),
+    default: { record: mockRecordFn },
   };
 });
 
 // Import after mock is registered
 const { AudioService } = await import('../audio.js');
-const { record } = await import('node-record-lpcm16');
-
-const mockRecord = vi.mocked(record);
 
 function makeFakeRecording(stream: PassThrough) {
   return {
@@ -48,7 +50,7 @@ describe('AudioService', () => {
 
   it('startRecording() sets recording state to true', () => {
     const stream = new PassThrough();
-    mockRecord.mockReturnValue(makeFakeRecording(stream));
+    mockRecordFn.mockReturnValue(makeFakeRecording(stream));
 
     const service = new AudioService({ audioDir });
     service.startRecording();
@@ -58,7 +60,7 @@ describe('AudioService', () => {
 
   it('throws if startRecording is called while already recording', () => {
     const stream = new PassThrough();
-    mockRecord.mockReturnValue(makeFakeRecording(stream));
+    mockRecordFn.mockReturnValue(makeFakeRecording(stream));
 
     const service = new AudioService({ audioDir });
     service.startRecording();
@@ -75,7 +77,7 @@ describe('AudioService', () => {
 
   it('getAudioStream() returns a Readable stream while recording', () => {
     const stream = new PassThrough();
-    mockRecord.mockReturnValue(makeFakeRecording(stream));
+    mockRecordFn.mockReturnValue(makeFakeRecording(stream));
 
     const service = new AudioService({ audioDir });
     service.startRecording();
@@ -92,7 +94,7 @@ describe('AudioService', () => {
   it('stopRecording() saves WAV and returns path matching YYYY-MM/YYYY-MM-DD-{id}.wav', async () => {
     const stream = new PassThrough();
     const fakeRecording = makeFakeRecording(stream);
-    mockRecord.mockReturnValue(fakeRecording);
+    mockRecordFn.mockReturnValue(fakeRecording);
 
     const service = new AudioService({ audioDir });
     service.startRecording();
@@ -117,11 +119,11 @@ describe('AudioService', () => {
   it('stopRecording() resets state so recording can start again', async () => {
     const stream1 = new PassThrough();
     const fakeRecording1 = makeFakeRecording(stream1);
-    mockRecord.mockReturnValueOnce(fakeRecording1);
+    mockRecordFn.mockReturnValueOnce(fakeRecording1);
 
     const stream2 = new PassThrough();
     const fakeRecording2 = makeFakeRecording(stream2);
-    mockRecord.mockReturnValueOnce(fakeRecording2);
+    mockRecordFn.mockReturnValueOnce(fakeRecording2);
 
     const service = new AudioService({ audioDir });
 

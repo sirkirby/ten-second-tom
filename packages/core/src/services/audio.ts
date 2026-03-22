@@ -1,5 +1,6 @@
-import { record } from 'node-record-lpcm16';
-import type { Recording } from 'node-record-lpcm16';
+import recorder from 'node-record-lpcm16';
+const { record } = recorder;
+type Recording = ReturnType<typeof record>;
 import type { Readable } from 'node:stream';
 import { createWriteStream, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
