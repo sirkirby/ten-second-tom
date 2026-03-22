@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import { Command } from 'commander';
 import { render } from 'ink';
+import { join } from 'node:path';
 import {
   ConfigManager,
   AudioService,
@@ -169,8 +170,13 @@ function RecordCommand() {
   const [error, setError] = useState<string | null>(null);
   const [services, setServices] = useState<RecordingPipelineServices | null>(null);
 
+  // Ref to hold the live transcription promise so stopAndAnalyze can await it
+  const transcriptionPromiseRef = useRef<Promise<string> | null>(null);
+  // Ref to hold the audioPath base directory for file-based fallback
+  const audioBaseDirRef = useRef<string>('');
+
   // -------------------------------------------------------------------------
-  // Initialise: check setup, load model, start recording
+  // Initialise: check setup, load model, start recording, begin live transcription
   // -------------------------------------------------------------------------
   useEffect(() => {
     async function init() {
@@ -185,6 +191,7 @@ function RecordCommand() {
 
         const config = configManager.load()!;
         const svcs = buildServicesFromConfig(config, configManager);
+        audioBaseDirRef.current = configManager.audioPath;
 
         // Load STT model
         if (!svcs.transcription.isModelLoaded()) {
@@ -221,6 +228,17 @@ function RecordCommand() {
           return;
         }
 
+        // Wire up live streaming transcription — feed audio stream to STT,
+        // onChunk updates the transcript state for the RecordingUI to show.
+        // The promise resolves with the full transcript when the stream ends
+        // (i.e. when stopRecording() is called).
+        const audioStream = svcs.audio.getAudioStream();
+        transcriptionPromiseRef.current = svcs.transcription
+          .transcribeStream(audioStream, (chunk) => {
+            setTranscript((t) => t + chunk);
+          })
+          .catch(() => '');
+
         setPhase('recording');
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -253,23 +271,30 @@ function RecordCommand() {
     setPhase('analyzing');
 
     try {
-      const audioPath = await services.audio.stopRecording();
-      const audioStream = services.audio.isRecording() ? services.audio.getAudioStream() : null;
+      // Stop recording — this signals end-of-stream to the audio recorder
+      // and saves the WAV file. The relative path is returned.
+      const audioRelPath = await services.audio.stopRecording();
 
-      // Transcribe from the stream we already collected
-      // Since stopRecording has finished, we transcribe the saved file
-      let finalTranscript = transcript;
-      if (finalTranscript.trim().length === 0 && audioStream) {
+      // Wait for the live transcription promise to resolve now that the
+      // stream has ended. This gives us the full transcript from the
+      // streaming STT that was running during recording.
+      let finalTranscript = '';
+      if (transcriptionPromiseRef.current) {
+        finalTranscript = await transcriptionPromiseRef.current;
+      }
+
+      // Fall back to file-based transcription if streaming produced nothing
+      if (finalTranscript.trim().length === 0 && audioRelPath) {
         try {
-          finalTranscript = await services.transcription.transcribeStream(audioStream, (chunk) => {
-            setTranscript((t) => t + chunk);
-          });
+          const fullAudioPath = join(audioBaseDirRef.current, audioRelPath);
+          finalTranscript = await services.transcription.transcribeFile(fullAudioPath);
+          setTranscript(finalTranscript);
         } catch {
           // Transcript stays empty — still save the entry
         }
       }
 
-      const result = await runAnalysisPipeline(finalTranscript, audioPath, services);
+      const result = await runAnalysisPipeline(finalTranscript, audioRelPath, services);
 
       setAnalysis(result.analysis);
       setWarnings(result.warnings);
