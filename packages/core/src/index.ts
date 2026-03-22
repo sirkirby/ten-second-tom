@@ -14,3 +14,4 @@ export {
 } from './services/embedding.js';
 export { SearchService } from './services/search.js';
 export { type IAudioService, type AudioServiceConfig, AudioService } from './services/audio.js';
+export { type ITranscriptionService, WhisperTranscriptionService } from './services/transcription.js';
