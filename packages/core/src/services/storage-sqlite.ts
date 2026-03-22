@@ -149,8 +149,9 @@ export class SqliteStorageService implements IStorageService {
   }
 
   async searchByVector(_embedding: Float32Array, _limit: number): Promise<Entry[]> {
-    // Placeholder - vector search is pending Sprint 1 research spike
-    return [];
+    // Vector search is pending Sprint 1 research spike — throw so callers
+    // (e.g. SearchService) fall back to FTS instead of silently returning [].
+    throw new Error('Vector search not yet implemented');
   }
 
   async deleteEntry(id: string): Promise<void> {
