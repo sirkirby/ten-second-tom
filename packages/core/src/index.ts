@@ -6,3 +6,10 @@ export { SqliteStorageService } from './services/storage-sqlite.js';
 export { ConfigManager } from './config/config-manager.js';
 export { TomAgent } from './agent/tom-agent.js';
 export { type AgentConfig, getModelId, getBaseUrl } from './agent/config.js';
+export {
+  type IEmbeddingService,
+  OllamaEmbeddingService,
+  NoopEmbeddingService,
+  type OllamaEmbeddingConfig,
+} from './services/embedding.js';
+export { SearchService } from './services/search.js';
