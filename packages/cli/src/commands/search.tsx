@@ -6,11 +6,9 @@ import { render } from 'ink';
 import {
   ConfigManager,
   SearchService,
-  SqliteStorageService,
-  OllamaEmbeddingService,
-  NoopEmbeddingService,
 } from '@ten-second-tom/core';
 import type { Entry } from '@ten-second-tom/core';
+import { buildServicesFromConfig } from './record.js';
 import { SearchResultsWithDetail } from '../components/SearchResults.js';
 
 // ---------------------------------------------------------------------------
@@ -40,18 +38,9 @@ export async function runSearchPipeline(query: string): Promise<SearchPipelineRe
   }
 
   const config = configManager.load()!;
+  const services = buildServicesFromConfig(config, configManager);
 
-  const storage = new SqliteStorageService(config.storage.dbPath);
-
-  const embedding =
-    config.embedding.provider === 'ollama'
-      ? new OllamaEmbeddingService({
-          model: config.embedding.model,
-          endpoint: config.embedding.endpoint,
-        })
-      : new NoopEmbeddingService();
-
-  const searchService = new SearchService(storage, embedding);
+  const searchService = new SearchService(services.storage, services.embedding);
 
   try {
     const entries = await searchService.search(query.trim());
@@ -60,7 +49,7 @@ export async function runSearchPipeline(query: string): Promise<SearchPipelineRe
     const msg = err instanceof Error ? err.message : String(err);
     return { entries: [], error: `Search failed: ${msg}` };
   } finally {
-    storage.close();
+    services.storage.close();
   }
 }
 

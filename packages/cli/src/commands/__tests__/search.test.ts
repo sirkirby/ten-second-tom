@@ -11,6 +11,9 @@ vi.mock('@ten-second-tom/core', () => {
     SearchService: vi.fn(),
     OllamaEmbeddingService: vi.fn(),
     NoopEmbeddingService: vi.fn(),
+    AudioService: vi.fn(),
+    WhisperTranscriptionService: vi.fn(),
+    TomAgent: vi.fn(),
   };
 });
 
@@ -28,6 +31,7 @@ vi.mock('react', () => ({
   default: { createElement: vi.fn() },
   useState: vi.fn(),
   useEffect: vi.fn(),
+  useRef: vi.fn(() => ({ current: null })),
 }));
 
 // Mock ink-text-input
@@ -38,19 +42,28 @@ vi.mock('../../components/SearchResults.js', () => ({
   SearchResults: vi.fn(),
   SearchResultsWithDetail: vi.fn(),
 }));
+vi.mock('../../components/RecordingUI.js', () => ({ RecordingUI: vi.fn() }));
+vi.mock('../../components/SentimentDisplay.js', () => ({ SentimentDisplay: vi.fn() }));
+
+// Mock the record module so we can spy on buildServicesFromConfig
+vi.mock('../record.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../record.js')>();
+  return {
+    ...actual,
+    buildServicesFromConfig: vi.fn(),
+  };
+});
 
 // Mock ink-spinner
 vi.mock('ink-spinner', () => ({ default: vi.fn() }));
 
 import {
   ConfigManager,
-  SqliteStorageService,
   SearchService,
-  OllamaEmbeddingService,
-  NoopEmbeddingService,
 } from '@ten-second-tom/core';
 import type { Entry, AppConfig } from '@ten-second-tom/core';
 
+import { buildServicesFromConfig } from '../record.js';
 import { runSearchPipeline } from '../search.js';
 
 // ---------------------------------------------------------------------------
@@ -130,12 +143,16 @@ describe('runSearchPipeline', () => {
 
     const mockSearch = vi.fn().mockResolvedValue([entry1, entry2]);
     const mockStorageClose = vi.fn();
+    const mockStorage = { close: mockStorageClose };
+    const mockEmbedding = {};
 
-    (SqliteStorageService as unknown as Mock).mockImplementation(() => ({
-      close: mockStorageClose,
-    }));
-
-    (NoopEmbeddingService as unknown as Mock).mockImplementation(() => ({}));
+    (buildServicesFromConfig as unknown as Mock).mockReturnValue({
+      storage: mockStorage,
+      embedding: mockEmbedding,
+      audio: {},
+      transcription: {},
+      agent: {},
+    });
 
     (SearchService as unknown as Mock).mockImplementation(() => ({
       search: mockSearch,
@@ -153,11 +170,13 @@ describe('runSearchPipeline', () => {
   it('returns empty entries when search yields no results', async () => {
     mockSetup(true, makeConfig());
 
-    (SqliteStorageService as unknown as Mock).mockImplementation(() => ({
-      close: vi.fn(),
-    }));
-
-    (NoopEmbeddingService as unknown as Mock).mockImplementation(() => ({}));
+    (buildServicesFromConfig as unknown as Mock).mockReturnValue({
+      storage: { close: vi.fn() },
+      embedding: {},
+      audio: {},
+      transcription: {},
+      agent: {},
+    });
 
     (SearchService as unknown as Mock).mockImplementation(() => ({
       search: vi.fn().mockResolvedValue([]),
@@ -169,7 +188,7 @@ describe('runSearchPipeline', () => {
     expect(result.entries).toHaveLength(0);
   });
 
-  it('uses OllamaEmbeddingService when embedding provider is ollama', async () => {
+  it('uses embedding from buildServicesFromConfig', async () => {
     const config: AppConfig = {
       ...makeConfig(),
       embedding: { provider: 'ollama', model: 'nomic-embed-text', endpoint: 'http://localhost:11434' },
@@ -177,12 +196,16 @@ describe('runSearchPipeline', () => {
 
     mockSetup(true, config);
 
-    (SqliteStorageService as unknown as Mock).mockImplementation(() => ({
-      close: vi.fn(),
-    }));
+    const mockEmbeddingInstance = { embed: vi.fn() };
+    const mockStorageInstance = { close: vi.fn() };
 
-    const mockOllamaInstance = {};
-    (OllamaEmbeddingService as unknown as Mock).mockImplementation(() => mockOllamaInstance);
+    (buildServicesFromConfig as unknown as Mock).mockReturnValue({
+      storage: mockStorageInstance,
+      embedding: mockEmbeddingInstance,
+      audio: {},
+      transcription: {},
+      agent: {},
+    });
 
     let capturedEmbeddingInstance: unknown;
     (SearchService as unknown as Mock).mockImplementation((_storage: unknown, embedding: unknown) => {
@@ -192,49 +215,20 @@ describe('runSearchPipeline', () => {
 
     await runSearchPipeline('test query');
 
-    expect(OllamaEmbeddingService).toHaveBeenCalledWith({
-      model: 'nomic-embed-text',
-      endpoint: 'http://localhost:11434',
-    });
-    expect(capturedEmbeddingInstance).toBe(mockOllamaInstance);
-  });
-
-  it('falls back to NoopEmbeddingService when embedding provider is none', async () => {
-    const config: AppConfig = {
-      ...makeConfig(),
-      embedding: { provider: 'none', model: '' },
-    } as AppConfig;
-
-    mockSetup(true, config);
-
-    (SqliteStorageService as unknown as Mock).mockImplementation(() => ({
-      close: vi.fn(),
-    }));
-
-    const mockNoopInstance = {};
-    (NoopEmbeddingService as unknown as Mock).mockImplementation(() => mockNoopInstance);
-
-    let capturedEmbeddingInstance: unknown;
-    (SearchService as unknown as Mock).mockImplementation((_storage: unknown, embedding: unknown) => {
-      capturedEmbeddingInstance = embedding;
-      return { search: vi.fn().mockResolvedValue([]) };
-    });
-
-    await runSearchPipeline('test query');
-
-    expect(NoopEmbeddingService).toHaveBeenCalled();
-    expect(capturedEmbeddingInstance).toBe(mockNoopInstance);
+    expect(capturedEmbeddingInstance).toBe(mockEmbeddingInstance);
   });
 
   it('closes storage even when search throws', async () => {
     mockSetup(true, makeConfig());
 
     const mockClose = vi.fn();
-    (SqliteStorageService as unknown as Mock).mockImplementation(() => ({
-      close: mockClose,
-    }));
-
-    (NoopEmbeddingService as unknown as Mock).mockImplementation(() => ({}));
+    (buildServicesFromConfig as unknown as Mock).mockReturnValue({
+      storage: { close: mockClose },
+      embedding: {},
+      audio: {},
+      transcription: {},
+      agent: {},
+    });
 
     (SearchService as unknown as Mock).mockImplementation(() => ({
       search: vi.fn().mockRejectedValue(new Error('DB error')),
