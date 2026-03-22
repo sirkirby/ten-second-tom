@@ -4,6 +4,7 @@ import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
 import { Command } from 'commander';
 import { render } from 'ink';
+import { join } from 'node:path';
 import { ConfigManager } from '@ten-second-tom/core';
 import type { AppConfig, LlmConfig, EmbeddingConfig } from '@ten-second-tom/core';
 
@@ -133,12 +134,17 @@ function SetupWizard() {
             modelId: state.localModelId,
           };
 
+    // Use the user's local LLM endpoint for Ollama embedding when configured,
+    // otherwise fall back to the default Ollama endpoint.
+    const ollamaEndpoint =
+      state.llmProvider === 'local' ? state.localEndpoint : 'http://localhost:11434';
+
     const embedding: EmbeddingConfig =
       state.embeddingProvider === 'ollama'
         ? {
             provider: 'ollama',
             model: 'nomic-embed-text',
-            endpoint: 'http://localhost:11434',
+            endpoint: ollamaEndpoint,
           }
         : state.embeddingProvider === 'cloud'
           ? { provider: 'cloud', model: 'voyage-3-lite' }
@@ -148,11 +154,11 @@ function SetupWizard() {
       llm,
       stt: {
         engine: 'whisper.node',
-        modelPath: configManager.modelsPath + '/ggml-distil-small.en.bin',
+        modelPath: join(configManager.modelsPath, 'ggml-distil-small.en.bin'),
       },
       embedding,
       storage: {
-        dbPath: configManager.homePath + '/tom.db',
+        dbPath: join(configManager.homePath, 'tom.db'),
       },
     };
 
