@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { AgentConfig } from '../config.js';
+import type { LlmConfig } from '../../types/config.js';
 
 // Mock the Anthropic SDK before importing TomAgent
 const mockMessagesCreate = vi.fn().mockResolvedValue({
@@ -25,7 +25,7 @@ vi.mock('@anthropic-ai/sdk', () => {
 });
 
 describe('TomAgent', () => {
-  const cloudConfig: AgentConfig = {
+  const cloudConfig: LlmConfig = {
     provider: 'cloud',
     apiKey: 'sk-ant-test-key',
   };

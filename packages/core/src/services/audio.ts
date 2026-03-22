@@ -18,9 +18,13 @@ export interface AudioServiceConfig {
 }
 
 export class AudioService implements IAudioService {
+  /** Maximum buffer size (~55 minutes at 16kHz mono 16-bit). */
+  private static readonly MAX_BUFFER_BYTES = 100 * 1024 * 1024; // 100MB
+
   private recording: Recording | null = null;
   private audioStream: Readable | null = null;
   private audioChunks: Buffer[] = [];
+  private bufferSize = 0;
   private readonly audioDir: string;
 
   constructor(config: AudioServiceConfig) {
@@ -33,6 +37,7 @@ export class AudioService implements IAudioService {
     }
 
     this.audioChunks = [];
+    this.bufferSize = 0;
 
     this.recording = record({
       sampleRate: 16000,
@@ -46,6 +51,12 @@ export class AudioService implements IAudioService {
     // without conflicting with the TranscriptionService reading the same stream
     this.audioStream.on('data', (chunk: Buffer) => {
       this.audioChunks.push(chunk);
+      this.bufferSize += chunk.length;
+
+      // Auto-stop recording to prevent OOM if buffer exceeds maximum
+      if (this.bufferSize >= AudioService.MAX_BUFFER_BYTES) {
+        void this.stopRecording();
+      }
     });
   }
 
@@ -95,6 +106,7 @@ export class AudioService implements IAudioService {
     this.recording = null;
     this.audioStream = null;
     this.audioChunks = [];
+    this.bufferSize = 0;
 
     // Return relative path from audioDir parent perspective (monthDir/fileName)
     return join(monthDir, fileName);

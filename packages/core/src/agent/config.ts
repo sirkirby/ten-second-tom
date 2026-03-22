@@ -1,20 +1,22 @@
-export interface AgentConfig {
-  provider: 'cloud' | 'local';
-  apiKey?: string;
-  localEndpoint?: string;
-  modelId?: string;
-}
+import type { LlmConfig } from '../types/config.js';
 
-export function getModelId(config: AgentConfig): string {
+/**
+ * @deprecated Use LlmConfig from types/config.js directly.
+ * Kept as a type alias for backward compatibility with external consumers.
+ */
+export type AgentConfig = LlmConfig;
+
+export function getModelId(config: LlmConfig): string {
   if (config.provider === 'cloud') {
     return 'claude-sonnet-4-6';
   }
   return config.modelId ?? 'qwen2.5:7b';
 }
 
-export function getBaseUrl(config: AgentConfig): string | undefined {
+export function getBaseUrl(config: LlmConfig): string | undefined {
   if (config.provider === 'local') {
-    return config.localEndpoint ?? 'http://localhost:11434/v1';
+    const endpoint = config.localEndpoint ?? 'http://localhost:11434';
+    return endpoint.replace(/\/?$/, '/v1');
   }
   return undefined;
 }

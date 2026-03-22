@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { EntryAnalysis } from '../types/entry.js';
-import { type AgentConfig, getModelId, getBaseUrl } from './config.js';
+import type { LlmConfig } from '../types/config.js';
+import { getModelId, getBaseUrl } from './config.js';
 
 const ANALYSIS_PROMPT = `You are an AI assistant that analyzes journal entries and notes.
 Analyze the provided text and return ONLY a JSON object with this exact structure:
@@ -15,12 +16,13 @@ Do not include any text outside the JSON object.`;
 
 export class TomAgent {
   private readonly client: Anthropic;
-  private readonly config: AgentConfig;
+  private readonly modelId: string;
 
-  constructor(config: AgentConfig) {
-    this.config = config;
+  constructor(config: LlmConfig) {
+    const apiKey = config.provider === 'cloud' ? config.apiKey : '';
+    this.modelId = getModelId(config);
     this.client = new Anthropic({
-      apiKey: config.apiKey,
+      apiKey,
       baseURL: getBaseUrl(config),
     });
   }
@@ -30,15 +32,14 @@ export class TomAgent {
       throw new Error('Content cannot be empty');
     }
 
-    const modelId = getModelId(this.config);
-
     const response = await this.client.messages.create({
-      model: modelId,
+      model: this.modelId,
       max_tokens: 1024,
+      system: ANALYSIS_PROMPT,
       messages: [
         {
           role: 'user',
-          content: `${ANALYSIS_PROMPT}\n\nText to analyze:\n${content}`,
+          content,
         },
       ],
     });
