@@ -18,6 +18,6 @@ export class SearchService {
         // Fall through to FTS
       }
     }
-    return this.storage.searchByKeyword(query);
+    return this.storage.searchByKeyword(query, limit);
   }
 }

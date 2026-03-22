@@ -135,15 +135,16 @@ export class SqliteStorageService implements IStorageService {
     // Placeholder - vector storage is pending Sprint 1 research spike
   }
 
-  async searchByKeyword(query: string): Promise<Entry[]> {
+  async searchByKeyword(query: string, limit: number = 20): Promise<Entry[]> {
     const rows = this.db
-      .prepare<[string], EntryRow>(
+      .prepare<[string, number], EntryRow>(
         `SELECT e.* FROM entries e
          JOIN entries_fts ON e.rowid = entries_fts.rowid
          WHERE entries_fts MATCH ?
-         ORDER BY rank`,
+         ORDER BY rank
+         LIMIT ?`,
       )
-      .all(query);
+      .all(query, limit);
 
     return rows.map(rowToEntry);
   }

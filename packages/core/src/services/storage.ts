@@ -12,7 +12,7 @@ export interface IStorageService {
   listEntries(options: ListEntriesOptions): Promise<Entry[]>;
   updateEntryAnalysis(id: string, analysis: EntryAnalysis): Promise<void>;
   updateEntryEmbedding(id: string, embedding: Float32Array): Promise<void>;
-  searchByKeyword(query: string): Promise<Entry[]>;
+  searchByKeyword(query: string, limit?: number): Promise<Entry[]>;
   searchByVector(embedding: Float32Array, limit: number): Promise<Entry[]>;
   deleteEntry(id: string): Promise<void>;
   close(): void;
