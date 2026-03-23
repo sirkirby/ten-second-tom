@@ -11,8 +11,8 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts",
-    "dev": "tsup src/index.ts --format esm --dts --watch"
+    "build": "tsup src/index.ts --format esm --dts --external sherpa-onnx-node --external @fugood/whisper.node --external better-sqlite3 --external sqlite-vec",
+    "dev": "tsup src/index.ts --format esm --dts --watch --external sherpa-onnx-node --external @fugood/whisper.node --external better-sqlite3 --external sqlite-vec"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

@@ -84,15 +84,35 @@ function int16BufferToFloat32(buffer: Buffer): Float32Array {
 }
 
 /**
- * Default factory: loads the real sherpa-onnx-node native module and constructs
- * an OnlineRecognizer.
+ * Lazily loads the sherpa-onnx-node native module using createRequire.
+ * tsup converts bare `require()` to `__require()` in ESM bundles which fails.
+ * `createRequire` produces a real Node.js `require` function that works.
  */
-function defaultCreateRecognizer(config: SherpaOnnxRecognizerConfig): SherpaOnnxOnlineRecognizer {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { OnlineRecognizer } = require('sherpa-onnx-node') as {
+import { createRequire } from 'node:module';
+
+let _OnlineRecognizer:
+  | (new (config: SherpaOnnxRecognizerConfig) => SherpaOnnxOnlineRecognizer)
+  | null = null;
+
+function ensureSherpaLoaded(): void {
+  if (_OnlineRecognizer !== null) return;
+  // createRequire needs an absolute file URL or path — use the current file
+  const nativeRequire = createRequire(import.meta.url);
+  const mod = nativeRequire('sherpa-onnx-node') as {
     OnlineRecognizer: new (config: SherpaOnnxRecognizerConfig) => SherpaOnnxOnlineRecognizer;
   };
-  return new OnlineRecognizer(config);
+  _OnlineRecognizer = mod.OnlineRecognizer;
+}
+
+/**
+ * Default factory: loads sherpa-onnx-node and constructs an OnlineRecognizer.
+ */
+function defaultCreateRecognizer(config: SherpaOnnxRecognizerConfig): SherpaOnnxOnlineRecognizer {
+  ensureSherpaLoaded();
+  if (_OnlineRecognizer === null) {
+    throw new Error('sherpa-onnx-node: OnlineRecognizer not loaded');
+  }
+  return new _OnlineRecognizer(config);
 }
 
 // ---------------------------------------------------------------------------
