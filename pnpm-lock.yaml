@@ -32,9 +32,15 @@ importers:
 
   packages/cli:
     dependencies:
+      '@fugood/whisper.node':
+        specifier: ^1.0.16
+        version: 1.0.16
       '@ten-second-tom/core':
         specifier: workspace:*
         version: link:../core
+      better-sqlite3:
+        specifier: ^12.8.0
+        version: 12.8.0
       commander:
         specifier: ^13.1.0
         version: 13.1.0
@@ -53,6 +59,12 @@ importers:
       react:
         specifier: ^18.3.0
         version: 18.3.1
+      sherpa-onnx-node:
+        specifier: ^1.12.32
+        version: 1.12.32
+      sqlite-vec:
+        specifier: ^0.1.7
+        version: 0.1.7
     devDependencies:
       '@types/react':
         specifier: ^18.3.0
