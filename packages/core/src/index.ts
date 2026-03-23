@@ -20,6 +20,7 @@ export {
   AudioService,
   checkAudioPrerequisites,
   checkModelExists,
+  createWavHeader,
 } from './services/audio.js';
 export {
   type ITranscriptionService,

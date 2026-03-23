@@ -7,6 +7,34 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 
+/**
+ * Creates a standard 44-byte WAV header for 16kHz, 16-bit, mono PCM data.
+ * Used to wrap raw PCM buffers so they can be saved as valid .wav files.
+ */
+export function createWavHeader(dataLength: number): Buffer {
+  const header = Buffer.alloc(44);
+  const sampleRate = 16000;
+  const channels = 1;
+  const bitsPerSample = 16;
+  const byteRate = sampleRate * channels * (bitsPerSample / 8);
+  const blockAlign = channels * (bitsPerSample / 8);
+
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + dataLength, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16); // PCM chunk size
+  header.writeUInt16LE(1, 20); // PCM format
+  header.writeUInt16LE(channels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(bitsPerSample, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(dataLength, 40);
+  return header;
+}
+
 export type AudioPrerequisiteResult = { ok: true } | { ok: false; message: string };
 
 /**
@@ -89,7 +117,7 @@ export class AudioService implements IAudioService {
     this.recording = record({
       sampleRate: 16000,
       channels: 1,
-      audioType: 'wav',
+      audioType: 'raw',
     });
 
     this.audioStream = this.recording.stream();
@@ -138,11 +166,19 @@ export class AudioService implements IAudioService {
 
     mkdirSync(dirPath, { recursive: true });
 
-    // Write buffered audio to disk
+    // Write buffered raw PCM audio to disk as a valid WAV file.
+    // The recorder outputs raw PCM (audioType: 'raw') so that the
+    // transcription stream receives clean PCM without WAV headers.
+    // We prepend a standard WAV header here for file-based playback
+    // and for whisper.node's transcribeFile which handles WAV natively.
+    const totalPcmBytes = this.audioChunks.reduce((sum, c) => sum + c.length, 0);
+    const wavHeader = createWavHeader(totalPcmBytes);
+
     const writeStream = createWriteStream(filePath);
     await new Promise<void>((resolve, reject) => {
       writeStream.on('finish', resolve);
       writeStream.on('error', reject);
+      writeStream.write(wavHeader);
       for (const chunk of this.audioChunks) {
         writeStream.write(chunk);
       }

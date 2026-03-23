@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PassThrough } from 'node:stream';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -17,7 +17,9 @@ vi.mock('node-record-lpcm16', () => {
 });
 
 // Import after mock is registered
-const { AudioService, checkAudioPrerequisites, checkModelExists } = await import('../audio.js');
+const { AudioService, checkAudioPrerequisites, checkModelExists, createWavHeader } = await import(
+  '../audio.js'
+);
 
 function makeFakeRecording(stream: PassThrough) {
   return {
@@ -112,6 +114,40 @@ describe('AudioService', () => {
     expect(fakeRecording.stop).toHaveBeenCalledOnce();
   });
 
+  it('stopRecording() writes a valid WAV header before raw PCM data', async () => {
+    const stream = new PassThrough();
+    const fakeRecording = makeFakeRecording(stream);
+    mockRecordFn.mockReturnValue(fakeRecording);
+
+    const service = new AudioService({ audioDir });
+    service.startRecording();
+
+    // Write 4 bytes of PCM data
+    const pcmData = Buffer.from([0x00, 0x01, 0x02, 0x03]);
+    stream.write(pcmData);
+
+    const resultPath = await service.stopRecording();
+
+    // Read the saved file
+    const filePath = join(audioDir, resultPath);
+    const fileData = readFileSync(filePath);
+
+    // File should be 44 (WAV header) + 4 (PCM data) = 48 bytes
+    expect(fileData.length).toBe(48);
+
+    // Verify WAV header magic bytes
+    expect(fileData.toString('ascii', 0, 4)).toBe('RIFF');
+    expect(fileData.toString('ascii', 8, 12)).toBe('WAVE');
+    expect(fileData.toString('ascii', 12, 16)).toBe('fmt ');
+    expect(fileData.toString('ascii', 36, 40)).toBe('data');
+
+    // Verify data chunk size matches PCM data length
+    expect(fileData.readUInt32LE(40)).toBe(4);
+
+    // Verify the raw PCM data follows the header
+    expect(fileData.subarray(44)).toEqual(pcmData);
+  });
+
   it('stopRecording() resets state so recording can start again', async () => {
     const stream1 = new PassThrough();
     const fakeRecording1 = makeFakeRecording(stream1);
@@ -131,6 +167,46 @@ describe('AudioService', () => {
     // Should be able to start again
     service.startRecording();
     expect(service.isRecording()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: createWavHeader
+// ---------------------------------------------------------------------------
+
+describe('createWavHeader', () => {
+  it('returns a 44-byte buffer', () => {
+    const header = createWavHeader(0);
+    expect(header.length).toBe(44);
+  });
+
+  it('contains correct RIFF/WAVE identifiers', () => {
+    const header = createWavHeader(1000);
+    expect(header.toString('ascii', 0, 4)).toBe('RIFF');
+    expect(header.toString('ascii', 8, 12)).toBe('WAVE');
+    expect(header.toString('ascii', 12, 16)).toBe('fmt ');
+    expect(header.toString('ascii', 36, 40)).toBe('data');
+  });
+
+  it('encodes correct file size (36 + dataLength)', () => {
+    const dataLength = 32000;
+    const header = createWavHeader(dataLength);
+    expect(header.readUInt32LE(4)).toBe(36 + dataLength);
+  });
+
+  it('encodes 16kHz sample rate, mono, 16-bit PCM', () => {
+    const header = createWavHeader(0);
+    expect(header.readUInt16LE(20)).toBe(1); // PCM format
+    expect(header.readUInt16LE(22)).toBe(1); // mono
+    expect(header.readUInt32LE(24)).toBe(16000); // sample rate
+    expect(header.readUInt32LE(28)).toBe(32000); // byte rate (16000 * 1 * 2)
+    expect(header.readUInt16LE(32)).toBe(2); // block align (1 * 2)
+    expect(header.readUInt16LE(34)).toBe(16); // bits per sample
+  });
+
+  it('encodes correct data chunk size', () => {
+    const header = createWavHeader(64000);
+    expect(header.readUInt32LE(40)).toBe(64000);
   });
 });
 
