@@ -1,164 +1,91 @@
-# Ten-Second Tom v2 — Project Reference
+# CLAUDE.md
 
-> **Design spec (authority)**: [`docs/superpowers/specs/2026-03-22-tom-v2-rewrite-design.md`](./docs/superpowers/specs/2026-03-22-tom-v2-rewrite-design.md)
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## What This Is
+## Project
 
-Intelligence-first voice capture and analysis CLI. Node.js/TypeScript rewrite from .NET v1. Core loop: **capture → transcribe → analyze → search**.
+Ten-Second Tom — intelligence-first voice capture and analysis CLI. Node.js/TypeScript.
 
-## Stack
-
-```
-TypeScript 5 (strict, ESM, verbatimModuleSyntax) | Ink 5 + Commander | @anthropic-ai/sdk
-Zod | better-sqlite3 + FTS5 | @fugood/whisper.node | Vitest | pnpm workspaces | tsup
-```
-
-## Commands
+## Build & Test
 
 ```bash
-make check          # Lint + format + tests (CI gate)
-make build          # Build all packages
-make test           # Run tests
-make coverage       # Tests with coverage report
-make link-dev       # Build + link `tom` globally (requires PNPM_HOME)
-make unlink-dev     # Remove global link
-make tom ARGS="..." # Run without linking (e.g., make tom ARGS="record")
-make dev            # Watch mode
-make clean          # Remove build artifacts
+make check              # CI gate: lint + format + tests. Run before every commit.
+make build              # Build all packages
+make test               # Run all tests
+make tom ARGS="record"  # Run CLI without global linking
+make link-dev           # Link `tom` globally (requires PNPM_HOME)
+make coverage           # Tests with coverage report
 ```
 
-## Structure
+Run a single test: `pnpm vitest run packages/core/src/services/__tests__/storage.test.ts`
 
-```
-packages/
-  cli/src/
-    cli.ts                  # Entry point — Commander routing
-    commands/
-      setup.tsx             # First-run wizard (LLM, embedding, model download)
-      record.tsx            # Audio capture + streaming STT + analysis
-      note.tsx              # Text/dictation input + analysis
-      search.tsx            # Semantic + FTS search
-      analyze.tsx           # Re-run analysis on existing entry
-    components/
-      RecordingUI.tsx       # Timer, live transcript, controls
-      SentimentDisplay.tsx  # Color-coded analysis results
-      SearchResults.tsx     # Result list with detail view
-      ErrorDisplay.tsx      # Shared error display
-    hooks/
-      useSetupGuard.ts      # checkSetupComplete() — shared across commands
-      useAutoExit.ts        # useAutoExit(shouldExit, delayMs) — auto-exit hook
-    utils/
-      sentiment.ts          # getSentimentColor(), getSentimentEmoji(), thresholds
-  core/src/
-    types/
-      entry.ts              # EntrySchema, EntryAnalysisSchema, CreateEntrySchema
-      config.ts             # AppConfigSchema (discriminated unions for providers)
-      index.ts              # Barrel export
-    services/
-      storage.ts            # IStorageService interface
-      storage-sqlite.ts     # SqliteStorageService (better-sqlite3, FTS5, prepared statements)
-      audio.ts              # AudioService, checkAudioPrerequisites(), checkModelExists()
-      transcription.ts      # WhisperTranscriptionService (@fugood/whisper.node)
-      embedding.ts          # OllamaEmbeddingService, NoopEmbeddingService
-      search.ts             # SearchService (semantic + FTS fallback)
-    agent/
-      config.ts             # getModelId(), getBaseUrl()
-      tom-agent.ts          # TomAgent — Claude SDK analysis
-    config/
-      config-manager.ts     # ConfigManager — ~/.tom/ management
-```
+## Rules
 
-## Key APIs
+### TypeScript
 
-### ConfigManager
+- Strict mode, ESM, `verbatimModuleSyntax` — no exceptions.
+- Always use `.js` extensions in relative imports. This is required for ESM.
+- Always use `import type` for type-only imports.
+- Use Zod schemas as the source of truth for types. Infer TypeScript types from schemas with `z.infer<>`. Never manually duplicate a type that a schema already defines.
+- Use discriminated unions for provider-dependent configuration. Each provider variant must require only the fields relevant to it.
 
+### Architecture
+
+- `packages/core/` owns all business logic. The CLI package is a thin rendering layer over core services. No business logic in CLI components.
+- All database access goes through the `IStorageService` interface. Never import SQLite directly in CLI code.
+- All LLM interaction goes through `TomAgent`. No direct SDK/API calls from CLI commands.
+- All service construction uses `buildServicesFromConfig()`. Never construct services ad-hoc in command files.
+- All commands use `checkSetupComplete()` from `useSetupGuard` before accessing config or services.
+
+### Error Handling
+
+- **Capture always succeeds if the mic works.** Analysis, embedding, and other post-capture steps degrade gracefully — show a warning, save the entry without the enrichment, move on.
+- Check prerequisites upfront, not mid-operation: setup complete → model exists → SoX available → then start recording.
+- Platform-specific error messages for mic/SoX issues (macOS: System Settings path, Windows: Settings path).
+- Never show raw stack traces to the user. Catch, extract the message, show in `<ErrorDisplay>`.
+
+### Testing
+
+- TDD: write the failing test first, then implement.
+- Vitest with globals enabled. Tests colocated: `src/module/__tests__/module.test.ts`
+- 80% coverage target on the core package.
+- Mock native dependencies (whisper.node, node-record-lpcm16) in tests — never depend on hardware.
+- Use `vi.hoisted()` for mock variables that need to be captured inside `vi.mock()` factory functions. This is required for Vitest ESM mocking.
+
+### CLI Components (Ink)
+
+- Every command component follows the phase pattern: `init → [working phases] → done | error`.
+- Every command uses `useAutoExit(shouldExit)` to exit after completion.
+- Every command uses `<ErrorDisplay message={error} />` for errors.
+- Sentiment colors and thresholds come from `utils/sentiment.ts` — never hardcode thresholds in components.
+- Use `setTimeout(resolve, 0)` to yield to the event loop before CPU-intensive native calls (model loading, transcription) so Ink can render status updates.
+
+### CJS Modules in ESM
+
+`node-record-lpcm16` is CommonJS. Import pattern:
 ```typescript
-const cm = new ConfigManager();       // defaults to ~/.tom/
-cm.ensureDirectories();               // creates ~/.tom/, audio/, models/
-cm.save(config: AppConfig): void;     // validates with Zod, writes config.json
-cm.load(): AppConfig | undefined;     // reads + validates (cached after first call)
-cm.isSetupComplete(): boolean;        // load() !== undefined
-cm.homePath / cm.audioPath / cm.modelsPath  // readonly path getters
+import recorder from 'node-record-lpcm16';
+const { record } = recorder;
 ```
+Never use named imports from CJS modules — they will fail at runtime even if TypeScript allows them.
 
-### IStorageService
+### Audio
 
-```typescript
-saveEntry(input: CreateEntry): Promise<Entry>;        // generates UUID + timestamps
-getEntry(id: string): Promise<Entry | undefined>;
-listEntries(options: ListEntriesOptions): Promise<Entry[]>;
-updateEntryAnalysis(id: string, analysis: EntryAnalysis): Promise<void>;
-updateEntryEmbedding(id: string, embedding: Float32Array): Promise<void>;
-searchByKeyword(query: string, limit?: number): Promise<Entry[]>;
-searchByVector(embedding: Float32Array, limit: number): Promise<Entry[]>;
-deleteEntry(id: string): Promise<void>;
-close(): void;
-```
+- Record as raw PCM (16kHz, mono, 16-bit). Write WAV header on save.
+- Audio files go to `~/.tom/audio/{YYYY-MM}/{YYYY-MM-DD-{id}}.wav`.
+- Buffer is capped at 100MB (~55 min). Auto-stop on overflow.
+- SoX is a system dependency (`brew install sox` on macOS). Check before recording.
 
-### TomAgent
+### LLM Integration
 
-```typescript
-const agent = new TomAgent(config.llm);  // accepts LlmConfig directly (discriminated union)
-const analysis = await agent.analyze(text);  // returns EntryAnalysis
-// Uses system message for prompt, validates JSON response, clamps scores
-```
+- Cloud: Anthropic SDK with `messages.create` and `system` parameter.
+- Local: Ollama native `/api/chat` endpoint directly. The Anthropic SDK does NOT work with Ollama.
+- Setup wizard queries Ollama `/api/tags` for installed models — never hardcode model lists.
+- Suppress whisper.cpp stderr logging via `GGML_LOG_LEVEL=0` env var before native calls.
 
-### Shared CLI Patterns
+## References
 
-```typescript
-// Setup guard — use in all commands that need config
-import { checkSetupComplete } from '../hooks/useSetupGuard.js';
-const guard = checkSetupComplete(); // { ok, config, configManager } or { ok: false, error }
-
-// Auto-exit — use in all command components
-import { useAutoExit } from '../hooks/useAutoExit.js';
-useAutoExit(phase === 'done' || phase === 'error');
-
-// Error display
-import { ErrorDisplay } from '../components/ErrorDisplay.js';
-<ErrorDisplay message={error} />
-
-// Service construction — shared factory in record.tsx
-import { buildServicesFromConfig } from './record.js';
-const services = buildServicesFromConfig(config, configManager);
-```
-
-## Config (Discriminated Unions)
-
-```typescript
-// LLM — cloud requires apiKey, local requires endpoint + modelId
-config.llm.provider === 'cloud'  → config.llm.apiKey
-config.llm.provider === 'local'  → config.llm.localEndpoint, config.llm.modelId
-
-// Embedding — ollama requires endpoint, none enforces empty model
-config.embedding.provider === 'ollama' → config.embedding.model, config.embedding.endpoint
-config.embedding.provider === 'cloud'  → config.embedding.model
-config.embedding.provider === 'none'   → config.embedding.model === ''
-```
-
-## Testing
-
-- TDD: red → green → refactor
-- Vitest with globals enabled
-- 80% coverage target on core (currently 88%)
-- Tests colocated: `src/module/__tests__/module.test.ts`
-
-## Gotchas
-
-- **ESM imports**: always use `.js` extensions in relative imports
-- **`import type`**: required for type-only imports (`verbatimModuleSyntax`)
-- **`node-record-lpcm16`**: CJS module — must use `import recorder from 'node-record-lpcm16'` then `const { record } = recorder`, NOT named import
-- **Vitest ESM mocks**: use `vi.hoisted()` for mock variables referenced inside `vi.mock()` factories
-- **`pnpm link --global`**: requires `PNPM_HOME` set — run `pnpm setup` first if missing
-- **SoX**: required system dependency for mic recording (`brew install sox` on macOS)
-- **Whisper model**: downloaded during `tom setup` to `~/.tom/models/ggml-distil-small.en.bin` (~380MB)
-- **`searchByVector` stub**: currently throws (not yet implemented) — SearchService catches and falls back to FTS5
-- **Audio buffer**: capped at 100MB (~55 min) to prevent OOM; auto-stops recording
-
-## Architecture Rules
-
-- `core/` owns all business logic — CLI is a thin rendering layer
-- Storage behind `IStorageService` interface (swappable database)
-- TomAgent is the single point of contact with the Claude SDK
-- Capture always succeeds if mic works — analysis/embedding degrade gracefully
-- Commands check prerequisites upfront: setup complete → model exists → SoX available
+- Design spec: `docs/superpowers/specs/2026-03-22-tom-v2-rewrite-design.md`
+- Implementation plan: `docs/superpowers/plans/2026-03-22-tom-v2-rewrite.md`
+- STT research: `docs/research/stt-evaluation.md`
+- Database research: `docs/research/database-evaluation.md`
