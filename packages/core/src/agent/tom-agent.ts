@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { EntryAnalysis } from '../types/entry.js';
 import type { LlmConfig } from '../types/config.js';
 import { getModelId, getBaseUrl } from './config.js';
+import { ANALYSIS_MAX_TOKENS, DEFAULT_OLLAMA_ENDPOINT } from '../constants.js';
 
 const ANALYSIS_PROMPT = `You are an AI assistant that analyzes journal entries and notes.
 Analyze the provided text and return ONLY a JSON object with this exact structure:
@@ -86,7 +87,7 @@ export class TomAgent {
 
     const response = await this.client.messages.create({
       model: this.modelId,
-      max_tokens: 1024,
+      max_tokens: ANALYSIS_MAX_TOKENS,
       system: ANALYSIS_PROMPT,
       messages: [
         {
@@ -110,7 +111,7 @@ export class TomAgent {
    * OpenAI-compatible API, not an Anthropic-compatible one.
    */
   private async analyzeLocal(content: string): Promise<EntryAnalysis> {
-    const endpoint = this.baseUrl ?? 'http://localhost:11434';
+    const endpoint = this.baseUrl ?? DEFAULT_OLLAMA_ENDPOINT;
 
     const response = await fetch(`${endpoint}/api/chat`, {
       method: 'POST',

@@ -1,21 +1,20 @@
 import type { LlmConfig } from '../types/config.js';
-
-/**
- * @deprecated Use LlmConfig from types/config.js directly.
- * Kept as a type alias for backward compatibility with external consumers.
- */
-export type AgentConfig = LlmConfig;
+import {
+  DEFAULT_CLOUD_MODEL_ID,
+  DEFAULT_LOCAL_MODEL_ID,
+  DEFAULT_OLLAMA_ENDPOINT,
+} from '../constants.js';
 
 export function getModelId(config: LlmConfig): string {
   if (config.provider === 'cloud') {
-    return 'claude-sonnet-4-6';
+    return DEFAULT_CLOUD_MODEL_ID;
   }
-  return config.modelId ?? 'qwen2.5:7b';
+  return config.modelId ?? DEFAULT_LOCAL_MODEL_ID;
 }
 
 export function getBaseUrl(config: LlmConfig): string | undefined {
   if (config.provider === 'local') {
-    const endpoint = config.localEndpoint ?? 'http://localhost:11434';
+    const endpoint = config.localEndpoint ?? DEFAULT_OLLAMA_ENDPOINT;
     // Return the raw endpoint without /v1 suffix.
     // Ollama exposes a native API at /api/chat, not an Anthropic-compatible one.
     return endpoint.replace(/\/+$/, '');

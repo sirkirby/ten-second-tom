@@ -11,6 +11,7 @@ import { SentimentDisplay } from '../components/SentimentDisplay.js';
 import { ErrorDisplay } from '../components/ErrorDisplay.js';
 import { useAutoExit } from '../hooks/useAutoExit.js';
 import { checkSetupComplete } from '../hooks/useSetupGuard.js';
+import { EXIT_HINT_TEXT } from '../constants.js';
 import { buildServicesFromConfig, runAnalysisPipeline } from './record.js';
 import type { RecordingPipelineServices } from './record.js';
 
@@ -370,7 +371,7 @@ function NoteCommand() {
       )}
 
       <Box marginTop={1}>
-        <Text dimColor>Press Enter or q to exit.</Text>
+        <Text dimColor>{EXIT_HINT_TEXT}</Text>
       </Box>
     </Box>
   );

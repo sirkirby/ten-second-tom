@@ -24,6 +24,7 @@ import { SentimentDisplay } from '../components/SentimentDisplay.js';
 import { ErrorDisplay } from '../components/ErrorDisplay.js';
 import { useAutoExit } from '../hooks/useAutoExit.js';
 import { checkSetupComplete } from '../hooks/useSetupGuard.js';
+import { EXIT_HINT_TEXT } from '../constants.js';
 
 // ---------------------------------------------------------------------------
 // Pipeline types & orchestration (extracted for testability)
@@ -423,7 +424,7 @@ function RecordCommand() {
       )}
 
       <Box marginTop={1}>
-        <Text dimColor>Press Enter or q to exit.</Text>
+        <Text dimColor>{EXIT_HINT_TEXT}</Text>
       </Box>
     </Box>
   );

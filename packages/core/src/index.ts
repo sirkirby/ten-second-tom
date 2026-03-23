@@ -1,11 +1,12 @@
 // Core package barrel export
 
+export * from './constants.js';
 export * from './types/index.js';
 export { type IStorageService, type ListEntriesOptions } from './services/storage.js';
 export { SqliteStorageService } from './services/storage-sqlite.js';
 export { ConfigManager } from './config/config-manager.js';
 export { TomAgent } from './agent/tom-agent.js';
-export { type AgentConfig, getModelId, getBaseUrl } from './agent/config.js';
+export { getModelId, getBaseUrl } from './agent/config.js';
 export {
   type IEmbeddingService,
   OllamaEmbeddingService,

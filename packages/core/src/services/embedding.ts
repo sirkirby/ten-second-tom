@@ -1,3 +1,8 @@
+import {
+  EMBEDDING_AVAILABILITY_TIMEOUT_MS,
+  EMBEDDING_AVAILABILITY_CACHE_MS,
+} from '../constants.js';
+
 export interface IEmbeddingService {
   embed(text: string): Promise<Float32Array>;
   isAvailable(): Promise<boolean>;
@@ -14,7 +19,6 @@ export class OllamaEmbeddingService implements IEmbeddingService {
 
   /** Cached availability result: [value, expiresAt] */
   private availabilityCache: [boolean, number] | null = null;
-  private static readonly AVAILABILITY_CACHE_MS = 30_000;
 
   constructor({ model, endpoint }: OllamaEmbeddingConfig) {
     this.model = model;
@@ -42,16 +46,16 @@ export class OllamaEmbeddingService implements IEmbeddingService {
 
     try {
       const response = await fetch(this.endpoint, {
-        signal: AbortSignal.timeout(3000),
+        signal: AbortSignal.timeout(EMBEDDING_AVAILABILITY_TIMEOUT_MS),
       });
       const available = response.ok;
       this.availabilityCache = [
         available,
-        Date.now() + OllamaEmbeddingService.AVAILABILITY_CACHE_MS,
+        Date.now() + EMBEDDING_AVAILABILITY_CACHE_MS,
       ];
       return available;
     } catch {
-      this.availabilityCache = [false, Date.now() + OllamaEmbeddingService.AVAILABILITY_CACHE_MS];
+      this.availabilityCache = [false, Date.now() + EMBEDDING_AVAILABILITY_CACHE_MS];
       return false;
     }
   }

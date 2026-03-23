@@ -1,18 +1,26 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
 import { Command } from 'commander';
 import { render } from 'ink';
 import { join } from 'node:path';
-import { existsSync, mkdirSync, createWriteStream, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, createWriteStream, unlinkSync, renameSync } from 'node:fs';
 import { ConfigManager } from '@ten-second-tom/core';
+import {
+  WHISPER_MODEL_FILENAME,
+  DEFAULT_OLLAMA_ENDPOINT,
+  DEFAULT_LOCAL_MODEL_ID,
+  DEFAULT_OLLAMA_EMBEDDING_MODEL,
+  DEFAULT_CLOUD_EMBEDDING_MODEL,
+  ANTHROPIC_API_KEY_PREFIX,
+} from '@ten-second-tom/core';
 import type { AppConfig, LlmConfig, EmbeddingConfig } from '@ten-second-tom/core';
 import { useAutoExit } from '../hooks/useAutoExit.js';
+import { EXIT_HINT_TEXT, OLLAMA_FETCH_TIMEOUT_MS } from '../constants.js';
 
 const WHISPER_MODEL_URL =
   'https://huggingface.co/distil-whisper/distil-small.en/resolve/main/ggml-distil-small.en.bin';
-const WHISPER_MODEL_FILENAME = 'ggml-distil-small.en.bin';
 
 type Step =
   | 'llm-provider'
@@ -49,7 +57,7 @@ const llmProviderItems = [
 ];
 
 const FALLBACK_MODEL_ITEMS = [
-  { label: 'qwen2.5:7b (recommended)', value: 'qwen2.5:7b' },
+  { label: `${DEFAULT_LOCAL_MODEL_ID} (recommended)`, value: DEFAULT_LOCAL_MODEL_ID },
   { label: 'mistral:7b', value: 'mistral:7b' },
   { label: 'llama3.2:3b', value: 'llama3.2:3b' },
 ];
@@ -80,7 +88,7 @@ export async function fetchOllamaModels(
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), OLLAMA_FETCH_TIMEOUT_MS);
 
     const response = await fetch(url, { signal: controller.signal });
     clearTimeout(timeout);
@@ -181,7 +189,6 @@ export async function downloadModel(
     });
 
     // Rename temp file to final destination
-    const { renameSync } = await import('node:fs');
     renameSync(tmpPath, destPath);
   } catch (err) {
     // Clean up partial download
@@ -201,8 +208,8 @@ function SetupWizard() {
   const [state, setState] = useState<WizardState>({
     llmProvider: null,
     apiKey: '',
-    localEndpoint: 'http://localhost:11434',
-    localModelId: 'qwen2.5:7b',
+    localEndpoint: DEFAULT_OLLAMA_ENDPOINT,
+    localModelId: DEFAULT_LOCAL_MODEL_ID,
     embeddingProvider: null,
     errorMessage: '',
   });
@@ -239,7 +246,7 @@ function SetupWizard() {
   function handleApiKeySubmit(value: string) {
     const trimmed = value.trim();
     if (trimmed.length === 0) return;
-    if (!trimmed.startsWith('sk-ant-')) {
+    if (!trimmed.startsWith(ANTHROPIC_API_KEY_PREFIX)) {
       setState((s) => ({
         ...s,
         errorMessage:
@@ -253,7 +260,7 @@ function SetupWizard() {
   }
 
   function handleLocalEndpointSubmit(value: string) {
-    const endpoint = value.trim() || 'http://localhost:11434';
+    const endpoint = value.trim() || DEFAULT_OLLAMA_ENDPOINT;
     setState((s) => ({ ...s, localEndpoint: endpoint }));
     setStep('llm-local-model-loading');
   }
@@ -399,17 +406,17 @@ function SetupWizard() {
     // Use the user's local LLM endpoint for Ollama embedding when configured,
     // otherwise fall back to the default Ollama endpoint.
     const ollamaEndpoint =
-      state.llmProvider === 'local' ? state.localEndpoint : 'http://localhost:11434';
+      state.llmProvider === 'local' ? state.localEndpoint : DEFAULT_OLLAMA_ENDPOINT;
 
     const embedding: EmbeddingConfig =
       state.embeddingProvider === 'ollama'
         ? {
             provider: 'ollama',
-            model: 'nomic-embed-text',
+            model: DEFAULT_OLLAMA_EMBEDDING_MODEL,
             endpoint: ollamaEndpoint,
           }
         : state.embeddingProvider === 'cloud'
-          ? { provider: 'cloud', model: 'voyage-3-lite' }
+          ? { provider: 'cloud', model: DEFAULT_CLOUD_EMBEDDING_MODEL }
           : { provider: 'none', model: '' };
 
     const config: AppConfig = {
@@ -628,7 +635,7 @@ function SetupWizard() {
           </Text>
           <Text color="red">{state.errorMessage}</Text>
           <Box marginTop={1}>
-            <Text dimColor>Press Enter or q to exit.</Text>
+            <Text dimColor>{EXIT_HINT_TEXT}</Text>
           </Box>
         </Box>
       )}

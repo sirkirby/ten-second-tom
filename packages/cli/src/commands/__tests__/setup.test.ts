@@ -14,6 +14,7 @@ vi.mock('react', () => ({
   useState: vi.fn(() => [null, vi.fn()]),
   useEffect: vi.fn(),
   useCallback: vi.fn((fn: unknown) => fn),
+  useMemo: vi.fn((fn: () => unknown) => fn()),
 }));
 
 vi.mock('ink-select-input', () => ({ default: vi.fn() }));
@@ -26,6 +27,13 @@ vi.mock('@ten-second-tom/core', () => ({
     audioPath: '/tmp/test/audio',
     save: vi.fn(),
   })),
+  // Constants used at module scope in setup.tsx
+  WHISPER_MODEL_FILENAME: 'ggml-distil-small.en.bin',
+  DEFAULT_OLLAMA_ENDPOINT: 'http://localhost:11434',
+  DEFAULT_LOCAL_MODEL_ID: 'qwen2.5:7b',
+  DEFAULT_OLLAMA_EMBEDDING_MODEL: 'nomic-embed-text',
+  DEFAULT_CLOUD_EMBEDDING_MODEL: 'voyage-3-lite',
+  ANTHROPIC_API_KEY_PREFIX: 'sk-ant-',
 }));
 
 import { fetchOllamaModels } from '../setup.js';

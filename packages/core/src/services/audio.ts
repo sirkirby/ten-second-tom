@@ -6,6 +6,12 @@ import { createWriteStream, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import {
+  AUDIO_SAMPLE_RATE,
+  AUDIO_CHANNELS,
+  AUDIO_BITS_PER_SAMPLE,
+  MAX_AUDIO_BUFFER_BYTES,
+} from '../constants.js';
 
 /**
  * Creates a standard 44-byte WAV header for 16kHz, 16-bit, mono PCM data.
@@ -13,11 +19,8 @@ import { execFileSync } from 'node:child_process';
  */
 export function createWavHeader(dataLength: number): Buffer {
   const header = Buffer.alloc(44);
-  const sampleRate = 16000;
-  const channels = 1;
-  const bitsPerSample = 16;
-  const byteRate = sampleRate * channels * (bitsPerSample / 8);
-  const blockAlign = channels * (bitsPerSample / 8);
+  const byteRate = AUDIO_SAMPLE_RATE * AUDIO_CHANNELS * (AUDIO_BITS_PER_SAMPLE / 8);
+  const blockAlign = AUDIO_CHANNELS * (AUDIO_BITS_PER_SAMPLE / 8);
 
   header.write('RIFF', 0);
   header.writeUInt32LE(36 + dataLength, 4);
@@ -25,11 +28,11 @@ export function createWavHeader(dataLength: number): Buffer {
   header.write('fmt ', 12);
   header.writeUInt32LE(16, 16); // PCM chunk size
   header.writeUInt16LE(1, 20); // PCM format
-  header.writeUInt16LE(channels, 22);
-  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt16LE(AUDIO_CHANNELS, 22);
+  header.writeUInt32LE(AUDIO_SAMPLE_RATE, 24);
   header.writeUInt32LE(byteRate, 28);
   header.writeUInt16LE(blockAlign, 32);
-  header.writeUInt16LE(bitsPerSample, 34);
+  header.writeUInt16LE(AUDIO_BITS_PER_SAMPLE, 34);
   header.write('data', 36);
   header.writeUInt32LE(dataLength, 40);
   return header;
@@ -93,9 +96,6 @@ export interface AudioServiceConfig {
 }
 
 export class AudioService implements IAudioService {
-  /** Maximum buffer size (~55 minutes at 16kHz mono 16-bit). */
-  private static readonly MAX_BUFFER_BYTES = 100 * 1024 * 1024; // 100MB
-
   private recording: Recording | null = null;
   private audioStream: Readable | null = null;
   private audioChunks: Buffer[] = [];
@@ -115,8 +115,8 @@ export class AudioService implements IAudioService {
     this.bufferSize = 0;
 
     this.recording = record({
-      sampleRate: 16000,
-      channels: 1,
+      sampleRate: AUDIO_SAMPLE_RATE,
+      channels: AUDIO_CHANNELS,
       audioType: 'raw',
     });
 
@@ -129,7 +129,7 @@ export class AudioService implements IAudioService {
       this.bufferSize += chunk.length;
 
       // Auto-stop recording to prevent OOM if buffer exceeds maximum
-      if (this.bufferSize >= AudioService.MAX_BUFFER_BYTES) {
+      if (this.bufferSize >= MAX_AUDIO_BUFFER_BYTES) {
         void this.stopRecording();
       }
     });
