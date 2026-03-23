@@ -282,7 +282,7 @@ export function NoteScreen({ context, onComplete, onCancel }: NoteScreenProps) {
         <Text color="cyan">
           <Spinner type="dots" />
         </Text>
-        <Text> Analysing note...</Text>
+        <Text> Analyzing note...</Text>
       </Box>
     );
   }

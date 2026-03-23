@@ -46,12 +46,27 @@ export function Prompt({ commands, onCommand }: PromptProps) {
     }
   });
 
+  const commandHints = commands
+    .filter((c) => c.name !== 'quit' && c.name !== 'help')
+    .map((c) => c.name)
+    .join(' \u00B7 ');
+
   return (
-    <Box>
-      <Text color="green" bold>
-        {'tom > '}
-      </Text>
-      <TextInput value={value} onChange={setValue} onSubmit={handleSubmit} />
+    <Box flexDirection="column">
+      <Box>
+        <Text color="green" bold>
+          {'tom > '}
+        </Text>
+        <TextInput value={value} onChange={setValue} onSubmit={handleSubmit} />
+      </Box>
+      {!value && (
+        <Box paddingLeft={6}>
+          <Text dimColor>
+            {commandHints}
+            {' \u00B7 '}help
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 }

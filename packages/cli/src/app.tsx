@@ -122,6 +122,14 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
     }
   }, []);
 
+  // ---- refresh entry count whenever home screen is shown ----
+  useEffect(() => {
+    if (screen !== 'home' || !services) return;
+    void services.storage.listEntries({ limit: 100_000 }).then((entries) => {
+      setEntryCount(entries.length);
+    });
+  }, [screen, services]);
+
   // ---- execute initial command in one-shot mode ----
   useEffect(() => {
     if (mode !== 'oneshot' || !initialCommand || initialCommandExecuted.current) return;

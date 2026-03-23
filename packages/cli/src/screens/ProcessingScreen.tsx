@@ -306,7 +306,7 @@ export function ProcessingScreen({
           <Text color="cyan">
             <Spinner type="dots" />
           </Text>
-          <Text> Analysing...</Text>
+          <Text> Analyzing...</Text>
         </Box>
       </Box>
     );

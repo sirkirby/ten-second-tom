@@ -72,6 +72,14 @@ export function ResultsSummary({
             <Text dimColor>{formatConfidence(analysis.sentiment.confidence)} confidence</Text>
           </Box>
 
+          {/* AI-generated summary */}
+          {analysis.summary.length > 0 && (
+            <Text>
+              <Text dimColor>Summary: </Text>
+              <Text>{analysis.summary}</Text>
+            </Text>
+          )}
+
           {/* Topics and context type on one line */}
           {(hasTopics(analysis) || hasContextType(analysis)) && (
             <Text dimColor>
