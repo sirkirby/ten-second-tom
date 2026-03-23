@@ -155,7 +155,7 @@ export class SqliteStorageService implements IStorageService {
     if (exists) {
       // Extract the dimension from the existing DDL, e.g. "float[768]"
       const match = exists.sql.match(/float\[(\d+)\]/);
-      const existingDim = match ? parseInt(match[1], 10) : null;
+      const existingDim = match?.[1] ? parseInt(match[1], 10) : null;
 
       if (existingDim !== null && existingDim !== dimension) {
         // Dimension mismatch — drop and recreate. Existing embeddings are lost
