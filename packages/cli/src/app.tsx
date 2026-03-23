@@ -10,6 +10,7 @@ import { ProcessingScreen } from './screens/ProcessingScreen.js';
 import { SearchScreen } from './screens/SearchScreen.js';
 import { ListScreen } from './screens/ListScreen.js';
 import { NoteScreen } from './screens/NoteScreen.js';
+import { SetupWizard } from './commands/setup.js';
 import { ResultsSummary } from './components/ResultsSummary.js';
 import type { ResultsSummaryProps } from './components/ResultsSummary.js';
 import { findCommand } from './commands/registry.js';
@@ -303,8 +304,13 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
         />
       )}
 
-      {/* Placeholder screens — will be implemented in subsequent tasks */}
-      {screen === 'setup' && <Text color="yellow">Setup screen (coming later)</Text>}
+      {screen === 'setup' && (
+        <SetupWizard
+          onComplete={() => {
+            setScreen('home');
+          }}
+        />
+      )}
     </Box>
   );
 }

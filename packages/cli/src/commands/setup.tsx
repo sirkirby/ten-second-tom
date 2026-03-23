@@ -280,7 +280,12 @@ export function extractTarBz2(archivePath: string, targetDir: string): void {
   execFileSync('tar', ['xjf', archivePath, '-C', targetDir]);
 }
 
-function SetupWizard() {
+export interface SetupWizardProps {
+  /** When provided, called instead of exit() on completion (REPL mode). */
+  onComplete?: () => void;
+}
+
+export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
   const { exit } = useApp();
   const [step, setStep] = useState<Step>('llm-provider');
   const [state, setState] = useState<WizardState>({
@@ -311,12 +316,17 @@ function SetupWizard() {
 
   const configManager = useMemo(() => new ConfigManager(), []);
 
-  // Auto-exit after error with a short delay; allow q/Enter to exit immediately
-  useAutoExit(step === 'error');
+  // Auto-exit after error with a short delay; allow q/Enter to exit immediately.
+  // Disabled in REPL mode (onComplete provided) — the REPL manages its own lifecycle.
+  useAutoExit(step === 'error', undefined, !onComplete);
 
   useInput((input, key) => {
     if ((input === 'q' || key.return) && step === 'error') {
-      exit();
+      if (onComplete) {
+        onComplete();
+      } else {
+        exit();
+      }
     }
   });
 
@@ -715,7 +725,11 @@ function SetupWizard() {
       configManager.save(config);
       setStep('done');
       setTimeout(() => {
-        exit();
+        if (onComplete) {
+          onComplete();
+        } else {
+          exit();
+        }
       }, 1500);
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
