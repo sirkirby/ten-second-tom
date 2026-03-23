@@ -6,6 +6,7 @@ import { checkSetupComplete } from './hooks/useSetupGuard.js';
 import { HomeScreen } from './screens/HomeScreen.js';
 import { RecordingScreen } from './screens/RecordingScreen.js';
 import { ProcessingScreen } from './screens/ProcessingScreen.js';
+import { SearchScreen } from './screens/SearchScreen.js';
 import { ResultsSummary } from './components/ResultsSummary.js';
 import type { ResultsSummaryProps } from './components/ResultsSummary.js';
 import { findCommand } from './commands/registry.js';
@@ -192,8 +193,18 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
         />
       )}
 
+      {screen === 'search' && (
+        <SearchScreen
+          context={context}
+          initialQuery={screenData['query'] as string | undefined}
+          onClose={() => {
+            setScreenData({});
+            setScreen('home');
+          }}
+        />
+      )}
+
       {/* Placeholder screens — will be implemented in subsequent tasks */}
-      {screen === 'search' && <Text color="yellow">Search screen (coming in Task 4)</Text>}
       {screen === 'note' && <Text color="yellow">Note screen (coming in Task 5)</Text>}
       {screen === 'setup' && <Text color="yellow">Setup screen (coming later)</Text>}
     </Box>
