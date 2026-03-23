@@ -206,9 +206,8 @@ function SetupWizard() {
     embeddingProvider: null,
     errorMessage: '',
   });
-  const [ollamaModelItems, setOllamaModelItems] = useState<
-    Array<{ label: string; value: string }>
-  >(FALLBACK_MODEL_ITEMS);
+  const [ollamaModelItems, setOllamaModelItems] =
+    useState<Array<{ label: string; value: string }>>(FALLBACK_MODEL_ITEMS);
   const [ollamaStatusMessage, setOllamaStatusMessage] = useState('');
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress>({
     status: 'checking',
@@ -275,9 +274,7 @@ function SetupWizard() {
       }
 
       if (result.models.length === 0) {
-        setOllamaStatusMessage(
-          'No models found. Install a model with: ollama pull qwen2.5:7b',
-        );
+        setOllamaStatusMessage('No models found. Install a model with: ollama pull qwen2.5:7b');
         setOllamaModelItems(FALLBACK_MODEL_ITEMS);
         setStep('llm-local-model');
         return;

@@ -17,9 +17,8 @@ vi.mock('node-record-lpcm16', () => {
 });
 
 // Import after mock is registered
-const { AudioService, checkAudioPrerequisites, checkModelExists, createWavHeader } = await import(
-  '../audio.js'
-);
+const { AudioService, checkAudioPrerequisites, checkModelExists, createWavHeader } =
+  await import('../audio.js');
 
 function makeFakeRecording(stream: PassThrough) {
   return {
