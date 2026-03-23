@@ -47,6 +47,13 @@ check: lint format-check test ## Run all checks (lint, format, tests)
 # ─── Dev Convenience ─────────────────────────────────────────────────────────
 
 link-dev: build ## Link 'tom' binary globally for local testing
+	@if [ -z "$$PNPM_HOME" ]; then \
+		echo ""; \
+		echo "  PNPM_HOME is not set. Run 'pnpm setup' first, then restart your shell."; \
+		echo "  In the meantime, use 'make tom ARGS=\"record\"' to run directly."; \
+		echo ""; \
+		exit 1; \
+	fi
 	cd packages/cli && pnpm link --global
 	@echo ""
 	@echo "  'tom' is now linked to your local build."
