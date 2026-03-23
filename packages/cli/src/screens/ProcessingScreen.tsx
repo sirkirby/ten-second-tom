@@ -8,7 +8,7 @@ import { TranscriptBox } from '../components/TranscriptBox.js';
 import { ErrorDisplay } from '../components/ErrorDisplay.js';
 import { checkSetupComplete } from '../hooks/useSetupGuard.js';
 import { useAutoExit } from '../hooks/useAutoExit.js';
-import { runAnalysisPipeline } from '../commands/record.js';
+import { runAnalysisPipeline } from '../pipeline.js';
 import type { AppContext } from '../commands/registry.js';
 import type { ResultsSummaryProps } from '../components/ResultsSummary.js';
 import { AUTO_EXIT_DELAY_MS } from '../constants.js';
