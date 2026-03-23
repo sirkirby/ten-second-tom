@@ -1,13 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
 import { Command } from 'commander';
 import { render } from 'ink';
 import { join } from 'node:path';
+import { existsSync, mkdirSync, createWriteStream, unlinkSync } from 'node:fs';
 import { ConfigManager } from '@ten-second-tom/core';
 import type { AppConfig, LlmConfig, EmbeddingConfig } from '@ten-second-tom/core';
 import { useAutoExit } from '../hooks/useAutoExit.js';
+
+const WHISPER_MODEL_URL =
+  'https://huggingface.co/distil-whisper/distil-small.en/resolve/main/ggml-distil-small.en.bin';
+const WHISPER_MODEL_FILENAME = 'ggml-distil-small.en.bin';
 
 type Step =
   | 'llm-provider'
@@ -16,6 +21,7 @@ type Step =
   | 'llm-local-model'
   | 'embedding-provider'
   | 'stt-info'
+  | 'model-download'
   | 'saving'
   | 'done'
   | 'error';
@@ -26,6 +32,13 @@ interface WizardState {
   localEndpoint: string;
   localModelId: string;
   embeddingProvider: 'ollama' | 'cloud' | 'none' | null;
+  errorMessage: string;
+}
+
+interface DownloadProgress {
+  status: 'checking' | 'already-downloaded' | 'downloading' | 'complete' | 'error';
+  bytesDownloaded: number;
+  totalBytes: number;
   errorMessage: string;
 }
 
@@ -46,6 +59,85 @@ const embeddingProviderItems = [
   { label: 'None (keyword search only)', value: 'none' as const },
 ];
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(0)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
+}
+
+function makeProgressBar(percent: number, width: number = 20): string {
+  const filled = Math.round((percent / 100) * width);
+  const empty = width - filled;
+  return '[' + '\u2588'.repeat(filled) + '\u2591'.repeat(empty) + ']';
+}
+
+/**
+ * Download the Whisper model file with progress tracking.
+ * Exported for testability.
+ */
+export async function downloadModel(
+  url: string,
+  destPath: string,
+  onProgress: (bytesDownloaded: number, totalBytes: number) => void,
+): Promise<void> {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Download failed: HTTP ${response.status} ${response.statusText}`);
+  }
+
+  if (!response.body) {
+    throw new Error('Download failed: no response body');
+  }
+
+  const contentLength = Number(response.headers.get('content-length') ?? 0);
+  let bytesDownloaded = 0;
+
+  // Ensure the directory exists
+  const dir = join(destPath, '..');
+  mkdirSync(dir, { recursive: true });
+
+  // Use a temporary path so a partial download doesn't leave a corrupted file
+  const tmpPath = destPath + '.downloading';
+
+  const fileStream = createWriteStream(tmpPath);
+
+  try {
+    const reader = response.body.getReader();
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      fileStream.write(Buffer.from(value));
+      bytesDownloaded += value.byteLength;
+      onProgress(bytesDownloaded, contentLength);
+    }
+
+    // Wait for the write stream to finish
+    await new Promise<void>((resolve, reject) => {
+      fileStream.on('finish', resolve);
+      fileStream.on('error', reject);
+      fileStream.end();
+    });
+
+    // Rename temp file to final destination
+    const { renameSync } = await import('node:fs');
+    renameSync(tmpPath, destPath);
+  } catch (err) {
+    // Clean up partial download
+    fileStream.end();
+    try {
+      unlinkSync(tmpPath);
+    } catch {
+      // Best effort cleanup
+    }
+    throw err;
+  }
+}
+
 function SetupWizard() {
   const { exit } = useApp();
   const [step, setStep] = useState<Step>('llm-provider');
@@ -55,6 +147,12 @@ function SetupWizard() {
     localEndpoint: 'http://localhost:11434',
     localModelId: 'qwen2.5:7b',
     embeddingProvider: null,
+    errorMessage: '',
+  });
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress>({
+    status: 'checking',
+    bytesDownloaded: 0,
+    totalBytes: 0,
     errorMessage: '',
   });
 
@@ -113,6 +211,83 @@ function SetupWizard() {
 
   function handleSttContinue(item: { value: string }) {
     if (item.value === 'continue') {
+      setStep('model-download');
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Model download step
+  // -------------------------------------------------------------------------
+  const modelPath = join(configManager.modelsPath, WHISPER_MODEL_FILENAME);
+
+  const startDownload = useCallback(async () => {
+    // Check if model already exists
+    if (existsSync(modelPath)) {
+      setDownloadProgress({
+        status: 'already-downloaded',
+        bytesDownloaded: 0,
+        totalBytes: 0,
+        errorMessage: '',
+      });
+      // Proceed to save after a short delay
+      setTimeout(() => {
+        handleSave();
+      }, 1000);
+      return;
+    }
+
+    setDownloadProgress({
+      status: 'downloading',
+      bytesDownloaded: 0,
+      totalBytes: 0,
+      errorMessage: '',
+    });
+
+    try {
+      await downloadModel(WHISPER_MODEL_URL, modelPath, (downloaded, total) => {
+        setDownloadProgress({
+          status: 'downloading',
+          bytesDownloaded: downloaded,
+          totalBytes: total,
+          errorMessage: '',
+        });
+      });
+
+      setDownloadProgress((prev) => ({
+        ...prev,
+        status: 'complete',
+      }));
+
+      // Proceed to save
+      handleSave();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setDownloadProgress({
+        status: 'error',
+        bytesDownloaded: 0,
+        totalBytes: 0,
+        errorMessage: `Model download failed: ${msg}`,
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelPath]);
+
+  useEffect(() => {
+    if (step === 'model-download' && downloadProgress.status === 'checking') {
+      void startDownload();
+    }
+  }, [step, downloadProgress.status, startDownload]);
+
+  // Handle retry/skip on download error
+  function handleDownloadErrorChoice(item: { value: string }) {
+    if (item.value === 'retry') {
+      setDownloadProgress({
+        status: 'checking',
+        bytesDownloaded: 0,
+        totalBytes: 0,
+        errorMessage: '',
+      });
+    } else if (item.value === 'skip') {
       handleSave();
     }
   }
@@ -149,7 +324,7 @@ function SetupWizard() {
       llm,
       stt: {
         engine: 'whisper.node',
-        modelPath: join(configManager.modelsPath, 'ggml-distil-small.en.bin'),
+        modelPath: join(configManager.modelsPath, WHISPER_MODEL_FILENAME),
       },
       embedding,
       storage: {
@@ -278,17 +453,67 @@ function SetupWizard() {
             <Text>
               Model:{' '}
               <Text bold>ggml-distil-small.en</Text>{' '}
-              <Text dimColor>(~380MB)</Text>
+              <Text dimColor>(~380 MB)</Text>
             </Text>
             <Text dimColor>
-              The model will be downloaded automatically on first recording.
+              The model will be downloaded next.
             </Text>
           </Box>
           <Box marginTop={1}>
             <SelectInput
-              items={[{ label: 'Continue and save configuration', value: 'continue' }]}
+              items={[{ label: 'Continue and download model', value: 'continue' }]}
               onSelect={handleSttContinue}
             />
+          </Box>
+        </Box>
+      )}
+
+      {step === 'model-download' && (
+        <Box flexDirection="column">
+          <Text>Step 4 of 4: Download Whisper Model</Text>
+          <Box marginTop={1} flexDirection="column">
+            {downloadProgress.status === 'checking' && (
+              <Text dimColor>Checking for existing model...</Text>
+            )}
+            {downloadProgress.status === 'already-downloaded' && (
+              <Text color="green">Model already downloaded. Continuing...</Text>
+            )}
+            {downloadProgress.status === 'downloading' && (
+              <>
+                <Text>
+                  Downloading ggml-distil-small.en (~380 MB)...
+                </Text>
+                <Text>
+                  {'  '}
+                  {downloadProgress.totalBytes > 0
+                    ? `${makeProgressBar(
+                        (downloadProgress.bytesDownloaded / downloadProgress.totalBytes) * 100,
+                      )} ${Math.round(
+                        (downloadProgress.bytesDownloaded / downloadProgress.totalBytes) * 100,
+                      )}% (${formatBytes(downloadProgress.bytesDownloaded)} / ${formatBytes(
+                        downloadProgress.totalBytes,
+                      )})`
+                    : `Downloaded ${formatBytes(downloadProgress.bytesDownloaded)}...`}
+                </Text>
+              </>
+            )}
+            {downloadProgress.status === 'complete' && (
+              <Text color="green">Download complete! Saving configuration...</Text>
+            )}
+            {downloadProgress.status === 'error' && (
+              <Box flexDirection="column">
+                <Text color="red">{downloadProgress.errorMessage}</Text>
+                <Box marginTop={1}>
+                  <SelectInput
+                    items={[
+                      { label: 'Retry download', value: 'retry' },
+                      { label: 'Skip (download later)', value: 'skip' },
+                    ]}
+                    onSelect={handleDownloadErrorChoice}
+                  />
+                </Box>
+              </Box>
+            )}
           </Box>
         </Box>
       )}
