@@ -1,39 +1,7 @@
 import { initWhisper, toggleNativeLog } from '@fugood/whisper.node';
 import type { WhisperContext, TranscribeOptions } from '@fugood/whisper.node';
 import type { Readable } from 'node:stream';
-import { openSync, closeSync } from 'node:fs';
 import { LIVE_TRANSCRIPTION_CHUNK_BYTES } from '../constants.js';
-
-/**
- * Redirect file descriptor 2 (stderr) to /dev/null.
- * This is the ONLY reliable way to suppress native C++ library output
- * (whisper.cpp, ggml) that writes directly via fprintf(stderr, ...).
- * toggleNativeLog() doesn't catch the early ggml_metal_init messages.
- */
-function suppressNativeStderr(): void {
-  try {
-    closeSync(2);
-    openSync('/dev/null', 'w'); // gets fd 2 since we just freed it
-  } catch {
-    // Non-fatal — stderr suppression is best-effort
-  }
-}
-
-/**
- * Restore file descriptor 2 to the real stderr (/dev/stderr or /dev/tty).
- */
-function restoreNativeStderr(): void {
-  try {
-    closeSync(2);
-    openSync('/dev/stderr', 'w');
-  } catch {
-    try {
-      openSync('/dev/tty', 'w');
-    } catch {
-      // Non-fatal
-    }
-  }
-}
 
 export interface ITranscriptionService {
   transcribeStream(audioStream: Readable, onChunk: (text: string) => void): Promise<string>;
@@ -143,19 +111,11 @@ export class WhisperTranscriptionService implements ITranscriptionService {
       this.context = null;
     }
 
-    // Suppress native C++ output at the file descriptor level.
-    // toggleNativeLog(false) catches some output via a callback hook,
-    // but ggml_metal_init and whisper_model_load write directly to stderr
-    // via fprintf before the hook is even registered.
-    // Redirecting fd 2 to /dev/null is the only reliable suppression.
+    // toggleNativeLog suppresses output via the native log callback.
+    // fd 2 is already redirected to /dev/null at app startup (cli.ts)
+    // for any output that bypasses the callback.
     await toggleNativeLog(false);
-    suppressNativeStderr();
-
-    try {
-      this.context = await initWhisper({ filePath: modelPath });
-    } finally {
-      restoreNativeStderr();
-    }
+    this.context = await initWhisper({ filePath: modelPath });
   }
 
   /**
@@ -165,13 +125,8 @@ export class WhisperTranscriptionService implements ITranscriptionService {
    */
   async release(): Promise<void> {
     if (this.context !== null) {
-      suppressNativeStderr();
-      try {
-        await this.context.release();
-      } finally {
-        this.context = null;
-        restoreNativeStderr();
-      }
+      await this.context.release();
+      this.context = null;
     }
   }
 
@@ -196,14 +151,9 @@ export class WhisperTranscriptionService implements ITranscriptionService {
     }
 
     await this.suppressNativeLog();
-    suppressNativeStderr();
-    try {
-      const { promise } = this.context.transcribeFile(audioPath, DEFAULT_TRANSCRIBE_OPTIONS);
-      const result = await promise;
-      return extractTranscript(result);
-    } finally {
-      restoreNativeStderr();
-    }
+    const { promise } = this.context.transcribeFile(audioPath, DEFAULT_TRANSCRIBE_OPTIONS);
+    const result = await promise;
+    return extractTranscript(result);
   }
 
   /**

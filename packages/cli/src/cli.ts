@@ -1,7 +1,20 @@
 #!/usr/bin/env node
 import React from 'react';
 import { render } from 'ink';
+import { openSync, closeSync } from 'node:fs';
 import { App } from './app.js';
+
+// Suppress native C++ stderr output (whisper.cpp, ggml, sherpa-onnx)
+// permanently for the entire app lifecycle. These libraries write directly
+// to file descriptor 2 via fprintf(stderr, ...) and cannot be suppressed
+// via Node.js APIs. Redirecting fd 2 to /dev/null is the only reliable fix.
+// We do NOT restore it — stderr is unused by Tom (all output goes to stdout via Ink).
+try {
+  closeSync(2);
+  openSync('/dev/null', 'w'); // gets fd 2
+} catch {
+  // Non-fatal — best effort suppression
+}
 
 const args = process.argv.slice(2);
 const KNOWN_COMMANDS = ['record', 'note', 'search', 'analyze', 'setup'];
