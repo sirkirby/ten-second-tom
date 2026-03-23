@@ -7,9 +7,11 @@ import type { EntryAnalysis, ServiceContainer } from '@ten-second-tom/core';
 import { TranscriptBox } from '../components/TranscriptBox.js';
 import { ErrorDisplay } from '../components/ErrorDisplay.js';
 import { checkSetupComplete } from '../hooks/useSetupGuard.js';
+import { useAutoExit } from '../hooks/useAutoExit.js';
 import { runAnalysisPipeline } from '../commands/record.js';
 import type { AppContext } from '../commands/registry.js';
 import type { ResultsSummaryProps } from '../components/ResultsSummary.js';
+import { AUTO_EXIT_DELAY_MS } from '../constants.js';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -243,6 +245,11 @@ export function ProcessingScreen({
       cancelled = true;
     };
   }, [entryId]);
+
+  // -------------------------------------------------------------------------
+  // One-shot: auto-exit after showing an error
+  // -------------------------------------------------------------------------
+  useAutoExit(phase === 'error', AUTO_EXIT_DELAY_MS, context.oneShot);
 
   // -------------------------------------------------------------------------
   // Render

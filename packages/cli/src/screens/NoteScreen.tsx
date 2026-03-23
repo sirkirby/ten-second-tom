@@ -11,10 +11,12 @@ import {
 } from '@ten-second-tom/core';
 import type { ServiceContainer } from '@ten-second-tom/core';
 import { checkSetupComplete } from '../hooks/useSetupGuard.js';
+import { useAutoExit } from '../hooks/useAutoExit.js';
 import { ErrorDisplay } from '../components/ErrorDisplay.js';
 import { runAnalysisPipeline } from '../commands/record.js';
 import type { AppContext } from '../commands/registry.js';
 import type { ResultsSummaryProps } from '../components/ResultsSummary.js';
+import { AUTO_EXIT_DELAY_MS } from '../constants.js';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -261,6 +263,11 @@ export function NoteScreen({ context, onComplete, onCancel }: NoteScreenProps) {
       }
     };
   }, [discardRecording]);
+
+  // -------------------------------------------------------------------------
+  // One-shot: auto-exit after showing an error
+  // -------------------------------------------------------------------------
+  useAutoExit(phase === 'error', AUTO_EXIT_DELAY_MS, context.oneShot);
 
   // -------------------------------------------------------------------------
   // Render

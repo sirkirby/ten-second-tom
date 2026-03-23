@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Box, Static, Text, useApp } from 'ink';
+import { Box, Static, Text, useApp, useInput } from 'ink';
 import { buildServicesFromConfig } from '@ten-second-tom/core';
 import type { AppConfig, ServiceContainer, ConfigManager } from '@ten-second-tom/core';
 import { checkSetupComplete } from './hooks/useSetupGuard.js';
+import { useAutoExit } from './hooks/useAutoExit.js';
 import { HomeScreen } from './screens/HomeScreen.js';
 import { RecordingScreen } from './screens/RecordingScreen.js';
 import { ProcessingScreen } from './screens/ProcessingScreen.js';
@@ -12,6 +13,7 @@ import { ResultsSummary } from './components/ResultsSummary.js';
 import type { ResultsSummaryProps } from './components/ResultsSummary.js';
 import { findCommand } from './commands/registry.js';
 import type { Screen, HistoryEntry, AppContext } from './commands/registry.js';
+import { AUTO_EXIT_DELAY_MS } from './constants.js';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -39,6 +41,9 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
   const [configManager, setConfigManager] = useState<ConfigManager | null>(null);
   const [entryCount, setEntryCount] = useState(0);
 
+  // One-shot: tracks whether the command has completed (triggers auto-exit)
+  const [commandDone, setCommandDone] = useState(false);
+
   // Data passed from RecordingScreen → ProcessingScreen
   const [recordingData, setRecordingData] = useState<{
     audioRelPath: string;
@@ -48,6 +53,19 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
 
   // Guard against double-executing the initial command in StrictMode
   const initialCommandExecuted = useRef(false);
+
+  // ---- one-shot: auto-exit after delay when done ----
+  useAutoExit(commandDone, AUTO_EXIT_DELAY_MS, mode === 'oneshot');
+
+  // Allow pressing any key to exit immediately in one-shot mode when done
+  useInput(
+    (_input, _key) => {
+      if (commandDone && mode === 'oneshot') {
+        exit();
+      }
+    },
+    { isActive: commandDone && mode === 'oneshot' },
+  );
 
   // ---- helpers ----
   const pushHistory = useCallback((entry: HistoryEntry) => {
@@ -129,7 +147,10 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
       content: 'Recording cancelled.',
     });
     setScreen('home');
-  }, [pushHistory]);
+    if (mode === 'oneshot') {
+      setCommandDone(true);
+    }
+  }, [pushHistory, mode]);
 
   // ---- note screen callback ----
   const handleNoteComplete = useCallback(
@@ -147,13 +168,11 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
       });
       setScreenData({});
       setScreen('home');
-
-      // In one-shot mode, exit after note completes
       if (mode === 'oneshot') {
-        exit();
+        setCommandDone(true);
       }
     },
-    [pushHistory, mode, exit],
+    [pushHistory, mode],
   );
 
   // ---- processing screen callback ----
@@ -174,13 +193,11 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
       setRecordingData(null);
       setScreenData({});
       setScreen('home');
-
-      // In one-shot mode, exit after processing completes
       if (mode === 'oneshot') {
-        exit();
+        setCommandDone(true);
       }
     },
-    [pushHistory, mode, exit],
+    [pushHistory, mode],
   );
 
   // ---- render ----
@@ -195,8 +212,15 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
         )}
       </Static>
 
-      {/* Active screen */}
-      {screen === 'home' && (
+      {/* One-shot done: show exit hint instead of home screen */}
+      {commandDone && mode === 'oneshot' && (
+        <Box paddingTop={1}>
+          <Text dimColor>Press any key to exit (auto-exits in 5s)</Text>
+        </Box>
+      )}
+
+      {/* Active screen — hidden in one-shot done state */}
+      {!commandDone && screen === 'home' && (
         <HomeScreen context={context} config={config} entryCount={entryCount} />
       )}
 
@@ -226,6 +250,9 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
           onClose={() => {
             setScreenData({});
             setScreen('home');
+            if (mode === 'oneshot') {
+              setCommandDone(true);
+            }
           }}
         />
       )}
@@ -234,7 +261,12 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
         <NoteScreen
           context={context}
           onComplete={handleNoteComplete}
-          onCancel={() => setScreen('home')}
+          onCancel={() => {
+            setScreen('home');
+            if (mode === 'oneshot') {
+              setCommandDone(true);
+            }
+          }}
         />
       )}
 

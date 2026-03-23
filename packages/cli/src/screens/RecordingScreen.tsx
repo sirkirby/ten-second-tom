@@ -9,9 +9,11 @@ import {
 } from '@ten-second-tom/core';
 import type { ServiceContainer } from '@ten-second-tom/core';
 import { checkSetupComplete } from '../hooks/useSetupGuard.js';
+import { useAutoExit } from '../hooks/useAutoExit.js';
 import { ErrorDisplay } from '../components/ErrorDisplay.js';
 import { TranscriptBox } from '../components/TranscriptBox.js';
 import type { AppContext } from '../commands/registry.js';
+import { AUTO_EXIT_DELAY_MS } from '../constants.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -263,6 +265,11 @@ export function RecordingScreen({ context, onComplete, onCancel }: RecordingScre
       void handleCancel();
     }
   });
+
+  // -------------------------------------------------------------------------
+  // One-shot: auto-exit after showing an error
+  // -------------------------------------------------------------------------
+  useAutoExit(phase === 'error', AUTO_EXIT_DELAY_MS, context.oneShot);
 
   // -------------------------------------------------------------------------
   // Render
