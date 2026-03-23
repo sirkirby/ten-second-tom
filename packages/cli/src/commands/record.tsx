@@ -4,7 +4,6 @@ import { Command } from 'commander';
 import { render } from 'ink';
 import { join } from 'node:path';
 import {
-  ConfigManager,
   AudioService,
   WhisperTranscriptionService,
   TomAgent,
@@ -18,7 +17,7 @@ import {
   type ITranscriptionService,
   type IEmbeddingService,
 } from '@ten-second-tom/core';
-import type { AppConfig, EntryAnalysis } from '@ten-second-tom/core';
+import type { ConfigManager, AppConfig, EntryAnalysis } from '@ten-second-tom/core';
 import { RecordingUI } from '../components/RecordingUI.js';
 import { SentimentDisplay } from '../components/SentimentDisplay.js';
 import { ErrorDisplay } from '../components/ErrorDisplay.js';

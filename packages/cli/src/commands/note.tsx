@@ -252,7 +252,10 @@ function NoteCommand() {
       let services = servicesRef.current;
       if (services === null) {
         const configManager = new ConfigManager();
-        const config = configManager.load()!;
+        const config = configManager.load();
+        if (config === undefined) {
+          throw new Error('Configuration not found. Run `tom setup` first.');
+        }
         services = buildServicesFromConfig(config, configManager);
         servicesRef.current = services;
       }

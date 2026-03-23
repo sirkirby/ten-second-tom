@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
+import type * as RecordModule from '../record.js';
 
 // ---------------------------------------------------------------------------
 // We test the exported pipeline helper (runAnalyzePipeline) directly.
@@ -44,14 +45,13 @@ vi.mock('../../hooks/useSetupGuard.js', () => ({
 
 // Mock the record module so we can spy on buildServicesFromConfig
 vi.mock('../record.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../record.js')>();
+  const actual = await importOriginal<typeof RecordModule>();
   return {
     ...actual,
     buildServicesFromConfig: vi.fn(),
   };
 });
 
-import { ConfigManager } from '@ten-second-tom/core';
 import type {
   IEmbeddingService,
   IStorageService,

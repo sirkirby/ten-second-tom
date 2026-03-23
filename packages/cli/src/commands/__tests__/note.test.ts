@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
+import type * as RecordModule from '../record.js';
 
 // ---------------------------------------------------------------------------
 // We test the exported pipeline helpers and note command pipeline directly.
@@ -47,7 +48,7 @@ vi.mock('ink-text-input', () => ({ default: vi.fn() }));
 
 // Mock the record module so we can spy on runAnalysisPipeline
 vi.mock('../record.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../record.js')>();
+  const actual = await importOriginal<typeof RecordModule>();
   return {
     ...actual,
     runAnalysisPipeline: vi.fn(),
@@ -55,9 +56,6 @@ vi.mock('../record.js', async (importOriginal) => {
   };
 });
 
-import {
-  ConfigManager,
-} from '@ten-second-tom/core';
 import type {
   IEmbeddingService,
   IStorageService,
@@ -411,10 +409,9 @@ describe('startDictation', () => {
     };
 
     // stopDictation: stop recording but discard the returned audio path
-    const _discardedPath = await audio.stopRecording();
+    await audio.stopRecording();
 
     expect(audio.stopRecording).toHaveBeenCalledOnce();
-    // We don't assert on _discardedPath — it's intentionally discarded
   });
 
   it('stops recording and discards audio path on submit in dictated mode', async () => {

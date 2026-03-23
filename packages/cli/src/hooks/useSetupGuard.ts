@@ -19,6 +19,9 @@ export function checkSetupComplete(): SetupGuardResult {
   if (!configManager.isSetupComplete()) {
     return { ok: false, error: SETUP_REQUIRED_MESSAGE };
   }
-  const config = configManager.load()!;
+  const config = configManager.load();
+  if (config === undefined) {
+    return { ok: false, error: SETUP_REQUIRED_MESSAGE };
+  }
   return { ok: true, config, configManager };
 }

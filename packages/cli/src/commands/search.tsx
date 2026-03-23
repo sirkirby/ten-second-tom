@@ -4,7 +4,6 @@ import TextInput from 'ink-text-input';
 import { Command } from 'commander';
 import { render } from 'ink';
 import {
-  ConfigManager,
   SearchService,
 } from '@ten-second-tom/core';
 import type { Entry } from '@ten-second-tom/core';

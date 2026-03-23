@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
+import type * as RecordModule from '../record.js';
 
 // ---------------------------------------------------------------------------
 // Mock @ten-second-tom/core before importing the module under test
@@ -52,7 +53,7 @@ vi.mock('../../hooks/useSetupGuard.js', () => ({
 
 // Mock the record module so we can spy on buildServicesFromConfig
 vi.mock('../record.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../record.js')>();
+  const actual = await importOriginal<typeof RecordModule>();
   return {
     ...actual,
     buildServicesFromConfig: vi.fn(),
@@ -63,7 +64,6 @@ vi.mock('../record.js', async (importOriginal) => {
 vi.mock('ink-spinner', () => ({ default: vi.fn() }));
 
 import {
-  ConfigManager,
   SearchService,
 } from '@ten-second-tom/core';
 import type { Entry, AppConfig } from '@ten-second-tom/core';

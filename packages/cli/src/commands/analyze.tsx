@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import { Command } from 'commander';
 import { render } from 'ink';
-import { ConfigManager } from '@ten-second-tom/core';
 import type { EntryAnalysis } from '@ten-second-tom/core';
 import { SentimentDisplay } from '../components/SentimentDisplay.js';
 import { ErrorDisplay } from '../components/ErrorDisplay.js';
