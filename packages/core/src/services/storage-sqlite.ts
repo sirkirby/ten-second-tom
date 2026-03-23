@@ -3,7 +3,7 @@ import * as sqliteVec from 'sqlite-vec';
 import { randomUUID } from 'node:crypto';
 import type { Entry, CreateEntry, EntryAnalysis } from '../types/entry.js';
 import type { IStorageService, ListEntriesOptions } from './storage.js';
-import { EMBEDDING_DIMENSION } from '../constants.js';
+import { DEFAULT_EMBEDDING_DIMENSION } from '../constants.js';
 
 const MIGRATION_SQL = `
 CREATE TABLE IF NOT EXISTS entries (
@@ -33,15 +33,19 @@ CREATE TRIGGER IF NOT EXISTS entries_au AFTER UPDATE ON entries BEGIN
 END;
 `;
 
-// vec0 DDL embeds the dimension constant so it is consistent at table creation time.
-// EMBEDDING_DIMENSION defaults to 768 (nomic-embed-text). Change in constants.ts if
-// you switch to a different embedding model (e.g. bge-m3 = 1024).
-const VECTOR_MIGRATION_SQL = `
+/**
+ * Build the vec0 DDL for the given embedding dimension. The dimension must
+ * match the vectors that will be inserted — a mismatch causes sqlite-vec to
+ * throw at INSERT time.
+ */
+function vectorMigrationSql(dimension: number): string {
+  return `
 CREATE VIRTUAL TABLE IF NOT EXISTS entry_embeddings USING vec0(
   entry_id TEXT PRIMARY KEY,
-  embedding float[${EMBEDDING_DIMENSION}]
+  embedding float[${dimension}]
 );
 `;
+}
 
 interface EntryRow {
   id: string;
@@ -82,7 +86,7 @@ export class SqliteStorageService implements IStorageService {
   private readonly stmtInsertEmbedding: Database.Statement;
   private readonly stmtSearchVector: Database.Statement;
 
-  constructor(dbPath: string) {
+  constructor(dbPath: string, embeddingDimension: number = DEFAULT_EMBEDDING_DIMENSION) {
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
@@ -91,7 +95,12 @@ export class SqliteStorageService implements IStorageService {
     sqliteVec.load(this.db);
 
     this.db.exec(MIGRATION_SQL);
-    this.db.exec(VECTOR_MIGRATION_SQL);
+
+    // Ensure the vec0 table matches the requested embedding dimension.
+    // If the table already exists with a different dimension (e.g. the user
+    // switched embedding models), drop and recreate it.  This loses existing
+    // embeddings, but they can be regenerated via `tom analyze --all`.
+    this.ensureVectorTable(embeddingDimension);
 
     // Prepare all statements once
     this.stmtInsertEntry = this.db.prepare(
@@ -131,6 +140,34 @@ export class SqliteStorageService implements IStorageService {
        AND k = ?
        ORDER BY distance`,
     );
+  }
+
+  /**
+   * Ensure the entry_embeddings vec0 table exists with the correct dimension.
+   * If a table already exists with a different dimension, drop and recreate it.
+   */
+  private ensureVectorTable(dimension: number): void {
+    // Check if the table already exists by querying sqlite_master
+    const exists = this.db
+      .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='entry_embeddings'")
+      .get() as { sql: string } | undefined;
+
+    if (exists) {
+      // Extract the dimension from the existing DDL, e.g. "float[768]"
+      const match = exists.sql.match(/float\[(\d+)\]/);
+      const existingDim = match ? parseInt(match[1], 10) : null;
+
+      if (existingDim !== null && existingDim !== dimension) {
+        // Dimension mismatch — drop and recreate. Existing embeddings are lost
+        // but can be regenerated.
+        this.db.exec('DROP TABLE IF EXISTS entry_embeddings');
+        this.db.exec(vectorMigrationSql(dimension));
+        return;
+      }
+    }
+
+    // Table either doesn't exist or matches — create if needed (idempotent).
+    this.db.exec(vectorMigrationSql(dimension));
   }
 
   async saveEntry(input: CreateEntry): Promise<Entry> {

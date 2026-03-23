@@ -9,9 +9,43 @@ export const DEFAULT_OLLAMA_EMBEDDING_MODEL = 'nomic-embed-text';
 export const DEFAULT_CLOUD_EMBEDDING_MODEL = 'voyage-3-lite';
 export const EMBEDDING_AVAILABILITY_TIMEOUT_MS = 3_000;
 export const EMBEDDING_AVAILABILITY_CACHE_MS = 30_000;
-// nomic-embed-text produces 768-dimensional vectors; bge-m3 produces 1024.
-// 768 is the default — change if you switch embedding models.
-export const EMBEDDING_DIMENSION = 768;
+export const DEFAULT_EMBEDDING_DIMENSION = 768;
+
+/**
+ * Known embedding model dimensions. Used to determine the vec0 table column
+ * size without needing to call the embedding provider at startup. Keys are
+ * matched against the start of the configured model name (case-insensitive)
+ * so that tagged variants like "bge-m3:latest" resolve correctly.
+ */
+export const EMBEDDING_MODEL_DIMENSIONS: Record<string, number> = {
+  'nomic-embed-text': 768,
+  'bge-m3': 1024,
+  'mxbai-embed-large': 1024,
+  'all-minilm': 384,
+  'snowflake-arctic-embed': 1024,
+  'qwen3-embedding': 1536,
+  'jina-embeddings': 768,
+  'voyage-3-lite': 512,
+};
+
+/**
+ * Look up the embedding dimension for a model name. Handles Ollama-style
+ * tagged names (e.g. "bge-m3:latest") by matching the prefix before the colon.
+ * Falls back to DEFAULT_EMBEDDING_DIMENSION if the model is not recognized.
+ */
+export function getEmbeddingDimension(modelName: string): number {
+  const lower = modelName.toLowerCase();
+  // Try exact match first
+  if (EMBEDDING_MODEL_DIMENSIONS[lower] !== undefined) {
+    return EMBEDDING_MODEL_DIMENSIONS[lower];
+  }
+  // Try prefix match (strip ":tag" suffix for Ollama models like "bge-m3:latest")
+  const base = lower.split(':')[0];
+  if (base && EMBEDDING_MODEL_DIMENSIONS[base] !== undefined) {
+    return EMBEDDING_MODEL_DIMENSIONS[base];
+  }
+  return DEFAULT_EMBEDDING_DIMENSION;
+}
 
 // Audio
 export const AUDIO_SAMPLE_RATE = 16000;

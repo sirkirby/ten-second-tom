@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteStorageService } from '../storage-sqlite.js';
 import type { CreateEntry } from '../../types/entry.js';
-import { EMBEDDING_DIMENSION } from '../../constants.js';
+import { DEFAULT_EMBEDDING_DIMENSION } from '../../constants.js';
 
 let tempDir: string;
 let service: SqliteStorageService;
@@ -16,18 +16,22 @@ afterEach(() => {
   }
 });
 
-function createService(): SqliteStorageService {
+function createService(embeddingDimension?: number): SqliteStorageService {
   tempDir = mkdtempSync(join(tmpdir(), 'tst-storage-'));
-  service = new SqliteStorageService(join(tempDir, 'test.db'));
+  service = new SqliteStorageService(join(tempDir, 'test.db'), embeddingDimension);
   return service;
 }
 
 /**
- * Build a Float32Array of EMBEDDING_DIMENSION elements all set to `value`.
- * Using the real dimension ensures tests exercise the actual vec0 table schema.
+ * Build a Float32Array of the given dimension (defaults to DEFAULT_EMBEDDING_DIMENSION)
+ * all set to `value`. Using the real dimension ensures tests exercise the actual
+ * vec0 table schema.
  */
-function makeEmbedding(value: number): Float32Array {
-  return new Float32Array(EMBEDDING_DIMENSION).fill(value);
+function makeEmbedding(
+  value: number,
+  dimension: number = DEFAULT_EMBEDDING_DIMENSION,
+): Float32Array {
+  return new Float32Array(dimension).fill(value);
 }
 
 const baseNote: CreateEntry = {
@@ -210,5 +214,38 @@ describe('SqliteStorageService', () => {
     const results = await svc.searchByVector(makeEmbedding(0.5), 10);
 
     expect(results).toHaveLength(0);
+  });
+
+  it('accepts a custom embedding dimension', async () => {
+    const dim = 1024;
+    const svc = createService(dim);
+
+    const entry = await svc.saveEntry(baseNote);
+    const embedding = makeEmbedding(0.5, dim);
+
+    await expect(svc.updateEntryEmbedding(entry.id, embedding)).resolves.toBeUndefined();
+  });
+
+  it('recreates vec0 table when dimension changes on the same database', async () => {
+    // Create a database with 768-dim embeddings
+    tempDir = mkdtempSync(join(tmpdir(), 'tst-storage-'));
+    const dbPath = join(tempDir, 'test.db');
+
+    const svc768 = new SqliteStorageService(dbPath, 768);
+    const entry = await svc768.saveEntry(baseNote);
+    await svc768.updateEntryEmbedding(entry.id, makeEmbedding(0.5, 768));
+    svc768.close();
+
+    // Re-open with 1024-dim — should drop and recreate the vec0 table
+    service = new SqliteStorageService(dbPath, 1024);
+
+    // Old embedding is gone (table was recreated)
+    const results = await service.searchByVector(makeEmbedding(0.5, 1024), 10);
+    expect(results).toHaveLength(0);
+
+    // Can insert new 1024-dim embedding without error
+    await expect(
+      service.updateEntryEmbedding(entry.id, makeEmbedding(0.3, 1024)),
+    ).resolves.toBeUndefined();
   });
 });

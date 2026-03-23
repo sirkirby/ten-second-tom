@@ -15,6 +15,7 @@ import {
 import { TomAgent } from '../agent/tom-agent.js';
 import { OllamaEmbeddingService, NoopEmbeddingService } from './embedding.js';
 import { SqliteStorageService } from './storage-sqlite.js';
+import { getEmbeddingDimension } from '../constants.js';
 
 export interface ServiceContainer {
   audio: IAudioService;
@@ -58,7 +59,12 @@ export function buildServicesFromConfig(
           new NoopEmbeddingService()
         : new NoopEmbeddingService();
 
-  const storage = new SqliteStorageService(config.storage.dbPath);
+  // Derive the embedding dimension from the configured model name so the
+  // vec0 table is created (or recreated) with the correct column size.
+  const embeddingModel = config.embedding.provider !== 'none' ? config.embedding.model : '';
+  const embeddingDimension = embeddingModel ? getEmbeddingDimension(embeddingModel) : undefined;
+
+  const storage = new SqliteStorageService(config.storage.dbPath, embeddingDimension);
 
   return { audio, transcription, liveTranscription, agent, embedding, storage };
 }
