@@ -94,6 +94,8 @@ const KNOWN_EMBEDDING_MODELS = [
     recommended: false,
     description: '1024-dim, retrieval focused',
   },
+  { name: 'qwen3-embedding', recommended: false, description: 'Qwen3 embedding model' },
+  { name: 'jina-embeddings', recommended: false, description: 'Jina AI embeddings' },
 ];
 
 interface OllamaModel {
@@ -410,28 +412,29 @@ function SetupWizard() {
         return;
       }
 
-      // Classify models: known embedding models go first, others follow
+      // Filter to only show known embedding models — don't show LLM models
+      // which would be confusing in this context
       const embeddingModels: Array<{ label: string; value: string }> = [];
-      const otherModels: Array<{ label: string; value: string }> = [];
 
       for (const m of result.models) {
         const known = KNOWN_EMBEDDING_MODELS.find((k) => m.name.startsWith(k.name));
         if (known) {
-          const tags = ['[Embedding]', ...(known.recommended ? ['[Recommended]'] : [])].join(' ');
+          const tag = known.recommended ? ' [Recommended]' : '';
           embeddingModels.push({
-            label: `${m.name} (${formatBytes(m.size)}) ${tags}`,
-            value: m.name,
-          });
-        } else {
-          otherModels.push({
-            label: `${m.name} (${formatBytes(m.size)})`,
+            label: `${m.name} (${formatBytes(m.size)}) — ${known.description}${tag}`,
             value: m.name,
           });
         }
       }
 
-      setEmbeddingModelStatusMessage('');
-      setEmbeddingModelItems([...embeddingModels, ...otherModels]);
+      if (embeddingModels.length === 0) {
+        setEmbeddingModelStatusMessage(
+          'No embedding models found. Install one with: ollama pull nomic-embed-text',
+        );
+      } else {
+        setEmbeddingModelStatusMessage('');
+      }
+      setEmbeddingModelItems(embeddingModels);
       setStep('embedding-model');
     })();
   }, [step, embeddingOllamaEndpoint]);
