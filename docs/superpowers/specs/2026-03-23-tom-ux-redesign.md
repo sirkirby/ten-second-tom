@@ -17,9 +17,21 @@ Redesign Tom from a collection of one-shot CLI commands into a persistent Ink TU
 
 One-shot commands (`tom record`, `tom note`, `tom search`, `tom analyze`, `tom setup`) continue to work — they launch the Ink app, execute the command, display results, and exit.
 
-### No Screen Clearing
+### Ink Rendering Model
 
-Content is additive. When a command completes, its results stay visible above the next prompt. Ink manages rendering without full-screen clears. The terminal scrolls naturally.
+A single long-lived `<App>` component manages all screens via internal state. There is one `render()` call for the entire app lifecycle — no multiple render/unmount cycles.
+
+Ink re-renders its output area in place. The app uses Ink's `<Static>` component to push completed command output into the terminal's scroll buffer. The active area (current screen + prompt) renders below the static output. This gives the appearance of additive content: completed results scroll up naturally while the active prompt stays at the bottom.
+
+Pattern:
+```
+<Static items={completedOutputs}>  ← scrolls up, stays in terminal buffer
+  {item => <CompletedResult ... />}
+</Static>
+<ActiveScreen />                   ← re-renders in place at bottom
+```
+
+This is Ink's supported model for REPL-style applications.
 
 ## Screens
 
@@ -70,7 +82,7 @@ tom ❯ _
   Analyzing...
 ```
 
-- Progressive: "Transcribing..." appears first, transcript fills in, then "Analyzing..." appears
+- Progressive via React state updates: `phase` state drives what's visible. "Transcribing..." renders first. When transcription completes, `transcript` state is set → Ink re-renders to show the text. Then `phase` moves to "analyzing" → Ink re-renders to add the spinner. Standard React state-driven rendering — no manual stdout writes.
 - Each step shows as it completes — not all at once
 
 ### Results View
@@ -106,7 +118,10 @@ Search: "deploy pipeline"
 
 - Left border colored by sentiment (green/red/yellow)
 - Date, score, excerpt on one line per result
-- Arrow keys navigate, Enter expands to full detail, Esc returns to prompt
+- Arrow keys navigate (wraps at top/bottom), Enter expands to full detail below the list, Esc returns to prompt
+- 0 results: shows "No entries found" message with prompt
+- User cannot edit the query from results — Esc to close, then search again
+- Expanded detail replaces the list; Esc from detail returns to list
 
 ### Note View
 
@@ -164,7 +179,11 @@ Services are constructed once on app startup (not per-command). The `ServiceCont
 
 ### One-Shot Mode
 
-When `tom record` is invoked (with a subcommand), the app launches, executes the command, displays results, and exits after a short delay. Detection: `process.argv` has a command → one-shot mode. No args → REPL mode.
+When `tom record` is invoked (with a subcommand), the app launches, skips the home screen, executes the command, displays results, and exits automatically after 5 seconds (using `useAutoExit`). No user interaction required to exit.
+
+Detection: `process.argv` has a recognized command → one-shot mode. No args → REPL mode. `tom record --help` shows command help via Commander (before Ink launches).
+
+One-shot commands do not accept additional positional args beyond what's defined (e.g., `tom analyze <entry-id>`). Commander handles arg parsing before the Ink app starts.
 
 ## Native Output Suppression
 
@@ -184,6 +203,24 @@ The whisper.cpp native logging issue is addressed by:
 | Prompt | None (Commander handles args) | Ink TextInput with autocomplete |
 | Screen management | Each command owns the full terminal | App component manages screen state |
 | One-shot | Only mode | Detected via argv, app exits after command |
+
+## Error Handling
+
+- **Transcription fails mid-recording**: recording continues (audio is still being captured). On stop, entry is saved without transcript. Warning shown in results view.
+- **Analysis/embedding fails**: entry saved without enrichment. Warning shown inline in results view (same as current behavior).
+- **Crash during recording**: audio buffer is lost (not yet saved to disk). This is acceptable — `stopRecording()` is what triggers the WAV save.
+- **Service unavailable at startup**: home screen shows degraded config line (e.g., missing model name replaced with "unavailable"). Commands that need the missing service show an error when invoked, not at startup.
+
+## Config Display Mapping
+
+```
+config.llm.provider === 'cloud' → "Claude"
+config.llm.provider === 'local' → config.llm.modelId (e.g., "gpt-oss")
+"whisper" → always shown (hardcoded, all users use whisper)
+config.embedding.provider === 'none' → omitted from config line
+config.embedding.provider !== 'none' → config.embedding.model (e.g., "bge-m3")
+entry count → SELECT COUNT(*) from entries
+```
 
 ## What Doesn't Change
 
