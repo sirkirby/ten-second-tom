@@ -16,7 +16,9 @@ export function getModelId(config: LlmConfig): string {
 export function getBaseUrl(config: LlmConfig): string | undefined {
   if (config.provider === 'local') {
     const endpoint = config.localEndpoint ?? 'http://localhost:11434';
-    return endpoint.replace(/\/?$/, '/v1');
+    // Return the raw endpoint without /v1 suffix.
+    // Ollama exposes a native API at /api/chat, not an Anthropic-compatible one.
+    return endpoint.replace(/\/+$/, '');
   }
   return undefined;
 }
