@@ -136,6 +136,7 @@ function RecordCommand() {
   const [error, setError] = useState<string | null>(null);
   const [services, setServices] = useState<ServiceContainer | null>(null);
   const [isLivePreview, setIsLivePreview] = useState(false);
+  const [liveTranscriptionWarning, setLiveTranscriptionWarning] = useState<string | null>(null);
 
   // Ref to hold the audioPath base directory for file-based transcription
   const audioBaseDirRef = useRef<string>('');
@@ -221,8 +222,10 @@ function RecordCommand() {
               setTranscript(text);
               setIsLivePreview(true);
             });
-          } catch {
-            // Live transcription is optional — continue without it
+          } catch (err) {
+            // Live transcription is optional — show a warning but continue recording
+            const msg = err instanceof Error ? err.message : String(err);
+            setLiveTranscriptionWarning(`Live preview unavailable: ${msg}`);
           }
         }
 
@@ -271,6 +274,9 @@ function RecordCommand() {
 
       // Batch-transcribe the complete WAV file via Whisper. This produces
       // high-quality archival output that replaces the sherpa-onnx live draft.
+      // Clear the terminal before transcription — whisper.cpp may have leaked
+      // native stderr output during recording.
+      process.stdout.write('\x1b[2J\x1b[0f');
       setPhase('transcribing');
       setIsLivePreview(false);
       let finalTranscript = '';
@@ -284,6 +290,9 @@ function RecordCommand() {
           // Transcript stays empty — still save the entry
         }
       }
+
+      // Clear again after transcribeFile — native code may have leaked to stderr
+      process.stdout.write('\x1b[2J\x1b[0f');
 
       // Transition to analyzing phase
       setPhase('analyzing');
@@ -355,12 +364,21 @@ function RecordCommand() {
 
   if (phase === 'recording') {
     return (
-      <RecordingUI
-        phase="recording"
-        transcript={transcript}
-        duration={duration}
-        isLivePreview={isLivePreview}
-      />
+      <Box flexDirection="column">
+        <RecordingUI
+          phase="recording"
+          transcript={transcript}
+          duration={duration}
+          isLivePreview={isLivePreview}
+        />
+        {liveTranscriptionWarning !== null && (
+          <Box paddingLeft={2}>
+            <Text dimColor color="yellow">
+              {liveTranscriptionWarning}
+            </Text>
+          </Box>
+        )}
+      </Box>
     );
   }
 
