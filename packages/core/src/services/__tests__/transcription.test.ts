@@ -11,8 +11,10 @@ vi.mock('@fugood/whisper.node', () => {
 
   return {
     initWhisper: vi.fn().mockResolvedValue(mockContext),
+    toggleNativeLog: vi.fn().mockResolvedValue(undefined),
     default: {
       initWhisper: vi.fn().mockResolvedValue(mockContext),
+      toggleNativeLog: vi.fn().mockResolvedValue(undefined),
     },
     __mockContext: mockContext,
   };
@@ -22,6 +24,7 @@ vi.mock('@fugood/whisper.node', () => {
 const { WhisperTranscriptionService } = await import('../transcription.js');
 const whisperModule = await import('@fugood/whisper.node');
 const mockInitWhisper = vi.mocked(whisperModule.initWhisper);
+const mockToggleNativeLog = vi.mocked(whisperModule.toggleNativeLog);
 // Access the shared mock context
 const mockContext = (
   whisperModule as unknown as {
@@ -56,6 +59,20 @@ describe('WhisperTranscriptionService', () => {
       expect(mockInitWhisper).toHaveBeenCalledOnce();
       expect(mockInitWhisper).toHaveBeenCalledWith({ filePath: '/path/to/ggml-model.bin' });
       expect(service.isModelLoaded()).toBe(true);
+    });
+
+    it('disables native logging before initialising whisper', async () => {
+      const service = new WhisperTranscriptionService();
+
+      await service.loadModel('/path/to/ggml-model.bin');
+
+      expect(mockToggleNativeLog).toHaveBeenCalledWith(false);
+      // toggleNativeLog must be called before initWhisper
+      const logOrder = mockToggleNativeLog.mock.invocationCallOrder[0];
+      const initOrder = mockInitWhisper.mock.invocationCallOrder[0];
+      expect(logOrder).toBeDefined();
+      expect(initOrder).toBeDefined();
+      expect(logOrder).toBeLessThan(initOrder as number);
     });
 
     it('releases the previous context before loading a new model', async () => {

@@ -211,11 +211,11 @@ function RecordCommand() {
           return;
         }
 
-        // Start live chunked transcription — updates transcript state as
-        // audio arrives in ~5-second segments during recording.
-        svcs.transcription.startLiveTranscription(svcs.audio.getAudioStream(), (segment) => {
-          setTranscript((prev) => (prev.length > 0 ? prev + ' ' + segment.trim() : segment.trim()));
-        });
+        // Clear any native whisper.cpp stderr output that leaked during model
+        // loading (belt-and-suspenders alongside toggleNativeLog(false) in the
+        // transcription service).  This resets the terminal so the recording UI
+        // starts on a clean screen.
+        process.stdout.write('\x1b[2J\x1b[0f');
 
         setPhase('recording');
       } catch (err) {
@@ -248,21 +248,17 @@ function RecordCommand() {
     if (!services || phase !== 'recording') return;
 
     try {
-      // Stop both the audio recorder and the live transcription concurrently.
-      // stopLiveTranscription() flushes the final partial audio chunk;
-      // stopRecording() stops the mic and writes the WAV file.
-      const [audioRelPath, liveTranscript] = await Promise.all([
-        services.audio.stopRecording(),
-        services.transcription.stopLiveTranscription().catch(() => ''),
-      ]);
+      // Stop the audio recorder — writes the WAV file to disk.
+      const audioRelPath = await services.audio.stopRecording();
 
-      // Use the live transcript accumulated during recording.
-      // If it came back empty (e.g. very short recording), fall back to
-      // batch transcription of the saved WAV file.
-      let finalTranscript = liveTranscript;
+      // Batch-transcribe the complete WAV file. This produces much more
+      // reliable output than the chunked live approach, which transcribes
+      // each ~5-second segment in isolation and produces garbled text with
+      // "[." artifacts from whisper's confusion markers.
+      setPhase('transcribing');
+      let finalTranscript = '';
 
-      if (finalTranscript.trim().length === 0 && audioRelPath) {
-        setPhase('transcribing');
+      if (audioRelPath) {
         try {
           const fullAudioPath = join(audioBaseDirRef.current, audioRelPath);
           finalTranscript = await services.transcription.transcribeFile(fullAudioPath);
@@ -340,7 +336,7 @@ function RecordCommand() {
   }
 
   if (phase === 'recording') {
-    return <RecordingUI phase="recording" transcript={transcript} duration={duration} />;
+    return <RecordingUI phase="recording" transcript="" duration={duration} />;
   }
 
   if (phase === 'transcribing') {
@@ -392,7 +388,7 @@ function RecordCommand() {
 // ---------------------------------------------------------------------------
 
 export const recordCommand = new Command('record')
-  .description('Record audio with live transcription and AI analysis')
+  .description('Record audio with transcription and AI analysis')
   .action(() => {
     render(<RecordCommand />);
   });

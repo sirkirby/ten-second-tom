@@ -1,4 +1,4 @@
-import { initWhisper } from '@fugood/whisper.node';
+import { initWhisper, toggleNativeLog } from '@fugood/whisper.node';
 import type { WhisperContext, TranscribeOptions } from '@fugood/whisper.node';
 import type { Readable } from 'node:stream';
 import { LIVE_TRANSCRIPTION_CHUNK_BYTES } from '../constants.js';
@@ -109,30 +109,15 @@ export class WhisperTranscriptionService implements ITranscriptionService {
       this.context = null;
     }
 
-    // Suppress whisper.cpp / ggml verbose GPU-init and model-info logs that
-    // the native library writes directly to stderr (fd 2).  Setting these
-    // env vars before the native init call is the only reliable way — Node's
-    // process.stderr.write override has no effect on C++ fprintf(stderr, …).
-    const prevGgml = process.env['GGML_LOG_LEVEL'];
-    const prevWhisper = process.env['WHISPER_LOG_LEVEL'];
-    process.env['GGML_LOG_LEVEL'] = '0';
-    process.env['WHISPER_LOG_LEVEL'] = 'none';
+    // Suppress whisper.cpp / ggml native logging that the C++ library writes
+    // directly to stderr.  The env-var approach (GGML_LOG_LEVEL) does not work
+    // reliably at runtime.  The whisper.node package exposes toggleNativeLog()
+    // which hooks into the native log callback — calling it with `false`
+    // *before* initWhisper prevents all native output from reaching the
+    // terminal during model loading and subsequent transcription calls.
+    await toggleNativeLog(false);
 
-    try {
-      this.context = await initWhisper({ filePath: modelPath });
-    } finally {
-      // Restore previous values (or delete if they were unset)
-      if (prevGgml === undefined) {
-        delete process.env['GGML_LOG_LEVEL'];
-      } else {
-        process.env['GGML_LOG_LEVEL'] = prevGgml;
-      }
-      if (prevWhisper === undefined) {
-        delete process.env['WHISPER_LOG_LEVEL'];
-      } else {
-        process.env['WHISPER_LOG_LEVEL'] = prevWhisper;
-      }
-    }
+    this.context = await initWhisper({ filePath: modelPath });
   }
 
   /**
