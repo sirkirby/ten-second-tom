@@ -18,6 +18,7 @@ type Step =
   | 'llm-provider'
   | 'llm-cloud-key'
   | 'llm-local-endpoint'
+  | 'llm-local-model-loading'
   | 'llm-local-model'
   | 'embedding-provider'
   | 'stt-info'
@@ -47,11 +48,68 @@ const llmProviderItems = [
   { label: 'Local (Ollama / LM Studio)', value: 'local' as const },
 ];
 
-const localModelItems = [
+const FALLBACK_MODEL_ITEMS = [
   { label: 'qwen2.5:7b (recommended)', value: 'qwen2.5:7b' },
   { label: 'mistral:7b', value: 'mistral:7b' },
   { label: 'llama3.2:3b', value: 'llama3.2:3b' },
 ];
+
+interface OllamaModel {
+  name: string;
+  size: number;
+}
+
+function formatModelSize(bytes: number): string {
+  const gb = bytes / (1024 * 1024 * 1024);
+  if (gb >= 1) {
+    return `${gb.toFixed(1)} GB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
+}
+
+/**
+ * Fetch the list of installed models from an Ollama instance.
+ * Exported for testability.
+ */
+export async function fetchOllamaModels(
+  endpoint: string,
+): Promise<{ ok: true; models: OllamaModel[] } | { ok: false; error: string }> {
+  // Normalise endpoint — strip trailing slash
+  const base = endpoint.replace(/\/+$/, '');
+  const url = `${base}/api/tags`;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      return { ok: false, error: `Ollama returned HTTP ${response.status}` };
+    }
+
+    const data = (await response.json()) as { models?: Array<{ name: string; size: number }> };
+    const models: OllamaModel[] = (data.models ?? []).map((m) => ({
+      name: m.name,
+      size: m.size,
+    }));
+
+    return { ok: true, models };
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      return {
+        ok: false,
+        error: `Could not connect to Ollama at ${endpoint}. Connection timed out. Make sure Ollama is running.`,
+      };
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      error: `Could not connect to Ollama at ${endpoint}. Make sure Ollama is running. (${msg})`,
+    };
+  }
+}
 
 const embeddingProviderItems = [
   { label: 'Ollama (local vectors, recommended)', value: 'ollama' as const },
@@ -148,6 +206,10 @@ function SetupWizard() {
     embeddingProvider: null,
     errorMessage: '',
   });
+  const [ollamaModelItems, setOllamaModelItems] = useState<
+    Array<{ label: string; value: string }>
+  >(FALLBACK_MODEL_ITEMS);
+  const [ollamaStatusMessage, setOllamaStatusMessage] = useState('');
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress>({
     status: 'checking',
     bytesDownloaded: 0,
@@ -194,8 +256,44 @@ function SetupWizard() {
   function handleLocalEndpointSubmit(value: string) {
     const endpoint = value.trim() || 'http://localhost:11434';
     setState((s) => ({ ...s, localEndpoint: endpoint }));
-    setStep('llm-local-model');
+    setStep('llm-local-model-loading');
   }
+
+  // Fetch Ollama models when we enter the loading step
+  useEffect(() => {
+    if (step !== 'llm-local-model-loading') return;
+
+    void (async () => {
+      const result = await fetchOllamaModels(state.localEndpoint);
+
+      if (!result.ok) {
+        // Ollama unreachable — show error as status, fall back to hardcoded list
+        setOllamaStatusMessage(result.error);
+        setOllamaModelItems(FALLBACK_MODEL_ITEMS);
+        setStep('llm-local-model');
+        return;
+      }
+
+      if (result.models.length === 0) {
+        setOllamaStatusMessage(
+          'No models found. Install a model with: ollama pull qwen2.5:7b',
+        );
+        setOllamaModelItems(FALLBACK_MODEL_ITEMS);
+        setStep('llm-local-model');
+        return;
+      }
+
+      // Build selection items from discovered models
+      const items = result.models.map((m) => ({
+        label: `${m.name} (${formatModelSize(m.size)})`,
+        value: m.name,
+      }));
+
+      setOllamaStatusMessage('');
+      setOllamaModelItems(items);
+      setStep('llm-local-model');
+    })();
+  }, [step, state.localEndpoint]);
 
   function handleLocalModelSelect(item: { value: string }) {
     setState((s) => ({ ...s, localModelId: item.value }));
@@ -402,11 +500,25 @@ function SetupWizard() {
         </Box>
       )}
 
-      {step === 'llm-local-model' && (
+      {step === 'llm-local-model-loading' && (
         <Box flexDirection="column">
           <Text>Step 2 of 4: Choose a local model</Text>
           <Box marginTop={1}>
-            <SelectInput items={localModelItems} onSelect={handleLocalModelSelect} />
+            <Text dimColor>Querying Ollama for installed models...</Text>
+          </Box>
+        </Box>
+      )}
+
+      {step === 'llm-local-model' && (
+        <Box flexDirection="column">
+          <Text>Step 2 of 4: Choose a local model</Text>
+          {ollamaStatusMessage.length > 0 && (
+            <Box marginTop={1}>
+              <Text color="yellow">{ollamaStatusMessage}</Text>
+            </Box>
+          )}
+          <Box marginTop={1}>
+            <SelectInput items={ollamaModelItems} onSelect={handleLocalModelSelect} />
           </Box>
         </Box>
       )}
