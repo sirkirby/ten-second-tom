@@ -147,7 +147,9 @@ export class SqliteStorageService implements IStorageService {
   }
 
   async updateEntryEmbedding(_id: string, _embedding: Float32Array): Promise<void> {
-    // Placeholder - vector storage is pending Sprint 1 research spike
+    // Vector storage is pending Sprint 1 research spike — throw so callers
+    // can handle gracefully (e.g. runAnalysisPipeline catches and warns).
+    throw new Error('Vector storage not yet implemented');
   }
 
   async searchByKeyword(query: string, limit: number = 20): Promise<Entry[]> {

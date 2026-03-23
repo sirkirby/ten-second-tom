@@ -6,9 +6,9 @@ import { render } from 'ink';
 import { join } from 'node:path';
 import { unlinkSync } from 'node:fs';
 import {
-  ConfigManager,
   checkAudioPrerequisites,
   getMicrophonePermissionHint,
+  buildServicesFromConfig,
 } from '@ten-second-tom/core';
 import type { EntryAnalysis } from '@ten-second-tom/core';
 import { SentimentDisplay } from '../components/SentimentDisplay.js';
@@ -16,8 +16,9 @@ import { ErrorDisplay } from '../components/ErrorDisplay.js';
 import { WarningList } from '../components/WarningList.js';
 import { useAutoExit } from '../hooks/useAutoExit.js';
 import { checkSetupComplete } from '../hooks/useSetupGuard.js';
+import type { SetupGuardResult } from '../hooks/useSetupGuard.js';
 import { EXIT_HINT_TEXT } from '../constants.js';
-import { buildServicesFromConfig, runAnalysisPipeline } from './record.js';
+import { runAnalysisPipeline } from './record.js';
 import type { RecordingPipelineServices } from './record.js';
 
 // ---------------------------------------------------------------------------
@@ -97,12 +98,14 @@ function NoteCommand() {
   const [dictationWarning, setDictationWarning] = useState<string | null>(null);
   const servicesRef = useRef<RecordingPipelineServices | null>(null);
   const audioBaseDirRef = useRef<string>('');
+  const guardRef = useRef<SetupGuardResult | null>(null);
 
   // -------------------------------------------------------------------------
   // On mount: check setup guard
   // -------------------------------------------------------------------------
   useEffect(() => {
     const guard = checkSetupComplete();
+    guardRef.current = guard;
     if (!guard.ok) {
       setError(guard.error);
       setPhase('error');
@@ -182,29 +185,31 @@ function NoteCommand() {
   }
 
   // -------------------------------------------------------------------------
-  // Stop dictation: stop audio, discard the file, keep transcribed text
+  // Discard recording: stop audio and delete the orphaned WAV file
   // -------------------------------------------------------------------------
-  async function stopDictation() {
+  async function discardRecording() {
     const svcs = servicesRef.current;
-    if (svcs === null) return;
+    if (svcs === null || !svcs.audio.isRecording()) return;
 
     try {
-      if (svcs.audio.isRecording()) {
-        // Stop recording — get the file path so we can delete the orphaned file
-        const audioRelPath = await svcs.audio.stopRecording();
-        // Delete the orphaned WAV file since we only want the transcribed text
-        if (audioRelPath && audioBaseDirRef.current) {
-          try {
-            unlinkSync(join(audioBaseDirRef.current, audioRelPath));
-          } catch {
-            // Best effort — file may not exist
-          }
+      const audioRelPath = await svcs.audio.stopRecording();
+      if (audioRelPath && audioBaseDirRef.current) {
+        try {
+          unlinkSync(join(audioBaseDirRef.current, audioRelPath));
+        } catch {
+          // Best effort — file may not exist
         }
       }
     } catch {
       // Best effort — continue regardless
     }
+  }
 
+  // -------------------------------------------------------------------------
+  // Stop dictation: stop audio, discard the file, keep transcribed text
+  // -------------------------------------------------------------------------
+  async function stopDictation() {
+    await discardRecording();
     setInputMode('typed');
   }
 
@@ -227,22 +232,7 @@ function NoteCommand() {
 
     // If still in dictation mode, stop the audio and delete the orphaned file
     if (inputMode === 'dictated') {
-      const svcs = servicesRef.current;
-      if (svcs !== null && svcs.audio.isRecording()) {
-        try {
-          const audioRelPath = await svcs.audio.stopRecording();
-          // Delete orphaned WAV — we only want the transcribed text
-          if (audioRelPath && audioBaseDirRef.current) {
-            try {
-              unlinkSync(join(audioBaseDirRef.current, audioRelPath));
-            } catch {
-              // Best effort
-            }
-          }
-        } catch {
-          // Best effort
-        }
-      }
+      await discardRecording();
     }
 
     setPhase('analyzing');
@@ -251,12 +241,11 @@ function NoteCommand() {
       // Reuse services from dictation if available, otherwise build new ones
       let services = servicesRef.current;
       if (services === null) {
-        const configManager = new ConfigManager();
-        const config = configManager.load();
-        if (config === undefined) {
-          throw new Error('Configuration not found. Run `tom setup` first.');
+        const guard = guardRef.current ?? checkSetupComplete();
+        if (!guard.ok) {
+          throw new Error(guard.error);
         }
-        services = buildServicesFromConfig(config, configManager);
+        services = buildServicesFromConfig(guard.config, guard.configManager);
         servicesRef.current = services;
       }
 

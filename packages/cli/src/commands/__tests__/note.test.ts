@@ -7,10 +7,8 @@ import type * as RecordModule from '../record.js';
 // ---------------------------------------------------------------------------
 
 // Mock @ten-second-tom/core before importing the module under test
-vi.mock('@ten-second-tom/core', async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
+vi.mock('@ten-second-tom/core', () => {
   return {
-    ...actual,
     ConfigManager: vi.fn(),
     AudioService: vi.fn(),
     WhisperTranscriptionService: vi.fn(),
@@ -18,6 +16,9 @@ vi.mock('@ten-second-tom/core', async (importOriginal) => {
     OllamaEmbeddingService: vi.fn(),
     NoopEmbeddingService: vi.fn(),
     SqliteStorageService: vi.fn(),
+    buildServicesFromConfig: vi.fn(),
+    checkAudioPrerequisites: vi.fn(() => ({ ok: true })),
+    getMicrophonePermissionHint: vi.fn(() => 'Check your audio device settings.'),
   };
 });
 
@@ -59,6 +60,9 @@ vi.mock('../record.js', async (importOriginal) => {
   };
 });
 
+import {
+  buildServicesFromConfig,
+} from '@ten-second-tom/core';
 import type {
   IEmbeddingService,
   IAgentService,
@@ -67,7 +71,7 @@ import type {
   AppConfig,
 } from '@ten-second-tom/core';
 
-import { runAnalysisPipeline, buildServicesFromConfig } from '../record.js';
+import { runAnalysisPipeline } from '../record.js';
 import type { RecordingPipelineServices } from '../record.js';
 import { runNotePipeline } from '../note.js';
 import { checkSetupComplete } from '../../hooks/useSetupGuard.js';

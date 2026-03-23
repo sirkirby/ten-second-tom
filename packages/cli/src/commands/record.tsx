@@ -97,8 +97,13 @@ export async function runAnalysisPipeline(
   }
 
   if (embeddingResult.status === 'fulfilled') {
-    await services.storage.updateEntryEmbedding(entry.id, embeddingResult.value);
-    embeddingStored = true;
+    try {
+      await services.storage.updateEntryEmbedding(entry.id, embeddingResult.value);
+      embeddingStored = true;
+    } catch {
+      // Vector storage not yet implemented — non-fatal.
+      warnings.push('Embedding storage unavailable — entry saved without vector index.');
+    }
   } else {
     warnings.push('Embedding unavailable — entry saved without vector index.');
   }
