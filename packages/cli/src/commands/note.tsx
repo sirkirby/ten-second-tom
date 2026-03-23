@@ -326,12 +326,13 @@ function NoteCommand() {
         />
 
         {dictationWarning !== null && (
-          <Text color="yellow">{'⚠ '}{dictationWarning}</Text>
+          <Text color="yellow">
+            {'⚠ '}
+            {dictationWarning}
+          </Text>
         )}
 
-        <Text dimColor>
-          {isDictating ? '[Tab] Switch to typing' : '[Tab] Switch to dictation'}
-        </Text>
+        <Text dimColor>{isDictating ? '[Tab] Switch to typing' : '[Tab] Switch to dictation'}</Text>
       </Box>
     );
   }
@@ -361,7 +362,8 @@ function NoteCommand() {
         <Box marginTop={1} flexDirection="column">
           {warnings.map((w, i) => (
             <Text key={i} color="yellow">
-              {'⚠ '}{w}
+              {'⚠ '}
+              {w}
             </Text>
           ))}
         </Box>

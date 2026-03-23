@@ -34,9 +34,7 @@ describe('SqliteStorageService', () => {
     const saved = await svc.saveEntry(baseNote);
 
     expect(saved.id).toBeDefined();
-    expect(saved.id).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-    );
+    expect(saved.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     expect(saved.content).toBe(baseNote.content);
     expect(saved.type).toBe(baseNote.type);
     expect(saved.inputMethod).toBe(baseNote.inputMethod);

@@ -66,7 +66,11 @@ describe('ConfigManager', () => {
     const dir = createTempDir();
     const homePath = join(dir, '.tom');
     mkdirSync(homePath, { recursive: true });
-    writeFileSync(join(homePath, 'config.json'), JSON.stringify({ llm: { provider: 'invalid' } }), 'utf-8');
+    writeFileSync(
+      join(homePath, 'config.json'),
+      JSON.stringify({ llm: { provider: 'invalid' } }),
+      'utf-8',
+    );
 
     const manager = new ConfigManager(homePath);
 

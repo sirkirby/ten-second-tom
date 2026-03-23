@@ -23,11 +23,15 @@ const { WhisperTranscriptionService } = await import('../transcription.js');
 const whisperModule = await import('@fugood/whisper.node');
 const mockInitWhisper = vi.mocked(whisperModule.initWhisper);
 // Access the shared mock context
-const mockContext = (whisperModule as unknown as { __mockContext: typeof whisperModule & {
-  transcribeFile: ReturnType<typeof vi.fn>;
-  transcribeData: ReturnType<typeof vi.fn>;
-  release: ReturnType<typeof vi.fn>;
-} }).__mockContext;
+const mockContext = (
+  whisperModule as unknown as {
+    __mockContext: typeof whisperModule & {
+      transcribeFile: ReturnType<typeof vi.fn>;
+      transcribeData: ReturnType<typeof vi.fn>;
+      release: ReturnType<typeof vi.fn>;
+    };
+  }
+).__mockContext;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -69,9 +73,7 @@ describe('WhisperTranscriptionService', () => {
     it('throws if model is not loaded', async () => {
       const service = new WhisperTranscriptionService();
 
-      await expect(service.transcribeFile('/audio.wav')).rejects.toThrow(
-        'Model not loaded',
-      );
+      await expect(service.transcribeFile('/audio.wav')).rejects.toThrow('Model not loaded');
     });
 
     it('returns the transcribed text from a file', async () => {
@@ -122,9 +124,7 @@ describe('WhisperTranscriptionService', () => {
       const stream = new PassThrough();
       stream.end();
 
-      await expect(service.transcribeStream(stream, () => {})).rejects.toThrow(
-        'Model not loaded',
-      );
+      await expect(service.transcribeStream(stream, () => {})).rejects.toThrow('Model not loaded');
     });
 
     it('collects audio chunks, transcribes, and calls onChunk with partial text', async () => {
@@ -135,7 +135,10 @@ describe('WhisperTranscriptionService', () => {
 
       // Set up transcribeData to call onNewSegments synchronously before returning
       mockContext.transcribeData.mockImplementation(
-        (_audioData: ArrayBuffer, options: { onNewSegments?: (result: { result: string }) => void }) => {
+        (
+          _audioData: ArrayBuffer,
+          options: { onNewSegments?: (result: { result: string }) => void },
+        ) => {
           // Call onNewSegments synchronously to simulate a segment arriving
           options?.onNewSegments?.({ result: 'Hello from stream' });
           return {

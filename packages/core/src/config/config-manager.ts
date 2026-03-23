@@ -14,8 +14,7 @@ export class ConfigManager {
 
   constructor(homePath?: string) {
     this.homePath =
-      homePath ??
-      join(process.env['HOME'] ?? process.env['USERPROFILE'] ?? '', '.tom');
+      homePath ?? join(process.env['HOME'] ?? process.env['USERPROFILE'] ?? '', '.tom');
     this.audioPath = join(this.homePath, 'audio');
     this.modelsPath = join(this.homePath, 'models');
     this.configFilePath = join(this.homePath, 'config.json');

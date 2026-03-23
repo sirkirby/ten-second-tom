@@ -27,9 +27,7 @@ export function SentimentDisplay({ analysis }: SentimentDisplayProps) {
       <Box paddingLeft={2} flexDirection="column">
         <Text>
           {'Sentiment: '}
-          <Text color={sentimentColor}>
-            {sentiment.label}
-          </Text>
+          <Text color={sentimentColor}>{sentiment.label}</Text>
           {` (${formatScore(sentiment.score)})`}
         </Text>
 

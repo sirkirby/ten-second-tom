@@ -7,9 +7,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 
-export type AudioPrerequisiteResult =
-  | { ok: true }
-  | { ok: false; message: string };
+export type AudioPrerequisiteResult = { ok: true } | { ok: false; message: string };
 
 /**
  * Check whether SoX (required by node-record-lpcm16) is available on the system.
@@ -45,9 +43,7 @@ export function checkAudioPrerequisites(): AudioPrerequisiteResult {
  * Check whether the Whisper model file exists at the given path.
  * Returns `{ ok: true }` if found, or `{ ok: false, message }` otherwise.
  */
-export function checkModelExists(
-  modelPath: string,
-): AudioPrerequisiteResult {
+export function checkModelExists(modelPath: string): AudioPrerequisiteResult {
   if (existsSync(modelPath)) {
     return { ok: true };
   }

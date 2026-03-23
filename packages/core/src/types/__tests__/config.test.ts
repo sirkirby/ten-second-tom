@@ -15,9 +15,17 @@ describe('AppConfigSchema', () => {
 
   it('validates a local config with ollama', () => {
     const config = {
-      llm: { provider: 'local' as const, localEndpoint: 'http://localhost:11434', modelId: 'qwen2.5:7b' },
+      llm: {
+        provider: 'local' as const,
+        localEndpoint: 'http://localhost:11434',
+        modelId: 'qwen2.5:7b',
+      },
       stt: { engine: 'whisper-distil-en', modelPath: '/Users/test/.tom/models/whisper-distil-en' },
-      embedding: { provider: 'ollama' as const, model: 'nomic-embed-text', endpoint: 'http://localhost:11434' },
+      embedding: {
+        provider: 'ollama' as const,
+        model: 'nomic-embed-text',
+        endpoint: 'http://localhost:11434',
+      },
       storage: { dbPath: '/Users/test/.tom/tom.db' },
     };
     const result = AppConfigSchema.safeParse(config);

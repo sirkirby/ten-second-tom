@@ -71,7 +71,8 @@ function EntryDetail({ entry, onBack }: EntryDetailProps) {
 
       {entry.analysis && (
         <Box marginTop={1} paddingLeft={2} flexDirection="column">
-          <Text bold>{'📊 Sentiment: '}
+          <Text bold>
+            {'📊 Sentiment: '}
             <Text color={getSentimentColor(entry.analysis.sentiment.score)}>
               {entry.analysis.sentiment.label}
             </Text>

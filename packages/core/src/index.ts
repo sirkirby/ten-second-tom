@@ -21,4 +21,7 @@ export {
   checkAudioPrerequisites,
   checkModelExists,
 } from './services/audio.js';
-export { type ITranscriptionService, WhisperTranscriptionService } from './services/transcription.js';
+export {
+  type ITranscriptionService,
+  WhisperTranscriptionService,
+} from './services/transcription.js';

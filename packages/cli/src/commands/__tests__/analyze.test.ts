@@ -90,7 +90,9 @@ function makeEntry(overrides: Partial<Entry> = {}): Entry {
   };
 }
 
-function makeMockServices(overrides: Partial<RecordingPipelineServices> = {}): RecordingPipelineServices {
+function makeMockServices(
+  overrides: Partial<RecordingPipelineServices> = {},
+): RecordingPipelineServices {
   const mockEntry = makeEntry();
 
   const storage: IStorageService = {
@@ -128,7 +130,14 @@ function makeMockServices(overrides: Partial<RecordingPipelineServices> = {}): R
     loadModel: vi.fn(),
   };
 
-  return { audio, transcription, agent, embedding, storage, ...overrides } as RecordingPipelineServices;
+  return {
+    audio,
+    transcription,
+    agent,
+    embedding,
+    storage,
+    ...overrides,
+  } as RecordingPipelineServices;
 }
 
 function mockSetupGuard(isComplete = true): void {

@@ -136,8 +136,6 @@ describe('NoopEmbeddingService', () => {
 
   it('throws on embed', async () => {
     const service = new NoopEmbeddingService();
-    await expect(service.embed('anything')).rejects.toThrow(
-      'No embedding provider configured',
-    );
+    await expect(service.embed('anything')).rejects.toThrow('No embedding provider configured');
   });
 });

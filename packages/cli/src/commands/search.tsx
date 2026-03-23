@@ -3,9 +3,7 @@ import { Box, Text, useApp, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { Command } from 'commander';
 import { render } from 'ink';
-import {
-  SearchService,
-} from '@ten-second-tom/core';
+import { SearchService } from '@ten-second-tom/core';
 import type { Entry } from '@ten-second-tom/core';
 import { buildServicesFromConfig } from './record.js';
 import { SearchResultsWithDetail } from '../components/SearchResults.js';

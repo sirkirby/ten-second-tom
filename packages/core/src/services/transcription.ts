@@ -99,10 +99,7 @@ export class WhisperTranscriptionService implements ITranscriptionService {
    * @returns The full accumulated transcript when the stream ends
    * @throws If the model has not been loaded via loadModel()
    */
-  async transcribeStream(
-    audioStream: Readable,
-    onChunk: (text: string) => void,
-  ): Promise<string> {
+  async transcribeStream(audioStream: Readable, onChunk: (text: string) => void): Promise<string> {
     if (this.context === null) {
       throw new Error('Model not loaded — call loadModel() first');
     }

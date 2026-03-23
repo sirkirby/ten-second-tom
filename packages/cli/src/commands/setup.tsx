@@ -181,7 +181,8 @@ function SetupWizard() {
     if (!trimmed.startsWith('sk-ant-')) {
       setState((s) => ({
         ...s,
-        errorMessage: 'Invalid API key format. Anthropic API keys start with "sk-ant-". Get your key at https://console.anthropic.com',
+        errorMessage:
+          'Invalid API key format. Anthropic API keys start with "sk-ant-". Get your key at https://console.anthropic.com',
       }));
       setStep('error');
       return;
@@ -201,9 +202,7 @@ function SetupWizard() {
     setStep('embedding-provider');
   }
 
-  function handleEmbeddingProviderSelect(item: {
-    value: 'ollama' | 'cloud' | 'none';
-  }) {
+  function handleEmbeddingProviderSelect(item: { value: 'ollama' | 'cloud' | 'none' }) {
     setState((s) => ({ ...s, embeddingProvider: item.value }));
     setStep('stt-info');
   }
@@ -361,10 +360,7 @@ function SetupWizard() {
         <Box flexDirection="column">
           <Text>Step 1 of 4: Choose your LLM provider</Text>
           <Box marginTop={1}>
-            <SelectInput
-              items={llmProviderItems}
-              onSelect={handleLlmProviderSelect}
-            />
+            <SelectInput items={llmProviderItems} onSelect={handleLlmProviderSelect} />
           </Box>
         </Box>
       )}
@@ -398,9 +394,7 @@ function SetupWizard() {
             <Text>Endpoint: </Text>
             <TextInput
               value={state.localEndpoint}
-              onChange={(val) =>
-                setState((s) => ({ ...s, localEndpoint: val }))
-              }
+              onChange={(val) => setState((s) => ({ ...s, localEndpoint: val }))}
               onSubmit={handleLocalEndpointSubmit}
               placeholder="http://localhost:11434"
             />
@@ -412,10 +406,7 @@ function SetupWizard() {
         <Box flexDirection="column">
           <Text>Step 2 of 4: Choose a local model</Text>
           <Box marginTop={1}>
-            <SelectInput
-              items={localModelItems}
-              onSelect={handleLocalModelSelect}
-            />
+            <SelectInput items={localModelItems} onSelect={handleLocalModelSelect} />
           </Box>
         </Box>
       )}
@@ -424,15 +415,10 @@ function SetupWizard() {
         <Box flexDirection="column">
           <Text>Step 3 of 4: Choose your embedding provider</Text>
           <Box marginTop={1}>
-            <Text dimColor>
-              Embeddings enable semantic (meaning-based) search
-            </Text>
+            <Text dimColor>Embeddings enable semantic (meaning-based) search</Text>
           </Box>
           <Box marginTop={1}>
-            <SelectInput
-              items={embeddingProviderItems}
-              onSelect={handleEmbeddingProviderSelect}
-            />
+            <SelectInput items={embeddingProviderItems} onSelect={handleEmbeddingProviderSelect} />
           </Box>
         </Box>
       )}
@@ -449,13 +435,9 @@ function SetupWizard() {
               for local, private transcription.
             </Text>
             <Text>
-              Model:{' '}
-              <Text bold>ggml-distil-small.en</Text>{' '}
-              <Text dimColor>(~380 MB)</Text>
+              Model: <Text bold>ggml-distil-small.en</Text> <Text dimColor>(~380 MB)</Text>
             </Text>
-            <Text dimColor>
-              The model will be downloaded next.
-            </Text>
+            <Text dimColor>The model will be downloaded next.</Text>
           </Box>
           <Box marginTop={1}>
             <SelectInput
@@ -478,9 +460,7 @@ function SetupWizard() {
             )}
             {downloadProgress.status === 'downloading' && (
               <>
-                <Text>
-                  Downloading ggml-distil-small.en (~380 MB)...
-                </Text>
+                <Text>Downloading ggml-distil-small.en (~380 MB)...</Text>
                 <Text>
                   {'  '}
                   {downloadProgress.totalBytes > 0

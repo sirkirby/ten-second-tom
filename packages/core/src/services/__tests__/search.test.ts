@@ -47,10 +47,7 @@ describe('SearchService', () => {
     const results = await service.search('deploy pipeline');
 
     expect(embedding.embed).toHaveBeenCalledWith('deploy pipeline');
-    expect(storage.searchByVector).toHaveBeenCalledWith(
-      expect.any(Float32Array),
-      20,
-    );
+    expect(storage.searchByVector).toHaveBeenCalledWith(expect.any(Float32Array), 20);
     expect(storage.searchByKeyword).not.toHaveBeenCalled();
     expect(results).toEqual([mockEntry]);
   });

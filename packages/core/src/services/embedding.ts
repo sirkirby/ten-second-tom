@@ -28,9 +28,7 @@ export class OllamaEmbeddingService implements IEmbeddingService {
       body: JSON.stringify({ model: this.model, prompt: text }),
     });
     if (!response.ok) {
-      throw new Error(
-        `Embedding request failed: ${response.status} ${response.statusText}`,
-      );
+      throw new Error(`Embedding request failed: ${response.status} ${response.statusText}`);
     }
     const data = (await response.json()) as { embedding: number[] };
     return new Float32Array(data.embedding);
@@ -38,10 +36,7 @@ export class OllamaEmbeddingService implements IEmbeddingService {
 
   async isAvailable(): Promise<boolean> {
     // Return cached result if still valid
-    if (
-      this.availabilityCache !== null &&
-      Date.now() < this.availabilityCache[1]
-    ) {
+    if (this.availabilityCache !== null && Date.now() < this.availabilityCache[1]) {
       return this.availabilityCache[0];
     }
 
@@ -56,10 +51,7 @@ export class OllamaEmbeddingService implements IEmbeddingService {
       ];
       return available;
     } catch {
-      this.availabilityCache = [
-        false,
-        Date.now() + OllamaEmbeddingService.AVAILABILITY_CACHE_MS,
-      ];
+      this.availabilityCache = [false, Date.now() + OllamaEmbeddingService.AVAILABILITY_CACHE_MS];
       return false;
     }
   }

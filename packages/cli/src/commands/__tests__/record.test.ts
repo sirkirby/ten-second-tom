@@ -76,7 +76,9 @@ function makeAnalysis(): EntryAnalysis {
   };
 }
 
-function makeMockServices(overrides: Partial<RecordingPipelineServices> = {}): RecordingPipelineServices {
+function makeMockServices(
+  overrides: Partial<RecordingPipelineServices> = {},
+): RecordingPipelineServices {
   const mockEntry = {
     id: 'test-uuid-1234',
     type: 'recording' as const,
@@ -240,7 +242,9 @@ describe('buildServicesFromConfig', () => {
     vi.clearAllMocks();
     // Provide constructor implementations
     (AudioService as unknown as Mock).mockImplementation(() => ({ startRecording: vi.fn() }));
-    (WhisperTranscriptionService as unknown as Mock).mockImplementation(() => ({ isModelLoaded: vi.fn() }));
+    (WhisperTranscriptionService as unknown as Mock).mockImplementation(() => ({
+      isModelLoaded: vi.fn(),
+    }));
     (TomAgent as unknown as Mock).mockImplementation(() => ({ analyze: vi.fn() }));
     (OllamaEmbeddingService as unknown as Mock).mockImplementation(() => ({ embed: vi.fn() }));
     (NoopEmbeddingService as unknown as Mock).mockImplementation(() => ({ embed: vi.fn() }));
@@ -251,7 +255,11 @@ describe('buildServicesFromConfig', () => {
     const config: AppConfig = {
       llm: { provider: 'cloud', apiKey: 'sk-test' },
       stt: { engine: 'whisper.node', modelPath: '/models/model.bin' },
-      embedding: { provider: 'ollama', model: 'nomic-embed-text', endpoint: 'http://localhost:11434' },
+      embedding: {
+        provider: 'ollama',
+        model: 'nomic-embed-text',
+        endpoint: 'http://localhost:11434',
+      },
       storage: { dbPath: '/tmp/test.db' },
     };
     const configManager = new ConfigManager('/tmp/test-home');

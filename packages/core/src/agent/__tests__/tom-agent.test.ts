@@ -34,7 +34,9 @@ describe('TomAgent', () => {
     const { TomAgent } = await import('../tom-agent.js');
     const agent = new TomAgent(cloudConfig);
 
-    const result = await agent.analyze('We shipped the new dashboard today. Really excited about the progress!');
+    const result = await agent.analyze(
+      'We shipped the new dashboard today. Really excited about the progress!',
+    );
 
     expect(result.sentiment.score).toBe(0.7);
     expect(result.sentiment.label).toBe('positive — excited about progress');

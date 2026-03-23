@@ -70,9 +70,7 @@ describe('AudioService', () => {
 
   it('getAudioStream() throws if not recording', () => {
     const service = new AudioService({ audioDir });
-    expect(() => service.getAudioStream()).toThrow(
-      'Not recording — call startRecording() first',
-    );
+    expect(() => service.getAudioStream()).toThrow('Not recording — call startRecording() first');
   });
 
   it('getAudioStream() returns a Readable stream while recording', () => {
@@ -105,9 +103,7 @@ describe('AudioService', () => {
     const resultPath = await service.stopRecording();
 
     // Path format: YYYY-MM/YYYY-MM-DD-{8-char-id}.wav
-    expect(resultPath).toMatch(
-      /^\d{4}-\d{2}\/\d{4}-\d{2}-\d{2}-[0-9a-f]{8}\.wav$/,
-    );
+    expect(resultPath).toMatch(/^\d{4}-\d{2}\/\d{4}-\d{2}-\d{2}-[0-9a-f]{8}\.wav$/);
 
     // After stopping, isRecording() should be false
     expect(service.isRecording()).toBe(false);

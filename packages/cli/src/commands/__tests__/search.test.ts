@@ -63,9 +63,7 @@ vi.mock('../record.js', async (importOriginal) => {
 // Mock ink-spinner
 vi.mock('ink-spinner', () => ({ default: vi.fn() }));
 
-import {
-  SearchService,
-} from '@ten-second-tom/core';
+import { SearchService } from '@ten-second-tom/core';
 import type { Entry, AppConfig } from '@ten-second-tom/core';
 
 import { buildServicesFromConfig } from '../record.js';
@@ -97,10 +95,7 @@ function makeConfig(): AppConfig {
   } as AppConfig;
 }
 
-function mockSetup(
-  isSetupComplete: boolean,
-  config?: AppConfig,
-): void {
+function mockSetup(isSetupComplete: boolean, config?: AppConfig): void {
   if (isSetupComplete) {
     const mockConfigManager = { audioPath: '/tmp/audio' };
     (checkSetupComplete as unknown as Mock).mockReturnValue({
@@ -203,7 +198,11 @@ describe('runSearchPipeline', () => {
   it('uses embedding from buildServicesFromConfig', async () => {
     const config: AppConfig = {
       ...makeConfig(),
-      embedding: { provider: 'ollama', model: 'nomic-embed-text', endpoint: 'http://localhost:11434' },
+      embedding: {
+        provider: 'ollama',
+        model: 'nomic-embed-text',
+        endpoint: 'http://localhost:11434',
+      },
     } as AppConfig;
 
     mockSetup(true, config);
@@ -220,10 +219,12 @@ describe('runSearchPipeline', () => {
     });
 
     let capturedEmbeddingInstance: unknown;
-    (SearchService as unknown as Mock).mockImplementation((_storage: unknown, embedding: unknown) => {
-      capturedEmbeddingInstance = embedding;
-      return { search: vi.fn().mockResolvedValue([]) };
-    });
+    (SearchService as unknown as Mock).mockImplementation(
+      (_storage: unknown, embedding: unknown) => {
+        capturedEmbeddingInstance = embedding;
+        return { search: vi.fn().mockResolvedValue([]) };
+      },
+    );
 
     await runSearchPipeline('test query');
 

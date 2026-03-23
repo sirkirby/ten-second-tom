@@ -81,7 +81,9 @@ function makeAnalysis(): EntryAnalysis {
   };
 }
 
-function makeMockServices(overrides: Partial<RecordingPipelineServices> = {}): RecordingPipelineServices {
+function makeMockServices(
+  overrides: Partial<RecordingPipelineServices> = {},
+): RecordingPipelineServices {
   const mockEntry = {
     id: 'note-uuid-5678',
     type: 'note' as const,
@@ -127,7 +129,14 @@ function makeMockServices(overrides: Partial<RecordingPipelineServices> = {}): R
     loadModel: vi.fn(),
   };
 
-  return { audio, transcription, agent, embedding, storage, ...overrides } as RecordingPipelineServices;
+  return {
+    audio,
+    transcription,
+    agent,
+    embedding,
+    storage,
+    ...overrides,
+  } as RecordingPipelineServices;
 }
 
 // ---------------------------------------------------------------------------
@@ -178,12 +187,10 @@ describe('runNotePipeline', () => {
 
     const result = await runNotePipeline('my typed note');
 
-    expect(runAnalysisPipeline).toHaveBeenCalledWith(
-      'my typed note',
-      undefined,
-      mockServices,
-      { entryType: 'note', inputMethod: 'typed' },
-    );
+    expect(runAnalysisPipeline).toHaveBeenCalledWith('my typed note', undefined, mockServices, {
+      entryType: 'note',
+      inputMethod: 'typed',
+    });
     expect(result.error).toBeNull();
     expect(result.analysis).toEqual(makeAnalysis());
     expect(result.warnings).toHaveLength(0);
@@ -211,7 +218,9 @@ describe('runNotePipeline', () => {
       audioPath: undefined,
       analysis: null,
       embeddingStored: true,
-      warnings: ['AI analysis unavailable — entry saved without analysis. Check your LLM configuration.'],
+      warnings: [
+        'AI analysis unavailable — entry saved without analysis. Check your LLM configuration.',
+      ],
     });
 
     const result = await runNotePipeline('my typed note');
@@ -364,7 +373,10 @@ describe('startDictation', () => {
       loadModel: vi.fn(),
     };
 
-    const mockServices = makeMockServices({ audio, transcription } as Partial<RecordingPipelineServices>);
+    const mockServices = makeMockServices({
+      audio,
+      transcription,
+    } as Partial<RecordingPipelineServices>);
 
     // startDictation: start recording, get stream, begin transcription
     audio.startRecording();
