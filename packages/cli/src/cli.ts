@@ -29,6 +29,7 @@ if (firstArg === '--help' || firstArg === '-h') {
   process.stdout.write('2.0.0\n');
 } else if (firstArg && KNOWN_COMMANDS.includes(firstArg)) {
   // One-shot mode — run a single command then exit
+  process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
   const command = firstArg;
   const commandArgs = args.slice(1).join(' ');
   render(
@@ -40,5 +41,7 @@ if (firstArg === '--help' || firstArg === '-h') {
   );
 } else {
   // REPL mode — persistent interactive app
+  // Clear the terminal so Ink starts from a clean slate (no gap above content)
+  process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
   render(React.createElement(App, { mode: 'repl' }));
 }
