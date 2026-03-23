@@ -29,6 +29,14 @@ export function SentimentDisplay({ analysis }: SentimentDisplayProps) {
         <Text>{`Confidence: ${formatConfidence(sentiment.confidence)}`}</Text>
 
         <Text>{`Summary: ${summary}`}</Text>
+
+        {analysis.raw['contextType'] && (
+          <Text dimColor>{`  Context: ${String(analysis.raw['contextType'])}`}</Text>
+        )}
+        {Array.isArray(analysis.raw['topics']) &&
+          (analysis.raw['topics'] as string[]).length > 0 && (
+            <Text dimColor>{`  Topics: ${(analysis.raw['topics'] as string[]).join(', ')}`}</Text>
+          )}
       </Box>
     </Box>
   );

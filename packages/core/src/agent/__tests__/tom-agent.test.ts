@@ -1,17 +1,37 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { LlmConfig } from '../../types/config.js';
 
+// Rich mock response matching the new analysis prompt structure
+const richMockResponse = {
+  sentiment: {
+    score: 0.7,
+    label: 'excited and proud — significant milestone shipped',
+    confidence: 0.92,
+    emotions: [
+      { name: 'excitement', intensity: 0.8 },
+      { name: 'pride', intensity: 0.6 },
+    ],
+  },
+  summary:
+    'The team shipped the new dashboard today ahead of schedule. This matters because it unblocks the sales team for their upcoming demos.',
+  decisions: [
+    {
+      decision: 'Ship the dashboard to production',
+      context: 'Feature is ready and demos are upcoming',
+    },
+  ],
+  actionItems: [{ item: 'Notify the sales team about the deployment', owner: null }],
+  topics: ['deployment', 'dashboard', 'release'],
+  contextType: 'update',
+  quotes: ['Really excited about the progress!'],
+};
+
 // Mock the Anthropic SDK before importing TomAgent
 const mockMessagesCreate = vi.fn().mockResolvedValue({
   content: [
     {
       type: 'text',
-      text: JSON.stringify({
-        sentiment: { score: 0.7, label: 'positive — excited about progress', confidence: 0.92 },
-        summary: 'Positive update about shipping the new dashboard',
-        topics: ['dashboard', 'shipping', 'progress'],
-        emotions: ['excitement', 'satisfaction'],
-      }),
+      text: JSON.stringify(richMockResponse),
     },
   ],
 });
@@ -34,12 +54,7 @@ beforeEach(() => {
     content: [
       {
         type: 'text',
-        text: JSON.stringify({
-          sentiment: { score: 0.7, label: 'positive — excited about progress', confidence: 0.92 },
-          summary: 'Positive update about shipping the new dashboard',
-          topics: ['dashboard', 'shipping', 'progress'],
-          emotions: ['excitement', 'satisfaction'],
-        }),
+        text: JSON.stringify(richMockResponse),
       },
     ],
   });
@@ -72,13 +87,96 @@ describe('TomAgent', () => {
       );
 
       expect(result.sentiment.score).toBe(0.7);
-      expect(result.sentiment.label).toBe('positive — excited about progress');
+      expect(result.sentiment.label).toBe('excited and proud — significant milestone shipped');
       expect(result.sentiment.confidence).toBe(0.92);
-      expect(result.summary).toBe('Positive update about shipping the new dashboard');
+      expect(result.summary).toBe(
+        'The team shipped the new dashboard today ahead of schedule. This matters because it unblocks the sales team for their upcoming demos.',
+      );
+    });
+
+    it('stores the full rich response in raw', async () => {
+      const { TomAgent } = await import('../tom-agent.js');
+      const agent = new TomAgent(cloudConfig);
+
+      const result = await agent.analyze(
+        'We shipped the new dashboard today. Really excited about the progress!',
+      );
+
       expect(result.raw).toMatchObject({
-        topics: ['dashboard', 'shipping', 'progress'],
-        emotions: ['excitement', 'satisfaction'],
+        topics: ['deployment', 'dashboard', 'release'],
+        contextType: 'update',
+        quotes: ['Really excited about the progress!'],
+        decisions: [
+          {
+            decision: 'Ship the dashboard to production',
+            context: 'Feature is ready and demos are upcoming',
+          },
+        ],
+        actionItems: [{ item: 'Notify the sales team about the deployment', owner: null }],
       });
+    });
+
+    it('stores emotions array in raw.sentiment.emotions', async () => {
+      const { TomAgent } = await import('../tom-agent.js');
+      const agent = new TomAgent(cloudConfig);
+
+      const result = await agent.analyze(
+        'We shipped the new dashboard today. Really excited about the progress!',
+      );
+
+      const sentimentRaw = result.raw['sentiment'] as Record<string, unknown>;
+      const emotions = sentimentRaw['emotions'] as Array<{ name: string; intensity: number }>;
+      expect(Array.isArray(emotions)).toBe(true);
+      expect(emotions).toHaveLength(2);
+      expect(emotions[0]).toMatchObject({ name: 'excitement', intensity: 0.8 });
+      expect(emotions[1]).toMatchObject({ name: 'pride', intensity: 0.6 });
+    });
+
+    it('handles missing optional fields gracefully (empty decisions and actionItems)', async () => {
+      const minimalResponse = {
+        sentiment: { score: 0.0, label: 'neutral', confidence: 0.5, emotions: [] },
+        summary: 'A brief note.',
+        decisions: [],
+        actionItems: [],
+        topics: [],
+        contextType: 'other',
+        quotes: [],
+      };
+      mockMessagesCreate.mockResolvedValueOnce({
+        content: [{ type: 'text', text: JSON.stringify(minimalResponse) }],
+      });
+
+      const { TomAgent } = await import('../tom-agent.js');
+      const agent = new TomAgent(cloudConfig);
+
+      const result = await agent.analyze('ok');
+
+      expect(result.sentiment.score).toBe(0.0);
+      expect(result.summary).toBe('A brief note.');
+      expect(result.raw['decisions']).toEqual([]);
+      expect(result.raw['actionItems']).toEqual([]);
+      expect(result.raw['topics']).toEqual([]);
+    });
+
+    it('handles missing summary field gracefully', async () => {
+      const responseWithoutSummary = {
+        sentiment: { score: 0.3, label: 'mildly positive', confidence: 0.6, emotions: [] },
+        decisions: [],
+        actionItems: [],
+        topics: ['work'],
+        contextType: 'other',
+        quotes: [],
+      };
+      mockMessagesCreate.mockResolvedValueOnce({
+        content: [{ type: 'text', text: JSON.stringify(responseWithoutSummary) }],
+      });
+
+      const { TomAgent } = await import('../tom-agent.js');
+      const agent = new TomAgent(cloudConfig);
+
+      const result = await agent.analyze('Some content');
+
+      expect(result.summary).toBe('');
     });
 
     it('handles empty content gracefully', async () => {
@@ -132,14 +230,27 @@ describe('TomAgent', () => {
   // -----------------------------------------------------------------------
 
   describe('local provider', () => {
+    const richOllamaResponse = {
+      sentiment: {
+        score: 0.5,
+        label: 'calm and focused — routine check-in',
+        confidence: 0.8,
+        emotions: [
+          { name: 'calm', intensity: 0.7 },
+          { name: 'focus', intensity: 0.5 },
+        ],
+      },
+      summary: 'A routine daily update with no major issues.',
+      decisions: [],
+      actionItems: [{ item: 'Review PR before end of day', owner: null }],
+      topics: ['work', 'code-review'],
+      contextType: 'update',
+      quotes: [],
+    };
+
     const ollamaResponse = {
       message: {
-        content: JSON.stringify({
-          sentiment: { score: 0.5, label: 'neutral', confidence: 0.8 },
-          summary: 'A routine daily update',
-          topics: ['work'],
-          emotions: ['calm'],
-        }),
+        content: JSON.stringify(richOllamaResponse),
       },
     };
 
@@ -192,9 +303,27 @@ describe('TomAgent', () => {
       const result = await agent.analyze('Had a regular day at work.');
 
       expect(result.sentiment.score).toBe(0.5);
-      expect(result.sentiment.label).toBe('neutral');
+      expect(result.sentiment.label).toBe('calm and focused — routine check-in');
       expect(result.sentiment.confidence).toBe(0.8);
-      expect(result.summary).toBe('A routine daily update');
+      expect(result.summary).toBe('A routine daily update with no major issues.');
+    });
+
+    it('stores rich fields in raw for local provider', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(ollamaResponse),
+      });
+
+      const { TomAgent } = await import('../tom-agent.js');
+      const agent = new TomAgent(localConfig);
+
+      const result = await agent.analyze('Had a regular day at work.');
+
+      expect(result.raw['contextType']).toBe('update');
+      expect(result.raw['topics']).toEqual(['work', 'code-review']);
+      expect(result.raw['actionItems']).toEqual([
+        { item: 'Review PR before end of day', owner: null },
+      ]);
     });
 
     it('throws on Ollama HTTP error', async () => {
