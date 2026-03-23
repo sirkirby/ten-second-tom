@@ -11,14 +11,11 @@ export type SetupGuardResult =
  * Check whether Tom is configured. Returns the loaded config and
  * ConfigManager on success, or an error message on failure.
  *
- * This replaces the duplicated `ConfigManager.isSetupComplete()` +
- * `ConfigManager.load()` pattern found across multiple commands.
+ * Calls load() once — it returns undefined if no config file exists,
+ * avoiding the redundant isSetupComplete() + load() double-read.
  */
 export function checkSetupComplete(): SetupGuardResult {
   const configManager = new ConfigManager();
-  if (!configManager.isSetupComplete()) {
-    return { ok: false, error: SETUP_REQUIRED_MESSAGE };
-  }
   const config = configManager.load();
   if (config === undefined) {
     return { ok: false, error: SETUP_REQUIRED_MESSAGE };

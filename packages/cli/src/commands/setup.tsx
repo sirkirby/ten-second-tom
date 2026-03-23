@@ -220,7 +220,7 @@ function SetupWizard() {
     errorMessage: '',
   });
 
-  const configManager = new ConfigManager();
+  const configManager = useMemo(() => new ConfigManager(), []);
 
   // Auto-exit after error with a short delay; allow q/Enter to exit immediately
   useAutoExit(step === 'error');

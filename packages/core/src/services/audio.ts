@@ -181,7 +181,7 @@ export class AudioService implements IAudioService {
     // transcription stream receives clean PCM without WAV headers.
     // We prepend a standard WAV header here for file-based playback
     // and for whisper.node's transcribeFile which handles WAV natively.
-    const totalPcmBytes = this.audioChunks.reduce((sum, c) => sum + c.length, 0);
+    const totalPcmBytes = this.bufferSize;
     const wavHeader = createWavHeader(totalPcmBytes);
 
     const writeStream = createWriteStream(filePath);

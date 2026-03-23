@@ -101,8 +101,10 @@ export class TomAgent implements IAgentService {
       ],
     });
 
-    const textBlock = response.content.find((block) => block.type === 'text');
-    if (!textBlock || textBlock.type !== 'text') {
+    const textBlock = response.content.find(
+      (block): block is Anthropic.TextBlock => block.type === 'text',
+    );
+    if (!textBlock) {
       throw new Error('No text response from model');
     }
 
