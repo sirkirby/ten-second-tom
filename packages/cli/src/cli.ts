@@ -1,22 +1,44 @@
 #!/usr/bin/env node
-import { Command } from 'commander';
-import { setupCommand } from './commands/setup.js';
-import { recordCommand } from './commands/record.js';
-import { noteCommand } from './commands/note.js';
-import { searchCommand } from './commands/search.js';
-import { analyzeCommand } from './commands/analyze.js';
+import React from 'react';
+import { render } from 'ink';
+import { App } from './app.js';
 
-const program = new Command();
+const args = process.argv.slice(2);
+const KNOWN_COMMANDS = ['record', 'note', 'search', 'analyze', 'setup'];
 
-program
-  .name('tom')
-  .description('Ten-Second Tom — intelligence-first voice capture and analysis')
-  .version('2.0.0');
+const firstArg = args[0];
 
-program.addCommand(setupCommand);
-program.addCommand(recordCommand);
-program.addCommand(noteCommand);
-program.addCommand(searchCommand);
-program.addCommand(analyzeCommand);
-
-program.parse();
+if (firstArg === '--help' || firstArg === '-h') {
+  // Static help — no Ink needed
+  process.stdout.write(
+    [
+      'Usage: tom [command]',
+      '',
+      'Commands:',
+      '  record     Record audio with live transcription',
+      '  note       Create a text note (type or dictate)',
+      '  search     Search entries by meaning or keyword',
+      '  analyze    Re-run analysis on an existing entry',
+      '  setup      Configure Tom',
+      '',
+      'Run tom with no arguments for interactive mode.',
+      '',
+    ].join('\n'),
+  );
+} else if (firstArg === '--version' || firstArg === '-V') {
+  process.stdout.write('2.0.0\n');
+} else if (firstArg && KNOWN_COMMANDS.includes(firstArg)) {
+  // One-shot mode — run a single command then exit
+  const command = firstArg;
+  const commandArgs = args.slice(1).join(' ');
+  render(
+    React.createElement(App, {
+      mode: 'oneshot',
+      initialCommand: command,
+      initialArgs: commandArgs,
+    }),
+  );
+} else {
+  // REPL mode — persistent interactive app
+  render(React.createElement(App, { mode: 'repl' }));
+}
