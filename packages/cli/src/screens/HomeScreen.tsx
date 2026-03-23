@@ -160,7 +160,7 @@ export function HomeScreen({ context, config, entryCount }: HomeScreenProps) {
       const searchService = new SearchService(svcs.storage, svcs.embedding);
 
       try {
-        const results = await searchService.search(query);
+        const results = await searchService.search(query, 5);
         setLastSearchResults(results);
         context.pushHistory({
           id: `search-${Date.now()}`,

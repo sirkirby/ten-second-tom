@@ -47,7 +47,7 @@ describe('SearchService', () => {
     const results = await service.search('deploy pipeline');
 
     expect(embedding.embed).toHaveBeenCalledWith('deploy pipeline');
-    expect(storage.searchByVector).toHaveBeenCalledWith(expect.any(Float32Array), 20);
+    expect(storage.searchByVector).toHaveBeenCalledWith(expect.any(Float32Array), 10);
     expect(storage.searchByKeyword).not.toHaveBeenCalled();
     expect(results).toEqual([mockEntry]);
   });
@@ -62,7 +62,7 @@ describe('SearchService', () => {
     const results = await service.search('deploy pipeline');
 
     expect(embedding.embed).not.toHaveBeenCalled();
-    expect(storage.searchByKeyword).toHaveBeenCalledWith('deploy pipeline', 20);
+    expect(storage.searchByKeyword).toHaveBeenCalledWith('deploy pipeline', 10);
     expect(storage.searchByVector).not.toHaveBeenCalled();
     expect(results).toEqual([mockEntry]);
   });
@@ -78,7 +78,7 @@ describe('SearchService', () => {
     const results = await service.search('deploy pipeline');
 
     expect(embedding.embed).toHaveBeenCalledWith('deploy pipeline');
-    expect(storage.searchByKeyword).toHaveBeenCalledWith('deploy pipeline', 20);
+    expect(storage.searchByKeyword).toHaveBeenCalledWith('deploy pipeline', 10);
     expect(results).toEqual([mockEntry]);
   });
 

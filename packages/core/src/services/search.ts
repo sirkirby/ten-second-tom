@@ -12,7 +12,7 @@ export class SearchService implements ISearchService {
     private readonly embedding: IEmbeddingService,
   ) {}
 
-  async search(query: string, limit: number = 20): Promise<Entry[]> {
+  async search(query: string, limit: number = 10): Promise<Entry[]> {
     const embeddingAvailable = await this.embedding.isAvailable();
     if (embeddingAvailable) {
       try {
