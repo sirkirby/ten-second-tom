@@ -47,12 +47,23 @@ const helpCommand: TomCommand = {
   execute: (_args, ctx) => {
     const content = (
       <Box flexDirection="column">
+        <Text dimColor>Type anything to search your entries. Commands use a / prefix:</Text>
+        <Text> </Text>
         {COMMANDS.filter((c) => c.name !== 'help' && c.name !== 'quit').map((c) => (
           <Text key={c.name}>
-            <Text color="green">{c.name.padEnd(12)}</Text>
+            <Text color="green">{'/' + c.name.padEnd(12)}</Text>
             <Text dimColor>{c.description}</Text>
           </Text>
         ))}
+        <Text> </Text>
+        <Text>
+          <Text color="green">{'/help'.padEnd(13)}</Text>
+          <Text dimColor>Show this help</Text>
+        </Text>
+        <Text>
+          <Text color="green">{'/quit'.padEnd(13)}</Text>
+          <Text dimColor>Exit Tom</Text>
+        </Text>
       </Box>
     );
     ctx.pushHistory({ id: `help-${Date.now()}`, content });
