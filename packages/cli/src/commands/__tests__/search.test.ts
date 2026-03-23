@@ -5,8 +5,10 @@ import type * as RecordModule from '../record.js';
 // ---------------------------------------------------------------------------
 // Mock @ten-second-tom/core before importing the module under test
 // ---------------------------------------------------------------------------
-vi.mock('@ten-second-tom/core', () => {
+vi.mock('@ten-second-tom/core', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
   return {
+    ...actual,
     ConfigManager: vi.fn(),
     SqliteStorageService: vi.fn(),
     SearchService: vi.fn(),

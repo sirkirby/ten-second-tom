@@ -5,16 +5,37 @@ import type { Mock } from 'vitest';
 // We test the exported pipeline helpers directly (no Ink rendering needed).
 // ---------------------------------------------------------------------------
 
+// Hoist mock constructors so the buildServicesFromConfig mock factory can reference them
+const { mockAudioServiceCtor, mockWhisperCtor, mockTomAgentCtor, mockOllamaEmbCtor, mockNoopEmbCtor, mockSqliteCtor } = vi.hoisted(() => ({
+  mockAudioServiceCtor: vi.fn(),
+  mockWhisperCtor: vi.fn(),
+  mockTomAgentCtor: vi.fn(),
+  mockOllamaEmbCtor: vi.fn(),
+  mockNoopEmbCtor: vi.fn(),
+  mockSqliteCtor: vi.fn(),
+}));
+
 // Mock @ten-second-tom/core before importing the module under test
 vi.mock('@ten-second-tom/core', () => {
   return {
     ConfigManager: vi.fn(),
-    AudioService: vi.fn(),
-    WhisperTranscriptionService: vi.fn(),
-    TomAgent: vi.fn(),
-    OllamaEmbeddingService: vi.fn(),
-    NoopEmbeddingService: vi.fn(),
-    SqliteStorageService: vi.fn(),
+    AudioService: mockAudioServiceCtor,
+    WhisperTranscriptionService: mockWhisperCtor,
+    TomAgent: mockTomAgentCtor,
+    OllamaEmbeddingService: mockOllamaEmbCtor,
+    NoopEmbeddingService: mockNoopEmbCtor,
+    SqliteStorageService: mockSqliteCtor,
+    buildServicesFromConfig: vi.fn((config: Record<string, unknown>, configManager: Record<string, unknown>) => {
+      const audio = new mockAudioServiceCtor({ audioDir: (configManager as Record<string, unknown>)['audioPath'] });
+      const transcription = new mockWhisperCtor();
+      const agent = new mockTomAgentCtor((config as Record<string, unknown>)['llm']);
+      const embeddingConfig = (config as Record<string, Record<string, unknown>>)['embedding'];
+      const embedding = embeddingConfig['provider'] === 'ollama'
+        ? new mockOllamaEmbCtor({ model: embeddingConfig['model'], endpoint: embeddingConfig['endpoint'] })
+        : new mockNoopEmbCtor();
+      const storage = new mockSqliteCtor((config as Record<string, Record<string, unknown>>)['storage']['dbPath']);
+      return { audio, transcription, agent, embedding, storage };
+    }),
   };
 });
 
@@ -48,12 +69,7 @@ vi.mock('../../hooks/useSetupGuard.js', () => ({
 
 import {
   ConfigManager,
-  AudioService,
-  WhisperTranscriptionService,
-  TomAgent,
-  OllamaEmbeddingService,
-  NoopEmbeddingService,
-  SqliteStorageService,
+  buildServicesFromConfig,
 } from '@ten-second-tom/core';
 import type {
   IAudioService,
@@ -65,8 +81,16 @@ import type {
   AppConfig,
 } from '@ten-second-tom/core';
 
-import { runAnalysisPipeline, buildServicesFromConfig } from '../record.js';
+import { runAnalysisPipeline } from '../record.js';
 import type { RecordingPipelineServices } from '../record.js';
+
+// Alias hoisted mocks for use in assertions
+const AudioService = mockAudioServiceCtor;
+const WhisperTranscriptionService = mockWhisperCtor;
+const TomAgent = mockTomAgentCtor;
+const OllamaEmbeddingService = mockOllamaEmbCtor;
+const NoopEmbeddingService = mockNoopEmbCtor;
+const SqliteStorageService = mockSqliteCtor;
 
 // ---------------------------------------------------------------------------
 // Helpers

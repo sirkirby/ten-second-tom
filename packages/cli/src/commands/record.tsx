@@ -5,21 +5,11 @@ import { Command } from 'commander';
 import { render } from 'ink';
 import { join } from 'node:path';
 import {
-  AudioService,
-  WhisperTranscriptionService,
-  TomAgent,
-  OllamaEmbeddingService,
-  NoopEmbeddingService,
-  SqliteStorageService,
   checkAudioPrerequisites,
   checkModelExists,
-  type IStorageService,
-  type IAudioService,
-  type ITranscriptionService,
-  type IEmbeddingService,
-  type IAgentService,
+  buildServicesFromConfig,
 } from '@ten-second-tom/core';
-import type { ConfigManager, AppConfig, EntryAnalysis } from '@ten-second-tom/core';
+import type { EntryAnalysis, ServiceContainer } from '@ten-second-tom/core';
 import { RecordingUI } from '../components/RecordingUI.js';
 import { SentimentDisplay } from '../components/SentimentDisplay.js';
 import { ErrorDisplay } from '../components/ErrorDisplay.js';
@@ -31,13 +21,12 @@ import { EXIT_HINT_TEXT } from '../constants.js';
 // Pipeline types & orchestration (extracted for testability)
 // ---------------------------------------------------------------------------
 
-export interface RecordingPipelineServices {
-  audio: IAudioService;
-  transcription: ITranscriptionService;
-  agent: IAgentService;
-  embedding: IEmbeddingService;
-  storage: IStorageService;
-}
+/**
+ * Re-export ServiceContainer as RecordingPipelineServices for backward
+ * compatibility — note.tsx, search.tsx, and analyze.tsx import this name.
+ */
+export type { ServiceContainer as RecordingPipelineServices } from '@ten-second-tom/core';
+export { buildServicesFromConfig } from '@ten-second-tom/core';
 
 export interface PipelineResult {
   entryId: string;
@@ -55,36 +44,6 @@ export interface PipelineOptions {
 }
 
 /**
- * Build services from a loaded AppConfig.
- * Exported for testing.
- */
-export function buildServicesFromConfig(
-  config: AppConfig,
-  configManager: ConfigManager,
-): RecordingPipelineServices {
-  const audio = new AudioService({ audioDir: configManager.audioPath });
-
-  const transcription = new WhisperTranscriptionService();
-
-  const agent = new TomAgent(config.llm);
-
-  const embedding =
-    config.embedding.provider === 'ollama'
-      ? new OllamaEmbeddingService({
-          model: config.embedding.model,
-          endpoint: config.embedding.endpoint,
-        })
-      : config.embedding.provider === 'cloud'
-        ? // Cloud embedding not yet implemented — fall back to noop
-          new NoopEmbeddingService()
-        : new NoopEmbeddingService();
-
-  const storage = new SqliteStorageService(config.storage.dbPath);
-
-  return { audio, transcription, agent, embedding, storage };
-}
-
-/**
  * Run the post-recording/note analysis pipeline.
  * Returns the analysis result (or null) and any warnings.
  * Exported for testing.
@@ -98,7 +57,7 @@ export function buildServicesFromConfig(
 export async function runAnalysisPipeline(
   transcript: string,
   audioPathOrOptions: string | undefined,
-  services: RecordingPipelineServices,
+  services: ServiceContainer,
   options?: PipelineOptions,
 ): Promise<PipelineResult> {
   const warnings: string[] = [];
@@ -168,7 +127,7 @@ function RecordCommand() {
   const [analysis, setAnalysis] = useState<EntryAnalysis | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [services, setServices] = useState<RecordingPipelineServices | null>(null);
+  const [services, setServices] = useState<ServiceContainer | null>(null);
 
   // Ref to hold the audioPath base directory for file-based transcription
   const audioBaseDirRef = useRef<string>('');

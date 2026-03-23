@@ -27,3 +27,4 @@ export {
   type ITranscriptionService,
   WhisperTranscriptionService,
 } from './services/transcription.js';
+export { type ServiceContainer, buildServicesFromConfig } from './services/service-factory.js';
