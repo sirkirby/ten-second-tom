@@ -5,6 +5,9 @@ import type { AppConfig, ServiceContainer, ConfigManager } from '@ten-second-tom
 import { checkSetupComplete } from './hooks/useSetupGuard.js';
 import { HomeScreen } from './screens/HomeScreen.js';
 import { RecordingScreen } from './screens/RecordingScreen.js';
+import { ProcessingScreen } from './screens/ProcessingScreen.js';
+import { ResultsSummary } from './components/ResultsSummary.js';
+import type { ResultsSummaryProps } from './components/ResultsSummary.js';
 import { findCommand } from './commands/registry.js';
 import type { Screen, HistoryEntry, AppContext } from './commands/registry.js';
 
@@ -33,6 +36,13 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [configManager, setConfigManager] = useState<ConfigManager | null>(null);
   const [entryCount, setEntryCount] = useState(0);
+
+  // Data passed from RecordingScreen → ProcessingScreen
+  const [recordingData, setRecordingData] = useState<{
+    audioRelPath: string;
+    liveTranscript: string;
+    duration: number;
+  } | null>(null);
 
   // Guard against double-executing the initial command in StrictMode
   const initialCommandExecuted = useRef(false);
@@ -104,17 +114,11 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
 
   // ---- recording screen callbacks ----
   const handleRecordingComplete = useCallback(
-    (audioRelPath: string, liveTranscript: string) => {
-      handleSetScreenData({ audioRelPath, liveTranscript });
-      // ProcessingScreen will be implemented in Task 3 — for now, push a
-      // placeholder message to history and return to home.
-      pushHistory({
-        id: `recording-${Date.now()}`,
-        content: `Recording saved (${audioRelPath}). Processing screen coming soon.`,
-      });
-      setScreen('home');
+    (audioRelPath: string, liveTranscript: string, recordingDuration: number) => {
+      setRecordingData({ audioRelPath, liveTranscript, duration: recordingDuration });
+      setScreen('processing');
     },
-    [handleSetScreenData, pushHistory],
+    [],
   );
 
   const handleRecordingCancel = useCallback(() => {
@@ -125,14 +129,41 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
     setScreen('home');
   }, [pushHistory]);
 
+  // ---- processing screen callback ----
+  const handleProcessingComplete = useCallback(
+    (result: ResultsSummaryProps) => {
+      pushHistory({
+        id: `result-${Date.now()}`,
+        content: (
+          <ResultsSummary
+            duration={result.duration}
+            transcript={result.transcript}
+            analysis={result.analysis}
+            warnings={result.warnings}
+            entryType={result.entryType}
+          />
+        ),
+      });
+      setRecordingData(null);
+      setScreenData({});
+      setScreen('home');
+
+      // In one-shot mode, exit after processing completes
+      if (mode === 'oneshot') {
+        exit();
+      }
+    },
+    [pushHistory, mode, exit],
+  );
+
   // ---- render ----
   return (
     <Box flexDirection="column">
       {/* Scroll history — already-completed outputs */}
       <Static items={completedOutputs}>
         {(entry) => (
-          <Box key={entry.id}>
-            <Text>{String(entry.content)}</Text>
+          <Box key={entry.id} flexDirection="column">
+            {typeof entry.content === 'string' ? <Text>{entry.content}</Text> : entry.content}
           </Box>
         )}
       </Static>
@@ -150,8 +181,18 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
         />
       )}
 
+      {screen === 'processing' && (
+        <ProcessingScreen
+          context={context}
+          audioRelPath={recordingData?.audioRelPath}
+          liveTranscript={recordingData?.liveTranscript}
+          duration={recordingData?.duration}
+          entryId={screenData['entryId'] as string | undefined}
+          onComplete={handleProcessingComplete}
+        />
+      )}
+
       {/* Placeholder screens — will be implemented in subsequent tasks */}
-      {screen === 'processing' && <Text color="yellow">Processing screen (coming in Task 3)</Text>}
       {screen === 'search' && <Text color="yellow">Search screen (coming in Task 4)</Text>}
       {screen === 'note' && <Text color="yellow">Note screen (coming in Task 5)</Text>}
       {screen === 'setup' && <Text color="yellow">Setup screen (coming later)</Text>}

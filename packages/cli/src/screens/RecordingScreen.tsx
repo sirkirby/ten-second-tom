@@ -26,7 +26,7 @@ const RECORDING_INDICATOR = '\u25CF'; // ● (filled circle)
 
 export interface RecordingScreenProps {
   context: AppContext;
-  onComplete: (audioRelPath: string, liveTranscript: string) => void;
+  onComplete: (audioRelPath: string, liveTranscript: string, duration: number) => void;
   onCancel: () => void;
 }
 
@@ -58,6 +58,7 @@ export function RecordingScreen({ context, onComplete, onCancel }: RecordingScre
   const servicesRef = useRef<ServiceContainer | null>(null);
   const phaseRef = useRef<Phase>('init');
   const transcriptRef = useRef('');
+  const durationRef = useRef(0);
 
   // Keep phaseRef in sync
   useEffect(() => {
@@ -68,6 +69,11 @@ export function RecordingScreen({ context, onComplete, onCancel }: RecordingScre
   useEffect(() => {
     transcriptRef.current = transcript;
   }, [transcript]);
+
+  // Keep durationRef in sync
+  useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
 
   // -------------------------------------------------------------------------
   // Initialise: check setup, load model, start recording
@@ -221,8 +227,8 @@ export function RecordingScreen({ context, onComplete, onCancel }: RecordingScre
       // Stop the audio recorder — writes the WAV file to disk
       const audioRelPath = await svcs.audio.stopRecording();
 
-      // Hand off the audio path and the live transcript to the parent
-      onComplete(audioRelPath, transcriptRef.current);
+      // Hand off the audio path, live transcript, and duration to the parent
+      onComplete(audioRelPath, transcriptRef.current, durationRef.current);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(`Recording failed: ${msg}`);
