@@ -203,19 +203,15 @@ function RecordCommand() {
         const svcs = buildServicesFromConfig(config, configManager);
         audioBaseDirRef.current = configManager.audioPath;
 
-        // Load STT model — suppress whisper.cpp's verbose native logging
-        // (GPU init, model info, etc.) that writes directly to stderr.
+        // Load STT model — stderr suppression is handled inside the
+        // transcription service via GGML_LOG_LEVEL env var.
         if (!svcs.transcription.isModelLoaded()) {
-          const originalStderrWrite = process.stderr.write;
           try {
-            process.stderr.write = (() => true) as typeof process.stderr.write;
             await svcs.transcription.loadModel(config.stt.modelPath);
           } catch {
             setError('STT model not found. Run `tom setup` to download the model.');
             setPhase('error');
             return;
-          } finally {
-            process.stderr.write = originalStderrWrite;
           }
         }
 
