@@ -6,7 +6,7 @@ import type { ServiceContainer, ConfigManager } from '@ten-second-tom/core';
 // Screen + history types
 // ---------------------------------------------------------------------------
 
-export type Screen = 'home' | 'recording' | 'processing' | 'search' | 'note' | 'setup';
+export type Screen = 'home' | 'recording' | 'processing' | 'search' | 'note' | 'setup' | 'list';
 
 export interface HistoryEntry {
   id: string;
@@ -105,6 +105,15 @@ const analyzeCmd: TomCommand = {
   },
 };
 
+const listCmd: TomCommand = {
+  name: 'list',
+  description: 'Browse recent entries',
+  execute: (args, ctx) => {
+    ctx.setScreenData({ filter: args.trim() || undefined });
+    ctx.setScreen('list');
+  },
+};
+
 const setupCmd: TomCommand = {
   name: 'setup',
   description: 'Configure Tom',
@@ -117,6 +126,7 @@ export const COMMANDS: TomCommand[] = [
   recordCmd,
   noteCmd,
   searchCmd,
+  listCmd,
   analyzeCmd,
   setupCmd,
   helpCommand,

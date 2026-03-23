@@ -8,6 +8,7 @@ import { HomeScreen } from './screens/HomeScreen.js';
 import { RecordingScreen } from './screens/RecordingScreen.js';
 import { ProcessingScreen } from './screens/ProcessingScreen.js';
 import { SearchScreen } from './screens/SearchScreen.js';
+import { ListScreen } from './screens/ListScreen.js';
 import { NoteScreen } from './screens/NoteScreen.js';
 import { ResultsSummary } from './components/ResultsSummary.js';
 import type { ResultsSummaryProps } from './components/ResultsSummary.js';
@@ -265,6 +266,20 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
         <SearchScreen
           context={context}
           initialQuery={screenData['query'] as string | undefined}
+          onClose={() => {
+            setScreenData({});
+            setScreen('home');
+            if (mode === 'oneshot') {
+              setCommandDone(true);
+            }
+          }}
+        />
+      )}
+
+      {screen === 'list' && (
+        <ListScreen
+          context={context}
+          filter={screenData['filter'] as 'notes' | 'recordings' | undefined}
           onClose={() => {
             setScreenData({});
             setScreen('home');
