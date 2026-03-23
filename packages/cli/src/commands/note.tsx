@@ -5,7 +5,7 @@ import { Command } from 'commander';
 import { render } from 'ink';
 import { join } from 'node:path';
 import { unlinkSync } from 'node:fs';
-import { ConfigManager } from '@ten-second-tom/core';
+import { ConfigManager, checkAudioPrerequisites } from '@ten-second-tom/core';
 import type { EntryAnalysis } from '@ten-second-tom/core';
 import { SentimentDisplay } from '../components/SentimentDisplay.js';
 import { ErrorDisplay } from '../components/ErrorDisplay.js';
@@ -139,6 +139,13 @@ function NoteCommand() {
 
       if (!svcs.transcription.isModelLoaded()) {
         setDictationWarning('STT model not loaded — run `tom setup` to download the model.');
+        return;
+      }
+
+      // Check SoX is installed (required by node-record-lpcm16)
+      const soxCheck = checkAudioPrerequisites();
+      if (!soxCheck.ok) {
+        setDictationWarning(soxCheck.message);
         return;
       }
 

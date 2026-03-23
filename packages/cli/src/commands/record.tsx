@@ -11,6 +11,8 @@ import {
   OllamaEmbeddingService,
   NoopEmbeddingService,
   SqliteStorageService,
+  checkAudioPrerequisites,
+  checkModelExists,
   type IStorageService,
   type IAudioService,
   type ITranscriptionService,
@@ -184,6 +186,23 @@ function RecordCommand() {
         }
 
         const { config, configManager } = guard;
+
+        // Check Whisper model exists before loading
+        const modelCheck = checkModelExists(config.stt.modelPath);
+        if (!modelCheck.ok) {
+          setError(modelCheck.message);
+          setPhase('error');
+          return;
+        }
+
+        // Check SoX is installed (required by node-record-lpcm16)
+        const soxCheck = checkAudioPrerequisites();
+        if (!soxCheck.ok) {
+          setError(soxCheck.message);
+          setPhase('error');
+          return;
+        }
+
         const svcs = buildServicesFromConfig(config, configManager);
         audioBaseDirRef.current = configManager.audioPath;
 

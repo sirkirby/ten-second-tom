@@ -2,9 +2,60 @@ import recorder from 'node-record-lpcm16';
 const { record } = recorder;
 type Recording = ReturnType<typeof record>;
 import type { Readable } from 'node:stream';
-import { createWriteStream, mkdirSync } from 'node:fs';
+import { createWriteStream, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+
+export type AudioPrerequisiteResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+/**
+ * Check whether SoX (required by node-record-lpcm16) is available on the system.
+ * Returns `{ ok: true }` if SoX is found, or `{ ok: false, message }` with
+ * platform-specific install instructions otherwise.
+ */
+export function checkAudioPrerequisites(): AudioPrerequisiteResult {
+  try {
+    execFileSync('sox', ['--version'], { stdio: 'ignore' });
+    return { ok: true };
+  } catch {
+    const platform = process.platform;
+    if (platform === 'darwin') {
+      return {
+        ok: false,
+        message: 'SoX is required for audio recording. Install with: brew install sox',
+      };
+    } else if (platform === 'win32') {
+      return {
+        ok: false,
+        message:
+          'SoX is required for audio recording. Install from: https://sourceforge.net/projects/sox/',
+      };
+    }
+    return {
+      ok: false,
+      message: 'SoX is required for audio recording. Install it for your platform.',
+    };
+  }
+}
+
+/**
+ * Check whether the Whisper model file exists at the given path.
+ * Returns `{ ok: true }` if found, or `{ ok: false, message }` otherwise.
+ */
+export function checkModelExists(
+  modelPath: string,
+): AudioPrerequisiteResult {
+  if (existsSync(modelPath)) {
+    return { ok: true };
+  }
+  return {
+    ok: false,
+    message: `Whisper model not found at ${modelPath}. Run \`tom setup\` to download it.`,
+  };
+}
 
 export interface IAudioService {
   startRecording(): void;

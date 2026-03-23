@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PassThrough } from 'node:stream';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -17,7 +17,7 @@ vi.mock('node-record-lpcm16', () => {
 });
 
 // Import after mock is registered
-const { AudioService } = await import('../audio.js');
+const { AudioService, checkAudioPrerequisites, checkModelExists } = await import('../audio.js');
 
 function makeFakeRecording(stream: PassThrough) {
   return {
@@ -135,5 +135,59 @@ describe('AudioService', () => {
     // Should be able to start again
     service.startRecording();
     expect(service.isRecording()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: checkAudioPrerequisites
+// ---------------------------------------------------------------------------
+
+describe('checkAudioPrerequisites', () => {
+  it('returns { ok: true } when sox is available', () => {
+    // We cannot fully control whether sox is installed in the test env,
+    // but we can at least verify the function returns a valid shape.
+    const result = checkAudioPrerequisites();
+    expect(result).toHaveProperty('ok');
+    if (result.ok) {
+      expect(result).toEqual({ ok: true });
+    } else {
+      expect(result).toHaveProperty('message');
+      expect(result.message).toContain('SoX');
+    }
+  });
+
+  it('returns an object with ok and message properties', () => {
+    const result = checkAudioPrerequisites();
+    expect(typeof result.ok).toBe('boolean');
+    if (!result.ok) {
+      expect(typeof result.message).toBe('string');
+      expect(result.message.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: checkModelExists
+// ---------------------------------------------------------------------------
+
+describe('checkModelExists', () => {
+  it('returns { ok: true } when model file exists', () => {
+    const modelPath = join(audioDir, 'test-model.bin');
+    writeFileSync(modelPath, 'fake model data');
+
+    const result = checkModelExists(modelPath);
+    expect(result).toEqual({ ok: true });
+  });
+
+  it('returns { ok: false } with message when model file does not exist', () => {
+    const modelPath = join(audioDir, 'nonexistent-model.bin');
+
+    const result = checkModelExists(modelPath);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.message).toContain('Whisper model not found');
+      expect(result.message).toContain(modelPath);
+      expect(result.message).toContain('tom setup');
+    }
   });
 });
