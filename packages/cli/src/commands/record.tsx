@@ -153,7 +153,7 @@ export async function runAnalysisPipeline(
 // React component
 // ---------------------------------------------------------------------------
 
-type Phase = 'init' | 'recording' | 'analyzing' | 'done' | 'error';
+type Phase = 'init' | 'recording' | 'transcribing' | 'analyzing' | 'done' | 'error';
 
 function RecordCommand() {
   const { exit } = useApp();
@@ -166,13 +166,11 @@ function RecordCommand() {
   const [error, setError] = useState<string | null>(null);
   const [services, setServices] = useState<RecordingPipelineServices | null>(null);
 
-  // Ref to hold the live transcription promise so stopAndAnalyze can await it
-  const transcriptionPromiseRef = useRef<Promise<string> | null>(null);
-  // Ref to hold the audioPath base directory for file-based fallback
+  // Ref to hold the audioPath base directory for file-based transcription
   const audioBaseDirRef = useRef<string>('');
 
   // -------------------------------------------------------------------------
-  // Initialise: check setup, load model, start recording, begin live transcription
+  // Initialise: check setup, load model, start recording
   // -------------------------------------------------------------------------
   useEffect(() => {
     async function init() {
@@ -205,14 +203,19 @@ function RecordCommand() {
         const svcs = buildServicesFromConfig(config, configManager);
         audioBaseDirRef.current = configManager.audioPath;
 
-        // Load STT model
+        // Load STT model — suppress whisper.cpp's verbose native logging
+        // (GPU init, model info, etc.) that writes directly to stderr.
         if (!svcs.transcription.isModelLoaded()) {
+          const originalStderrWrite = process.stderr.write;
           try {
+            process.stderr.write = (() => true) as typeof process.stderr.write;
             await svcs.transcription.loadModel(config.stt.modelPath);
           } catch {
             setError('STT model not found. Run `tom setup` to download the model.');
             setPhase('error');
             return;
+          } finally {
+            process.stderr.write = originalStderrWrite;
           }
         }
 
@@ -239,17 +242,6 @@ function RecordCommand() {
           setPhase('error');
           return;
         }
-
-        // Wire up live streaming transcription — feed audio stream to STT,
-        // onChunk updates the transcript state for the RecordingUI to show.
-        // The promise resolves with the full transcript when the stream ends
-        // (i.e. when stopRecording() is called).
-        const audioStream = svcs.audio.getAudioStream();
-        transcriptionPromiseRef.current = svcs.transcription
-          .transcribeStream(audioStream, (chunk) => {
-            setTranscript((t) => t + chunk);
-          })
-          .catch(() => '');
 
         setPhase('recording');
       } catch (err) {
@@ -280,31 +272,36 @@ function RecordCommand() {
   // -------------------------------------------------------------------------
   async function stopAndAnalyze() {
     if (!services || phase !== 'recording') return;
-    setPhase('analyzing');
 
     try {
       // Stop recording — this signals end-of-stream to the audio recorder
       // and saves the WAV file. The relative path is returned.
       const audioRelPath = await services.audio.stopRecording();
 
-      // Wait for the live transcription promise to resolve now that the
-      // stream has ended. This gives us the full transcript from the
-      // streaming STT that was running during recording.
-      let finalTranscript = '';
-      if (transcriptionPromiseRef.current) {
-        finalTranscript = await transcriptionPromiseRef.current;
-      }
+      // Transition to transcribing phase — whisper processes the saved file
+      // and we show segments as they arrive via onNewSegments.
+      setPhase('transcribing');
 
-      // Fall back to file-based transcription if streaming produced nothing
-      if (finalTranscript.trim().length === 0 && audioRelPath) {
+      let finalTranscript = '';
+      if (audioRelPath) {
         try {
           const fullAudioPath = join(audioBaseDirRef.current, audioRelPath);
+
+          // Use the audio stream for transcription. The stream has already
+          // been fully collected by AudioService, so we use transcribeFile
+          // on the saved WAV. The onNewSegments callback in the transcription
+          // service fires during processing, but transcribeFile doesn't
+          // expose it — so we use transcribeStream with the buffered PCM.
+          // Actually, transcribeFile is simpler and works with WAV files.
           finalTranscript = await services.transcription.transcribeFile(fullAudioPath);
           setTranscript(finalTranscript);
         } catch {
           // Transcript stays empty — still save the entry
         }
       }
+
+      // Transition to analyzing phase
+      setPhase('analyzing');
 
       const result = await runAnalysisPipeline(finalTranscript, audioRelPath, services);
 
@@ -362,13 +359,17 @@ function RecordCommand() {
   if (phase === 'init') {
     return (
       <Box paddingY={1}>
-        <Text dimColor>Initialising...</Text>
+        <Text dimColor>Loading Whisper model...</Text>
       </Box>
     );
   }
 
   if (phase === 'recording') {
-    return <RecordingUI transcript={transcript} duration={duration} isRecording={true} />;
+    return <RecordingUI phase="recording" transcript="" duration={duration} />;
+  }
+
+  if (phase === 'transcribing') {
+    return <RecordingUI phase="transcribing" transcript={transcript} duration={duration} />;
   }
 
   if (phase === 'analyzing') {

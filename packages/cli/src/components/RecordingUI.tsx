@@ -1,10 +1,12 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 
+export type RecordingPhase = 'recording' | 'transcribing';
+
 interface RecordingUIProps {
+  phase: RecordingPhase;
   transcript: string;
   duration: number;
-  isRecording: boolean;
 }
 
 function formatDuration(seconds: number): string {
@@ -13,25 +15,37 @@ function formatDuration(seconds: number): string {
   return `${minutes}:${String(secs).padStart(2, '0')}`;
 }
 
-export function RecordingUI({ transcript, duration, isRecording }: RecordingUIProps) {
+export function RecordingUI({ phase, transcript, duration }: RecordingUIProps) {
+  if (phase === 'transcribing') {
+    return (
+      <Box flexDirection="column" gap={1}>
+        <Box>
+          <Text color="cyan" bold>
+            {'Transcribing...'}
+          </Text>
+        </Box>
+
+        {transcript.length > 0 && (
+          <Box paddingLeft={2}>
+            <Text>{transcript}</Text>
+          </Box>
+        )}
+      </Box>
+    );
+  }
+
   return (
     <Box flexDirection="column" gap={1}>
       <Box>
         <Text color="red" bold>
-          {'🎙️  RECORDING'}
+          {'RECORDING'}
         </Text>
         <Text bold>{` — ${formatDuration(duration)}`}</Text>
       </Box>
 
       <Box paddingLeft={2}>
-        <Text>{transcript}</Text>
+        <Text dimColor>{'Esc to cancel | Enter to finish'}</Text>
       </Box>
-
-      {isRecording && (
-        <Box paddingLeft={2}>
-          <Text dimColor>{'◀ Esc to cancel  ▶ Enter to finish'}</Text>
-        </Box>
-      )}
     </Box>
   );
 }
