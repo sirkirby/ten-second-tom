@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
+import Spinner from 'ink-spinner';
 import { Command } from 'commander';
 import { render } from 'ink';
 import { join } from 'node:path';
@@ -159,6 +160,7 @@ function RecordCommand() {
   const { exit } = useApp();
 
   const [phase, setPhase] = useState<Phase>('init');
+  const [initStatus, setInitStatus] = useState('Checking prerequisites...');
   const [transcript, setTranscript] = useState('');
   const [duration, setDuration] = useState(0);
   const [analysis, setAnalysis] = useState<EntryAnalysis | null>(null);
@@ -206,6 +208,10 @@ function RecordCommand() {
         // Load STT model — stderr suppression is handled inside the
         // transcription service via GGML_LOG_LEVEL env var.
         if (!svcs.transcription.isModelLoaded()) {
+          setInitStatus('Loading Whisper model...');
+          // Yield to the event loop so Ink can render the status update
+          // before the native code potentially blocks the main thread.
+          await new Promise((resolve) => setTimeout(resolve, 0));
           try {
             await svcs.transcription.loadModel(config.stt.modelPath);
           } catch {
@@ -220,6 +226,10 @@ function RecordCommand() {
           setPhase('error');
           return;
         }
+
+        setInitStatus('Starting microphone...');
+        // Yield so the status update renders before starting recording
+        await new Promise((resolve) => setTimeout(resolve, 0));
 
         setServices(svcs);
 
@@ -355,7 +365,10 @@ function RecordCommand() {
   if (phase === 'init') {
     return (
       <Box paddingY={1}>
-        <Text dimColor>Loading Whisper model...</Text>
+        <Text color="cyan">
+          <Spinner type="dots" />
+        </Text>
+        <Text> {initStatus}</Text>
       </Box>
     );
   }
@@ -371,7 +384,10 @@ function RecordCommand() {
   if (phase === 'analyzing') {
     return (
       <Box paddingY={1}>
-        <Text color="cyan">Analysing recording...</Text>
+        <Text color="cyan">
+          <Spinner type="dots" />
+        </Text>
+        <Text> Analysing recording...</Text>
       </Box>
     );
   }

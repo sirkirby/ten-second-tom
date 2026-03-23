@@ -27,6 +27,9 @@ vi.mock('ink', () => ({
   useInput: vi.fn(),
 }));
 
+// Mock ink-spinner
+vi.mock('ink-spinner', () => ({ default: vi.fn() }));
+
 // Mock React
 vi.mock('react', () => ({
   default: { createElement: vi.fn() },
