@@ -2,7 +2,7 @@
 export const DEFAULT_CLOUD_MODEL_ID = 'claude-sonnet-4-6';
 export const DEFAULT_LOCAL_MODEL_ID = 'qwen2.5:7b';
 export const DEFAULT_OLLAMA_ENDPOINT = 'http://localhost:11434';
-export const ANALYSIS_MAX_TOKENS = 1024;
+export const ANALYSIS_MAX_TOKENS = 2048;
 
 // Embedding defaults
 export const DEFAULT_OLLAMA_EMBEDDING_MODEL = 'nomic-embed-text';

@@ -43,6 +43,12 @@ export function RecordingUI({ phase, transcript, duration }: RecordingUIProps) {
         <Text bold>{` — ${formatDuration(duration)}`}</Text>
       </Box>
 
+      {transcript.length > 0 && (
+        <Box paddingLeft={2} marginTop={1}>
+          <Text dimColor>{transcript}</Text>
+        </Box>
+      )}
+
       <Box paddingLeft={2}>
         <Text dimColor>{'Esc to cancel | Enter to finish'}</Text>
       </Box>

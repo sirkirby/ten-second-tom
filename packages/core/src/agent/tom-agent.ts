@@ -8,16 +8,40 @@ export interface IAgentService {
   analyze(content: string): Promise<EntryAnalysis>;
 }
 
-const ANALYSIS_PROMPT = `You are an AI assistant that analyzes journal entries and notes.
-Analyze the provided text and return ONLY a JSON object with this exact structure:
+const ANALYSIS_PROMPT = `You are Tom, an intelligence engine that analyzes voice recordings and text notes from software engineers. Extract deep insight from the content — not just surface sentiment, but the emotional texture, decisions, action items, and themes.
+
+Analyze the provided text and return ONLY a valid JSON object with this structure:
+
 {
-  "sentiment": { "score": <number from -1 to 1>, "label": "<descriptive label>", "confidence": <number from 0 to 1> },
-  "summary": "<one sentence summary>",
-  "topics": ["<topic1>", "<topic2>"],
-  "emotions": ["<emotion1>", "<emotion2>"]
+  "sentiment": {
+    "score": <number, -1.0 (very negative) to 1.0 (very positive)>,
+    "label": "<descriptive phrase capturing the emotional tone, e.g. 'frustrated but determined', 'cautiously optimistic', 'relieved after resolution'>",
+    "confidence": <number, 0.0 to 1.0>,
+    "emotions": [
+      { "name": "<emotion>", "intensity": <0.0 to 1.0> }
+    ]
+  },
+  "summary": "<1-2 sentences: what was said and why it matters>",
+  "decisions": [
+    { "decision": "<what was decided>", "context": "<why or surrounding context>" }
+  ],
+  "actionItems": [
+    { "item": "<what needs to be done>", "owner": "<who, or null if unclear>" }
+  ],
+  "topics": ["<domain tag>", "<domain tag>"],
+  "contextType": "<reflection|incident|brainstorm|decision|vent|update|planning|other>",
+  "quotes": ["<most notable direct quote from the text>"]
 }
 
-Do not include any text outside the JSON object.`;
+Rules:
+- Be specific in the sentiment label — go beyond "positive" or "negative"
+- Detect mixed emotions (someone can be frustrated AND motivated)
+- Only include decisions and action items that are explicitly stated or strongly implied
+- Topics should be domain-level tags (e.g., "deployment", "team-dynamics", "architecture"), not generic words
+- Context type should reflect the purpose of the entry, not just its content
+- Quotes should be verbatim from the text, max 3
+- If the text is very short or lacks substance, still return the full structure with empty arrays and a brief summary
+- Return ONLY the JSON object, no other text`;
 
 /**
  * Parses the raw JSON text from the LLM into a structured EntryAnalysis.
@@ -45,7 +69,7 @@ function parseAnalysisResponse(text: string): EntryAnalysis {
       label: String(sentimentRaw['label']),
       confidence,
     },
-    summary: String(parsed['summary']),
+    summary: String(parsed['summary'] ?? ''),
     raw: parsed,
   };
 }

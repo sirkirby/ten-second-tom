@@ -1,10 +1,13 @@
 import { initWhisper } from '@fugood/whisper.node';
 import type { WhisperContext, TranscribeOptions } from '@fugood/whisper.node';
 import type { Readable } from 'node:stream';
+import { LIVE_TRANSCRIPTION_CHUNK_BYTES } from '../constants.js';
 
 export interface ITranscriptionService {
   transcribeStream(audioStream: Readable, onChunk: (text: string) => void): Promise<string>;
   transcribeFile(audioPath: string): Promise<string>;
+  startLiveTranscription(audioStream: Readable, onChunk: (text: string) => void): void;
+  stopLiveTranscription(): Promise<string>;
   isModelLoaded(): boolean;
   loadModel(modelPath: string): Promise<void>;
 }
@@ -35,9 +38,41 @@ function extractTranscript(result: { result: string; segments: Array<{ text: str
   return result.segments.map((s) => s.text).join('');
 }
 
+/**
+ * Converts a Buffer of Int16 PCM to an ArrayBuffer suitable for transcribeData.
+ */
+function pcmBufferToArrayBuffer(buffer: Buffer): ArrayBuffer {
+  const float32 = int16BufferToFloat32(buffer);
+  return float32.buffer.slice(
+    float32.byteOffset,
+    float32.byteOffset + float32.byteLength,
+  ) as ArrayBuffer;
+}
+
 const DEFAULT_TRANSCRIBE_OPTIONS: TranscribeOptions = {
   language: 'en',
 };
+
+/**
+ * State for the live transcription session managed by startLiveTranscription /
+ * stopLiveTranscription.
+ */
+interface LiveSession {
+  /** Accumulated transcript across all completed chunks */
+  accumulatedTranscript: string;
+  /** PCM bytes buffered since the last chunk was transcribed */
+  pendingBuffer: Buffer[];
+  /** Total byte count of pendingBuffer */
+  pendingBytes: number;
+  /** Listener bound to the audio stream's 'data' event */
+  onData: (chunk: Buffer) => void;
+  /** Callback to deliver each partial transcript segment to the caller */
+  onChunk: (text: string) => void;
+  /** The audio stream being listened to */
+  stream: Readable;
+  /** Promise for the currently running transcribeData call (if any) */
+  activeTranscription: Promise<void> | null;
+}
 
 /**
  * Whisper-based transcription service wrapping @fugood/whisper.node.
@@ -45,13 +80,20 @@ const DEFAULT_TRANSCRIBE_OPTIONS: TranscribeOptions = {
  * Supports:
  * - Batch transcription of a WAV file via transcribeFile()
  * - Streaming (chunked) transcription via transcribeStream()
+ * - Live chunked transcription during recording via startLiveTranscription() /
+ *   stopLiveTranscription()
  *
- * The streaming implementation buffers all PCM audio chunks from the Readable
- * stream, then runs a single transcribeData call with onNewSegments to
- * deliver incremental results via the onChunk callback.
+ * Live transcription:
+ *   The streaming implementation slices incoming PCM audio into ~5-second
+ *   chunks (LIVE_TRANSCRIPTION_CHUNK_BYTES), transcribes each chunk in sequence
+ *   via transcribeData(), and delivers partial segment text to the caller via
+ *   the onChunk callback. Because whisper.cpp cannot run two transcriptions
+ *   concurrently on the same context, chunks are queued: a new chunk is only
+ *   started once the previous one completes.
  */
 export class WhisperTranscriptionService implements ITranscriptionService {
   private context: WhisperContext | null = null;
+  private liveSession: LiveSession | null = null;
 
   isModelLoaded(): boolean {
     return this.context !== null;
@@ -111,7 +153,7 @@ export class WhisperTranscriptionService implements ITranscriptionService {
   }
 
   /**
-   * Transcribes audio from a Readable PCM stream.
+   * Transcribes audio from a Readable PCM stream (batch mode — waits for stream end).
    *
    * The stream is expected to emit raw Int16 PCM data at 16kHz, 1 channel
    * (as produced by AudioService.getAudioStream()). All chunks are buffered
@@ -141,13 +183,7 @@ export class WhisperTranscriptionService implements ITranscriptionService {
     }
 
     const combined = Buffer.concat(chunks);
-    const float32Audio = int16BufferToFloat32(combined);
-
-    // transcribeData expects an ArrayBuffer
-    const audioBuffer = float32Audio.buffer.slice(
-      float32Audio.byteOffset,
-      float32Audio.byteOffset + float32Audio.byteLength,
-    ) as ArrayBuffer;
+    const audioBuffer = pcmBufferToArrayBuffer(combined);
 
     const { promise } = this.context.transcribeData(audioBuffer, {
       ...DEFAULT_TRANSCRIBE_OPTIONS,
@@ -160,5 +196,131 @@ export class WhisperTranscriptionService implements ITranscriptionService {
 
     const result = await promise;
     return extractTranscript(result);
+  }
+
+  /**
+   * Starts live chunked transcription from the given audio stream.
+   *
+   * Audio is sliced into ~5-second chunks (LIVE_TRANSCRIPTION_CHUNK_BYTES).
+   * Each full chunk is transcribed via transcribeData() immediately.
+   * Partial results are delivered via onChunk() as they arrive.
+   *
+   * Call stopLiveTranscription() to flush the final partial chunk and stop.
+   *
+   * @param audioStream - Readable stream of raw Int16 PCM at 16kHz mono 16-bit
+   * @param onChunk - Called with each transcript segment text as it arrives
+   * @throws If the model has not been loaded via loadModel()
+   * @throws If a live transcription session is already active
+   */
+  startLiveTranscription(audioStream: Readable, onChunk: (text: string) => void): void {
+    if (this.context === null) {
+      throw new Error('Model not loaded — call loadModel() first');
+    }
+    if (this.liveSession !== null) {
+      throw new Error('Live transcription already active — call stopLiveTranscription() first');
+    }
+
+    const session: LiveSession = {
+      accumulatedTranscript: '',
+      pendingBuffer: [],
+      pendingBytes: 0,
+      onChunk,
+      stream: audioStream,
+      activeTranscription: null,
+      onData: () => {},
+    };
+
+    // Transcribes a single PCM buffer chunk and appends its result to the
+    // accumulated transcript. Chunks are serialised so whisper.cpp is never
+    // called concurrently.
+    const transcribeChunk = async (pcmData: Buffer): Promise<void> => {
+      if (this.context === null) return;
+
+      const audioBuffer = pcmBufferToArrayBuffer(pcmData);
+      const { promise } = this.context.transcribeData(audioBuffer, {
+        ...DEFAULT_TRANSCRIBE_OPTIONS,
+        onNewSegments: (segmentResult) => {
+          if (segmentResult.result.length > 0) {
+            onChunk(segmentResult.result);
+          }
+        },
+      });
+
+      const result = await promise;
+      const text = extractTranscript(result);
+      if (text.length > 0) {
+        session.accumulatedTranscript += text;
+      }
+    };
+
+    session.onData = (chunk: Buffer) => {
+      session.pendingBuffer.push(chunk);
+      session.pendingBytes += chunk.length;
+
+      // Once we have a full chunk's worth of audio, start transcribing it.
+      if (session.pendingBytes >= LIVE_TRANSCRIPTION_CHUNK_BYTES) {
+        const pcmData = Buffer.concat(session.pendingBuffer);
+        session.pendingBuffer = [];
+        session.pendingBytes = 0;
+
+        // Serialise: wait for any active transcription to finish before
+        // starting the next one. This prevents concurrent whisper.cpp calls.
+        const prev = session.activeTranscription ?? Promise.resolve();
+        session.activeTranscription = prev.then(() => transcribeChunk(pcmData));
+      }
+    };
+
+    audioStream.on('data', session.onData);
+    this.liveSession = session;
+  }
+
+  /**
+   * Stops live transcription, flushes any remaining buffered audio, and
+   * returns the full accumulated transcript.
+   *
+   * @returns The complete transcript from all transcribed chunks
+   * @throws If no live transcription session is active
+   */
+  async stopLiveTranscription(): Promise<string> {
+    if (this.liveSession === null) {
+      throw new Error('No active live transcription session');
+    }
+
+    const session = this.liveSession;
+    this.liveSession = null;
+
+    // Remove the data listener so no more chunks are queued
+    session.stream.removeListener('data', session.onData);
+
+    // Wait for any in-progress chunk transcription to finish
+    if (session.activeTranscription !== null) {
+      await session.activeTranscription;
+    }
+
+    // Flush remaining buffered audio (the final partial chunk)
+    if (session.pendingBytes > 0) {
+      const pcmData = Buffer.concat(session.pendingBuffer);
+      await (async () => {
+        if (this.context === null) return;
+
+        const audioBuffer = pcmBufferToArrayBuffer(pcmData);
+        const { promise } = this.context.transcribeData(audioBuffer, {
+          ...DEFAULT_TRANSCRIBE_OPTIONS,
+          onNewSegments: (segmentResult) => {
+            if (segmentResult.result.length > 0) {
+              session.onChunk(segmentResult.result);
+            }
+          },
+        });
+
+        const result = await promise;
+        const text = extractTranscript(result);
+        if (text.length > 0) {
+          session.accumulatedTranscript += text;
+        }
+      })();
+    }
+
+    return session.accumulatedTranscript;
   }
 }

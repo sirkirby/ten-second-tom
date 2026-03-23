@@ -205,4 +205,158 @@ describe('WhisperTranscriptionService', () => {
       expect(result).toBe('Full transcript text');
     });
   });
+
+  describe('startLiveTranscription() / stopLiveTranscription()', () => {
+    it('throws if model is not loaded', () => {
+      const service = new WhisperTranscriptionService();
+      const stream = new PassThrough();
+
+      expect(() => service.startLiveTranscription(stream, () => {})).toThrow('Model not loaded');
+    });
+
+    it('throws if a live session is already active', async () => {
+      const service = new WhisperTranscriptionService();
+      await service.loadModel('/model.bin');
+
+      const stream = new PassThrough();
+      service.startLiveTranscription(stream, () => {});
+
+      expect(() => service.startLiveTranscription(stream, () => {})).toThrow(
+        'Live transcription already active',
+      );
+
+      // Clean up
+      await service.stopLiveTranscription();
+    });
+
+    it('throws stopLiveTranscription if no active session', async () => {
+      const service = new WhisperTranscriptionService();
+      await service.loadModel('/model.bin');
+
+      await expect(service.stopLiveTranscription()).rejects.toThrow(
+        'No active live transcription session',
+      );
+    });
+
+    it('transcribes a full chunk when enough audio arrives and calls onChunk', async () => {
+      const service = new WhisperTranscriptionService();
+      await service.loadModel('/model.bin');
+
+      const onChunk = vi.fn();
+
+      mockContext.transcribeData.mockImplementation(
+        (
+          _audioData: ArrayBuffer,
+          options: { onNewSegments?: (result: { result: string }) => void },
+        ) => {
+          options?.onNewSegments?.({ result: 'Live segment' });
+          return {
+            promise: Promise.resolve({
+              result: 'Live segment',
+              segments: [{ text: 'Live segment', t0: 0, t1: 500 }],
+              isAborted: false,
+            }),
+            stop: vi.fn().mockResolvedValue(undefined),
+          };
+        },
+      );
+
+      const stream = new PassThrough();
+      service.startLiveTranscription(stream, onChunk);
+
+      // Write more than LIVE_TRANSCRIPTION_CHUNK_BYTES (5s = 160000 bytes) to trigger chunking
+      const chunkBytes = 5 * 16000 * 2; // 160000 bytes
+      stream.write(Buffer.alloc(chunkBytes));
+
+      // Wait for the async transcription to complete
+      const result = await service.stopLiveTranscription();
+
+      expect(mockContext.transcribeData).toHaveBeenCalled();
+      expect(onChunk).toHaveBeenCalledWith('Live segment');
+      expect(result).toContain('Live segment');
+    });
+
+    it('flushes partial audio buffer on stop and returns accumulated transcript', async () => {
+      const service = new WhisperTranscriptionService();
+      await service.loadModel('/model.bin');
+
+      const onChunk = vi.fn();
+
+      mockContext.transcribeData.mockImplementation(
+        (_audioData: ArrayBuffer, options: { onNewSegments?: (r: { result: string }) => void }) => {
+          options?.onNewSegments?.({ result: 'Partial' });
+          return {
+            promise: Promise.resolve({
+              result: 'Partial',
+              segments: [{ text: 'Partial', t0: 0, t1: 100 }],
+              isAborted: false,
+            }),
+            stop: vi.fn().mockResolvedValue(undefined),
+          };
+        },
+      );
+
+      const stream = new PassThrough();
+      service.startLiveTranscription(stream, onChunk);
+
+      // Write less than a full chunk (won't trigger automatic transcription)
+      stream.write(Buffer.alloc(1000));
+
+      // stopLiveTranscription should flush the remaining buffer
+      const result = await service.stopLiveTranscription();
+
+      expect(mockContext.transcribeData).toHaveBeenCalledOnce();
+      expect(result).toBe('Partial');
+    });
+
+    it('returns empty string when no audio was captured', async () => {
+      const service = new WhisperTranscriptionService();
+      await service.loadModel('/model.bin');
+
+      const stream = new PassThrough();
+      service.startLiveTranscription(stream, () => {});
+
+      // Don't write any data — immediate stop
+      const result = await service.stopLiveTranscription();
+
+      expect(mockContext.transcribeData).not.toHaveBeenCalled();
+      expect(result).toBe('');
+    });
+
+    it('serialises chunks — does not call transcribeData concurrently', async () => {
+      const service = new WhisperTranscriptionService();
+      await service.loadModel('/model.bin');
+
+      let concurrentCalls = 0;
+      let maxConcurrent = 0;
+
+      mockContext.transcribeData.mockImplementation(() => {
+        concurrentCalls++;
+        maxConcurrent = Math.max(maxConcurrent, concurrentCalls);
+        return {
+          promise: Promise.resolve({
+            result: 'chunk',
+            segments: [],
+            isAborted: false,
+          }).then((r) => {
+            concurrentCalls--;
+            return r;
+          }),
+          stop: vi.fn().mockResolvedValue(undefined),
+        };
+      });
+
+      const stream = new PassThrough();
+      service.startLiveTranscription(stream, () => {});
+
+      // Write 3 full chunks at once
+      const chunkBytes = 5 * 16000 * 2; // 160000 bytes each
+      stream.write(Buffer.alloc(chunkBytes * 3));
+
+      await service.stopLiveTranscription();
+
+      // Chunks should have been serialised — max concurrent calls should be 1
+      expect(maxConcurrent).toBe(1);
+    });
+  });
 });

@@ -211,6 +211,12 @@ function RecordCommand() {
           return;
         }
 
+        // Start live chunked transcription — updates transcript state as
+        // audio arrives in ~5-second segments during recording.
+        svcs.transcription.startLiveTranscription(svcs.audio.getAudioStream(), (segment) => {
+          setTranscript((prev) => (prev.length > 0 ? prev + ' ' + segment.trim() : segment.trim()));
+        });
+
         setPhase('recording');
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -242,25 +248,23 @@ function RecordCommand() {
     if (!services || phase !== 'recording') return;
 
     try {
-      // Stop recording — this signals end-of-stream to the audio recorder
-      // and saves the WAV file. The relative path is returned.
-      const audioRelPath = await services.audio.stopRecording();
+      // Stop both the audio recorder and the live transcription concurrently.
+      // stopLiveTranscription() flushes the final partial audio chunk;
+      // stopRecording() stops the mic and writes the WAV file.
+      const [audioRelPath, liveTranscript] = await Promise.all([
+        services.audio.stopRecording(),
+        services.transcription.stopLiveTranscription().catch(() => ''),
+      ]);
 
-      // Transition to transcribing phase — whisper processes the saved file
-      // and we show segments as they arrive via onNewSegments.
-      setPhase('transcribing');
+      // Use the live transcript accumulated during recording.
+      // If it came back empty (e.g. very short recording), fall back to
+      // batch transcription of the saved WAV file.
+      let finalTranscript = liveTranscript;
 
-      let finalTranscript = '';
-      if (audioRelPath) {
+      if (finalTranscript.trim().length === 0 && audioRelPath) {
+        setPhase('transcribing');
         try {
           const fullAudioPath = join(audioBaseDirRef.current, audioRelPath);
-
-          // Use the audio stream for transcription. The stream has already
-          // been fully collected by AudioService, so we use transcribeFile
-          // on the saved WAV. The onNewSegments callback in the transcription
-          // service fires during processing, but transcribeFile doesn't
-          // expose it — so we use transcribeStream with the buffered PCM.
-          // Actually, transcribeFile is simpler and works with WAV files.
           finalTranscript = await services.transcription.transcribeFile(fullAudioPath);
           setTranscript(finalTranscript);
         } catch {
@@ -336,7 +340,7 @@ function RecordCommand() {
   }
 
   if (phase === 'recording') {
-    return <RecordingUI phase="recording" transcript="" duration={duration} />;
+    return <RecordingUI phase="recording" transcript={transcript} duration={duration} />;
   }
 
   if (phase === 'transcribing') {
