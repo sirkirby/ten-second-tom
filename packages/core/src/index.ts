@@ -5,7 +5,7 @@ export * from './types/index.js';
 export { type IStorageService, type ListEntriesOptions } from './services/storage.js';
 export { SqliteStorageService } from './services/storage-sqlite.js';
 export { ConfigManager } from './config/config-manager.js';
-export { TomAgent } from './agent/tom-agent.js';
+export { type IAgentService, TomAgent } from './agent/tom-agent.js';
 export { getModelId, getBaseUrl } from './agent/config.js';
 export {
   type IEmbeddingService,
@@ -13,7 +13,7 @@ export {
   NoopEmbeddingService,
   type OllamaEmbeddingConfig,
 } from './services/embedding.js';
-export { SearchService } from './services/search.js';
+export { type ISearchService, SearchService } from './services/search.js';
 export {
   type IAudioService,
   type AudioServiceConfig,

@@ -4,6 +4,10 @@ import type { LlmConfig } from '../types/config.js';
 import { getModelId, getBaseUrl } from './config.js';
 import { ANALYSIS_MAX_TOKENS, DEFAULT_OLLAMA_ENDPOINT } from '../constants.js';
 
+export interface IAgentService {
+  analyze(content: string): Promise<EntryAnalysis>;
+}
+
 const ANALYSIS_PROMPT = `You are an AI assistant that analyzes journal entries and notes.
 Analyze the provided text and return ONLY a JSON object with this exact structure:
 {
@@ -46,7 +50,7 @@ function parseAnalysisResponse(text: string): EntryAnalysis {
   };
 }
 
-export class TomAgent {
+export class TomAgent implements IAgentService {
   private readonly config: LlmConfig;
   private readonly client: Anthropic | null;
   private readonly modelId: string;

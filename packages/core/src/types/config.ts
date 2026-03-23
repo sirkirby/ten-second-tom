@@ -48,3 +48,4 @@ export type AppConfig = z.infer<typeof AppConfigSchema>;
 export type LlmConfig = z.infer<typeof LlmConfigSchema>;
 export type SttConfig = z.infer<typeof SttConfigSchema>;
 export type EmbeddingConfig = z.infer<typeof EmbeddingConfigSchema>;
+export type StorageConfig = z.infer<typeof StorageConfigSchema>;

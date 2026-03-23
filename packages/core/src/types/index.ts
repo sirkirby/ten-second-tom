@@ -19,4 +19,5 @@ export {
   type LlmConfig,
   type SttConfig,
   type EmbeddingConfig,
+  type StorageConfig,
 } from './config.js';

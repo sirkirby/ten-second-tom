@@ -17,6 +17,7 @@ import {
   type IAudioService,
   type ITranscriptionService,
   type IEmbeddingService,
+  type IAgentService,
 } from '@ten-second-tom/core';
 import type { ConfigManager, AppConfig, EntryAnalysis } from '@ten-second-tom/core';
 import { RecordingUI } from '../components/RecordingUI.js';
@@ -33,7 +34,7 @@ import { EXIT_HINT_TEXT } from '../constants.js';
 export interface RecordingPipelineServices {
   audio: IAudioService;
   transcription: ITranscriptionService;
-  agent: TomAgent;
+  agent: IAgentService;
   embedding: IEmbeddingService;
   storage: IStorageService;
 }

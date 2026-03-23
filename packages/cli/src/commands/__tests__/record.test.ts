@@ -59,6 +59,7 @@ import type {
   IAudioService,
   ITranscriptionService,
   IEmbeddingService,
+  IAgentService,
   IStorageService,
   EntryAnalysis,
   AppConfig,
@@ -120,7 +121,7 @@ function makeMockServices(
 
   const agent = {
     analyze: vi.fn().mockResolvedValue(makeAnalysis()),
-  } as unknown as TomAgent;
+  } as IAgentService;
 
   const embedding: IEmbeddingService = {
     embed: vi.fn().mockResolvedValue(new Float32Array([0.1, 0.2, 0.3])),

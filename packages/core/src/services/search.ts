@@ -2,7 +2,11 @@ import type { Entry } from '../types/entry.js';
 import type { IStorageService } from './storage.js';
 import type { IEmbeddingService } from './embedding.js';
 
-export class SearchService {
+export interface ISearchService {
+  search(query: string, limit?: number): Promise<Entry[]>;
+}
+
+export class SearchService implements ISearchService {
   constructor(
     private readonly storage: IStorageService,
     private readonly embedding: IEmbeddingService,

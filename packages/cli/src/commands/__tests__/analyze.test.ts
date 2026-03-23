@@ -54,12 +54,12 @@ vi.mock('../record.js', async (importOriginal) => {
 
 import type {
   IEmbeddingService,
+  IAgentService,
   IStorageService,
   EntryAnalysis,
   AppConfig,
   Entry,
 } from '@ten-second-tom/core';
-import type { TomAgent } from '@ten-second-tom/core';
 
 import { buildServicesFromConfig } from '../record.js';
 import type { RecordingPipelineServices } from '../record.js';
@@ -109,7 +109,7 @@ function makeMockServices(
 
   const agent = {
     analyze: vi.fn().mockResolvedValue(makeAnalysis()),
-  } as unknown as TomAgent;
+  } as IAgentService;
 
   const embedding: IEmbeddingService = {
     embed: vi.fn().mockResolvedValue(new Float32Array([0.1, 0.2, 0.3])),
