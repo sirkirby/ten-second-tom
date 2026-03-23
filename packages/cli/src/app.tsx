@@ -4,6 +4,7 @@ import { buildServicesFromConfig } from '@ten-second-tom/core';
 import type { AppConfig, ServiceContainer, ConfigManager } from '@ten-second-tom/core';
 import { checkSetupComplete } from './hooks/useSetupGuard.js';
 import { HomeScreen } from './screens/HomeScreen.js';
+import { RecordingScreen } from './screens/RecordingScreen.js';
 import { findCommand } from './commands/registry.js';
 import type { Screen, HistoryEntry, AppContext } from './commands/registry.js';
 
@@ -101,6 +102,29 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
   // unused-variable lint warning here since it is referenced indirectly.
   void screenData;
 
+  // ---- recording screen callbacks ----
+  const handleRecordingComplete = useCallback(
+    (audioRelPath: string, liveTranscript: string) => {
+      handleSetScreenData({ audioRelPath, liveTranscript });
+      // ProcessingScreen will be implemented in Task 3 — for now, push a
+      // placeholder message to history and return to home.
+      pushHistory({
+        id: `recording-${Date.now()}`,
+        content: `Recording saved (${audioRelPath}). Processing screen coming soon.`,
+      });
+      setScreen('home');
+    },
+    [handleSetScreenData, pushHistory],
+  );
+
+  const handleRecordingCancel = useCallback(() => {
+    pushHistory({
+      id: `recording-cancel-${Date.now()}`,
+      content: 'Recording cancelled.',
+    });
+    setScreen('home');
+  }, [pushHistory]);
+
   // ---- render ----
   return (
     <Box flexDirection="column">
@@ -118,8 +142,15 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
         <HomeScreen context={context} config={config} entryCount={entryCount} />
       )}
 
+      {screen === 'recording' && (
+        <RecordingScreen
+          context={context}
+          onComplete={handleRecordingComplete}
+          onCancel={handleRecordingCancel}
+        />
+      )}
+
       {/* Placeholder screens — will be implemented in subsequent tasks */}
-      {screen === 'recording' && <Text color="yellow">Recording screen (coming in Task 2)</Text>}
       {screen === 'processing' && <Text color="yellow">Processing screen (coming in Task 3)</Text>}
       {screen === 'search' && <Text color="yellow">Search screen (coming in Task 4)</Text>}
       {screen === 'note' && <Text color="yellow">Note screen (coming in Task 5)</Text>}
