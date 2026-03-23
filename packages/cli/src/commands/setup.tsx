@@ -6,21 +6,29 @@ import { Command } from 'commander';
 import { render } from 'ink';
 import { join } from 'node:path';
 import { existsSync, mkdirSync, createWriteStream, unlinkSync, renameSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { ConfigManager } from '@ten-second-tom/core';
 import {
-  WHISPER_MODEL_FILENAME,
   DEFAULT_OLLAMA_ENDPOINT,
   DEFAULT_LOCAL_MODEL_ID,
   DEFAULT_OLLAMA_EMBEDDING_MODEL,
   DEFAULT_CLOUD_EMBEDDING_MODEL,
   ANTHROPIC_API_KEY_PREFIX,
+  WHISPER_MODELS,
+  getDefaultWhisperModel,
+  SHERPA_MODELS,
 } from '@ten-second-tom/core';
-import type { AppConfig, LlmConfig, EmbeddingConfig } from '@ten-second-tom/core';
+import type {
+  AppConfig,
+  LlmConfig,
+  EmbeddingConfig,
+  WhisperModel,
+  SherpaModel,
+} from '@ten-second-tom/core';
 import { useAutoExit } from '../hooks/useAutoExit.js';
 import { EXIT_HINT_TEXT, OLLAMA_FETCH_TIMEOUT_MS } from '../constants.js';
 
-const WHISPER_MODEL_URL =
-  'https://huggingface.co/distil-whisper/distil-small.en/resolve/main/ggml-distil-small.en.bin';
+const TOTAL_STEPS = 6;
 
 type Step =
   | 'llm-provider'
@@ -29,8 +37,10 @@ type Step =
   | 'llm-local-model-loading'
   | 'llm-local-model'
   | 'embedding-provider'
-  | 'stt-info'
-  | 'model-download'
+  | 'whisper-model'
+  | 'whisper-download'
+  | 'sherpa-model'
+  | 'sherpa-download'
   | 'saving'
   | 'done'
   | 'error';
@@ -41,15 +51,24 @@ interface WizardState {
   localEndpoint: string;
   localModelId: string;
   embeddingProvider: 'ollama' | 'cloud' | 'none' | null;
+  selectedWhisperModel: WhisperModel | null;
+  selectedSherpaModel: SherpaModel | null;
   errorMessage: string;
 }
 
 interface DownloadProgress {
-  status: 'checking' | 'already-downloaded' | 'downloading' | 'complete' | 'error';
+  status: 'checking' | 'already-downloaded' | 'downloading' | 'extracting' | 'complete' | 'error';
   bytesDownloaded: number;
   totalBytes: number;
   errorMessage: string;
 }
+
+const INITIAL_DOWNLOAD_PROGRESS: DownloadProgress = {
+  status: 'checking',
+  bytesDownloaded: 0,
+  totalBytes: 0,
+  errorMessage: '',
+};
 
 const llmProviderItems = [
   { label: 'Cloud (Claude via Anthropic API)', value: 'cloud' as const },
@@ -129,6 +148,35 @@ const embeddingProviderItems = [
   { label: 'None (keyword search only)', value: 'none' as const },
 ];
 
+// ---------------------------------------------------------------------------
+// Whisper model selection items
+// ---------------------------------------------------------------------------
+
+/** Build SelectInput items from the WHISPER_MODELS registry. */
+function buildWhisperModelItems(): Array<{ label: string; value: string }> {
+  return WHISPER_MODELS.map((m) => ({
+    label: `ggml-${m.id} (${m.sizeLabel}) — ${m.description}${m.recommended ? ' [Recommended]' : ''}`,
+    value: m.id,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Sherpa-onnx model selection items
+// ---------------------------------------------------------------------------
+
+/** Build SelectInput items from the SHERPA_MODELS registry, plus a "Skip" option. */
+function buildSherpaModelItems(): Array<{ label: string; value: string }> {
+  const items = SHERPA_MODELS.map((m) => ({
+    label: `${m.dirName} (${m.sizeLabel}) — ${m.description}${m.recommended ? ' [Recommended]' : ''}`,
+    value: m.id,
+  }));
+  items.push({
+    label: 'Skip — No live preview (Whisper batch transcription only)',
+    value: 'skip',
+  });
+  return items;
+}
+
 function makeProgressBar(percent: number, width: number = 20): string {
   const filled = Math.round((percent / 100) * width);
   const empty = width - filled;
@@ -136,7 +184,7 @@ function makeProgressBar(percent: number, width: number = 20): string {
 }
 
 /**
- * Download the Whisper model file with progress tracking.
+ * Download a file with progress tracking.
  * Exported for testability.
  */
 export async function downloadModel(
@@ -199,6 +247,15 @@ export async function downloadModel(
   }
 }
 
+/**
+ * Extract a .tar.bz2 archive to a target directory.
+ * Uses the system `tar` command (available on macOS, Linux, and Windows 10+).
+ */
+export function extractTarBz2(archivePath: string, targetDir: string): void {
+  mkdirSync(targetDir, { recursive: true });
+  execFileSync('tar', ['xjf', archivePath, '-C', targetDir]);
+}
+
 function SetupWizard() {
   const { exit } = useApp();
   const [step, setStep] = useState<Step>('llm-provider');
@@ -208,17 +265,20 @@ function SetupWizard() {
     localEndpoint: DEFAULT_OLLAMA_ENDPOINT,
     localModelId: DEFAULT_LOCAL_MODEL_ID,
     embeddingProvider: null,
+    selectedWhisperModel: null,
+    selectedSherpaModel: null,
     errorMessage: '',
   });
   const [ollamaModelItems, setOllamaModelItems] =
     useState<Array<{ label: string; value: string }>>(FALLBACK_MODEL_ITEMS);
   const [ollamaStatusMessage, setOllamaStatusMessage] = useState('');
-  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress>({
-    status: 'checking',
-    bytesDownloaded: 0,
-    totalBytes: 0,
-    errorMessage: '',
-  });
+  const [whisperDownloadProgress, setWhisperDownloadProgress] =
+    useState<DownloadProgress>(INITIAL_DOWNLOAD_PROGRESS);
+  const [sherpaDownloadProgress, setSherpaDownloadProgress] =
+    useState<DownloadProgress>(INITIAL_DOWNLOAD_PROGRESS);
+
+  const whisperModelItems = useMemo(buildWhisperModelItems, []);
+  const sherpaModelItems = useMemo(buildSherpaModelItems, []);
 
   const configManager = useMemo(() => new ConfigManager(), []);
 
@@ -303,37 +363,48 @@ function SetupWizard() {
 
   function handleEmbeddingProviderSelect(item: { value: 'ollama' | 'cloud' | 'none' }) {
     setState((s) => ({ ...s, embeddingProvider: item.value }));
-    setStep('stt-info');
+    setStep('whisper-model');
   }
 
-  function handleSttContinue(item: { value: string }) {
-    if (item.value === 'continue') {
-      setStep('model-download');
-    }
+  // ---------------------------------------------------------------------------
+  // Whisper model selection
+  // ---------------------------------------------------------------------------
+
+  function handleWhisperModelSelect(item: { value: string }) {
+    const model = WHISPER_MODELS.find((m) => m.id === item.value);
+    if (!model) return;
+    setState((s) => ({ ...s, selectedWhisperModel: model }));
+    setStep('whisper-download');
   }
 
-  // -------------------------------------------------------------------------
-  // Model download step
-  // -------------------------------------------------------------------------
-  const modelPath = join(configManager.modelsPath, WHISPER_MODEL_FILENAME);
+  // ---------------------------------------------------------------------------
+  // Whisper model download
+  // ---------------------------------------------------------------------------
 
-  const startDownload = useCallback(async () => {
+  const whisperModelPath = useMemo(() => {
+    const model = state.selectedWhisperModel ?? getDefaultWhisperModel();
+    return join(configManager.modelsPath, model.filename);
+  }, [state.selectedWhisperModel, configManager.modelsPath]);
+
+  const startWhisperDownload = useCallback(async () => {
+    const model = state.selectedWhisperModel ?? getDefaultWhisperModel();
+
     // Check if model already exists
-    if (existsSync(modelPath)) {
-      setDownloadProgress({
+    if (existsSync(whisperModelPath)) {
+      setWhisperDownloadProgress({
         status: 'already-downloaded',
         bytesDownloaded: 0,
         totalBytes: 0,
         errorMessage: '',
       });
-      // Proceed to save after a short delay
+      // Proceed to sherpa selection after a short delay
       setTimeout(() => {
-        handleSave();
+        setStep('sherpa-model');
       }, 1000);
       return;
     }
 
-    setDownloadProgress({
+    setWhisperDownloadProgress({
       status: 'downloading',
       bytesDownloaded: 0,
       totalBytes: 0,
@@ -341,8 +412,8 @@ function SetupWizard() {
     });
 
     try {
-      await downloadModel(WHISPER_MODEL_URL, modelPath, (downloaded, total) => {
-        setDownloadProgress({
+      await downloadModel(model.url, whisperModelPath, (downloaded, total) => {
+        setWhisperDownloadProgress({
           status: 'downloading',
           bytesDownloaded: downloaded,
           totalBytes: total,
@@ -350,46 +421,165 @@ function SetupWizard() {
         });
       });
 
-      setDownloadProgress((prev) => ({
+      setWhisperDownloadProgress((prev) => ({
+        ...prev,
+        status: 'complete',
+      }));
+
+      // Proceed to sherpa model selection
+      setTimeout(() => {
+        setStep('sherpa-model');
+      }, 500);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setWhisperDownloadProgress({
+        status: 'error',
+        bytesDownloaded: 0,
+        totalBytes: 0,
+        errorMessage: `Whisper model download failed: ${msg}`,
+      });
+    }
+  }, [whisperModelPath, state.selectedWhisperModel]);
+
+  useEffect(() => {
+    if (step === 'whisper-download' && whisperDownloadProgress.status === 'checking') {
+      void startWhisperDownload();
+    }
+  }, [step, whisperDownloadProgress.status, startWhisperDownload]);
+
+  function handleWhisperDownloadErrorChoice(item: { value: string }) {
+    if (item.value === 'retry') {
+      setWhisperDownloadProgress(INITIAL_DOWNLOAD_PROGRESS);
+    } else if (item.value === 'skip') {
+      setStep('sherpa-model');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sherpa-onnx model selection
+  // ---------------------------------------------------------------------------
+
+  function handleSherpaModelSelect(item: { value: string }) {
+    if (item.value === 'skip') {
+      setState((s) => ({ ...s, selectedSherpaModel: null }));
+      handleSave();
+      return;
+    }
+    const model = SHERPA_MODELS.find((m) => m.id === item.value);
+    if (!model) return;
+    setState((s) => ({ ...s, selectedSherpaModel: model }));
+    setStep('sherpa-download');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sherpa-onnx model download
+  // ---------------------------------------------------------------------------
+
+  const startSherpaDownload = useCallback(async () => {
+    const model = state.selectedSherpaModel;
+    if (!model) {
+      handleSave();
+      return;
+    }
+
+    const modelDir = join(configManager.modelsPath, model.dirName);
+    const archivePath = join(configManager.modelsPath, model.archiveFilename);
+
+    // Check if model directory already exists (already extracted)
+    if (existsSync(modelDir)) {
+      setSherpaDownloadProgress({
+        status: 'already-downloaded',
+        bytesDownloaded: 0,
+        totalBytes: 0,
+        errorMessage: '',
+      });
+      setTimeout(() => {
+        handleSave();
+      }, 1000);
+      return;
+    }
+
+    setSherpaDownloadProgress({
+      status: 'downloading',
+      bytesDownloaded: 0,
+      totalBytes: 0,
+      errorMessage: '',
+    });
+
+    try {
+      await downloadModel(model.url, archivePath, (downloaded, total) => {
+        setSherpaDownloadProgress({
+          status: 'downloading',
+          bytesDownloaded: downloaded,
+          totalBytes: total,
+          errorMessage: '',
+        });
+      });
+
+      // Extract the archive
+      setSherpaDownloadProgress((prev) => ({
+        ...prev,
+        status: 'extracting',
+      }));
+
+      extractTarBz2(archivePath, configManager.modelsPath);
+
+      // Clean up the archive
+      try {
+        unlinkSync(archivePath);
+      } catch {
+        // Best effort cleanup
+      }
+
+      setSherpaDownloadProgress((prev) => ({
         ...prev,
         status: 'complete',
       }));
 
       // Proceed to save
-      handleSave();
+      setTimeout(() => {
+        handleSave();
+      }, 500);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      setDownloadProgress({
+      // Clean up partial archive if it exists
+      try {
+        if (existsSync(archivePath)) unlinkSync(archivePath);
+      } catch {
+        // Best effort cleanup
+      }
+      setSherpaDownloadProgress({
         status: 'error',
         bytesDownloaded: 0,
         totalBytes: 0,
-        errorMessage: `Model download failed: ${msg}`,
+        errorMessage: `Sherpa-onnx model download failed: ${msg}`,
       });
     }
-  }, [modelPath]);
+  }, [state.selectedSherpaModel, configManager.modelsPath]);
 
   useEffect(() => {
-    if (step === 'model-download' && downloadProgress.status === 'checking') {
-      void startDownload();
+    if (step === 'sherpa-download' && sherpaDownloadProgress.status === 'checking') {
+      void startSherpaDownload();
     }
-  }, [step, downloadProgress.status, startDownload]);
+  }, [step, sherpaDownloadProgress.status, startSherpaDownload]);
 
-  // Handle retry/skip on download error
-  function handleDownloadErrorChoice(item: { value: string }) {
+  function handleSherpaDownloadErrorChoice(item: { value: string }) {
     if (item.value === 'retry') {
-      setDownloadProgress({
-        status: 'checking',
-        bytesDownloaded: 0,
-        totalBytes: 0,
-        errorMessage: '',
-      });
+      setSherpaDownloadProgress(INITIAL_DOWNLOAD_PROGRESS);
     } else if (item.value === 'skip') {
+      setState((s) => ({ ...s, selectedSherpaModel: null }));
       handleSave();
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Save config
+  // ---------------------------------------------------------------------------
+
   function handleSave() {
     setStep('saving');
+
+    const whisperModel = state.selectedWhisperModel ?? getDefaultWhisperModel();
 
     const llm: LlmConfig =
       state.llmProvider === 'cloud'
@@ -420,7 +610,7 @@ function SetupWizard() {
       llm,
       stt: {
         engine: 'whisper.node',
-        modelPath: join(configManager.modelsPath, WHISPER_MODEL_FILENAME),
+        modelPath: join(configManager.modelsPath, whisperModel.filename),
       },
       embedding,
       storage: {
@@ -447,6 +637,13 @@ function SetupWizard() {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Render helpers
+  // ---------------------------------------------------------------------------
+
+  const whisperModel = state.selectedWhisperModel ?? getDefaultWhisperModel();
+  const sherpaModel = state.selectedSherpaModel;
+
   return (
     <Box flexDirection="column" paddingY={1}>
       <Box marginBottom={1}>
@@ -457,7 +654,7 @@ function SetupWizard() {
 
       {step === 'llm-provider' && (
         <Box flexDirection="column">
-          <Text>Step 1 of 4: Choose your LLM provider</Text>
+          <Text>Step 1 of {TOTAL_STEPS}: Choose your LLM provider</Text>
           <Box marginTop={1}>
             <SelectInput items={llmProviderItems} onSelect={handleLlmProviderSelect} />
           </Box>
@@ -466,7 +663,7 @@ function SetupWizard() {
 
       {step === 'llm-cloud-key' && (
         <Box flexDirection="column">
-          <Text>Step 2 of 4: Enter your Anthropic API key</Text>
+          <Text>Step 2 of {TOTAL_STEPS}: Enter your Anthropic API key</Text>
           <Box marginTop={1}>
             <Text dimColor>Get your key at https://console.anthropic.com</Text>
           </Box>
@@ -485,7 +682,7 @@ function SetupWizard() {
 
       {step === 'llm-local-endpoint' && (
         <Box flexDirection="column">
-          <Text>Step 2 of 4: Local LLM endpoint URL</Text>
+          <Text>Step 2 of {TOTAL_STEPS}: Local LLM endpoint URL</Text>
           <Box marginTop={1}>
             <Text dimColor>Press Enter to accept the default</Text>
           </Box>
@@ -503,7 +700,7 @@ function SetupWizard() {
 
       {step === 'llm-local-model-loading' && (
         <Box flexDirection="column">
-          <Text>Step 2 of 4: Choose a local model</Text>
+          <Text>Step 2 of {TOTAL_STEPS}: Choose a local model</Text>
           <Box marginTop={1}>
             <Text dimColor>Querying Ollama for installed models...</Text>
           </Box>
@@ -512,7 +709,7 @@ function SetupWizard() {
 
       {step === 'llm-local-model' && (
         <Box flexDirection="column">
-          <Text>Step 2 of 4: Choose a local model</Text>
+          <Text>Step 2 of {TOTAL_STEPS}: Choose a local model</Text>
           {ollamaStatusMessage.length > 0 && (
             <Box marginTop={1}>
               <Text color="yellow">{ollamaStatusMessage}</Text>
@@ -526,7 +723,7 @@ function SetupWizard() {
 
       {step === 'embedding-provider' && (
         <Box flexDirection="column">
-          <Text>Step 3 of 4: Choose your embedding provider</Text>
+          <Text>Step 3 of {TOTAL_STEPS}: Choose your embedding provider</Text>
           <Box marginTop={1}>
             <Text dimColor>Embeddings enable semantic (meaning-based) search</Text>
           </Box>
@@ -536,71 +733,143 @@ function SetupWizard() {
         </Box>
       )}
 
-      {step === 'stt-info' && (
+      {step === 'whisper-model' && (
         <Box flexDirection="column">
-          <Text>Step 4 of 4: Speech-to-Text model</Text>
-          <Box marginTop={1} flexDirection="column">
-            <Text>
-              Tom uses{' '}
-              <Text bold color="yellow">
-                Whisper
-              </Text>{' '}
-              for local, private transcription.
+          <Text>Step 4 of {TOTAL_STEPS}: Choose Whisper model (speech-to-text)</Text>
+          <Box marginTop={1}>
+            <Text dimColor>
+              Whisper runs locally for private transcription. Choose a model based on your
+              speed/accuracy needs.
             </Text>
-            <Text>
-              Model: <Text bold>ggml-distil-small.en</Text> <Text dimColor>(~380 MB)</Text>
-            </Text>
-            <Text dimColor>The model will be downloaded next.</Text>
           </Box>
           <Box marginTop={1}>
-            <SelectInput
-              items={[{ label: 'Continue and download model', value: 'continue' }]}
-              onSelect={handleSttContinue}
-            />
+            <SelectInput items={whisperModelItems} onSelect={handleWhisperModelSelect} />
           </Box>
         </Box>
       )}
 
-      {step === 'model-download' && (
+      {step === 'whisper-download' && (
         <Box flexDirection="column">
-          <Text>Step 4 of 4: Download Whisper Model</Text>
+          <Text>Step 4 of {TOTAL_STEPS}: Download Whisper Model</Text>
           <Box marginTop={1} flexDirection="column">
-            {downloadProgress.status === 'checking' && (
+            {whisperDownloadProgress.status === 'checking' && (
               <Text dimColor>Checking for existing model...</Text>
             )}
-            {downloadProgress.status === 'already-downloaded' && (
-              <Text color="green">Model already downloaded. Continuing...</Text>
+            {whisperDownloadProgress.status === 'already-downloaded' && (
+              <Text color="green">
+                Model {whisperModel.filename} already downloaded. Continuing...
+              </Text>
             )}
-            {downloadProgress.status === 'downloading' && (
+            {whisperDownloadProgress.status === 'downloading' && (
               <>
-                <Text>Downloading ggml-distil-small.en (~380 MB)...</Text>
+                <Text>
+                  Downloading {whisperModel.filename} (~{whisperModel.sizeLabel})...
+                </Text>
                 <Text>
                   {'  '}
-                  {downloadProgress.totalBytes > 0
+                  {whisperDownloadProgress.totalBytes > 0
                     ? `${makeProgressBar(
-                        (downloadProgress.bytesDownloaded / downloadProgress.totalBytes) * 100,
+                        (whisperDownloadProgress.bytesDownloaded /
+                          whisperDownloadProgress.totalBytes) *
+                          100,
                       )} ${Math.round(
-                        (downloadProgress.bytesDownloaded / downloadProgress.totalBytes) * 100,
-                      )}% (${formatBytes(downloadProgress.bytesDownloaded)} / ${formatBytes(
-                        downloadProgress.totalBytes,
+                        (whisperDownloadProgress.bytesDownloaded /
+                          whisperDownloadProgress.totalBytes) *
+                          100,
+                      )}% (${formatBytes(whisperDownloadProgress.bytesDownloaded)} / ${formatBytes(
+                        whisperDownloadProgress.totalBytes,
                       )})`
-                    : `Downloaded ${formatBytes(downloadProgress.bytesDownloaded)}...`}
+                    : `Downloaded ${formatBytes(whisperDownloadProgress.bytesDownloaded)}...`}
                 </Text>
               </>
             )}
-            {downloadProgress.status === 'complete' && (
-              <Text color="green">Download complete! Saving configuration...</Text>
+            {whisperDownloadProgress.status === 'complete' && (
+              <Text color="green">Whisper model downloaded!</Text>
             )}
-            {downloadProgress.status === 'error' && (
+            {whisperDownloadProgress.status === 'error' && (
               <Box flexDirection="column">
-                <Text color="red">{downloadProgress.errorMessage}</Text>
+                <Text color="red">{whisperDownloadProgress.errorMessage}</Text>
                 <Box marginTop={1}>
                   <SelectInput
                     items={[
                       { label: 'Retry download', value: 'retry' },
                       { label: 'Skip (download later)', value: 'skip' },
                     ]}
-                    onSelect={handleDownloadErrorChoice}
+                    onSelect={handleWhisperDownloadErrorChoice}
+                  />
+                </Box>
+              </Box>
+            )}
+          </Box>
+        </Box>
+      )}
+
+      {step === 'sherpa-model' && (
+        <Box flexDirection="column">
+          <Text>Step 5 of {TOTAL_STEPS}: Choose live transcription model (optional)</Text>
+          <Box marginTop={1} flexDirection="column">
+            <Text dimColor>
+              Live transcription shows a real-time preview of your speech while recording.
+            </Text>
+            <Text dimColor>Requires an additional model download.</Text>
+          </Box>
+          <Box marginTop={1}>
+            <SelectInput items={sherpaModelItems} onSelect={handleSherpaModelSelect} />
+          </Box>
+        </Box>
+      )}
+
+      {step === 'sherpa-download' && sherpaModel && (
+        <Box flexDirection="column">
+          <Text>Step 5 of {TOTAL_STEPS}: Download Live Transcription Model</Text>
+          <Box marginTop={1} flexDirection="column">
+            {sherpaDownloadProgress.status === 'checking' && (
+              <Text dimColor>Checking for existing model...</Text>
+            )}
+            {sherpaDownloadProgress.status === 'already-downloaded' && (
+              <Text color="green">
+                Model {sherpaModel.dirName} already downloaded. Continuing...
+              </Text>
+            )}
+            {sherpaDownloadProgress.status === 'downloading' && (
+              <>
+                <Text>
+                  Downloading {sherpaModel.archiveFilename} (~{sherpaModel.sizeLabel})...
+                </Text>
+                <Text>
+                  {'  '}
+                  {sherpaDownloadProgress.totalBytes > 0
+                    ? `${makeProgressBar(
+                        (sherpaDownloadProgress.bytesDownloaded /
+                          sherpaDownloadProgress.totalBytes) *
+                          100,
+                      )} ${Math.round(
+                        (sherpaDownloadProgress.bytesDownloaded /
+                          sherpaDownloadProgress.totalBytes) *
+                          100,
+                      )}% (${formatBytes(sherpaDownloadProgress.bytesDownloaded)} / ${formatBytes(
+                        sherpaDownloadProgress.totalBytes,
+                      )})`
+                    : `Downloaded ${formatBytes(sherpaDownloadProgress.bytesDownloaded)}...`}
+                </Text>
+              </>
+            )}
+            {sherpaDownloadProgress.status === 'extracting' && (
+              <Text dimColor>Extracting model files...</Text>
+            )}
+            {sherpaDownloadProgress.status === 'complete' && (
+              <Text color="green">Live transcription model ready!</Text>
+            )}
+            {sherpaDownloadProgress.status === 'error' && (
+              <Box flexDirection="column">
+                <Text color="red">{sherpaDownloadProgress.errorMessage}</Text>
+                <Box marginTop={1}>
+                  <SelectInput
+                    items={[
+                      { label: 'Retry download', value: 'retry' },
+                      { label: 'Skip (no live preview)', value: 'skip' },
+                    ]}
+                    onSelect={handleSherpaDownloadErrorChoice}
                   />
                 </Box>
               </Box>

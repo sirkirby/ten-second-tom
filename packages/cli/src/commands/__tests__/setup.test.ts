@@ -28,12 +28,48 @@ vi.mock('@ten-second-tom/core', () => ({
     save: vi.fn(),
   })),
   // Constants used at module scope in setup.tsx
-  WHISPER_MODEL_FILENAME: 'ggml-distil-small.en.bin',
   DEFAULT_OLLAMA_ENDPOINT: 'http://localhost:11434',
   DEFAULT_LOCAL_MODEL_ID: 'qwen2.5:7b',
   DEFAULT_OLLAMA_EMBEDDING_MODEL: 'nomic-embed-text',
   DEFAULT_CLOUD_EMBEDDING_MODEL: 'voyage-3-lite',
   ANTHROPIC_API_KEY_PREFIX: 'sk-ant-',
+  // Model registries
+  WHISPER_MODELS: [
+    {
+      id: 'distil-small.en',
+      filename: 'ggml-distil-small.en.bin',
+      url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-distil-small.en.bin',
+      sizeBytes: 380_000_000,
+      sizeLabel: '380 MB',
+      description: 'English, fast, good accuracy',
+      recommended: true,
+    },
+  ],
+  getDefaultWhisperModel: () => ({
+    id: 'distil-small.en',
+    filename: 'ggml-distil-small.en.bin',
+    url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-distil-small.en.bin',
+    sizeBytes: 380_000_000,
+    sizeLabel: '380 MB',
+    description: 'English, fast, good accuracy',
+    recommended: true,
+  }),
+  SHERPA_MODELS: [
+    {
+      id: 'zipformer-en-2023-06-26',
+      dirName: 'sherpa-onnx-streaming-zipformer-en-2023-06-26',
+      archiveFilename: 'sherpa-onnx-streaming-zipformer-en-2023-06-26.tar.bz2',
+      url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-2023-06-26.tar.bz2',
+      sizeBytes: 68_000_000,
+      sizeLabel: '68 MB',
+      description: 'English streaming, good balance',
+      recommended: true,
+      encoderFilename: 'encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx',
+      decoderFilename: 'decoder-epoch-99-avg-1-chunk-16-left-128.onnx',
+      joinerFilename: 'joiner-epoch-99-avg-1-chunk-16-left-128.int8.onnx',
+      tokensFilename: 'tokens.txt',
+    },
+  ],
 }));
 
 import { fetchOllamaModels } from '../setup.js';
