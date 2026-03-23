@@ -1,23 +1,28 @@
 /**
  * Registry of available sherpa-onnx streaming models for live transcription.
  *
- * These models are downloaded from the k2-fsa/sherpa-onnx GitHub releases as
- * .tar.bz2 archives that are extracted after download. They provide real-time
- * streaming speech-to-text during recording (live preview).
+ * Models are downloaded from HuggingFace as individual files (encoder, decoder,
+ * joiner, tokens) into a model directory under ~/.tom/models/.
  */
 
-const SHERPA_ONNX_BASE_URL = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/';
+const SHERPA_ONNX_HF_BASE_URL =
+  'https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06/resolve/main/';
 
-export interface SherpaModel {
-  /** Short identifier (e.g. 'zipformer-en-2023-06-26') */
-  id: string;
-  /** Directory name after extraction */
-  dirName: string;
-  /** Archive filename for download */
-  archiveFilename: string;
+export interface SherpaModelFile {
+  /** Filename within the model directory */
+  filename: string;
   /** Full download URL */
   url: string;
-  /** Approximate download size in bytes */
+}
+
+export interface SherpaModel {
+  /** Short identifier (e.g. 'zipformer-en-kroko-2025-08-06') */
+  id: string;
+  /** Directory name after download */
+  dirName: string;
+  /** Individual files to download */
+  files: SherpaModelFile[];
+  /** Approximate total download size in bytes */
   sizeBytes: number;
   /** Human-readable size label */
   sizeLabel: string;
@@ -37,31 +42,33 @@ export interface SherpaModel {
 
 export const SHERPA_MODELS: SherpaModel[] = [
   {
-    id: 'zipformer-en-2023-06-26',
-    dirName: 'sherpa-onnx-streaming-zipformer-en-2023-06-26',
-    archiveFilename: 'sherpa-onnx-streaming-zipformer-en-2023-06-26.tar.bz2',
-    url: `${SHERPA_ONNX_BASE_URL}sherpa-onnx-streaming-zipformer-en-2023-06-26.tar.bz2`,
-    sizeBytes: 68_000_000,
-    sizeLabel: '68 MB',
-    description: 'English streaming, good balance',
+    id: 'zipformer-en-kroko-2025-08-06',
+    dirName: 'sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06',
+    files: [
+      {
+        filename: 'encoder.onnx',
+        url: `${SHERPA_ONNX_HF_BASE_URL}encoder.onnx`,
+      },
+      {
+        filename: 'decoder.onnx',
+        url: `${SHERPA_ONNX_HF_BASE_URL}decoder.onnx`,
+      },
+      {
+        filename: 'joiner.onnx',
+        url: `${SHERPA_ONNX_HF_BASE_URL}joiner.onnx`,
+      },
+      {
+        filename: 'tokens.txt',
+        url: `${SHERPA_ONNX_HF_BASE_URL}tokens.txt`,
+      },
+    ],
+    sizeBytes: 67_000_000,
+    sizeLabel: '67 MB',
+    description: 'English streaming, optimized for sherpa-onnx-node v1.12+',
     recommended: true,
-    encoderFilename: 'encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx',
-    decoderFilename: 'decoder-epoch-99-avg-1-chunk-16-left-128.onnx',
-    joinerFilename: 'joiner-epoch-99-avg-1-chunk-16-left-128.int8.onnx',
-    tokensFilename: 'tokens.txt',
-  },
-  {
-    id: 'zipformer-small-bilingual-zh-en',
-    dirName: 'sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16',
-    archiveFilename: 'sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16.tar.bz2',
-    url: `${SHERPA_ONNX_BASE_URL}sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16.tar.bz2`,
-    sizeBytes: 40_000_000,
-    sizeLabel: '40 MB',
-    description: 'English + Chinese, smaller model',
-    recommended: false,
-    encoderFilename: 'encoder-epoch-99-avg-1.int8.onnx',
-    decoderFilename: 'decoder-epoch-99-avg-1.onnx',
-    joinerFilename: 'joiner-epoch-99-avg-1.int8.onnx',
+    encoderFilename: 'encoder.onnx',
+    decoderFilename: 'decoder.onnx',
+    joinerFilename: 'joiner.onnx',
     tokensFilename: 'tokens.txt',
   },
 ];

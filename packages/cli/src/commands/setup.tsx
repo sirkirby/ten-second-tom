@@ -5,7 +5,14 @@ import TextInput from 'ink-text-input';
 import { Command } from 'commander';
 import { render } from 'ink';
 import { join } from 'node:path';
-import { existsSync, mkdirSync, createWriteStream, unlinkSync, renameSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  createWriteStream,
+  unlinkSync,
+  renameSync,
+  statSync,
+} from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { ConfigManager } from '@ten-second-tom/core';
 import {
@@ -577,10 +584,11 @@ function SetupWizard() {
     }
 
     const modelDir = join(configManager.modelsPath, model.dirName);
-    const archivePath = join(configManager.modelsPath, model.archiveFilename);
 
-    // Check if model directory already exists (already extracted)
-    if (existsSync(modelDir)) {
+    // Check if all model files already exist
+    const allFilesExist =
+      model.files.length > 0 && model.files.every((f) => existsSync(join(modelDir, f.filename)));
+    if (allFilesExist) {
       setSherpaDownloadProgress({
         status: 'already-downloaded',
         bytesDownloaded: 0,
@@ -593,6 +601,9 @@ function SetupWizard() {
       return;
     }
 
+    // Ensure the model directory exists
+    mkdirSync(modelDir, { recursive: true });
+
     setSherpaDownloadProgress({
       status: 'downloading',
       bytesDownloaded: 0,
@@ -601,28 +612,22 @@ function SetupWizard() {
     });
 
     try {
-      await downloadModel(model.url, archivePath, (downloaded, total) => {
-        setSherpaDownloadProgress({
-          status: 'downloading',
-          bytesDownloaded: downloaded,
-          totalBytes: total,
-          errorMessage: '',
+      // Download each file individually
+      let totalBytesDownloaded = 0;
+      for (const file of model.files) {
+        const destPath = join(modelDir, file.filename);
+        await downloadModel(file.url, destPath, (downloaded, _total) => {
+          setSherpaDownloadProgress({
+            status: 'downloading',
+            bytesDownloaded: totalBytesDownloaded + downloaded,
+            totalBytes: model.sizeBytes,
+            errorMessage: '',
+          });
         });
-      });
-
-      // Extract the archive
-      setSherpaDownloadProgress((prev) => ({
-        ...prev,
-        status: 'extracting',
-      }));
-
-      extractTarBz2(archivePath, configManager.modelsPath);
-
-      // Clean up the archive
-      try {
-        unlinkSync(archivePath);
-      } catch {
-        // Best effort cleanup
+        // Accumulate completed file sizes
+        if (existsSync(destPath)) {
+          totalBytesDownloaded += statSync(destPath).size;
+        }
       }
 
       setSherpaDownloadProgress((prev) => ({
@@ -636,12 +641,6 @@ function SetupWizard() {
       }, 500);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // Clean up partial archive if it exists
-      try {
-        if (existsSync(archivePath)) unlinkSync(archivePath);
-      } catch {
-        // Best effort cleanup
-      }
       setSherpaDownloadProgress({
         status: 'error',
         bytesDownloaded: 0,
@@ -965,7 +964,7 @@ function SetupWizard() {
             {sherpaDownloadProgress.status === 'downloading' && (
               <>
                 <Text>
-                  Downloading {sherpaModel.archiveFilename} (~{sherpaModel.sizeLabel})...
+                  Downloading {sherpaModel.dirName} (~{sherpaModel.sizeLabel})...
                 </Text>
                 <Text>
                   {'  '}
@@ -984,9 +983,6 @@ function SetupWizard() {
                     : `Downloaded ${formatBytes(sherpaDownloadProgress.bytesDownloaded)}...`}
                 </Text>
               </>
-            )}
-            {sherpaDownloadProgress.status === 'extracting' && (
-              <Text dimColor>Extracting model files...</Text>
             )}
             {sherpaDownloadProgress.status === 'complete' && (
               <Text color="green">Live transcription model ready!</Text>

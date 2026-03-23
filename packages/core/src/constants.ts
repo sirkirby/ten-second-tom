@@ -66,12 +66,12 @@ export const LIVE_TRANSCRIPTION_CHUNK_BYTES =
   LIVE_TRANSCRIPTION_CHUNK_SEC * AUDIO_SAMPLE_RATE * (AUDIO_BITS_PER_SAMPLE / 8) * AUDIO_CHANNELS;
 
 // sherpa-onnx streaming model (used for live preview during recording)
-// Model: sherpa-onnx-streaming-zipformer-en-2023-06-26 (int8 quantized)
-// Download URL: https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-2023-06-26.tar.bz2
-export const SHERPA_ONNX_MODEL_DIR = 'sherpa-onnx-streaming-zipformer-en-2023-06-26';
-export const SHERPA_ONNX_ENCODER_FILENAME = 'encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx';
-export const SHERPA_ONNX_DECODER_FILENAME = 'decoder-epoch-99-avg-1-chunk-16-left-128.onnx';
-export const SHERPA_ONNX_JOINER_FILENAME = 'joiner-epoch-99-avg-1-chunk-16-left-128.int8.onnx';
+// Model: sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06
+// Downloaded as individual files from HuggingFace (not a tar.bz2 archive)
+export const SHERPA_ONNX_MODEL_DIR = 'sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06';
+export const SHERPA_ONNX_ENCODER_FILENAME = 'encoder.onnx';
+export const SHERPA_ONNX_DECODER_FILENAME = 'decoder.onnx';
+export const SHERPA_ONNX_JOINER_FILENAME = 'joiner.onnx';
 export const SHERPA_ONNX_TOKENS_FILENAME = 'tokens.txt';
 
 // Interval (ms) between polling the sherpa-onnx recognizer for new results

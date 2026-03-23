@@ -19,7 +19,7 @@
     "@fugood/whisper.node": "^1.0.16",
     "better-sqlite3": "^12.8.0",
     "node-record-lpcm16": "^1.0.1",
-    "sherpa-onnx": "^1.12.32",
+    "sherpa-onnx-node": "^1.12.32",
     "sqlite-vec": "^0.1.7",
     "uuid": "^11.1.0",
     "zod": "^3.24.0"

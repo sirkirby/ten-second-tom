@@ -12,11 +12,11 @@ import {
 } from '../constants.js';
 
 // ---------------------------------------------------------------------------
-// sherpa-onnx type declarations (CJS module, no shipped types)
+// sherpa-onnx-node type declarations (native NAPI bindings)
 // ---------------------------------------------------------------------------
 
 export interface SherpaOnnxOnlineStream {
-  acceptWaveform(sampleRate: number, samples: Float32Array): void;
+  acceptWaveform(obj: { sampleRate: number; samples: Float32Array }): void;
   inputFinished(): void;
   free(): void;
 }
@@ -71,7 +71,7 @@ export interface ILiveTranscriptionService {
 
 /**
  * Converts a Buffer of Int16 PCM samples to a Float32Array (range -1.0 to 1.0).
- * sherpa-onnx's acceptWaveform expects Float32Array audio data.
+ * sherpa-onnx-node's acceptWaveform expects Float32Array audio data.
  */
 function int16BufferToFloat32(buffer: Buffer): Float32Array {
   const sampleCount = Math.floor(buffer.byteLength / 2);
@@ -84,14 +84,15 @@ function int16BufferToFloat32(buffer: Buffer): Float32Array {
 }
 
 /**
- * Default factory: loads the real sherpa-onnx CJS module and calls createOnlineRecognizer.
+ * Default factory: loads the real sherpa-onnx-node native module and constructs
+ * an OnlineRecognizer.
  */
 function defaultCreateRecognizer(config: SherpaOnnxRecognizerConfig): SherpaOnnxOnlineRecognizer {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const sherpaOnnx = require('sherpa-onnx') as {
-    createOnlineRecognizer: CreateRecognizerFn;
+  const { OnlineRecognizer } = require('sherpa-onnx-node') as {
+    OnlineRecognizer: new (config: SherpaOnnxRecognizerConfig) => SherpaOnnxOnlineRecognizer;
   };
-  return sherpaOnnx.createOnlineRecognizer(config);
+  return new OnlineRecognizer(config);
 }
 
 // ---------------------------------------------------------------------------
@@ -103,13 +104,13 @@ export interface SherpaOnnxLiveTranscriptionConfig {
   modelsPath: string;
   /**
    * Optional factory to create the sherpa-onnx recognizer.
-   * Defaults to loading the real sherpa-onnx module. Override in tests.
+   * Defaults to loading the real sherpa-onnx-node module. Override in tests.
    */
   createRecognizer?: CreateRecognizerFn;
 }
 
 /**
- * Live streaming transcription using sherpa-onnx's online (streaming) recognizer.
+ * Live streaming transcription using sherpa-onnx-node's online (streaming) recognizer.
  *
  * Produces low-latency draft transcripts during recording by feeding PCM audio
  * frame-by-frame to a Zipformer transducer model. The output is suitable for
@@ -175,7 +176,7 @@ export class SherpaOnnxLiveTranscriptionService implements ILiveTranscriptionSer
         numThreads: 2,
         provider: 'cpu',
         debug: 0,
-        modelType: '',
+        modelType: 'zipformer2',
       },
       decodingMethod: 'greedy_search',
       maxActivePaths: 4,
@@ -193,7 +194,7 @@ export class SherpaOnnxLiveTranscriptionService implements ILiveTranscriptionSer
     this.dataListener = (chunk: Buffer) => {
       if (this.stream === null) return;
       const float32 = int16BufferToFloat32(chunk);
-      this.stream.acceptWaveform(AUDIO_SAMPLE_RATE, float32);
+      this.stream.acceptWaveform({ sampleRate: AUDIO_SAMPLE_RATE, samples: float32 });
     };
 
     audioStream.on('data', this.dataListener);

@@ -11,16 +11,19 @@ describe('SHERPA_MODELS', () => {
     expect(recommended).toHaveLength(1);
   });
 
-  it('every model has a valid archive filename ending in .tar.bz2', () => {
+  it('every model has non-empty files array with valid URLs', () => {
     for (const model of SHERPA_MODELS) {
-      expect(model.archiveFilename).toMatch(/\.tar\.bz2$/);
+      expect(model.files.length).toBeGreaterThan(0);
+      for (const file of model.files) {
+        expect(file.filename.length).toBeGreaterThan(0);
+        expect(file.url).toMatch(/^https:\/\//);
+      }
     }
   });
 
-  it('every model has non-empty id, url, dirName, description, and sizeLabel', () => {
+  it('every model has non-empty id, dirName, description, and sizeLabel', () => {
     for (const model of SHERPA_MODELS) {
       expect(model.id.length).toBeGreaterThan(0);
-      expect(model.url).toMatch(/^https:\/\//);
       expect(model.dirName.length).toBeGreaterThan(0);
       expect(model.description.length).toBeGreaterThan(0);
       expect(model.sizeLabel.length).toBeGreaterThan(0);
@@ -47,15 +50,15 @@ describe('getDefaultSherpaModel', () => {
   it('returns the recommended model', () => {
     const model = getDefaultSherpaModel();
     expect(model.recommended).toBe(true);
-    expect(model.id).toBe('zipformer-en-2023-06-26');
+    expect(model.id).toBe('zipformer-en-kroko-2025-08-06');
   });
 });
 
 describe('findSherpaModel', () => {
   it('finds a model by id', () => {
-    const model = findSherpaModel('zipformer-en-2023-06-26');
+    const model = findSherpaModel('zipformer-en-kroko-2025-08-06');
     expect(model).toBeDefined();
-    expect(model?.dirName).toBe('sherpa-onnx-streaming-zipformer-en-2023-06-26');
+    expect(model?.dirName).toBe('sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06');
   });
 
   it('returns undefined for unknown id', () => {

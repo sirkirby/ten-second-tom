@@ -7,6 +7,7 @@ export {
 
 export {
   type SherpaModel,
+  type SherpaModelFile,
   SHERPA_MODELS,
   getDefaultSherpaModel,
   findSherpaModel,

@@ -127,11 +127,33 @@ describe('SherpaOnnxLiveTranscriptionService', () => {
       expect(createRecognizer).toHaveBeenCalledOnce();
       expect(mockRecognizer.createStream).toHaveBeenCalledOnce();
 
-      // Write some PCM data — should be forwarded to acceptWaveform
+      // Write some PCM data — should be forwarded to acceptWaveform as object
       const pcmData = Buffer.alloc(3200); // 100ms of 16kHz 16-bit mono
       audioStream.write(pcmData);
 
-      expect(mockStream.acceptWaveform).toHaveBeenCalledWith(16000, expect.any(Float32Array));
+      expect(mockStream.acceptWaveform).toHaveBeenCalledWith({
+        sampleRate: 16000,
+        samples: expect.any(Float32Array),
+      });
+
+      service.stop();
+    });
+
+    it('passes modelType zipformer2 in recognizer config', () => {
+      const mockStream = makeMockStream();
+      const mockRecognizer = makeMockRecognizer(mockStream);
+      const createRecognizer = vi.fn(() => mockRecognizer) as CreateRecognizerFn;
+
+      const service = new SherpaOnnxLiveTranscriptionService({
+        modelsPath: '/models',
+        createRecognizer,
+      });
+      const audioStream = new PassThrough();
+
+      service.start(audioStream, vi.fn());
+
+      const config = createRecognizer.mock.calls[0][0];
+      expect(config.modelConfig.modelType).toBe('zipformer2');
 
       service.stop();
     });
