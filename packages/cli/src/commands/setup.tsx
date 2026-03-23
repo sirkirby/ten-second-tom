@@ -37,6 +37,8 @@ type Step =
   | 'llm-local-model-loading'
   | 'llm-local-model'
   | 'embedding-provider'
+  | 'embedding-model-loading'
+  | 'embedding-model'
   | 'whisper-model'
   | 'whisper-download'
   | 'sherpa-model'
@@ -51,6 +53,7 @@ interface WizardState {
   localEndpoint: string;
   localModelId: string;
   embeddingProvider: 'ollama' | 'cloud' | 'none' | null;
+  embeddingModel: string;
   selectedWhisperModel: WhisperModel | null;
   selectedSherpaModel: SherpaModel | null;
   errorMessage: string;
@@ -79,6 +82,18 @@ const FALLBACK_MODEL_ITEMS = [
   { label: `${DEFAULT_LOCAL_MODEL_ID} (recommended)`, value: DEFAULT_LOCAL_MODEL_ID },
   { label: 'mistral:7b', value: 'mistral:7b' },
   { label: 'llama3.2:3b', value: 'llama3.2:3b' },
+];
+
+const KNOWN_EMBEDDING_MODELS = [
+  { name: 'nomic-embed-text', recommended: true, description: '768-dim, best general-purpose' },
+  { name: 'bge-m3', recommended: false, description: '1024-dim, multilingual' },
+  { name: 'mxbai-embed-large', recommended: false, description: '1024-dim, high accuracy' },
+  { name: 'all-minilm', recommended: false, description: '384-dim, fast, lightweight' },
+  {
+    name: 'snowflake-arctic-embed',
+    recommended: false,
+    description: '1024-dim, retrieval focused',
+  },
 ];
 
 interface OllamaModel {
@@ -265,6 +280,7 @@ function SetupWizard() {
     localEndpoint: DEFAULT_OLLAMA_ENDPOINT,
     localModelId: DEFAULT_LOCAL_MODEL_ID,
     embeddingProvider: null,
+    embeddingModel: DEFAULT_OLLAMA_EMBEDDING_MODEL,
     selectedWhisperModel: null,
     selectedSherpaModel: null,
     errorMessage: '',
@@ -272,6 +288,10 @@ function SetupWizard() {
   const [ollamaModelItems, setOllamaModelItems] =
     useState<Array<{ label: string; value: string }>>(FALLBACK_MODEL_ITEMS);
   const [ollamaStatusMessage, setOllamaStatusMessage] = useState('');
+  const [embeddingModelItems, setEmbeddingModelItems] = useState<
+    Array<{ label: string; value: string }>
+  >([]);
+  const [embeddingModelStatusMessage, setEmbeddingModelStatusMessage] = useState('');
   const [whisperDownloadProgress, setWhisperDownloadProgress] =
     useState<DownloadProgress>(INITIAL_DOWNLOAD_PROGRESS);
   const [sherpaDownloadProgress, setSherpaDownloadProgress] =
@@ -361,9 +381,80 @@ function SetupWizard() {
     setStep('embedding-provider');
   }
 
+  // Determine the Ollama endpoint to use for embedding model discovery.
+  // If the user configured a local LLM, reuse that endpoint; otherwise fall back to default.
+  const embeddingOllamaEndpoint =
+    state.llmProvider === 'local' ? state.localEndpoint : DEFAULT_OLLAMA_ENDPOINT;
+
+  // Fetch Ollama models when we enter the embedding model loading step
+  useEffect(() => {
+    if (step !== 'embedding-model-loading') return;
+
+    void (async () => {
+      const result = await fetchOllamaModels(embeddingOllamaEndpoint);
+
+      if (!result.ok) {
+        // Ollama unreachable — show warning + manual text input fallback handled in render
+        setEmbeddingModelStatusMessage(result.error);
+        setEmbeddingModelItems([]);
+        setStep('embedding-model');
+        return;
+      }
+
+      if (result.models.length === 0) {
+        setEmbeddingModelStatusMessage(
+          'No models installed. Install an embedding model: `ollama pull nomic-embed-text`',
+        );
+        setEmbeddingModelItems([]);
+        setStep('embedding-model');
+        return;
+      }
+
+      // Classify models: known embedding models go first, others follow
+      const embeddingModels: Array<{ label: string; value: string }> = [];
+      const otherModels: Array<{ label: string; value: string }> = [];
+
+      for (const m of result.models) {
+        const known = KNOWN_EMBEDDING_MODELS.find((k) => m.name.startsWith(k.name));
+        if (known) {
+          const tags = ['[Embedding]', ...(known.recommended ? ['[Recommended]'] : [])].join(' ');
+          embeddingModels.push({
+            label: `${m.name} (${formatBytes(m.size)}) ${tags}`,
+            value: m.name,
+          });
+        } else {
+          otherModels.push({
+            label: `${m.name} (${formatBytes(m.size)})`,
+            value: m.name,
+          });
+        }
+      }
+
+      setEmbeddingModelStatusMessage('');
+      setEmbeddingModelItems([...embeddingModels, ...otherModels]);
+      setStep('embedding-model');
+    })();
+  }, [step, embeddingOllamaEndpoint]);
+
+  function handleEmbeddingModelSelect(item: { value: string }) {
+    setState((s) => ({ ...s, embeddingModel: item.value }));
+    setStep('whisper-model');
+  }
+
+  function handleEmbeddingModelManualSubmit(value: string) {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) return;
+    setState((s) => ({ ...s, embeddingModel: trimmed }));
+    setStep('whisper-model');
+  }
+
   function handleEmbeddingProviderSelect(item: { value: 'ollama' | 'cloud' | 'none' }) {
     setState((s) => ({ ...s, embeddingProvider: item.value }));
-    setStep('whisper-model');
+    if (item.value === 'ollama') {
+      setStep('embedding-model-loading');
+    } else {
+      setStep('whisper-model');
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -599,7 +690,7 @@ function SetupWizard() {
       state.embeddingProvider === 'ollama'
         ? {
             provider: 'ollama',
-            model: DEFAULT_OLLAMA_EMBEDDING_MODEL,
+            model: state.embeddingModel,
             endpoint: ollamaEndpoint,
           }
         : state.embeddingProvider === 'cloud'
@@ -730,6 +821,43 @@ function SetupWizard() {
           <Box marginTop={1}>
             <SelectInput items={embeddingProviderItems} onSelect={handleEmbeddingProviderSelect} />
           </Box>
+        </Box>
+      )}
+
+      {step === 'embedding-model-loading' && (
+        <Box flexDirection="column">
+          <Text>Step 3 of {TOTAL_STEPS}: Choose an embedding model</Text>
+          <Box marginTop={1}>
+            <Text dimColor>Querying Ollama for installed models...</Text>
+          </Box>
+        </Box>
+      )}
+
+      {step === 'embedding-model' && (
+        <Box flexDirection="column">
+          <Text>Step 3 of {TOTAL_STEPS}: Choose an embedding model</Text>
+          {embeddingModelStatusMessage.length > 0 && (
+            <Box marginTop={1}>
+              <Text color="yellow">{embeddingModelStatusMessage}</Text>
+            </Box>
+          )}
+          {embeddingModelItems.length > 0 ? (
+            <Box marginTop={1}>
+              <SelectInput items={embeddingModelItems} onSelect={handleEmbeddingModelSelect} />
+            </Box>
+          ) : (
+            <Box flexDirection="column" marginTop={1}>
+              <Text dimColor>Enter model name manually (e.g. nomic-embed-text):</Text>
+              <Box marginTop={1}>
+                <TextInput
+                  value={state.embeddingModel}
+                  onChange={(val) => setState((s) => ({ ...s, embeddingModel: val }))}
+                  onSubmit={handleEmbeddingModelManualSubmit}
+                  placeholder={DEFAULT_OLLAMA_EMBEDDING_MODEL}
+                />
+              </Box>
+            </Box>
+          )}
         </Box>
       )}
 
