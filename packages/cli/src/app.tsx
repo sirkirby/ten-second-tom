@@ -7,6 +7,7 @@ import { HomeScreen } from './screens/HomeScreen.js';
 import { RecordingScreen } from './screens/RecordingScreen.js';
 import { ProcessingScreen } from './screens/ProcessingScreen.js';
 import { SearchScreen } from './screens/SearchScreen.js';
+import { NoteScreen } from './screens/NoteScreen.js';
 import { ResultsSummary } from './components/ResultsSummary.js';
 import type { ResultsSummaryProps } from './components/ResultsSummary.js';
 import { findCommand } from './commands/registry.js';
@@ -130,6 +131,31 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
     setScreen('home');
   }, [pushHistory]);
 
+  // ---- note screen callback ----
+  const handleNoteComplete = useCallback(
+    (result: ResultsSummaryProps) => {
+      pushHistory({
+        id: `note-result-${Date.now()}`,
+        content: (
+          <ResultsSummary
+            transcript={result.transcript}
+            analysis={result.analysis}
+            warnings={result.warnings}
+            entryType={result.entryType}
+          />
+        ),
+      });
+      setScreenData({});
+      setScreen('home');
+
+      // In one-shot mode, exit after note completes
+      if (mode === 'oneshot') {
+        exit();
+      }
+    },
+    [pushHistory, mode, exit],
+  );
+
   // ---- processing screen callback ----
   const handleProcessingComplete = useCallback(
     (result: ResultsSummaryProps) => {
@@ -204,8 +230,15 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
         />
       )}
 
+      {screen === 'note' && (
+        <NoteScreen
+          context={context}
+          onComplete={handleNoteComplete}
+          onCancel={() => setScreen('home')}
+        />
+      )}
+
       {/* Placeholder screens — will be implemented in subsequent tasks */}
-      {screen === 'note' && <Text color="yellow">Note screen (coming in Task 5)</Text>}
       {screen === 'setup' && <Text color="yellow">Setup screen (coming later)</Text>}
     </Box>
   );
