@@ -22,6 +22,7 @@ export {
   checkAudioPrerequisites,
   checkModelExists,
   createWavHeader,
+  getMicrophonePermissionHint,
 } from './services/audio.js';
 export {
   type ITranscriptionService,

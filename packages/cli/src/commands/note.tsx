@@ -5,10 +5,15 @@ import { Command } from 'commander';
 import { render } from 'ink';
 import { join } from 'node:path';
 import { unlinkSync } from 'node:fs';
-import { ConfigManager, checkAudioPrerequisites } from '@ten-second-tom/core';
+import {
+  ConfigManager,
+  checkAudioPrerequisites,
+  getMicrophonePermissionHint,
+} from '@ten-second-tom/core';
 import type { EntryAnalysis } from '@ten-second-tom/core';
 import { SentimentDisplay } from '../components/SentimentDisplay.js';
 import { ErrorDisplay } from '../components/ErrorDisplay.js';
+import { WarningList } from '../components/WarningList.js';
 import { useAutoExit } from '../hooks/useAutoExit.js';
 import { checkSetupComplete } from '../hooks/useSetupGuard.js';
 import { EXIT_HINT_TEXT } from '../constants.js';
@@ -154,14 +159,8 @@ function NoteCommand() {
       try {
         svcs.audio.startRecording();
       } catch (err) {
-        const hint =
-          process.platform === 'darwin'
-            ? 'Grant permission in System Settings > Privacy & Security > Microphone'
-            : process.platform === 'win32'
-              ? 'Check Settings > Privacy > Microphone'
-              : 'Check your audio device settings.';
         const msg = err instanceof Error ? err.message : String(err);
-        setDictationWarning(`Microphone access denied. ${hint} (${msg})`);
+        setDictationWarning(`Microphone access denied. ${getMicrophonePermissionHint()} (${msg})`);
         return;
       }
 
@@ -359,16 +358,7 @@ function NoteCommand() {
         </Box>
       )}
 
-      {warnings.length > 0 && (
-        <Box marginTop={1} flexDirection="column">
-          {warnings.map((w, i) => (
-            <Text key={i} color="yellow">
-              {'⚠ '}
-              {w}
-            </Text>
-          ))}
-        </Box>
-      )}
+      <WarningList warnings={warnings} />
 
       <Box marginTop={1}>
         <Text dimColor>{EXIT_HINT_TEXT}</Text>

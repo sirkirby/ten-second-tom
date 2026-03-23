@@ -2,6 +2,15 @@ export const SENTIMENT_POSITIVE_THRESHOLD = 0.2;
 export const SENTIMENT_NEGATIVE_THRESHOLD = -0.2;
 
 /**
+ * Format a sentiment score with sign prefix.
+ * Shared between SentimentDisplay and SearchResults.
+ */
+export function formatScore(score: number): string {
+  const sign = score >= 0 ? '+' : '';
+  return `${sign}${score.toFixed(2)}`;
+}
+
+/**
  * Get the display color for a sentiment score.
  * Shared between SentimentDisplay and SearchResults components.
  */

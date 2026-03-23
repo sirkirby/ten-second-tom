@@ -67,12 +67,16 @@ interface OllamaModel {
   size: number;
 }
 
-function formatModelSize(bytes: number): string {
+function formatBytes(bytes: number): string {
   const gb = bytes / (1024 * 1024 * 1024);
   if (gb >= 1) {
     return `${gb.toFixed(1)} GB`;
   }
-  return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
+  const mb = bytes / (1024 * 1024);
+  if (mb >= 1) {
+    return `${mb.toFixed(0)} MB`;
+  }
+  return `${(bytes / 1024).toFixed(0)} KB`;
 }
 
 /**
@@ -124,13 +128,6 @@ const embeddingProviderItems = [
   { label: 'Cloud (Voyage AI)', value: 'cloud' as const },
   { label: 'None (keyword search only)', value: 'none' as const },
 ];
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(0)} KB`;
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
-}
 
 function makeProgressBar(percent: number, width: number = 20): string {
   const filled = Math.round((percent / 100) * width);
@@ -289,7 +286,7 @@ function SetupWizard() {
 
       // Build selection items from discovered models
       const items = result.models.map((m) => ({
-        label: `${m.name} (${formatModelSize(m.size)})`,
+        label: `${m.name} (${formatBytes(m.size)})`,
         value: m.name,
       }));
 

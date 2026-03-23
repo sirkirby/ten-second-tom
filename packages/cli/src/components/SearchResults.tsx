@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import type { Entry } from '@ten-second-tom/core';
-import { getSentimentColor, getSentimentEmoji } from '../utils/sentiment.js';
+import { getSentimentColor, getSentimentEmoji, formatScore } from '../utils/sentiment.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -76,7 +76,7 @@ function EntryDetail({ entry, onBack }: EntryDetailProps) {
             <Text color={getSentimentColor(entry.analysis.sentiment.score)}>
               {entry.analysis.sentiment.label}
             </Text>
-            {` \u2014 ${entry.analysis.summary} (${entry.analysis.sentiment.score >= 0 ? '+' : ''}${entry.analysis.sentiment.score.toFixed(2)})`}
+            {` \u2014 ${entry.analysis.summary} (${formatScore(entry.analysis.sentiment.score)})`}
           </Text>
         </Box>
       )}

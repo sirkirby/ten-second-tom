@@ -38,6 +38,16 @@ export function createWavHeader(dataLength: number): Buffer {
   return header;
 }
 
+/**
+ * Returns a platform-specific hint for granting microphone permission.
+ */
+export function getMicrophonePermissionHint(): string {
+  if (process.platform === 'darwin')
+    return 'Grant permission in System Settings > Privacy & Security > Microphone';
+  if (process.platform === 'win32') return 'Check Settings > Privacy > Microphone';
+  return 'Check your audio device settings.';
+}
+
 export type AudioPrerequisiteResult = { ok: true } | { ok: false; message: string };
 
 /**

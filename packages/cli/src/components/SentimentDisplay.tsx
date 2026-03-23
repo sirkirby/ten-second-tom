@@ -1,15 +1,10 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { EntryAnalysis } from '@ten-second-tom/core';
-import { getSentimentColor } from '../utils/sentiment.js';
+import { getSentimentColor, formatScore } from '../utils/sentiment.js';
 
 interface SentimentDisplayProps {
   analysis: EntryAnalysis;
-}
-
-function formatScore(score: number): string {
-  const sign = score >= 0 ? '+' : '';
-  return `${sign}${score.toFixed(2)}`;
 }
 
 function formatConfidence(confidence: number): string {
