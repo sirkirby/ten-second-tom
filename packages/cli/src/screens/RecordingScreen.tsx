@@ -179,10 +179,6 @@ export function RecordingScreen({ context, onComplete, onCancel }: RecordingScre
           }
         }
 
-        // Clear any native whisper.cpp stderr output that leaked during model
-        // loading. This resets the terminal so the recording UI starts clean.
-        process.stdout.write('\x1b[2J\x1b[0f');
-
         if (!cancelled) {
           setPhase('recording');
         }
