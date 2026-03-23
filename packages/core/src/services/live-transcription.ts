@@ -261,13 +261,14 @@ export class SherpaOnnxLiveTranscriptionService implements ILiveTranscriptionSer
     }
 
     // Clean up sherpa-onnx resources
+    // Note: free() exists on the WASM version but not the native NAPI version.
     if (this.stream !== null) {
-      this.stream.free();
+      if (typeof this.stream.free === 'function') this.stream.free();
       this.stream = null;
     }
 
     if (this.recognizer !== null) {
-      this.recognizer.free();
+      if (typeof this.recognizer.free === 'function') this.recognizer.free();
       this.recognizer = null;
     }
 
