@@ -223,6 +223,27 @@ describe('WhisperTranscriptionService', () => {
     });
   });
 
+  describe('release()', () => {
+    it('releases the whisper context and isModelLoaded() returns false', async () => {
+      const service = new WhisperTranscriptionService();
+      await service.loadModel('/model.bin');
+
+      expect(service.isModelLoaded()).toBe(true);
+
+      await service.release();
+
+      expect(mockContext.release).toHaveBeenCalledOnce();
+      expect(service.isModelLoaded()).toBe(false);
+    });
+
+    it('is safe to call when no model is loaded', async () => {
+      const service = new WhisperTranscriptionService();
+
+      await expect(service.release()).resolves.toBeUndefined();
+      expect(mockContext.release).not.toHaveBeenCalled();
+    });
+  });
+
   describe('startLiveTranscription() / stopLiveTranscription()', () => {
     it('throws if model is not loaded', () => {
       const service = new WhisperTranscriptionService();

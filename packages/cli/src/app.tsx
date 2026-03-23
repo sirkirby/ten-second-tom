@@ -107,6 +107,16 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
       void svcs.storage.listEntries({ limit: 100_000 }).then((entries) => {
         setEntryCount(entries.length);
       });
+
+      // Release native whisper context on exit to suppress "ggml_metal_free:
+      // deallocating" and similar native teardown messages.
+      const cleanup = () => {
+        void svcs.transcription.release();
+      };
+      process.on('exit', cleanup);
+      return () => {
+        process.off('exit', cleanup);
+      };
     } catch {
       // Service construction failed — degrade gracefully, home screen still works
     }

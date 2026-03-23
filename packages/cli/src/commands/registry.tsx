@@ -1,4 +1,5 @@
-import type React from 'react';
+import React from 'react';
+import { Box, Text } from 'ink';
 import type { ServiceContainer, ConfigManager } from '@ten-second-tom/core';
 
 // ---------------------------------------------------------------------------
@@ -44,14 +45,17 @@ const helpCommand: TomCommand = {
   name: 'help',
   description: 'Show available commands',
   execute: (_args, ctx) => {
-    const lines = COMMANDS.filter((c) => c.name !== 'help' && c.name !== 'quit')
-      .map((c) => `  ${c.name.padEnd(12)} ${c.description}`)
-      .join('\n');
-
-    ctx.pushHistory({
-      id: `help-${Date.now()}`,
-      content: `Available commands:\n${lines}`,
-    });
+    const content = (
+      <Box flexDirection="column">
+        {COMMANDS.filter((c) => c.name !== 'help' && c.name !== 'quit').map((c) => (
+          <Text key={c.name}>
+            <Text color="green">{c.name.padEnd(12)}</Text>
+            <Text dimColor>{c.description}</Text>
+          </Text>
+        ))}
+      </Box>
+    );
+    ctx.pushHistory({ id: `help-${Date.now()}`, content });
   },
 };
 

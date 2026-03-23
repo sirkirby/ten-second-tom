@@ -10,6 +10,8 @@ export interface ITranscriptionService {
   stopLiveTranscription(): Promise<string>;
   isModelLoaded(): boolean;
   loadModel(modelPath: string): Promise<void>;
+  /** Release the whisper context and free native resources. */
+  release(): Promise<void>;
 }
 
 /**
@@ -119,6 +121,18 @@ export class WhisperTranscriptionService implements ITranscriptionService {
     await toggleNativeLog(false);
 
     this.context = await initWhisper({ filePath: modelPath });
+  }
+
+  /**
+   * Releases the whisper context and frees native resources.
+   * After calling this, isModelLoaded() returns false.
+   * Safe to call even if no model is loaded.
+   */
+  async release(): Promise<void> {
+    if (this.context !== null) {
+      await this.context.release();
+      this.context = null;
+    }
   }
 
   /**
