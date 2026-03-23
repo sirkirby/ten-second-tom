@@ -6,7 +6,14 @@ import type { Mock } from 'vitest';
 // ---------------------------------------------------------------------------
 
 // Hoist mock constructors so the buildServicesFromConfig mock factory can reference them
-const { mockAudioServiceCtor, mockWhisperCtor, mockTomAgentCtor, mockOllamaEmbCtor, mockNoopEmbCtor, mockSqliteCtor } = vi.hoisted(() => ({
+const {
+  mockAudioServiceCtor,
+  mockWhisperCtor,
+  mockTomAgentCtor,
+  mockOllamaEmbCtor,
+  mockNoopEmbCtor,
+  mockSqliteCtor,
+} = vi.hoisted(() => ({
   mockAudioServiceCtor: vi.fn(),
   mockWhisperCtor: vi.fn(),
   mockTomAgentCtor: vi.fn(),
@@ -25,17 +32,27 @@ vi.mock('@ten-second-tom/core', () => {
     OllamaEmbeddingService: mockOllamaEmbCtor,
     NoopEmbeddingService: mockNoopEmbCtor,
     SqliteStorageService: mockSqliteCtor,
-    buildServicesFromConfig: vi.fn((config: Record<string, unknown>, configManager: Record<string, unknown>) => {
-      const audio = new mockAudioServiceCtor({ audioDir: (configManager as Record<string, unknown>)['audioPath'] });
-      const transcription = new mockWhisperCtor();
-      const agent = new mockTomAgentCtor((config as Record<string, unknown>)['llm']);
-      const embeddingConfig = (config as Record<string, Record<string, unknown>>)['embedding'];
-      const embedding = embeddingConfig['provider'] === 'ollama'
-        ? new mockOllamaEmbCtor({ model: embeddingConfig['model'], endpoint: embeddingConfig['endpoint'] })
-        : new mockNoopEmbCtor();
-      const storage = new mockSqliteCtor((config as Record<string, Record<string, unknown>>)['storage']['dbPath']);
-      return { audio, transcription, agent, embedding, storage };
-    }),
+    buildServicesFromConfig: vi.fn(
+      (config: Record<string, unknown>, configManager: Record<string, unknown>) => {
+        const audio = new mockAudioServiceCtor({
+          audioDir: (configManager as Record<string, unknown>)['audioPath'],
+        });
+        const transcription = new mockWhisperCtor();
+        const agent = new mockTomAgentCtor((config as Record<string, unknown>)['llm']);
+        const embeddingConfig = (config as Record<string, Record<string, unknown>>)['embedding'];
+        const embedding =
+          embeddingConfig['provider'] === 'ollama'
+            ? new mockOllamaEmbCtor({
+                model: embeddingConfig['model'],
+                endpoint: embeddingConfig['endpoint'],
+              })
+            : new mockNoopEmbCtor();
+        const storage = new mockSqliteCtor(
+          (config as Record<string, Record<string, unknown>>)['storage']['dbPath'],
+        );
+        return { audio, transcription, agent, embedding, storage };
+      },
+    ),
   };
 });
 
@@ -68,10 +85,7 @@ vi.mock('../../hooks/useSetupGuard.js', () => ({
   checkSetupComplete: vi.fn(() => ({ ok: true, config: {}, configManager: {} })),
 }));
 
-import {
-  ConfigManager,
-  buildServicesFromConfig,
-} from '@ten-second-tom/core';
+import { ConfigManager, buildServicesFromConfig } from '@ten-second-tom/core';
 import type {
   IAudioService,
   ITranscriptionService,

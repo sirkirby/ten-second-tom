@@ -60,9 +60,7 @@ vi.mock('../record.js', async (importOriginal) => {
   };
 });
 
-import {
-  buildServicesFromConfig,
-} from '@ten-second-tom/core';
+import { buildServicesFromConfig } from '@ten-second-tom/core';
 import type {
   IEmbeddingService,
   IAgentService,

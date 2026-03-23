@@ -49,10 +49,7 @@ export class OllamaEmbeddingService implements IEmbeddingService {
         signal: AbortSignal.timeout(EMBEDDING_AVAILABILITY_TIMEOUT_MS),
       });
       const available = response.ok;
-      this.availabilityCache = [
-        available,
-        Date.now() + EMBEDDING_AVAILABILITY_CACHE_MS,
-      ];
+      this.availabilityCache = [available, Date.now() + EMBEDDING_AVAILABILITY_CACHE_MS];
       return available;
     } catch {
       this.availabilityCache = [false, Date.now() + EMBEDDING_AVAILABILITY_CACHE_MS];
