@@ -9,6 +9,9 @@ export const DEFAULT_OLLAMA_EMBEDDING_MODEL = 'nomic-embed-text';
 export const DEFAULT_CLOUD_EMBEDDING_MODEL = 'voyage-3-lite';
 export const EMBEDDING_AVAILABILITY_TIMEOUT_MS = 3_000;
 export const EMBEDDING_AVAILABILITY_CACHE_MS = 30_000;
+// nomic-embed-text produces 768-dimensional vectors; bge-m3 produces 1024.
+// 768 is the default — change if you switch embedding models.
+export const EMBEDDING_DIMENSION = 768;
 
 // Audio
 export const AUDIO_SAMPLE_RATE = 16000;
@@ -21,3 +24,9 @@ export const ANTHROPIC_API_KEY_PREFIX = 'sk-ant-';
 
 // Whisper
 export const WHISPER_MODEL_FILENAME = 'ggml-distil-small.en.bin';
+
+// Live transcription chunking — each chunk sent to Whisper for incremental transcript
+// 5 seconds of 16kHz mono 16-bit PCM = 5 * 16000 * 2 = 160,000 bytes
+export const LIVE_TRANSCRIPTION_CHUNK_SEC = 5;
+export const LIVE_TRANSCRIPTION_CHUNK_BYTES =
+  LIVE_TRANSCRIPTION_CHUNK_SEC * AUDIO_SAMPLE_RATE * (AUDIO_BITS_PER_SAMPLE / 8) * AUDIO_CHANNELS;

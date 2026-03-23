@@ -1,7 +1,9 @@
 import Database from 'better-sqlite3';
+import * as sqliteVec from 'sqlite-vec';
 import { randomUUID } from 'node:crypto';
 import type { Entry, CreateEntry, EntryAnalysis } from '../types/entry.js';
 import type { IStorageService, ListEntriesOptions } from './storage.js';
+import { EMBEDDING_DIMENSION } from '../constants.js';
 
 const MIGRATION_SQL = `
 CREATE TABLE IF NOT EXISTS entries (
@@ -29,6 +31,16 @@ CREATE TRIGGER IF NOT EXISTS entries_au AFTER UPDATE ON entries BEGIN
   INSERT INTO entries_fts(entries_fts, rowid, content) VALUES('delete', old.rowid, old.content);
   INSERT INTO entries_fts(rowid, content) VALUES (new.rowid, new.content);
 END;
+`;
+
+// vec0 DDL embeds the dimension constant so it is consistent at table creation time.
+// EMBEDDING_DIMENSION defaults to 768 (nomic-embed-text). Change in constants.ts if
+// you switch to a different embedding model (e.g. bge-m3 = 1024).
+const VECTOR_MIGRATION_SQL = `
+CREATE VIRTUAL TABLE IF NOT EXISTS entry_embeddings USING vec0(
+  entry_id TEXT PRIMARY KEY,
+  embedding float[${EMBEDDING_DIMENSION}]
+);
 `;
 
 interface EntryRow {
@@ -66,12 +78,20 @@ export class SqliteStorageService implements IStorageService {
   private readonly stmtUpdateAnalysis: Database.Statement;
   private readonly stmtSearchFts: Database.Statement;
   private readonly stmtDeleteEntry: Database.Statement;
+  private readonly stmtDeleteEmbedding: Database.Statement;
+  private readonly stmtInsertEmbedding: Database.Statement;
+  private readonly stmtSearchVector: Database.Statement;
 
   constructor(dbPath: string) {
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
+
+    // Load sqlite-vec extension before running migrations so vec0 is available
+    sqliteVec.load(this.db);
+
     this.db.exec(MIGRATION_SQL);
+    this.db.exec(VECTOR_MIGRATION_SQL);
 
     // Prepare all statements once
     this.stmtInsertEntry = this.db.prepare(
@@ -96,6 +116,21 @@ export class SqliteStorageService implements IStorageService {
        LIMIT ?`,
     );
     this.stmtDeleteEntry = this.db.prepare('DELETE FROM entries WHERE id = ?');
+
+    // Vector embedding statements — vec0 does not support INSERT OR REPLACE,
+    // so we use DELETE + INSERT (two steps, both cheap).
+    this.stmtDeleteEmbedding = this.db.prepare('DELETE FROM entry_embeddings WHERE entry_id = ?');
+    this.stmtInsertEmbedding = this.db.prepare(
+      'INSERT INTO entry_embeddings (entry_id, embedding) VALUES (?, ?)',
+    );
+    this.stmtSearchVector = this.db.prepare(
+      `SELECT e.*
+       FROM entry_embeddings ev
+       JOIN entries e ON e.id = ev.entry_id
+       WHERE ev.embedding MATCH ?
+       AND k = ?
+       ORDER BY distance`,
+    );
   }
 
   async saveEntry(input: CreateEntry): Promise<Entry> {
@@ -146,10 +181,16 @@ export class SqliteStorageService implements IStorageService {
     this.stmtUpdateAnalysis.run(JSON.stringify(analysis), now, id);
   }
 
-  async updateEntryEmbedding(_id: string, _embedding: Float32Array): Promise<void> {
-    // Vector storage is pending Sprint 1 research spike — throw so callers
-    // can handle gracefully (e.g. runAnalysisPipeline catches and warns).
-    throw new Error('Vector storage not yet implemented');
+  async updateEntryEmbedding(id: string, embedding: Float32Array): Promise<void> {
+    // sqlite-vec expects the raw float bytes as a Buffer/Uint8Array
+    const buffer = Buffer.from(embedding.buffer, embedding.byteOffset, embedding.byteLength);
+
+    // vec0 does not support INSERT OR REPLACE — use DELETE + INSERT in a transaction
+    const upsert = this.db.transaction(() => {
+      this.stmtDeleteEmbedding.run(id);
+      this.stmtInsertEmbedding.run(id, buffer);
+    });
+    upsert();
   }
 
   async searchByKeyword(query: string, limit: number = 20): Promise<Entry[]> {
@@ -157,10 +198,10 @@ export class SqliteStorageService implements IStorageService {
     return rows.map(rowToEntry);
   }
 
-  async searchByVector(_embedding: Float32Array, _limit: number): Promise<Entry[]> {
-    // Vector search is pending Sprint 1 research spike — throw so callers
-    // (e.g. SearchService) fall back to FTS instead of silently returning [].
-    throw new Error('Vector search not yet implemented');
+  async searchByVector(embedding: Float32Array, limit: number): Promise<Entry[]> {
+    const buffer = Buffer.from(embedding.buffer, embedding.byteOffset, embedding.byteLength);
+    const rows = this.stmtSearchVector.all(buffer, limit) as EntryRow[];
+    return rows.map(rowToEntry);
   }
 
   async deleteEntry(id: string): Promise<void> {

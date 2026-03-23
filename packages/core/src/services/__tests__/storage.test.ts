@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteStorageService } from '../storage-sqlite.js';
 import type { CreateEntry } from '../../types/entry.js';
+import { EMBEDDING_DIMENSION } from '../../constants.js';
 
 let tempDir: string;
 let service: SqliteStorageService;
@@ -19,6 +20,14 @@ function createService(): SqliteStorageService {
   tempDir = mkdtempSync(join(tmpdir(), 'tst-storage-'));
   service = new SqliteStorageService(join(tempDir, 'test.db'));
   return service;
+}
+
+/**
+ * Build a Float32Array of EMBEDDING_DIMENSION elements all set to `value`.
+ * Using the real dimension ensures tests exercise the actual vec0 table schema.
+ */
+function makeEmbedding(value: number): Float32Array {
+  return new Float32Array(EMBEDDING_DIMENSION).fill(value);
 }
 
 const baseNote: CreateEntry = {
@@ -135,5 +144,71 @@ describe('SqliteStorageService', () => {
 
     const result = await svc.getEntry(saved.id);
     expect(result).toBeUndefined();
+  });
+
+  // --- Vector embedding tests ---
+
+  it('stores and retrieves embedding for an entry without error', async () => {
+    const svc = createService();
+
+    const entry = await svc.saveEntry(baseNote);
+    const embedding = makeEmbedding(0.5);
+
+    // Should not throw
+    await expect(svc.updateEntryEmbedding(entry.id, embedding)).resolves.toBeUndefined();
+  });
+
+  it('overwrites an existing embedding for the same entry', async () => {
+    const svc = createService();
+
+    const entry = await svc.saveEntry(baseNote);
+
+    await svc.updateEntryEmbedding(entry.id, makeEmbedding(0.1));
+    // Second call with a different vector should not throw
+    await expect(svc.updateEntryEmbedding(entry.id, makeEmbedding(0.9))).resolves.toBeUndefined();
+  });
+
+  it('searches entries by vector similarity and returns closest match first', async () => {
+    const svc = createService();
+
+    // Three entries with clearly different embeddings
+    const closeEntry = await svc.saveEntry({ ...baseNote, content: 'Close to query' });
+    const farEntry = await svc.saveEntry({ ...baseNote, content: 'Far from query' });
+    const midEntry = await svc.saveEntry({ ...baseNote, content: 'Mid distance' });
+
+    // Assign embeddings: close=0.1, far=0.9, mid=0.5
+    await svc.updateEntryEmbedding(closeEntry.id, makeEmbedding(0.1));
+    await svc.updateEntryEmbedding(farEntry.id, makeEmbedding(0.9));
+    await svc.updateEntryEmbedding(midEntry.id, makeEmbedding(0.5));
+
+    // Query vector near 0.1 — closest match should be closeEntry
+    const results = await svc.searchByVector(makeEmbedding(0.15), 3);
+
+    expect(results).toHaveLength(3);
+    expect(results[0]?.id).toBe(closeEntry.id);
+  });
+
+  it('searchByVector returns only entries with embeddings', async () => {
+    const svc = createService();
+
+    const withEmbedding = await svc.saveEntry({ ...baseNote, content: 'Has embedding' });
+    await svc.saveEntry({ ...baseNote, content: 'No embedding' });
+
+    await svc.updateEntryEmbedding(withEmbedding.id, makeEmbedding(0.5));
+
+    const results = await svc.searchByVector(makeEmbedding(0.5), 10);
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.id).toBe(withEmbedding.id);
+  });
+
+  it('searchByVector returns empty array when no embeddings exist', async () => {
+    const svc = createService();
+
+    await svc.saveEntry(baseNote);
+
+    const results = await svc.searchByVector(makeEmbedding(0.5), 10);
+
+    expect(results).toHaveLength(0);
   });
 });
