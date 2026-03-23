@@ -2,12 +2,12 @@ import React, { useState, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import { SearchService } from '@ten-second-tom/core';
-import type { AppConfig, Entry } from '@ten-second-tom/core';
+import type { AppConfig, Entry, ServiceContainer } from '@ten-second-tom/core';
 import { Prompt } from '../components/Prompt.js';
 import { InlineSearchResults } from '../components/InlineSearchResults.js';
 import { InlineEntryDetail } from '../components/InlineEntryDetail.js';
 import { COMMANDS, findCommand } from '../commands/registry.js';
-import type { AppContext } from '../commands/registry.js';
+import type { AppContext, HistoryEntry } from '../commands/registry.js';
 
 const DIVIDER = '───────────────────────────────────────';
 const VERSION = '2.0';
@@ -42,6 +42,61 @@ function configSummary(config: AppConfig, entryCount: number): string {
   return parts.join(' \u00B7 ');
 }
 
+// ---------------------------------------------------------------------------
+// Reindex logic
+// ---------------------------------------------------------------------------
+
+async function reindexEntries(
+  services: ServiceContainer,
+  pushHistory: (entry: HistoryEntry) => void,
+): Promise<void> {
+  const entries = await services.storage.listEntries({ limit: 100_000 });
+
+  if (entries.length === 0) {
+    pushHistory({
+      id: `reindex-empty-${Date.now()}`,
+      content: <Text dimColor>No entries to re-index.</Text>,
+    });
+    return;
+  }
+
+  const available = await services.embedding.isAvailable();
+  if (!available) {
+    pushHistory({
+      id: `reindex-unavailable-${Date.now()}`,
+      content: <Text color="yellow">Embedding service unavailable. Check Ollama is running.</Text>,
+    });
+    return;
+  }
+
+  pushHistory({
+    id: `reindex-start-${Date.now()}`,
+    content: <Text dimColor>Re-indexing {entries.length} entries...</Text>,
+  });
+
+  let updated = 0;
+  let failed = 0;
+  for (const entry of entries) {
+    try {
+      const embedding = await services.embedding.embed(entry.content);
+      await services.storage.updateEntryEmbedding(entry.id, embedding);
+      updated++;
+    } catch {
+      failed++;
+    }
+  }
+
+  pushHistory({
+    id: `reindex-done-${Date.now()}`,
+    content: (
+      <Text color="green">
+        ✓ Re-indexed {entries.length} entries ({updated} updated
+        {failed > 0 ? `, ${failed} failed` : ''})
+      </Text>
+    ),
+  });
+}
+
 export function HomeScreen({ context, config, entryCount }: HomeScreenProps) {
   const [searching, setSearching] = useState(false);
   const [lastSearchResults, setLastSearchResults] = useState<Entry[]>([]);
@@ -49,6 +104,24 @@ export function HomeScreen({ context, config, entryCount }: HomeScreenProps) {
   // ---- /command handler ----
   const handleCommand = useCallback(
     (name: string, args: string) => {
+      // Handle /reindex asynchronously — the registry stub exists only for discovery.
+      if (name === 'reindex') {
+        const svcs = context.services;
+        if (!svcs) {
+          context.pushHistory({
+            id: `reindex-err-${Date.now()}`,
+            content: (
+              <Text color="yellow">
+                Not configured. Run <Text color="green">/setup</Text> first.
+              </Text>
+            ),
+          });
+          return;
+        }
+        void reindexEntries(svcs, context.pushHistory);
+        return;
+      }
+
       const cmd = findCommand(name);
       if (cmd) {
         cmd.execute(args, context);

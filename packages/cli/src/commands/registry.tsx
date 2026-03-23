@@ -133,6 +133,14 @@ const setupCmd: TomCommand = {
   },
 };
 
+const reindexCmd: TomCommand = {
+  name: 'reindex',
+  description: 'Re-embed all entries for semantic search',
+  execute: (_args, _ctx) => {
+    // Handled asynchronously in HomeScreen — this stub exists for /help and tab-complete.
+  },
+};
+
 export const COMMANDS: TomCommand[] = [
   recordCmd,
   noteCmd,
@@ -140,6 +148,7 @@ export const COMMANDS: TomCommand[] = [
   listCmd,
   analyzeCmd,
   setupCmd,
+  reindexCmd,
   helpCommand,
   quitCommand,
 ];
