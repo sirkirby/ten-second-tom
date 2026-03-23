@@ -28,4 +28,10 @@ export {
   type ITranscriptionService,
   WhisperTranscriptionService,
 } from './services/transcription.js';
+export {
+  type ILiveTranscriptionService,
+  SherpaOnnxLiveTranscriptionService,
+  NoopLiveTranscriptionService,
+  type SherpaOnnxLiveTranscriptionConfig,
+} from './services/live-transcription.js';
 export { type ServiceContainer, buildServicesFromConfig } from './services/service-factory.js';

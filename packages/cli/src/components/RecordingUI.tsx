@@ -7,6 +7,8 @@ interface RecordingUIProps {
   phase: RecordingPhase;
   transcript: string;
   duration: number;
+  /** Whether the transcript shown during recording is a live draft (sherpa-onnx). */
+  isLivePreview?: boolean;
 }
 
 function formatDuration(seconds: number): string {
@@ -15,7 +17,7 @@ function formatDuration(seconds: number): string {
   return `${minutes}:${String(secs).padStart(2, '0')}`;
 }
 
-export function RecordingUI({ phase, transcript, duration }: RecordingUIProps) {
+export function RecordingUI({ phase, transcript, duration, isLivePreview }: RecordingUIProps) {
   if (phase === 'transcribing') {
     return (
       <Box flexDirection="column" gap={1}>
@@ -44,8 +46,15 @@ export function RecordingUI({ phase, transcript, duration }: RecordingUIProps) {
       </Box>
 
       {transcript.length > 0 && (
-        <Box paddingLeft={2} marginTop={1}>
-          <Text dimColor>{transcript}</Text>
+        <Box paddingLeft={2} marginTop={1} flexDirection="column">
+          {isLivePreview && (
+            <Text dimColor italic>
+              Live preview
+            </Text>
+          )}
+          <Text dimColor italic={isLivePreview}>
+            {transcript}
+          </Text>
         </Box>
       )}
 

@@ -132,9 +132,16 @@ function makeMockServices(
     loadModel: vi.fn(),
   };
 
+  const liveTranscription = {
+    start: vi.fn(),
+    stop: vi.fn(),
+    isAvailable: vi.fn().mockReturnValue(false),
+  };
+
   return {
     audio,
     transcription,
+    liveTranscription,
     agent,
     embedding,
     storage,

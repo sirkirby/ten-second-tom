@@ -78,6 +78,9 @@ importers:
       node-record-lpcm16:
         specifier: ^1.0.1
         version: 1.0.1
+      sherpa-onnx:
+        specifier: ^1.12.32
+        version: 1.12.32
       sqlite-vec:
         specifier: ^0.1.7
         version: 0.1.7
@@ -1509,6 +1512,9 @@ packages:
   shebang-regex@3.0.0:
     resolution: {integrity: sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==}
     engines: {node: '>=8'}
+
+  sherpa-onnx@1.12.32:
+    resolution: {integrity: sha512-Em9+9SoODdH25Dtf9IbbwXHGXY7CDdu7KH9jn//mSIteww2FlP85819k+shSNkIoliz81xmIufSsyA5LbT3Fkw==}
 
   siginfo@2.0.0:
     resolution: {integrity: sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g==}
@@ -3170,6 +3176,8 @@ snapshots:
       shebang-regex: 3.0.0
 
   shebang-regex@3.0.0: {}
+
+  sherpa-onnx@1.12.32: {}
 
   siginfo@2.0.0: {}
 

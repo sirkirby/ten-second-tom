@@ -32,12 +32,19 @@ vi.mock('@ten-second-tom/core', () => {
     OllamaEmbeddingService: mockOllamaEmbCtor,
     NoopEmbeddingService: mockNoopEmbCtor,
     SqliteStorageService: mockSqliteCtor,
+    SherpaOnnxLiveTranscriptionService: vi.fn(),
+    NoopLiveTranscriptionService: vi.fn(),
     buildServicesFromConfig: vi.fn(
       (config: Record<string, unknown>, configManager: Record<string, unknown>) => {
         const audio = new mockAudioServiceCtor({
           audioDir: (configManager as Record<string, unknown>)['audioPath'],
         });
         const transcription = new mockWhisperCtor();
+        const liveTranscription = {
+          start: vi.fn(),
+          stop: vi.fn(),
+          isAvailable: vi.fn(() => false),
+        };
         const agent = new mockTomAgentCtor((config as Record<string, unknown>)['llm']);
         const embeddingConfig = (config as Record<string, Record<string, unknown>>)['embedding'];
         const embedding =
@@ -50,7 +57,7 @@ vi.mock('@ten-second-tom/core', () => {
         const storage = new mockSqliteCtor(
           (config as Record<string, Record<string, unknown>>)['storage']['dbPath'],
         );
-        return { audio, transcription, agent, embedding, storage };
+        return { audio, transcription, liveTranscription, agent, embedding, storage };
       },
     ),
   };
@@ -89,6 +96,7 @@ import { ConfigManager, buildServicesFromConfig } from '@ten-second-tom/core';
 import type {
   IAudioService,
   ITranscriptionService,
+  ILiveTranscriptionService,
   IEmbeddingService,
   IAgentService,
   IStorageService,
@@ -158,6 +166,12 @@ function makeMockServices(
     loadModel: vi.fn().mockResolvedValue(undefined),
   };
 
+  const liveTranscription: ILiveTranscriptionService = {
+    start: vi.fn(),
+    stop: vi.fn(),
+    isAvailable: vi.fn().mockReturnValue(false),
+  };
+
   const agent = {
     analyze: vi.fn().mockResolvedValue(makeAnalysis()),
   } as IAgentService;
@@ -167,7 +181,7 @@ function makeMockServices(
     isAvailable: vi.fn().mockResolvedValue(true),
   };
 
-  return { audio, transcription, agent, embedding, storage, ...overrides };
+  return { audio, transcription, liveTranscription, agent, embedding, storage, ...overrides };
 }
 
 // ---------------------------------------------------------------------------

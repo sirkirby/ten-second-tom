@@ -30,3 +30,15 @@ export const WHISPER_MODEL_FILENAME = 'ggml-distil-small.en.bin';
 export const LIVE_TRANSCRIPTION_CHUNK_SEC = 5;
 export const LIVE_TRANSCRIPTION_CHUNK_BYTES =
   LIVE_TRANSCRIPTION_CHUNK_SEC * AUDIO_SAMPLE_RATE * (AUDIO_BITS_PER_SAMPLE / 8) * AUDIO_CHANNELS;
+
+// sherpa-onnx streaming model (used for live preview during recording)
+// Model: sherpa-onnx-streaming-zipformer-en-2023-06-26 (int8 quantized)
+// Download URL: https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-2023-06-26.tar.bz2
+export const SHERPA_ONNX_MODEL_DIR = 'sherpa-onnx-streaming-zipformer-en-2023-06-26';
+export const SHERPA_ONNX_ENCODER_FILENAME = 'encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx';
+export const SHERPA_ONNX_DECODER_FILENAME = 'decoder-epoch-99-avg-1-chunk-16-left-128.onnx';
+export const SHERPA_ONNX_JOINER_FILENAME = 'joiner-epoch-99-avg-1-chunk-16-left-128.int8.onnx';
+export const SHERPA_ONNX_TOKENS_FILENAME = 'tokens.txt';
+
+// Interval (ms) between polling the sherpa-onnx recognizer for new results
+export const SHERPA_ONNX_POLL_INTERVAL_MS = 100;

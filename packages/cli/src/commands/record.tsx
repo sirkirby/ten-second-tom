@@ -135,6 +135,7 @@ function RecordCommand() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [services, setServices] = useState<ServiceContainer | null>(null);
+  const [isLivePreview, setIsLivePreview] = useState(false);
 
   // Ref to hold the audioPath base directory for file-based transcription
   const audioBaseDirRef = useRef<string>('');
@@ -211,6 +212,20 @@ function RecordCommand() {
           return;
         }
 
+        // Start live transcription (sherpa-onnx) if available — this provides
+        // a draft transcript for display during recording. The final transcript
+        // is produced by Whisper batch after recording stops.
+        if (svcs.liveTranscription.isAvailable()) {
+          try {
+            svcs.liveTranscription.start(svcs.audio.getAudioStream(), (text) => {
+              setTranscript(text);
+              setIsLivePreview(true);
+            });
+          } catch {
+            // Live transcription is optional — continue without it
+          }
+        }
+
         // Clear any native whisper.cpp stderr output that leaked during model
         // loading (belt-and-suspenders alongside toggleNativeLog(false) in the
         // transcription service).  This resets the terminal so the recording UI
@@ -248,14 +263,16 @@ function RecordCommand() {
     if (!services || phase !== 'recording') return;
 
     try {
+      // Stop live transcription (sherpa-onnx) — no longer need the draft
+      services.liveTranscription.stop();
+
       // Stop the audio recorder — writes the WAV file to disk.
       const audioRelPath = await services.audio.stopRecording();
 
-      // Batch-transcribe the complete WAV file. This produces much more
-      // reliable output than the chunked live approach, which transcribes
-      // each ~5-second segment in isolation and produces garbled text with
-      // "[." artifacts from whisper's confusion markers.
+      // Batch-transcribe the complete WAV file via Whisper. This produces
+      // high-quality archival output that replaces the sherpa-onnx live draft.
       setPhase('transcribing');
+      setIsLivePreview(false);
       let finalTranscript = '';
 
       if (audioRelPath) {
@@ -288,6 +305,7 @@ function RecordCommand() {
   async function cancel() {
     if (!services || phase !== 'recording') return;
     try {
+      services.liveTranscription.stop();
       await services.audio.stopRecording();
       services.storage.close();
     } catch {
@@ -336,7 +354,14 @@ function RecordCommand() {
   }
 
   if (phase === 'recording') {
-    return <RecordingUI phase="recording" transcript="" duration={duration} />;
+    return (
+      <RecordingUI
+        phase="recording"
+        transcript={transcript}
+        duration={duration}
+        isLivePreview={isLivePreview}
+      />
+    );
   }
 
   if (phase === 'transcribing') {

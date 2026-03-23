@@ -79,4 +79,7 @@ declare module '@fugood/whisper.node' {
     options: NativeContextOptions,
     variant?: LibVariant,
   ): Promise<WhisperContext>;
+
+  /** Toggle native ggml/whisper.cpp log output. Call with `false` before initWhisper to suppress. */
+  export function toggleNativeLog(enabled: boolean): Promise<void>;
 }
