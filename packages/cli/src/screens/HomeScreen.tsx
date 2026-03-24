@@ -235,6 +235,7 @@ export function HomeScreen({ context, config, entryCount }: HomeScreenProps) {
           onCommand={handleCommand}
           onSearch={(query) => void handleSearch(query)}
           onExpandResult={handleExpandResult}
+          hasSearchResults={lastSearchResults.length > 0}
         />
       )}
     </Box>

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import type { TomCommand } from '../commands/registry.js';
@@ -8,6 +8,7 @@ interface PromptProps {
   onCommand: (name: string, args: string) => void;
   onSearch: (query: string) => void;
   onExpandResult: (index: number) => void;
+  hasSearchResults?: boolean;
 }
 
 /**
@@ -19,8 +20,19 @@ interface PromptProps {
  * - free text → onSearch(text)
  *
  * Tab completes `/` commands: `/re` → `/record`.
+ *
+ * Shows contextual hints below the input:
+ * - Empty input: "Type to search · / for commands"
+ * - Input starts with `/`: filtered list of matching commands
+ * - Has search results: "Type a number to expand · Type to search · / for commands"
  */
-export function Prompt({ commands, onCommand, onSearch, onExpandResult }: PromptProps) {
+export function Prompt({
+  commands,
+  onCommand,
+  onSearch,
+  onExpandResult,
+  hasSearchResults,
+}: PromptProps) {
   const [value, setValue] = useState('');
 
   const handleSubmit = useCallback(
@@ -63,10 +75,19 @@ export function Prompt({ commands, onCommand, onSearch, onExpandResult }: Prompt
     }
   });
 
-  const commandHints = commands
-    .filter((c) => c.name !== 'quit' && c.name !== 'help')
-    .map((c) => '/' + c.name)
-    .join(' \u00B7 ');
+  // Compute filtered command suggestions when input starts with /
+  const commandSuggestions = useMemo(() => {
+    const trimmed = value.trim();
+    if (!trimmed.startsWith('/')) return [];
+
+    const partial = trimmed.slice(1).toLowerCase();
+    if (!partial) return commands; // Show all commands when just "/" is typed
+
+    return commands.filter((c) => c.name.startsWith(partial));
+  }, [value, commands]);
+
+  const isSlashInput = value.trim().startsWith('/');
+  const isEmpty = !value;
 
   return (
     <Box flexDirection="column">
@@ -76,13 +97,30 @@ export function Prompt({ commands, onCommand, onSearch, onExpandResult }: Prompt
         </Text>
         <TextInput value={value} onChange={setValue} onSubmit={handleSubmit} />
       </Box>
-      {!value && (
-        <Box paddingLeft={6}>
-          <Text dimColor>
-            {commandHints}
-            {' \u00B7 '}
-            /help {'  \u2014  '}or just type to search
-          </Text>
+      {isEmpty && !hasSearchResults && (
+        <Box paddingLeft={2}>
+          <Text dimColor>Type to search</Text>
+          <Text dimColor> {'\u00B7'} </Text>
+          <Text dimColor>/ for commands</Text>
+        </Box>
+      )}
+      {isEmpty && hasSearchResults && (
+        <Box paddingLeft={2}>
+          <Text dimColor>Type a number to expand</Text>
+          <Text dimColor> {'\u00B7'} </Text>
+          <Text dimColor>Type to search</Text>
+          <Text dimColor> {'\u00B7'} </Text>
+          <Text dimColor>/ for commands</Text>
+        </Box>
+      )}
+      {isSlashInput && commandSuggestions.length > 0 && (
+        <Box flexDirection="column" paddingLeft={2}>
+          {commandSuggestions.map((c) => (
+            <Box key={c.name}>
+              <Text color="green">{'/' + c.name.padEnd(12)}</Text>
+              <Text dimColor>{c.description}</Text>
+            </Box>
+          ))}
         </Box>
       )}
     </Box>
