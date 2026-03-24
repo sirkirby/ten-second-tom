@@ -955,7 +955,14 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
             </Box>
           )}
           <Box marginTop={1}>
-            <SelectInput items={annotatedOllamaModelItems} onSelect={handleLocalModelSelect} />
+            <SelectInput
+              items={annotatedOllamaModelItems}
+              initialIndex={Math.max(
+                0,
+                annotatedOllamaModelItems.findIndex((i) => i.value === state.localModelId),
+              )}
+              onSelect={handleLocalModelSelect}
+            />
           </Box>
           {onComplete && <Text dimColor>Esc to cancel</Text>}
         </Box>
@@ -1003,6 +1010,10 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
             <Box marginTop={1}>
               <SelectInput
                 items={annotatedEmbeddingModelItems}
+                initialIndex={Math.max(
+                  0,
+                  annotatedEmbeddingModelItems.findIndex((i) => i.value === state.embeddingModel),
+                )}
                 onSelect={handleEmbeddingModelSelect}
               />
             </Box>
@@ -1033,7 +1044,16 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
             </Text>
           </Box>
           <Box marginTop={1}>
-            <SelectInput items={annotatedWhisperModelItems} onSelect={handleWhisperModelSelect} />
+            <SelectInput
+              items={annotatedWhisperModelItems}
+              initialIndex={Math.max(
+                0,
+                annotatedWhisperModelItems.findIndex(
+                  (i) => i.value === (state.currentWhisperModelId ?? ''),
+                ),
+              )}
+              onSelect={handleWhisperModelSelect}
+            />
           </Box>
           {onComplete && <Text dimColor>Esc to cancel</Text>}
         </Box>
