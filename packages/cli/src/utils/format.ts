@@ -2,6 +2,19 @@
  * Shared formatting utilities used across CLI screens and components.
  */
 
+const RELEVANCE_FILLED = '\u2588'; // █
+const RELEVANCE_EMPTY = '\u2591'; // ░
+const RELEVANCE_BAR_WIDTH = 5;
+
+/**
+ * Render a relevance bar like "████░" (5 chars wide).
+ * @param relevance 0-1 scale, higher = more relevant
+ */
+export function relevanceBar(relevance: number): string {
+  const filled = Math.round(relevance * RELEVANCE_BAR_WIDTH);
+  return RELEVANCE_FILLED.repeat(filled) + RELEVANCE_EMPTY.repeat(RELEVANCE_BAR_WIDTH - filled);
+}
+
 /**
  * Format an ISO date string as "Mon DD" (e.g. "Mar 22").
  */

@@ -11,6 +11,7 @@ import {
   getExcerpt,
   formatConfidence,
   toErrorMessage,
+  relevanceBar,
 } from '../utils/format.js';
 import { BORDER_CHAR } from '../constants.js';
 import type { AppContext } from '../commands/registry.js';
@@ -251,18 +252,22 @@ export function SearchScreen({ context, initialQuery, onClose }: SearchScreenPro
         <Box flexDirection="column">
           {results.map(({ entry, relevance }, index) => {
             const isSelected = index === selectedIndex;
-            const score = entry.analysis?.sentiment.score ?? 0;
+            const score = entry.analysis?.sentiment?.score ?? 0;
             const borderColor = getSentimentColor(score);
             const dateStr = formatShortDate(entry.createdAt);
-            const scoreStr = entry.analysis ? formatScore(score) : '     ';
-            const relPct = `${Math.round(relevance * 100)}%`.padStart(4);
+            const relBar = relevanceBar(relevance);
             const excerpt = getExcerpt(entry.content);
 
             return (
               <Box key={entry.id} paddingLeft={2}>
                 <Text color={borderColor}>{BORDER_CHAR} </Text>
                 <Text bold={isSelected} inverse={isSelected}>
-                  {dateStr.padEnd(7)} {relPct} {scoreStr.padEnd(6)} {excerpt}
+                  {dateStr.padEnd(7)}
+                </Text>
+                <Text color="cyan"> {relBar} </Text>
+                <Text bold={isSelected} inverse={isSelected}>
+                  {' '}
+                  {excerpt}
                 </Text>
               </Box>
             );
