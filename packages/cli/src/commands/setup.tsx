@@ -17,7 +17,7 @@ import {
   DEFAULT_OLLAMA_ENDPOINT,
   DEFAULT_LOCAL_MODEL_ID,
   DEFAULT_OLLAMA_EMBEDDING_MODEL,
-  DEFAULT_CLOUD_EMBEDDING_MODEL,
+  DEFAULT_OPENROUTER_EMBEDDING_MODEL,
   ANTHROPIC_API_KEY_PREFIX,
   WHISPER_MODELS,
   getDefaultWhisperModel,
@@ -45,6 +45,10 @@ type Step =
   | 'embedding-provider'
   | 'embedding-model-loading'
   | 'embedding-model'
+  | 'embedding-openrouter-key'
+  | 'embedding-openrouter-model'
+  | 'embedding-custom-endpoint'
+  | 'embedding-custom-model'
   | 'whisper-model'
   | 'whisper-download'
   | 'sherpa-model'
@@ -58,8 +62,10 @@ interface WizardState {
   apiKey: string;
   localEndpoint: string;
   localModelId: string;
-  embeddingProvider: 'ollama' | 'cloud' | 'none' | null;
+  embeddingProvider: 'ollama' | 'openrouter' | 'custom' | 'none' | null;
   embeddingModel: string;
+  embeddingApiKey: string;
+  embeddingEndpoint: string;
   selectedWhisperModel: WhisperModel | null;
   selectedSherpaModel: SherpaModel | null;
   errorMessage: string;
@@ -170,8 +176,9 @@ export async function fetchOllamaModels(
 }
 
 const embeddingProviderItems = [
-  { label: 'Ollama (local vectors, recommended)', value: 'ollama' as const },
-  { label: 'Cloud (Voyage AI)', value: 'cloud' as const },
+  { label: 'OpenRouter (cloud, recommended)', value: 'openrouter' as const },
+  { label: 'Custom local (LM Studio, llama.cpp)', value: 'custom' as const },
+  { label: 'Ollama (local)', value: 'ollama' as const },
   { label: 'None (keyword search only)', value: 'none' as const },
 ];
 
@@ -305,6 +312,8 @@ function deriveInitialState(cm: ConfigManager): { initial: WizardState; hasExist
         localModelId: DEFAULT_LOCAL_MODEL_ID,
         embeddingProvider: null,
         embeddingModel: DEFAULT_OLLAMA_EMBEDDING_MODEL,
+        embeddingApiKey: '',
+        embeddingEndpoint: '',
         selectedWhisperModel: null,
         selectedSherpaModel: null,
         errorMessage: '',
@@ -332,6 +341,8 @@ function deriveInitialState(cm: ConfigManager): { initial: WizardState; hasExist
         existing.embedding.provider !== 'none'
           ? existing.embedding.model
           : DEFAULT_OLLAMA_EMBEDDING_MODEL,
+      embeddingApiKey: existing.embedding.provider === 'openrouter' ? existing.embedding.apiKey : '',
+      embeddingEndpoint: existing.embedding.provider === 'custom' ? existing.embedding.endpoint : '',
       selectedWhisperModel: null,
       selectedSherpaModel: null,
       errorMessage: '',
@@ -594,13 +605,45 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
     setStep('whisper-model');
   }
 
-  function handleEmbeddingProviderSelect(item: { value: 'ollama' | 'cloud' | 'none' }) {
+  function handleEmbeddingProviderSelect(item: { value: 'ollama' | 'openrouter' | 'custom' | 'none' }) {
     setState((s) => ({ ...s, embeddingProvider: item.value }));
     if (item.value === 'ollama') {
       setStep('embedding-model-loading');
+    } else if (item.value === 'openrouter') {
+      setStep('embedding-openrouter-key');
+    } else if (item.value === 'custom') {
+      setStep('embedding-custom-endpoint');
     } else {
       setStep('whisper-model');
     }
+  }
+
+  function handleOpenRouterKeySubmit(value: string) {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) return;
+    setState((s) => ({ ...s, embeddingApiKey: trimmed }));
+    setStep('embedding-openrouter-model');
+  }
+
+  function handleOpenRouterModelSubmit(value: string) {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) return;
+    setState((s) => ({ ...s, embeddingModel: trimmed }));
+    setStep('whisper-model');
+  }
+
+  function handleCustomEndpointSubmit(value: string) {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) return;
+    setState((s) => ({ ...s, embeddingEndpoint: trimmed }));
+    setStep('embedding-custom-model');
+  }
+
+  function handleCustomModelSubmit(value: string) {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) return;
+    setState((s) => ({ ...s, embeddingModel: trimmed }));
+    setStep('whisper-model');
   }
 
   // ---------------------------------------------------------------------------
@@ -826,14 +869,20 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
 
     const embedding: EmbeddingConfig =
       state.embeddingProvider === 'ollama'
-        ? {
-            provider: 'ollama',
-            model: state.embeddingModel,
-            endpoint: ollamaEndpoint,
-          }
-        : state.embeddingProvider === 'cloud'
-          ? { provider: 'cloud', model: DEFAULT_CLOUD_EMBEDDING_MODEL }
-          : { provider: 'none', model: '' };
+        ? { provider: 'ollama', model: state.embeddingModel, endpoint: ollamaEndpoint }
+        : state.embeddingProvider === 'openrouter'
+          ? {
+              provider: 'openrouter',
+              model: state.embeddingModel || DEFAULT_OPENROUTER_EMBEDDING_MODEL,
+              apiKey: state.embeddingApiKey,
+            }
+          : state.embeddingProvider === 'custom'
+            ? {
+                provider: 'custom',
+                model: state.embeddingModel,
+                endpoint: state.embeddingEndpoint,
+              }
+            : { provider: 'none', model: '' };
 
     const config: AppConfig = {
       llm,
@@ -1037,6 +1086,53 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
             </Box>
           )}
           {onComplete && <Text dimColor>Esc to cancel</Text>}
+        </Box>
+      )}
+
+      {step === 'embedding-openrouter-key' && (
+        <Box flexDirection="column">
+          <Text>Step 2 of {TOTAL_STEPS}: Enter your OpenRouter API key</Text>
+          <Text dimColor>Get one at https://openrouter.ai/keys</Text>
+          <Box marginTop={1}>
+            <Text>API key: </Text>
+            <TextInput value={state.embeddingApiKey} onChange={(v) => setState((s) => ({ ...s, embeddingApiKey: v }))} onSubmit={handleOpenRouterKeySubmit} mask="*" />
+          </Box>
+        </Box>
+      )}
+
+      {step === 'embedding-openrouter-model' && (
+        <Box flexDirection="column">
+          <Text>Step 2 of {TOTAL_STEPS}: Enter embedding model</Text>
+          <Text dimColor>Default: {DEFAULT_OPENROUTER_EMBEDDING_MODEL}</Text>
+          <Box marginTop={1}>
+            <Text>Model: </Text>
+            <TextInput
+              value={state.embeddingModel || DEFAULT_OPENROUTER_EMBEDDING_MODEL}
+              onChange={(v) => setState((s) => ({ ...s, embeddingModel: v }))}
+              onSubmit={handleOpenRouterModelSubmit}
+            />
+          </Box>
+        </Box>
+      )}
+
+      {step === 'embedding-custom-endpoint' && (
+        <Box flexDirection="column">
+          <Text>Step 2 of {TOTAL_STEPS}: Enter embedding server URL</Text>
+          <Text dimColor>e.g., http://localhost:1234/v1</Text>
+          <Box marginTop={1}>
+            <Text>Endpoint: </Text>
+            <TextInput value={state.embeddingEndpoint} onChange={(v) => setState((s) => ({ ...s, embeddingEndpoint: v }))} onSubmit={handleCustomEndpointSubmit} />
+          </Box>
+        </Box>
+      )}
+
+      {step === 'embedding-custom-model' && (
+        <Box flexDirection="column">
+          <Text>Step 2 of {TOTAL_STEPS}: Enter embedding model name</Text>
+          <Box marginTop={1}>
+            <Text>Model: </Text>
+            <TextInput value={state.embeddingModel} onChange={(v) => setState((s) => ({ ...s, embeddingModel: v }))} onSubmit={handleCustomModelSubmit} />
+          </Box>
         </Box>
       )}
 

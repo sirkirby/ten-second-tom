@@ -31,7 +31,7 @@ vi.mock('@ten-second-tom/core', () => ({
   DEFAULT_OLLAMA_ENDPOINT: 'http://localhost:11434',
   DEFAULT_LOCAL_MODEL_ID: 'qwen2.5:7b',
   DEFAULT_OLLAMA_EMBEDDING_MODEL: 'nomic-embed-text',
-  DEFAULT_CLOUD_EMBEDDING_MODEL: 'voyage-3-lite',
+  DEFAULT_OPENROUTER_EMBEDDING_MODEL: 'openai/text-embedding-3-small',
   ANTHROPIC_API_KEY_PREFIX: 'sk-ant-',
   // Model registries
   WHISPER_MODELS: [

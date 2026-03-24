@@ -92,7 +92,11 @@ export class OpenAICompatibleEmbeddingService implements IEmbeddingService {
     const data = (await response.json()) as {
       data: Array<{ embedding: number[]; index: number }>;
     };
-    return new Float32Array(data.data[0].embedding);
+    const first = data.data[0];
+    if (!first) {
+      throw new Error('Embedding response contained no data');
+    }
+    return new Float32Array(first.embedding);
   }
 
   async isAvailable(): Promise<boolean> {
