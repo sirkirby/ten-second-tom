@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Static, Text, useApp, useInput } from 'ink';
-import { buildServicesFromConfig } from '@ten-second-tom/core';
-import type { AppConfig, ServiceContainer, ConfigManager } from '@ten-second-tom/core';
+import { buildServicesFromConfig } from 'ten-second-tom-core';
+import type { AppConfig, ServiceContainer, ConfigManager } from 'ten-second-tom-core';
 import { checkSetupComplete } from './hooks/useSetupGuard.js';
 import { useAutoExit } from './hooks/useAutoExit.js';
 import { HomeScreen } from './screens/HomeScreen.js';

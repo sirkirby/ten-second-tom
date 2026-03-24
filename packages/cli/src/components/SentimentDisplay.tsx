@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import type { EntryAnalysis } from '@ten-second-tom/core';
+import type { EntryAnalysis } from 'ten-second-tom-core';
 import { getSentimentColor, formatScore } from '../utils/sentiment.js';
 import { formatConfidence } from '../utils/format.js';
 

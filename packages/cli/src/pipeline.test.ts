@@ -4,8 +4,8 @@ import { describe, it, expect, vi } from 'vitest';
 // We test the exported pipeline helpers directly (no Ink rendering needed).
 // ---------------------------------------------------------------------------
 
-// Mock @ten-second-tom/core before importing the module under test
-vi.mock('@ten-second-tom/core', () => ({
+// Mock ten-second-tom-core before importing the module under test
+vi.mock('ten-second-tom-core', () => ({
   // Only the type re-exports are needed; the pipeline function itself
   // doesn't call any core constructors — it receives services as an arg.
 }));
@@ -20,7 +20,7 @@ import type {
   ILiveTranscriptionService,
   EntryAnalysis,
   ServiceContainer,
-} from '@ten-second-tom/core';
+} from 'ten-second-tom-core';
 
 import { runAnalysisPipeline } from './pipeline.js';
 

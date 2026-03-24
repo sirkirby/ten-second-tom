@@ -1,5 +1,5 @@
 {
-  "name": "@ten-second-tom/core",
+  "name": "ten-second-tom-core",
   "version": "2.0.0",
   "type": "module",
   "main": "./dist/index.js",

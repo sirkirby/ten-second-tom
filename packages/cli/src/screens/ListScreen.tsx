@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
-import type { Entry } from '@ten-second-tom/core';
+import type { Entry } from 'ten-second-tom-core';
 import { TranscriptBox } from '../components/TranscriptBox.js';
 import { getSentimentColor, formatScore } from '../utils/sentiment.js';
 import {

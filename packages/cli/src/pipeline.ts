@@ -1,4 +1,4 @@
-import type { EntryAnalysis, ServiceContainer } from '@ten-second-tom/core';
+import type { EntryAnalysis, ServiceContainer } from 'ten-second-tom-core';
 
 // ---------------------------------------------------------------------------
 // Pipeline types & orchestration (extracted from record.tsx for shared use)

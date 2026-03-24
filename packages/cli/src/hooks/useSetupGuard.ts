@@ -1,5 +1,5 @@
-import { ConfigManager } from '@ten-second-tom/core';
-import type { AppConfig } from '@ten-second-tom/core';
+import { ConfigManager } from 'ten-second-tom-core';
+import type { AppConfig } from 'ten-second-tom-core';
 
 const SETUP_REQUIRED_MESSAGE = 'Tom is not configured. Run `tom setup` first.';
 

@@ -20,7 +20,7 @@ vi.mock('react', () => ({
 vi.mock('ink-select-input', () => ({ default: vi.fn() }));
 vi.mock('ink-text-input', () => ({ default: vi.fn() }));
 vi.mock('../../hooks/useAutoExit.js', () => ({ useAutoExit: vi.fn() }));
-vi.mock('@ten-second-tom/core', () => ({
+vi.mock('ten-second-tom-core', () => ({
   ConfigManager: vi.fn().mockImplementation(() => ({
     homePath: '/tmp/test',
     modelsPath: '/tmp/test/models',

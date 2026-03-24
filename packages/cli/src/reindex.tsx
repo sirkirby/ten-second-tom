@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text } from 'ink';
-import type { ServiceContainer } from '@ten-second-tom/core';
+import type { ServiceContainer } from 'ten-second-tom-core';
 import type { HistoryEntry } from './commands/registry.js';
 
 /**

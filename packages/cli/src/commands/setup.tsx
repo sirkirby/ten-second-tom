@@ -12,7 +12,7 @@ import {
   statSync,
 } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { ConfigManager } from '@ten-second-tom/core';
+import { ConfigManager } from 'ten-second-tom-core';
 import {
   DEFAULT_OLLAMA_ENDPOINT,
   DEFAULT_LOCAL_MODEL_ID,
@@ -22,14 +22,14 @@ import {
   WHISPER_MODELS,
   getDefaultWhisperModel,
   SHERPA_MODELS,
-} from '@ten-second-tom/core';
+} from 'ten-second-tom-core';
 import type {
   AppConfig,
   LlmConfig,
   EmbeddingConfig,
   WhisperModel,
   SherpaModel,
-} from '@ten-second-tom/core';
+} from 'ten-second-tom-core';
 import { useAutoExit } from '../hooks/useAutoExit.js';
 import { toErrorMessage } from '../utils/format.js';
 import { EXIT_HINT_TEXT, OLLAMA_FETCH_TIMEOUT_MS } from '../constants.js';

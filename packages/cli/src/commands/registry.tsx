@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import type { ServiceContainer, ConfigManager } from '@ten-second-tom/core';
+import type { ServiceContainer, ConfigManager } from 'ten-second-tom-core';
 import { reindexEntries } from '../reindex.js';
 
 // ---------------------------------------------------------------------------

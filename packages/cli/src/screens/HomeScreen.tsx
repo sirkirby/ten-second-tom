@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { Box, Text } from 'ink';
-import type { AppConfig } from '@ten-second-tom/core';
+import type { AppConfig } from 'ten-second-tom-core';
 import { Prompt } from '../components/Prompt.js';
 import { APP_VERSION } from '../constants.js';
 import { COMMANDS, findCommand } from '../commands/registry.js';

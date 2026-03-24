@@ -8,8 +8,8 @@ import {
   checkAudioPrerequisites,
   buildServicesFromConfig,
   getMicrophonePermissionHint,
-} from '@ten-second-tom/core';
-import type { ServiceContainer } from '@ten-second-tom/core';
+} from 'ten-second-tom-core';
+import type { ServiceContainer } from 'ten-second-tom-core';
 import { checkSetupComplete } from '../hooks/useSetupGuard.js';
 import { useAutoExit } from '../hooks/useAutoExit.js';
 import { ErrorDisplay } from '../components/ErrorDisplay.js';
