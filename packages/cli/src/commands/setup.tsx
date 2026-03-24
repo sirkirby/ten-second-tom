@@ -81,8 +81,8 @@ const INITIAL_DOWNLOAD_PROGRESS: DownloadProgress = {
 };
 
 const llmProviderItems = [
-  { label: 'Cloud (Claude via Anthropic API)', value: 'cloud' as const },
-  { label: 'Local (Ollama / LM Studio)', value: 'local' as const },
+  { label: 'Local (Ollama / LM Studio) — runs on your machine', value: 'local' as const },
+  { label: 'Claude (Anthropic) — cloud, requires API key', value: 'cloud' as const },
 ];
 
 const FALLBACK_MODEL_ITEMS = [
