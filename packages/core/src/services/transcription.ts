@@ -117,14 +117,6 @@ export class WhisperTranscriptionService implements ITranscriptionService {
   }
 
   /**
-   * Ensure native logging stays suppressed. Called defensively before each
-   * transcription call in case something resets the native log callback.
-   */
-  private async suppressNativeLog(): Promise<void> {
-    await toggleNativeLog(false);
-  }
-
-  /**
    * Transcribes a complete WAV audio file (batch mode).
    *
    * @param audioPath - Absolute path to the WAV file (16kHz, mono, 16-bit PCM)
@@ -136,7 +128,6 @@ export class WhisperTranscriptionService implements ITranscriptionService {
       throw new Error('Model not loaded — call loadModel() first');
     }
 
-    await this.suppressNativeLog();
     const { promise } = this.context.transcribeFile(audioPath, DEFAULT_TRANSCRIBE_OPTIONS);
     const result = await promise;
     return extractTranscript(result);
@@ -175,7 +166,6 @@ export class WhisperTranscriptionService implements ITranscriptionService {
     const combined = Buffer.concat(chunks);
     const audioBuffer = pcmBufferToArrayBuffer(combined);
 
-    await this.suppressNativeLog();
     const { promise } = this.context.transcribeData(audioBuffer, {
       ...DEFAULT_TRANSCRIBE_OPTIONS,
       onNewSegments: (segmentResult) => {
@@ -227,7 +217,6 @@ export class WhisperTranscriptionService implements ITranscriptionService {
     const transcribeChunk = async (pcmData: Buffer): Promise<void> => {
       if (this.context === null) return;
 
-      await this.suppressNativeLog();
       const audioBuffer = pcmBufferToArrayBuffer(pcmData);
       const { promise } = this.context.transcribeData(audioBuffer, {
         ...DEFAULT_TRANSCRIBE_OPTIONS,
@@ -295,7 +284,6 @@ export class WhisperTranscriptionService implements ITranscriptionService {
       await (async () => {
         if (this.context === null) return;
 
-        await this.suppressNativeLog();
         const audioBuffer = pcmBufferToArrayBuffer(pcmData);
         const { promise } = this.context.transcribeData(audioBuffer, {
           ...DEFAULT_TRANSCRIBE_OPTIONS,

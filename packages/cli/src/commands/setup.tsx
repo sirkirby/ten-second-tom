@@ -429,7 +429,6 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
 
   const annotatedSherpaModelItems = useMemo(() => {
     if (!state.isReconfiguring) return sherpaModelItems;
-    const configManager = new ConfigManager();
     return sherpaModelItems.map((item) => {
       // Check if this model's directory exists on disk
       if (item.value !== 'skip' && existsSync(join(configManager.modelsPath, item.value))) {
@@ -437,7 +436,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
       }
       return item;
     });
-  }, [sherpaModelItems, state.isReconfiguring]);
+  }, [sherpaModelItems, state.isReconfiguring, configManager]);
 
   // Auto-exit after error with a short delay; allow q/Enter to exit immediately.
   // Disabled in REPL mode (onComplete provided) — the REPL manages its own lifecycle.

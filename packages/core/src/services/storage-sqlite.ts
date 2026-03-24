@@ -86,6 +86,7 @@ export class SqliteStorageService implements IStorageService {
   private readonly stmtInsertEmbedding: Database.Statement;
   private readonly stmtCountEntries: Database.Statement;
   private readonly stmtSearchVector: Database.Statement;
+  private readonly txnUpsertEmbedding: (id: string, buffer: Buffer) => void;
 
   constructor(dbPath: string, embeddingDimension: number = DEFAULT_EMBEDDING_DIMENSION) {
     this.db = new Database(dbPath);
@@ -142,6 +143,12 @@ export class SqliteStorageService implements IStorageService {
        AND k = ?
        ORDER BY distance`,
     );
+
+    // Pre-prepare the embedding upsert transaction (DELETE + INSERT)
+    this.txnUpsertEmbedding = this.db.transaction((id: string, buffer: Buffer) => {
+      this.stmtDeleteEmbedding.run(id);
+      this.stmtInsertEmbedding.run(id, buffer);
+    });
   }
 
   /**
@@ -229,12 +236,8 @@ export class SqliteStorageService implements IStorageService {
     // sqlite-vec expects the raw float bytes as a Buffer/Uint8Array
     const buffer = Buffer.from(embedding.buffer, embedding.byteOffset, embedding.byteLength);
 
-    // vec0 does not support INSERT OR REPLACE — use DELETE + INSERT in a transaction
-    const upsert = this.db.transaction(() => {
-      this.stmtDeleteEmbedding.run(id);
-      this.stmtInsertEmbedding.run(id, buffer);
-    });
-    upsert();
+    // vec0 does not support INSERT OR REPLACE — use pre-prepared DELETE + INSERT transaction
+    this.txnUpsertEmbedding(id, buffer);
   }
 
   async searchByKeyword(query: string, limit: number = 20): Promise<Entry[]> {

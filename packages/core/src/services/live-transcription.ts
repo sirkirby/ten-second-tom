@@ -135,6 +135,7 @@ export interface SherpaOnnxLiveTranscriptionConfig {
 export class SherpaOnnxLiveTranscriptionService implements ILiveTranscriptionService {
   private readonly modelsPath: string;
   private readonly createRecognizerFn: CreateRecognizerFn;
+  private readonly available: boolean;
   private recognizer: SherpaOnnxOnlineRecognizer | null = null;
   private stream: SherpaOnnxOnlineStream | null = null;
   private dataListener: ((chunk: Buffer) => void) | null = null;
@@ -145,16 +146,18 @@ export class SherpaOnnxLiveTranscriptionService implements ILiveTranscriptionSer
   constructor(config: SherpaOnnxLiveTranscriptionConfig) {
     this.modelsPath = config.modelsPath;
     this.createRecognizerFn = config.createRecognizer ?? defaultCreateRecognizer;
-  }
 
-  isAvailable(): boolean {
+    // Check filesystem once at construction time and cache the result
     const modelDir = join(this.modelsPath, SHERPA_ONNX_MODEL_DIR);
-    return (
+    this.available =
       existsSync(join(modelDir, SHERPA_ONNX_ENCODER_FILENAME)) &&
       existsSync(join(modelDir, SHERPA_ONNX_DECODER_FILENAME)) &&
       existsSync(join(modelDir, SHERPA_ONNX_JOINER_FILENAME)) &&
-      existsSync(join(modelDir, SHERPA_ONNX_TOKENS_FILENAME))
-    );
+      existsSync(join(modelDir, SHERPA_ONNX_TOKENS_FILENAME));
+  }
+
+  isAvailable(): boolean {
+    return this.available;
   }
 
   start(audioStream: Readable, onText: (text: string) => void): void {
