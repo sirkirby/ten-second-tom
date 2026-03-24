@@ -14,10 +14,10 @@ import {
   NoopLiveTranscriptionService,
 } from './live-transcription.js';
 import { TomAgent } from '../agent/tom-agent.js';
-import { OllamaEmbeddingService, NoopEmbeddingService } from './embedding.js';
+import { OllamaEmbeddingService, NoopEmbeddingService, OpenAICompatibleEmbeddingService } from './embedding.js';
 import { SqliteStorageService } from './storage-sqlite.js';
 import { SearchService } from './search.js';
-import { getEmbeddingDimension } from '../constants.js';
+import { getEmbeddingDimension, OPENROUTER_BASE_URL } from '../constants.js';
 
 export interface ServiceContainer {
   audio: IAudioService;
@@ -57,10 +57,18 @@ export function buildServicesFromConfig(
           model: config.embedding.model,
           endpoint: config.embedding.endpoint,
         })
-      : config.embedding.provider === 'cloud'
-        ? // Cloud embedding not yet implemented — fall back to noop
-          new NoopEmbeddingService()
-        : new NoopEmbeddingService();
+      : config.embedding.provider === 'openrouter'
+        ? new OpenAICompatibleEmbeddingService({
+            baseUrl: OPENROUTER_BASE_URL,
+            model: config.embedding.model,
+            apiKey: config.embedding.apiKey,
+          })
+        : config.embedding.provider === 'custom'
+          ? new OpenAICompatibleEmbeddingService({
+              baseUrl: config.embedding.endpoint,
+              model: config.embedding.model,
+            })
+          : new NoopEmbeddingService();
 
   // Derive the embedding dimension from the configured model name so the
   // vec0 table is created (or recreated) with the correct column size.

@@ -11,8 +11,10 @@ export { getModelId, getBaseUrl } from './agent/config.js';
 export {
   type IEmbeddingService,
   OllamaEmbeddingService,
+  OpenAICompatibleEmbeddingService,
   NoopEmbeddingService,
   type OllamaEmbeddingConfig,
+  type OpenAICompatibleEmbeddingConfig,
 } from './services/embedding.js';
 export { type ISearchService, type SearchResult, SearchService } from './services/search.js';
 export {
