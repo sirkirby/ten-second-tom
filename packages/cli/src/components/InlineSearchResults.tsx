@@ -20,18 +20,26 @@ export function InlineSearchResults({ query, results }: InlineSearchResultsProps
   return (
     <Box flexDirection="column">
       <Text dimColor>
-        Search: &quot;{query}&quot; ({results.length} {results.length === 1 ? 'result' : 'results'})
+        Search: &quot;{query}&quot; ({results.length} {results.length === 1 ? 'result' : 'results'}
+        {' · type a number to expand'})
       </Text>
       {results.map((entry, i) => {
-        const score = entry.analysis?.sentiment?.score ?? 0;
+        const sentiment = entry.analysis?.sentiment;
         return (
           <Text key={entry.id}>
-            <Text dimColor>
+            <Text color="green" bold>
               {'  '}
               {i + 1}.{' '}
             </Text>
             <Text dimColor>{formatShortDate(entry.createdAt).padEnd(7)}</Text>
-            <Text color={getSentimentColor(score)}> {formatScore(score)}</Text>
+            {sentiment ? (
+              <Text color={getSentimentColor(sentiment.score)}>
+                {' '}
+                {formatScore(sentiment.score)}
+              </Text>
+            ) : (
+              <Text dimColor> {'     '}</Text>
+            )}
             <Text>
               {'  '}
               {getExcerpt(entry.content)}
