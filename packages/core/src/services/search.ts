@@ -17,7 +17,12 @@ export class SearchService implements ISearchService {
     if (embeddingAvailable) {
       try {
         const queryEmbedding = await this.embedding.embed(query);
-        return await this.storage.searchByVector(queryEmbedding, limit);
+        const vectorResults = await this.storage.searchByVector(queryEmbedding, limit);
+        // If vector search returned results, use them. If empty (no embeddings
+        // stored yet), fall through to FTS so the user still gets results.
+        if (vectorResults.length > 0) {
+          return vectorResults;
+        }
       } catch {
         // Fall through to FTS
       }
