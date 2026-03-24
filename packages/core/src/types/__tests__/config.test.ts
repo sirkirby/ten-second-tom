@@ -6,11 +6,78 @@ describe('AppConfigSchema', () => {
     const config = {
       llm: { provider: 'cloud' as const, apiKey: 'sk-ant-test-key' },
       stt: { engine: 'whisper-distil-en', modelPath: '/Users/test/.tom/models/whisper-distil-en' },
-      embedding: { provider: 'cloud' as const, model: 'voyage-3-lite' },
+      embedding: {
+        provider: 'openrouter' as const,
+        model: 'openai/text-embedding-3-small',
+        apiKey: 'sk-or-test',
+      },
       storage: { dbPath: '/Users/test/.tom/tom.db' },
     };
     const result = AppConfigSchema.safeParse(config);
     expect(result.success).toBe(true);
+  });
+
+  it('validates openrouter embedding config', () => {
+    const config = {
+      llm: { provider: 'cloud' as const, apiKey: 'sk-ant-test-key' },
+      stt: { engine: 'whisper-distil-en', modelPath: '/Users/test/.tom/models/whisper-distil-en' },
+      embedding: {
+        provider: 'openrouter' as const,
+        model: 'openai/text-embedding-3-small',
+        apiKey: 'sk-or-test',
+      },
+      storage: { dbPath: '/Users/test/.tom/tom.db' },
+    };
+    const result = AppConfigSchema.safeParse(config);
+    expect(result.success).toBe(true);
+  });
+
+  it('validates custom embedding config', () => {
+    const config = {
+      llm: { provider: 'cloud' as const, apiKey: 'sk-ant-test-key' },
+      stt: { engine: 'whisper-distil-en', modelPath: '/Users/test/.tom/models/whisper-distil-en' },
+      embedding: {
+        provider: 'custom' as const,
+        model: 'bge-m3',
+        endpoint: 'http://localhost:8080',
+      },
+      storage: { dbPath: '/Users/test/.tom/tom.db' },
+    };
+    const result = AppConfigSchema.safeParse(config);
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects openrouter embedding without apiKey', () => {
+    const config = {
+      llm: { provider: 'cloud' as const, apiKey: 'sk-ant-test-key' },
+      stt: { engine: 'whisper', modelPath: '/tmp/model' },
+      embedding: { provider: 'openrouter', model: 'openai/text-embedding-3-small' },
+      storage: { dbPath: '/tmp/tom.db' },
+    };
+    const result = AppConfigSchema.safeParse(config);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects custom embedding without endpoint', () => {
+    const config = {
+      llm: { provider: 'cloud' as const, apiKey: 'sk-ant-test-key' },
+      stt: { engine: 'whisper', modelPath: '/tmp/model' },
+      embedding: { provider: 'custom', model: 'bge-m3' },
+      storage: { dbPath: '/tmp/tom.db' },
+    };
+    const result = AppConfigSchema.safeParse(config);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects removed cloud embedding provider', () => {
+    const config = {
+      llm: { provider: 'cloud' as const, apiKey: 'sk-ant-test-key' },
+      stt: { engine: 'whisper', modelPath: '/tmp/model' },
+      embedding: { provider: 'cloud', model: 'voyage-3-lite' },
+      storage: { dbPath: '/tmp/tom.db' },
+    };
+    const result = AppConfigSchema.safeParse(config);
+    expect(result.success).toBe(false);
   });
 
   it('validates a local config with ollama', () => {

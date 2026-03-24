@@ -24,8 +24,14 @@ export const EmbeddingConfigSchema = z.discriminatedUnion('provider', [
     endpoint: z.string().url(),
   }),
   z.object({
-    provider: z.literal('cloud'),
+    provider: z.literal('openrouter'),
     model: z.string().min(1),
+    apiKey: z.string().min(1),
+  }),
+  z.object({
+    provider: z.literal('custom'),
+    model: z.string().min(1),
+    endpoint: z.string().url(),
   }),
   z.object({
     provider: z.literal('none'),
