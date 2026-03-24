@@ -64,6 +64,10 @@ interface WizardState {
   selectedWhisperModel: WhisperModel | null;
   selectedSherpaModel: SherpaModel | null;
   errorMessage: string;
+  /** True when wizard was opened with an existing config loaded. */
+  isReconfiguring: boolean;
+  /** The whisper model id from the existing config, for "(current)" label. */
+  currentWhisperModelId: string | null;
 }
 
 interface DownloadProgress {
@@ -305,9 +309,15 @@ function deriveInitialState(cm: ConfigManager): { initial: WizardState; hasExist
         selectedWhisperModel: null,
         selectedSherpaModel: null,
         errorMessage: '',
+        isReconfiguring: false,
+        currentWhisperModelId: null,
       },
     };
   }
+
+  // Derive the current whisper model id from the stored model path
+  const currentWhisperModelId =
+    WHISPER_MODELS.find((m) => existing.stt.modelPath.endsWith(m.filename))?.id ?? null;
 
   return {
     hasExisting: true,
@@ -326,6 +336,8 @@ function deriveInitialState(cm: ConfigManager): { initial: WizardState; hasExist
       selectedWhisperModel: null,
       selectedSherpaModel: null,
       errorMessage: '',
+      isReconfiguring: true,
+      currentWhisperModelId,
     },
   };
 }
@@ -355,6 +367,69 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
   const whisperModelItems = useMemo(buildWhisperModelItems, []);
   const sherpaModelItems = useMemo(buildSherpaModelItems, []);
 
+  // "(current)" label helpers — only annotate when reconfiguring
+  const llmItems = useMemo(
+    () =>
+      llmProviderItems.map((item) => ({
+        ...item,
+        label:
+          state.isReconfiguring && item.value === state.llmProvider
+            ? `${item.label} (current)`
+            : item.label,
+      })),
+    [state.isReconfiguring, state.llmProvider],
+  );
+
+  const embeddingItems = useMemo(
+    () =>
+      embeddingProviderItems.map((item) => ({
+        ...item,
+        label:
+          state.isReconfiguring && item.value === state.embeddingProvider
+            ? `${item.label} (current)`
+            : item.label,
+      })),
+    [state.isReconfiguring, state.embeddingProvider],
+  );
+
+  const annotatedOllamaModelItems = useMemo(
+    () =>
+      ollamaModelItems.map((item) => ({
+        ...item,
+        label:
+          state.isReconfiguring && item.value === state.localModelId
+            ? `${item.label} (current)`
+            : item.label,
+      })),
+    [ollamaModelItems, state.isReconfiguring, state.localModelId],
+  );
+
+  const annotatedEmbeddingModelItems = useMemo(
+    () =>
+      embeddingModelItems.map((item) => ({
+        ...item,
+        label:
+          state.isReconfiguring && item.value === state.embeddingModel
+            ? `${item.label} (current)`
+            : item.label,
+      })),
+    [embeddingModelItems, state.isReconfiguring, state.embeddingModel],
+  );
+
+  const annotatedWhisperModelItems = useMemo(
+    () =>
+      whisperModelItems.map((item) => ({
+        ...item,
+        label:
+          state.isReconfiguring && item.value === state.currentWhisperModelId
+            ? `${item.label} (current)`
+            : item.label,
+      })),
+    [whisperModelItems, state.isReconfiguring, state.currentWhisperModelId],
+  );
+
+  const annotatedSherpaModelItems = useMemo(() => sherpaModelItems, [sherpaModelItems]);
+
   // Auto-exit after error with a short delay; allow q/Enter to exit immediately.
   // Disabled in REPL mode (onComplete provided) — the REPL manages its own lifecycle.
   useAutoExit(step === 'error', undefined, !onComplete);
@@ -366,6 +441,10 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
       } else {
         exit();
       }
+    }
+    // Allow Esc to cancel setup when running inside the REPL (onComplete provided)
+    if (key.escape && onComplete) {
+      onComplete();
     }
   });
 
@@ -806,7 +885,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
           <Text>Step 1 of {TOTAL_STEPS}: Choose your LLM provider</Text>
           <Box marginTop={1}>
             <SelectInput
-              items={llmProviderItems}
+              items={llmItems}
               initialIndex={
                 state.llmProvider
                   ? llmProviderItems.findIndex((i) => i.value === state.llmProvider)
@@ -815,6 +894,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
               onSelect={handleLlmProviderSelect}
             />
           </Box>
+          {onComplete && <Text dimColor>Esc to cancel</Text>}
         </Box>
       )}
 
@@ -834,6 +914,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
               placeholder="sk-ant-..."
             />
           </Box>
+          {onComplete && <Text dimColor>Esc to cancel</Text>}
         </Box>
       )}
 
@@ -852,6 +933,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
               placeholder="http://localhost:11434"
             />
           </Box>
+          {onComplete && <Text dimColor>Esc to cancel</Text>}
         </Box>
       )}
 
@@ -873,8 +955,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
             </Box>
           )}
           <Box marginTop={1}>
-            <SelectInput items={ollamaModelItems} onSelect={handleLocalModelSelect} />
+            <SelectInput items={annotatedOllamaModelItems} onSelect={handleLocalModelSelect} />
           </Box>
+          {onComplete && <Text dimColor>Esc to cancel</Text>}
         </Box>
       )}
 
@@ -886,7 +969,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
           </Box>
           <Box marginTop={1}>
             <SelectInput
-              items={embeddingProviderItems}
+              items={embeddingItems}
               initialIndex={
                 state.embeddingProvider
                   ? embeddingProviderItems.findIndex((i) => i.value === state.embeddingProvider)
@@ -895,6 +978,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
               onSelect={handleEmbeddingProviderSelect}
             />
           </Box>
+          {onComplete && <Text dimColor>Esc to cancel</Text>}
         </Box>
       )}
 
@@ -917,7 +1001,10 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
           )}
           {embeddingModelItems.length > 0 ? (
             <Box marginTop={1}>
-              <SelectInput items={embeddingModelItems} onSelect={handleEmbeddingModelSelect} />
+              <SelectInput
+                items={annotatedEmbeddingModelItems}
+                onSelect={handleEmbeddingModelSelect}
+              />
             </Box>
           ) : (
             <Box flexDirection="column" marginTop={1}>
@@ -932,6 +1019,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
               </Box>
             </Box>
           )}
+          {onComplete && <Text dimColor>Esc to cancel</Text>}
         </Box>
       )}
 
@@ -945,8 +1033,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
             </Text>
           </Box>
           <Box marginTop={1}>
-            <SelectInput items={whisperModelItems} onSelect={handleWhisperModelSelect} />
+            <SelectInput items={annotatedWhisperModelItems} onSelect={handleWhisperModelSelect} />
           </Box>
+          {onComplete && <Text dimColor>Esc to cancel</Text>}
         </Box>
       )}
 
@@ -1016,8 +1105,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
             <Text dimColor>Requires an additional model download.</Text>
           </Box>
           <Box marginTop={1}>
-            <SelectInput items={sherpaModelItems} onSelect={handleSherpaModelSelect} />
+            <SelectInput items={annotatedSherpaModelItems} onSelect={handleSherpaModelSelect} />
           </Box>
+          {onComplete && <Text dimColor>Esc to cancel</Text>}
         </Box>
       )}
 
