@@ -58,6 +58,68 @@ export class OllamaEmbeddingService implements IEmbeddingService {
   }
 }
 
+export interface OpenAICompatibleEmbeddingConfig {
+  baseUrl: string;
+  model: string;
+  apiKey?: string;
+}
+
+export class OpenAICompatibleEmbeddingService implements IEmbeddingService {
+  private readonly baseUrl: string;
+  private readonly model: string;
+  private readonly apiKey?: string;
+  private availabilityCache: [boolean, number] | null = null;
+
+  constructor({ baseUrl, model, apiKey }: OpenAICompatibleEmbeddingConfig) {
+    this.baseUrl = baseUrl.replace(/\/+$/, '');
+    this.model = model;
+    this.apiKey = apiKey;
+  }
+
+  async embed(text: string): Promise<Float32Array> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (this.apiKey) {
+      headers['Authorization'] = `Bearer ${this.apiKey}`;
+    }
+    const response = await fetch(`${this.baseUrl}/embeddings`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ input: text, model: this.model }),
+    });
+    if (!response.ok) {
+      throw new Error(`Embedding request failed: ${response.status} ${response.statusText}`);
+    }
+    const data = (await response.json()) as {
+      data: Array<{ embedding: number[]; index: number }>;
+    };
+    return new Float32Array(data.data[0].embedding);
+  }
+
+  async isAvailable(): Promise<boolean> {
+    if (this.availabilityCache !== null && Date.now() < this.availabilityCache[1]) {
+      return this.availabilityCache[0];
+    }
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (this.apiKey) {
+        headers['Authorization'] = `Bearer ${this.apiKey}`;
+      }
+      const response = await fetch(`${this.baseUrl}/embeddings`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ input: 'test', model: this.model }),
+        signal: AbortSignal.timeout(EMBEDDING_AVAILABILITY_TIMEOUT_MS),
+      });
+      const available = response.ok;
+      this.availabilityCache = [available, Date.now() + EMBEDDING_AVAILABILITY_CACHE_MS];
+      return available;
+    } catch {
+      this.availabilityCache = [false, Date.now() + EMBEDDING_AVAILABILITY_CACHE_MS];
+      return false;
+    }
+  }
+}
+
 export class NoopEmbeddingService implements IEmbeddingService {
   async isAvailable(): Promise<boolean> {
     return false;
