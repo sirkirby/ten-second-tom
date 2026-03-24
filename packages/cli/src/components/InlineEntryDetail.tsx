@@ -3,22 +3,7 @@ import { Box, Text } from 'ink';
 import type { Entry } from '@ten-second-tom/core';
 import { TranscriptBox } from './TranscriptBox.js';
 import { getSentimentColor, formatScore } from '../utils/sentiment.js';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function formatFullDate(isoString: string): string {
-  return new Date(isoString).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
-function formatConfidence(confidence: number): string {
-  return `${Math.round(confidence * 100)}%`;
-}
+import { formatFullDate, formatConfidence } from '../utils/format.js';
 
 // ---------------------------------------------------------------------------
 // InlineEntryDetail — rendered into Static history when user types a number

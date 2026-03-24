@@ -10,6 +10,7 @@ import {
   SHERPA_ONNX_TOKENS_FILENAME,
   SHERPA_ONNX_POLL_INTERVAL_MS,
 } from '../constants.js';
+import { int16BufferToFloat32 } from './audio-utils.js';
 
 // ---------------------------------------------------------------------------
 // sherpa-onnx-node type declarations (native NAPI bindings)
@@ -68,20 +69,6 @@ export interface ILiveTranscriptionService {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Converts a Buffer of Int16 PCM samples to a Float32Array (range -1.0 to 1.0).
- * sherpa-onnx-node's acceptWaveform expects Float32Array audio data.
- */
-function int16BufferToFloat32(buffer: Buffer): Float32Array {
-  const sampleCount = Math.floor(buffer.byteLength / 2);
-  const float32 = new Float32Array(sampleCount);
-  for (let i = 0; i < sampleCount; i++) {
-    const sample = buffer.readInt16LE(i * 2);
-    float32[i] = sample / 32768.0;
-  }
-  return float32;
-}
 
 /**
  * Lazily loads the sherpa-onnx-node native module using createRequire.

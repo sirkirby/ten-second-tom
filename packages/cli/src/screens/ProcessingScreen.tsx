@@ -9,6 +9,7 @@ import { ErrorDisplay } from '../components/ErrorDisplay.js';
 import { checkSetupComplete } from '../hooks/useSetupGuard.js';
 import { useAutoExit } from '../hooks/useAutoExit.js';
 import { runAnalysisPipeline } from '../pipeline.js';
+import { toErrorMessage } from '../utils/format.js';
 import type { AppContext } from '../commands/registry.js';
 import type { ResultsSummaryProps } from '../components/ResultsSummary.js';
 import { AUTO_EXIT_DELAY_MS } from '../constants.js';
@@ -128,7 +129,7 @@ export function ProcessingScreen({
         });
       } catch (err) {
         if (!cancelled) {
-          const msg = err instanceof Error ? err.message : String(err);
+          const msg = toErrorMessage(err);
           setError(`Processing failed: ${msg}`);
           setPhase('error');
         }
@@ -200,10 +201,7 @@ export function ProcessingScreen({
           analysis = analysisResult.value;
           await svcs.storage.updateEntryAnalysis(entry.id, analysis);
         } else {
-          const msg =
-            analysisResult.reason instanceof Error
-              ? analysisResult.reason.message
-              : String(analysisResult.reason);
+          const msg = toErrorMessage(analysisResult.reason);
           if (!cancelled) {
             setError(`AI analysis failed: ${msg}`);
             setPhase('error');
@@ -232,7 +230,7 @@ export function ProcessingScreen({
         });
       } catch (err) {
         if (!cancelled) {
-          const msg = err instanceof Error ? err.message : String(err);
+          const msg = toErrorMessage(err);
           setError(`Re-analysis failed: ${msg}`);
           setPhase('error');
         }

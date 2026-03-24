@@ -6,11 +6,12 @@ import type { AppConfig, Entry, ServiceContainer } from '@ten-second-tom/core';
 import { Prompt } from '../components/Prompt.js';
 import { InlineSearchResults } from '../components/InlineSearchResults.js';
 import { InlineEntryDetail } from '../components/InlineEntryDetail.js';
+import { toErrorMessage } from '../utils/format.js';
+import { APP_VERSION } from '../constants.js';
 import { COMMANDS, findCommand } from '../commands/registry.js';
 import type { AppContext, HistoryEntry } from '../commands/registry.js';
 
 const DIVIDER = '───────────────────────────────────────';
-const VERSION = '2.0';
 
 interface HomeScreenProps {
   context: AppContext;
@@ -167,7 +168,7 @@ export function HomeScreen({ context, config, entryCount }: HomeScreenProps) {
           content: <InlineSearchResults query={query} results={results} />,
         });
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = toErrorMessage(err);
         context.pushHistory({
           id: `search-err-${Date.now()}`,
           content: <Text color="red">Search failed: {msg}</Text>,
@@ -213,7 +214,7 @@ export function HomeScreen({ context, config, entryCount }: HomeScreenProps) {
 
   return (
     <Box flexDirection="column">
-      <Text bold>Ten-Second Tom v{VERSION}</Text>
+      <Text bold>Ten-Second Tom v{APP_VERSION}</Text>
       {config ? (
         <Text dimColor>{configSummary(config, entryCount)}</Text>
       ) : (

@@ -12,6 +12,7 @@ import { checkSetupComplete } from '../hooks/useSetupGuard.js';
 import { useAutoExit } from '../hooks/useAutoExit.js';
 import { ErrorDisplay } from '../components/ErrorDisplay.js';
 import { TranscriptBox } from '../components/TranscriptBox.js';
+import { formatDuration, toErrorMessage } from '../utils/format.js';
 import type { AppContext } from '../commands/registry.js';
 import { AUTO_EXIT_DELAY_MS } from '../constants.js';
 
@@ -37,12 +38,6 @@ export interface RecordingScreenProps {
 // ---------------------------------------------------------------------------
 
 type Phase = 'init' | 'recording' | 'error';
-
-function formatDuration(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${minutes}:${String(secs).padStart(2, '0')}`;
-}
 
 // ---------------------------------------------------------------------------
 // RecordingScreen
@@ -155,7 +150,7 @@ export function RecordingScreen({ context, onComplete, onCancel }: RecordingScre
         try {
           svcs.audio.startRecording();
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
+          const msg = toErrorMessage(err);
           if (!cancelled) {
             setError(`Microphone access denied. ${getMicrophonePermissionHint()}\n(${msg})`);
             setPhase('error');
@@ -172,7 +167,7 @@ export function RecordingScreen({ context, onComplete, onCancel }: RecordingScre
               }
             });
           } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
+            const msg = toErrorMessage(err);
             if (!cancelled) {
               setLiveTranscriptionWarning(`Live preview unavailable: ${msg}`);
             }
@@ -183,7 +178,7 @@ export function RecordingScreen({ context, onComplete, onCancel }: RecordingScre
           setPhase('recording');
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = toErrorMessage(err);
         if (!cancelled) {
           setError(`Initialisation failed: ${msg}`);
           setPhase('error');
@@ -228,7 +223,7 @@ export function RecordingScreen({ context, onComplete, onCancel }: RecordingScre
       // Hand off the audio path, live transcript, and duration to the parent
       onComplete(audioRelPath, transcriptRef.current, durationRef.current);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = toErrorMessage(err);
       setError(`Recording failed: ${msg}`);
       setPhase('error');
     }

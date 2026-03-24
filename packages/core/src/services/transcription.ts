@@ -2,6 +2,7 @@ import { initWhisper, toggleNativeLog } from '@fugood/whisper.node';
 import type { WhisperContext, TranscribeOptions } from '@fugood/whisper.node';
 import type { Readable } from 'node:stream';
 import { LIVE_TRANSCRIPTION_CHUNK_BYTES } from '../constants.js';
+import { int16BufferToFloat32 } from './audio-utils.js';
 
 export interface ITranscriptionService {
   transcribeStream(audioStream: Readable, onChunk: (text: string) => void): Promise<string>;
@@ -12,21 +13,6 @@ export interface ITranscriptionService {
   loadModel(modelPath: string): Promise<void>;
   /** Release the whisper context and free native resources. */
   release(): Promise<void>;
-}
-
-/**
- * Converts Int16 PCM Buffer samples to a Float32Array (range -1.0 to 1.0).
- * The whisper.node transcribeData expects Float32Array audio data.
- */
-function int16BufferToFloat32(buffer: Buffer): Float32Array {
-  const sampleCount = Math.floor(buffer.byteLength / 2);
-  const float32 = new Float32Array(sampleCount);
-  for (let i = 0; i < sampleCount; i++) {
-    // Read little-endian Int16
-    const sample = buffer.readInt16LE(i * 2);
-    float32[i] = sample / 32768.0;
-  }
-  return float32;
 }
 
 /**

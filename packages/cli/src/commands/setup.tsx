@@ -33,6 +33,7 @@ import type {
   SherpaModel,
 } from '@ten-second-tom/core';
 import { useAutoExit } from '../hooks/useAutoExit.js';
+import { toErrorMessage } from '../utils/format.js';
 import { EXIT_HINT_TEXT, OLLAMA_FETCH_TIMEOUT_MS } from '../constants.js';
 
 const TOTAL_STEPS = 6;
@@ -162,7 +163,7 @@ export async function fetchOllamaModels(
         error: `Could not connect to Ollama at ${endpoint}. Connection timed out. Make sure Ollama is running.`,
       };
     }
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = toErrorMessage(err);
     return {
       ok: false,
       error: `Could not connect to Ollama at ${endpoint}. Make sure Ollama is running. (${msg})`,
@@ -670,7 +671,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
         setStep('sherpa-model');
       }, 500);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = toErrorMessage(err);
       setWhisperDownloadProgress({
         status: 'error',
         bytesDownloaded: 0,
@@ -778,7 +779,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
         handleSave();
       }, 500);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = toErrorMessage(err);
       setSherpaDownloadProgress({
         status: 'error',
         bytesDownloaded: 0,
@@ -864,9 +865,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
       const message =
         code === 'EACCES' || code === 'EPERM'
           ? `Permission denied writing to ${configManager.homePath}. Check that you have write access to that directory.`
-          : err instanceof Error
-            ? err.message
-            : String(err);
+          : toErrorMessage(err);
       setState((s) => ({ ...s, errorMessage: message }));
       setStep('error');
     }

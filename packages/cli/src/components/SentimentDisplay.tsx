@@ -2,13 +2,10 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import type { EntryAnalysis } from '@ten-second-tom/core';
 import { getSentimentColor, formatScore } from '../utils/sentiment.js';
+import { formatConfidence } from '../utils/format.js';
 
 interface SentimentDisplayProps {
   analysis: EntryAnalysis;
-}
-
-function formatConfidence(confidence: number): string {
-  return `${Math.round(confidence * 100)}%`;
 }
 
 export function SentimentDisplay({ analysis }: SentimentDisplayProps) {

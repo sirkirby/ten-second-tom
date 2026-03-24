@@ -4,6 +4,7 @@ import type { EntryAnalysis } from '@ten-second-tom/core';
 import { TranscriptBox } from './TranscriptBox.js';
 import { WarningList } from './WarningList.js';
 import { getSentimentColor, formatScore } from '../utils/sentiment.js';
+import { formatDuration, formatConfidence } from '../utils/format.js';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -15,20 +16,6 @@ export interface ResultsSummaryProps {
   analysis: EntryAnalysis | null;
   warnings: string[];
   entryType: 'recording' | 'note';
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function formatDuration(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${minutes}:${String(secs).padStart(2, '0')}`;
-}
-
-function formatConfidence(confidence: number): string {
-  return `${Math.round(confidence * 100)}%`;
 }
 
 // ---------------------------------------------------------------------------

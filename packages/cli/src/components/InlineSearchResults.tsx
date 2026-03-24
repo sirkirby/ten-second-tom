@@ -2,23 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import type { Entry } from '@ten-second-tom/core';
 import { getSentimentColor, formatScore } from '../utils/sentiment.js';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function formatShortDate(isoString: string): string {
-  return new Date(isoString).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-function getExcerpt(content: string, maxLength = 60): string {
-  const oneLine = content.replace(/\n/g, ' ');
-  if (oneLine.length <= maxLength) return oneLine;
-  return oneLine.slice(0, maxLength) + '...';
-}
+import { formatShortDate, getExcerpt } from '../utils/format.js';
 
 // ---------------------------------------------------------------------------
 // InlineSearchResults — rendered into Static history after a search

@@ -4,6 +4,14 @@ import Spinner from 'ink-spinner';
 import type { Entry } from '@ten-second-tom/core';
 import { TranscriptBox } from '../components/TranscriptBox.js';
 import { getSentimentColor, formatScore } from '../utils/sentiment.js';
+import {
+  formatShortDate,
+  formatFullDate,
+  getExcerpt,
+  formatConfidence,
+  toErrorMessage,
+} from '../utils/format.js';
+import { BORDER_CHAR } from '../constants.js';
 import type { AppContext } from '../commands/registry.js';
 
 // ---------------------------------------------------------------------------
@@ -11,7 +19,6 @@ import type { AppContext } from '../commands/registry.js';
 // ---------------------------------------------------------------------------
 
 const LIST_LIMIT = 20;
-const BORDER_CHAR = '\u258E'; // ▎ left one-quarter block
 
 // ---------------------------------------------------------------------------
 // Props
@@ -28,31 +35,6 @@ export interface ListScreenProps {
 // ---------------------------------------------------------------------------
 
 type Phase = 'loading' | 'results' | 'detail';
-
-function formatShortDate(isoString: string): string {
-  return new Date(isoString).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-function formatFullDate(isoString: string): string {
-  return new Date(isoString).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
-function getExcerpt(content: string, maxLength = 60): string {
-  const oneLine = content.replace(/\n/g, ' ');
-  if (oneLine.length <= maxLength) return oneLine;
-  return oneLine.slice(0, maxLength) + '...';
-}
-
-function formatConfidence(confidence: number): string {
-  return `${Math.round(confidence * 100)}%`;
-}
 
 function filterLabel(filter: ListScreenProps['filter']): string {
   if (filter === 'notes') return 'notes';
@@ -95,8 +77,7 @@ export function ListScreen({ context, filter, onClose }: ListScreenProps) {
         setPhase('results');
       })
       .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : String(err);
-        setError(`Failed to load entries: ${msg}`);
+        setError(`Failed to load entries: ${toErrorMessage(err)}`);
         setEntries([]);
         setPhase('results');
       });

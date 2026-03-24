@@ -36,3 +36,4 @@ export {
   type SherpaOnnxLiveTranscriptionConfig,
 } from './services/live-transcription.js';
 export { type ServiceContainer, buildServicesFromConfig } from './services/service-factory.js';
+export { int16BufferToFloat32 } from './services/audio-utils.js';

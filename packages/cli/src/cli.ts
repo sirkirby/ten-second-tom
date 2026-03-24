@@ -3,6 +3,7 @@ import React from 'react';
 import { render } from 'ink';
 import { openSync, closeSync } from 'node:fs';
 import { App } from './app.js';
+import { APP_VERSION } from './constants.js';
 
 // Suppress native C++ stderr output (whisper.cpp, ggml, sherpa-onnx)
 // permanently for the entire app lifecycle. These libraries write directly
@@ -39,7 +40,7 @@ if (firstArg === '--help' || firstArg === '-h') {
     ].join('\n'),
   );
 } else if (firstArg === '--version' || firstArg === '-V') {
-  process.stdout.write('2.0.0\n');
+  process.stdout.write(`${APP_VERSION}\n`);
 } else if (firstArg && KNOWN_COMMANDS.includes(firstArg)) {
   // One-shot mode — run a single command then exit
   const command = firstArg;

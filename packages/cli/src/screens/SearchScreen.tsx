@@ -6,6 +6,14 @@ import { SearchService } from '@ten-second-tom/core';
 import type { Entry } from '@ten-second-tom/core';
 import { TranscriptBox } from '../components/TranscriptBox.js';
 import { getSentimentColor, formatScore } from '../utils/sentiment.js';
+import {
+  formatShortDate,
+  formatFullDate,
+  getExcerpt,
+  formatConfidence,
+  toErrorMessage,
+} from '../utils/format.js';
+import { BORDER_CHAR } from '../constants.js';
 import type { AppContext } from '../commands/registry.js';
 
 // ---------------------------------------------------------------------------
@@ -23,37 +31,6 @@ export interface SearchScreenProps {
 // ---------------------------------------------------------------------------
 
 type Phase = 'input' | 'searching' | 'results' | 'detail';
-
-function formatShortDate(isoString: string): string {
-  return new Date(isoString).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-function formatFullDate(isoString: string): string {
-  return new Date(isoString).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
-function getExcerpt(content: string, maxLength = 60): string {
-  const oneLine = content.replace(/\n/g, ' ');
-  if (oneLine.length <= maxLength) return oneLine;
-  return oneLine.slice(0, maxLength) + '...';
-}
-
-function formatConfidence(confidence: number): string {
-  return `${Math.round(confidence * 100)}%`;
-}
-
-// ---------------------------------------------------------------------------
-// Sentiment border character — colored by score
-// ---------------------------------------------------------------------------
-
-const BORDER_CHAR = '\u258E'; // ▎ left one-quarter block
 
 // ---------------------------------------------------------------------------
 // SearchScreen
@@ -91,8 +68,7 @@ export function SearchScreen({ context, initialQuery, onClose }: SearchScreenPro
         setSelectedIndex(0);
         setPhase('results');
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        setError(`Search failed: ${msg}`);
+        setError(`Search failed: ${toErrorMessage(err)}`);
         setPhase('results');
         setResults([]);
       }

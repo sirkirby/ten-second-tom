@@ -14,6 +14,7 @@ import { checkSetupComplete } from '../hooks/useSetupGuard.js';
 import { useAutoExit } from '../hooks/useAutoExit.js';
 import { ErrorDisplay } from '../components/ErrorDisplay.js';
 import { runAnalysisPipeline } from '../pipeline.js';
+import { toErrorMessage } from '../utils/format.js';
 import type { AppContext } from '../commands/registry.js';
 import type { ResultsSummaryProps } from '../components/ResultsSummary.js';
 import { AUTO_EXIT_DELAY_MS } from '../constants.js';
@@ -128,7 +129,7 @@ export function NoteScreen({ context, onComplete, onCancel }: NoteScreenProps) {
       try {
         svcs.audio.startRecording();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = toErrorMessage(err);
         setDictationWarning(`Microphone access denied. ${getMicrophonePermissionHint()} (${msg})`);
         return;
       }
@@ -141,12 +142,12 @@ export function NoteScreen({ context, onComplete, onCancel }: NoteScreenProps) {
           setNoteText(text);
         });
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = toErrorMessage(err);
         setDictationWarning(`Live transcription failed to start: ${msg}`);
         // Still in dictation mode with recording active but no transcript preview
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = toErrorMessage(err);
       setDictationWarning(`Dictation failed to start: ${msg}`);
     }
   }, [context.services, context.configManager]);
@@ -223,7 +224,7 @@ export function NoteScreen({ context, onComplete, onCancel }: NoteScreenProps) {
           entryType: 'note',
         });
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = toErrorMessage(err);
         setError(`Failed to save note: ${msg}`);
         setPhase('error');
       }
