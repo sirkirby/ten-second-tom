@@ -64,9 +64,10 @@ The OpenRouter base URL is a constant, not user-configurable. Custom local endpo
 ```typescript
 // OpenRouter
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
-export const OPENROUTER_MODELS_ENDPOINT = `${OPENROUTER_BASE_URL}/embeddings/models`;
 export const DEFAULT_OPENROUTER_EMBEDDING_MODEL = 'openai/text-embedding-3-small';
 ```
+
+Remove the existing `DEFAULT_CLOUD_EMBEDDING_MODEL` constant (replaced by `DEFAULT_OPENROUTER_EMBEDDING_MODEL`).
 
 Update the embedding dimensions map with OpenRouter model IDs:
 
@@ -80,12 +81,11 @@ EMBEDDING_MODEL_DIMENSIONS: Record<string, number> = {
   'snowflake-arctic-embed': 1024,
   'qwen3-embedding': 1536,
   'jina-embeddings': 768,
-  // OpenRouter / OpenAI models
+  // OpenRouter / OpenAI models (NEW)
   'openai/text-embedding-3-small': 1536,
   'openai/text-embedding-3-large': 3072,
   'openai/text-embedding-ada-002': 1536,
-  // Voyage (via OpenRouter)
-  'voyage-3-lite': 512,
+  // voyage-3-lite (512) already exists in the map — no change needed
 };
 ```
 
@@ -103,7 +103,7 @@ interface OpenAICompatibleEmbeddingConfig {
 
 Behavior:
 - `embed(text)` — `POST {baseUrl}/embeddings` with `{input: text, model}`. If `apiKey` provided, sets `Authorization: Bearer {apiKey}`. Returns `Float32Array` from `response.data[0].embedding`.
-- `isAvailable()` — Lightweight availability check with caching (same pattern as `OllamaEmbeddingService`).
+- `isAvailable()` — Sends a minimal embed request (single-word input) and caches the result. Unlike the Ollama service which probes the root URL, OpenAI-compatible endpoints have no standard health check path. A small real request is the most reliable test. Cache TTL matches `EMBEDDING_AVAILABILITY_CACHE_MS` (30s).
 
 ### Service Factory
 
@@ -141,7 +141,7 @@ Embedding provider:
 ```
 
 Flows:
-- **OpenRouter** → ask for API key → fetch available models from `GET /embeddings/models` → user selects model (default: `openai/text-embedding-3-small`)
+- **OpenRouter** → ask for API key → user enters model name (default: `openai/text-embedding-3-small`). Use free text input rather than fetching from a models endpoint, since OpenRouter's model discovery API may not have a dedicated embeddings-only listing.
 - **Custom local** → ask for endpoint URL → ask for model name (free text)
 - **Ollama** → existing flow (endpoint, model selection from running instance)
 - **None** → skip
@@ -156,19 +156,26 @@ Verified endpoint details:
 | **Auth** | `Authorization: Bearer <openrouter-api-key>` |
 | **Request** | `{ input: string, model: string }` |
 | **Response** | `{ data: [{ embedding: number[], index: 0 }], model, usage }` |
-| **Model discovery** | `GET https://openrouter.ai/api/v1/embeddings/models` |
+| **Model discovery** | Not used — model entered as free text in setup wizard |
 | **Compatibility** | Fully OpenAI-compatible request/response format |
+
+### Config Migration
+
+Existing users with `{ provider: 'cloud' }` in `~/.tom/config.json` will fail Zod validation on load since the `cloud` discriminant is removed. This is acceptable pre-release breakage — the app has not been published yet and there are no external users. `ConfigManager.load()` will throw a validation error; users re-run `tom setup` to regenerate their config. No migration code needed.
 
 ### Existing Code Changes
 
 | File | Change |
 |------|--------|
 | `core/src/types/config.ts` | Replace `cloud` variant with `openrouter` and `custom` variants |
-| `core/src/constants.ts` | Add OpenRouter constants, update dimensions map |
+| `core/src/constants.ts` | Add OpenRouter constants, remove `DEFAULT_CLOUD_EMBEDDING_MODEL`, update dimensions map |
 | `core/src/services/embedding.ts` | Add `OpenAICompatibleEmbeddingService` class |
 | `core/src/services/service-factory.ts` | Wire up new providers |
 | `core/src/index.ts` | Export new service class and config type |
 | `cli/src/commands/setup.tsx` | Update embedding provider wizard flow |
+| `core/src/services/__tests__/embedding.test.ts` | Tests for `OpenAICompatibleEmbeddingService` |
+| `core/src/types/__tests__/config.test.ts` | Updated schema tests for `openrouter` and `custom` variants |
+| `cli/src/commands/__tests__/setup.test.ts` | Update `DEFAULT_CLOUD_EMBEDDING_MODEL` references |
 
 ### Graceful Degradation
 
@@ -200,12 +207,12 @@ The internal workspace package names change to match the npm names. All source i
 
 ### Per-Package Tagging
 
-Following the pattern from the [unifi-mcp](https://github.com/user/unifi-mcp) monorepo:
+Following the per-package tagging pattern used in the unifi-mcp monorepo:
 
 - `core/v1.0.0` → triggers `publish-core.yml` → publishes `ten-second-tom-core@1.0.0`
 - `cli/v2.0.0` → triggers `publish-cli.yml` → publishes `ten-second-tom@2.0.0`
 
-Packages version independently. Core starts at `1.0.0`. CLI starts at `2.0.0` (matches the v2 rewrite).
+Packages version independently. Both packages currently have `2.0.0` in their `package.json`, but neither has been published before. Core starts at `1.0.0` for its first public release (it's a new library with no prior npm presence). CLI starts at `2.0.0` to match the v2 rewrite branding and the version users see in the app.
 
 ### Workflow: `publish-core.yml`
 
@@ -273,7 +280,7 @@ Same structure as `publish-core.yml` but:
 3. Push the tag: `git push origin core/v1.0.0`
 4. Workflow runs: build → test → release → publish → sync version
 
-**Ordering when both packages change:** Tag and push `core/v*` first, wait for completion, then tag `cli/v*`. The CLI's `workspace:*` dependency gets resolved to whatever version is in core's `package.json` at publish time.
+**Ordering when both packages change:** Tag and push `core/v*` first. Wait for the workflow to complete **and the package to appear on the npm registry** (npm propagation can take a few minutes). Then tag `cli/v*`. The CLI's `workspace:*` dependency gets resolved to whatever version is in core's `package.json` at publish time — that version must exist on npm or `npm install -g ten-second-tom` will fail for users.
 
 ### User Installation
 
