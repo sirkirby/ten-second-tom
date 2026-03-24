@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import Spinner from 'ink-spinner';
-import { SearchService } from '@ten-second-tom/core';
 import type { Entry } from '@ten-second-tom/core';
 import { TranscriptBox } from '../components/TranscriptBox.js';
 import { getSentimentColor, formatScore } from '../utils/sentiment.js';
@@ -60,10 +59,8 @@ export function SearchScreen({ context, initialQuery, onClose }: SearchScreenPro
         return;
       }
 
-      const searchService = new SearchService(svcs.storage, svcs.embedding);
-
       try {
-        const entries = await searchService.search(searchQuery.trim());
+        const entries = await svcs.search.search(searchQuery.trim());
         setResults(entries);
         setSelectedIndex(0);
         setPhase('results');

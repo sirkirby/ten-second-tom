@@ -14,6 +14,7 @@ import type {
   IAgentService,
   IEmbeddingService,
   IStorageService,
+  ISearchService,
   IAudioService,
   ITranscriptionService,
   ILiveTranscriptionService,
@@ -50,6 +51,7 @@ function makeMockServices(overrides: Partial<ServiceContainer> = {}): ServiceCon
     saveEntry: vi.fn().mockResolvedValue(mockEntry),
     getEntry: vi.fn().mockResolvedValue(mockEntry),
     listEntries: vi.fn().mockResolvedValue([]),
+    countEntries: vi.fn().mockResolvedValue(0),
     updateEntryAnalysis: vi.fn().mockResolvedValue(undefined),
     updateEntryEmbedding: vi.fn().mockResolvedValue(undefined),
     searchByKeyword: vi.fn().mockResolvedValue([]),
@@ -87,7 +89,20 @@ function makeMockServices(overrides: Partial<ServiceContainer> = {}): ServiceCon
     isAvailable: vi.fn().mockResolvedValue(true),
   };
 
-  return { audio, transcription, liveTranscription, agent, embedding, storage, ...overrides };
+  const search: ISearchService = {
+    search: vi.fn().mockResolvedValue([]),
+  };
+
+  return {
+    audio,
+    transcription,
+    liveTranscription,
+    agent,
+    embedding,
+    storage,
+    search,
+    ...overrides,
+  };
 }
 
 // ---------------------------------------------------------------------------

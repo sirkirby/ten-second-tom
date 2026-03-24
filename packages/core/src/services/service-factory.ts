@@ -6,6 +6,7 @@ import type { ILiveTranscriptionService } from './live-transcription.js';
 import type { IAgentService } from '../agent/tom-agent.js';
 import type { IEmbeddingService } from './embedding.js';
 import type { IStorageService } from './storage.js';
+import type { ISearchService } from './search.js';
 import { AudioService } from './audio.js';
 import { WhisperTranscriptionService } from './transcription.js';
 import {
@@ -15,6 +16,7 @@ import {
 import { TomAgent } from '../agent/tom-agent.js';
 import { OllamaEmbeddingService, NoopEmbeddingService } from './embedding.js';
 import { SqliteStorageService } from './storage-sqlite.js';
+import { SearchService } from './search.js';
 import { getEmbeddingDimension } from '../constants.js';
 
 export interface ServiceContainer {
@@ -24,6 +26,7 @@ export interface ServiceContainer {
   agent: IAgentService;
   embedding: IEmbeddingService;
   storage: IStorageService;
+  search: ISearchService;
 }
 
 /**
@@ -66,5 +69,7 @@ export function buildServicesFromConfig(
 
   const storage = new SqliteStorageService(config.storage.dbPath, embeddingDimension);
 
-  return { audio, transcription, liveTranscription, agent, embedding, storage };
+  const search = new SearchService(storage, embedding);
+
+  return { audio, transcription, liveTranscription, agent, embedding, storage, search };
 }

@@ -10,6 +10,7 @@ export interface IStorageService {
   saveEntry(input: CreateEntry): Promise<Entry>;
   getEntry(id: string): Promise<Entry | undefined>;
   listEntries(options: ListEntriesOptions): Promise<Entry[]>;
+  countEntries(): Promise<number>;
   updateEntryAnalysis(id: string, analysis: EntryAnalysis): Promise<void>;
   updateEntryEmbedding(id: string, embedding: Float32Array): Promise<void>;
   searchByKeyword(query: string, limit?: number): Promise<Entry[]>;

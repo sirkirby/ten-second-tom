@@ -84,6 +84,7 @@ export class SqliteStorageService implements IStorageService {
   private readonly stmtDeleteEntry: Database.Statement;
   private readonly stmtDeleteEmbedding: Database.Statement;
   private readonly stmtInsertEmbedding: Database.Statement;
+  private readonly stmtCountEntries: Database.Statement;
   private readonly stmtSearchVector: Database.Statement;
 
   constructor(dbPath: string, embeddingDimension: number = DEFAULT_EMBEDDING_DIMENSION) {
@@ -125,6 +126,7 @@ export class SqliteStorageService implements IStorageService {
        LIMIT ?`,
     );
     this.stmtDeleteEntry = this.db.prepare('DELETE FROM entries WHERE id = ?');
+    this.stmtCountEntries = this.db.prepare('SELECT COUNT(*) as count FROM entries');
 
     // Vector embedding statements — vec0 does not support INSERT OR REPLACE,
     // so we use DELETE + INSERT (two steps, both cheap).
@@ -211,6 +213,11 @@ export class SqliteStorageService implements IStorageService {
 
     const rows = this.stmtListAll.all(limit, offset) as EntryRow[];
     return rows.map(rowToEntry);
+  }
+
+  async countEntries(): Promise<number> {
+    const row = this.stmtCountEntries.get() as { count: number };
+    return row.count;
   }
 
   async updateEntryAnalysis(id: string, analysis: EntryAnalysis): Promise<void> {

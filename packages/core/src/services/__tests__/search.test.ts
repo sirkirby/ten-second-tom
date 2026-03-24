@@ -18,6 +18,7 @@ function makeStorage(overrides?: Partial<IStorageService>): IStorageService {
     saveEntry: vi.fn(),
     getEntry: vi.fn(),
     listEntries: vi.fn(),
+    countEntries: vi.fn().mockResolvedValue(0),
     updateEntryAnalysis: vi.fn(),
     updateEntryEmbedding: vi.fn(),
     searchByKeyword: vi.fn().mockResolvedValue([mockEntry]),

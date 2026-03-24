@@ -106,8 +106,8 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
       setServices(svcs);
 
       // Count entries
-      void svcs.storage.listEntries({ limit: 100_000 }).then((entries) => {
-        setEntryCount(entries.length);
+      void svcs.storage.countEntries().then((count) => {
+        setEntryCount(count);
       });
 
       // Release native whisper context on exit to suppress "ggml_metal_free:
@@ -127,8 +127,8 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
   // ---- refresh entry count whenever home screen is shown ----
   useEffect(() => {
     if (screen !== 'home' || !services) return;
-    void services.storage.listEntries({ limit: 100_000 }).then((entries) => {
-      setEntryCount(entries.length);
+    void services.storage.countEntries().then((count) => {
+      setEntryCount(count);
     });
   }, [screen, services]);
 

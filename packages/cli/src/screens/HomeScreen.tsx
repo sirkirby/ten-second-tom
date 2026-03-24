@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
-import { SearchService } from '@ten-second-tom/core';
 import type { AppConfig, Entry, ServiceContainer } from '@ten-second-tom/core';
 import { Prompt } from '../components/Prompt.js';
 import { InlineSearchResults } from '../components/InlineSearchResults.js';
@@ -158,10 +157,9 @@ export function HomeScreen({ context, config, entryCount }: HomeScreenProps) {
       }
 
       setSearching(true);
-      const searchService = new SearchService(svcs.storage, svcs.embedding);
 
       try {
-        const results = await searchService.search(query, 5);
+        const results = await svcs.search.search(query, 5);
         setLastSearchResults(results);
         context.pushHistory({
           id: `search-${Date.now()}`,
