@@ -341,8 +341,10 @@ function deriveInitialState(cm: ConfigManager): { initial: WizardState; hasExist
         existing.embedding.provider !== 'none'
           ? existing.embedding.model
           : DEFAULT_OLLAMA_EMBEDDING_MODEL,
-      embeddingApiKey: existing.embedding.provider === 'openrouter' ? existing.embedding.apiKey : '',
-      embeddingEndpoint: existing.embedding.provider === 'custom' ? existing.embedding.endpoint : '',
+      embeddingApiKey:
+        existing.embedding.provider === 'openrouter' ? existing.embedding.apiKey : '',
+      embeddingEndpoint:
+        existing.embedding.provider === 'custom' ? existing.embedding.endpoint : '',
       selectedWhisperModel: null,
       selectedSherpaModel: null,
       errorMessage: '',
@@ -605,7 +607,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
     setStep('whisper-model');
   }
 
-  function handleEmbeddingProviderSelect(item: { value: 'ollama' | 'openrouter' | 'custom' | 'none' }) {
+  function handleEmbeddingProviderSelect(item: {
+    value: 'ollama' | 'openrouter' | 'custom' | 'none';
+  }) {
     setState((s) => ({ ...s, embeddingProvider: item.value }));
     if (item.value === 'ollama') {
       setStep('embedding-model-loading');
@@ -1095,7 +1099,12 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
           <Text dimColor>Get one at https://openrouter.ai/keys</Text>
           <Box marginTop={1}>
             <Text>API key: </Text>
-            <TextInput value={state.embeddingApiKey} onChange={(v) => setState((s) => ({ ...s, embeddingApiKey: v }))} onSubmit={handleOpenRouterKeySubmit} mask="*" />
+            <TextInput
+              value={state.embeddingApiKey}
+              onChange={(v) => setState((s) => ({ ...s, embeddingApiKey: v }))}
+              onSubmit={handleOpenRouterKeySubmit}
+              mask="*"
+            />
           </Box>
         </Box>
       )}
@@ -1121,7 +1130,11 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
           <Text dimColor>e.g., http://localhost:1234/v1</Text>
           <Box marginTop={1}>
             <Text>Endpoint: </Text>
-            <TextInput value={state.embeddingEndpoint} onChange={(v) => setState((s) => ({ ...s, embeddingEndpoint: v }))} onSubmit={handleCustomEndpointSubmit} />
+            <TextInput
+              value={state.embeddingEndpoint}
+              onChange={(v) => setState((s) => ({ ...s, embeddingEndpoint: v }))}
+              onSubmit={handleCustomEndpointSubmit}
+            />
           </Box>
         </Box>
       )}
@@ -1131,7 +1144,11 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
           <Text>Step 2 of {TOTAL_STEPS}: Enter embedding model name</Text>
           <Box marginTop={1}>
             <Text>Model: </Text>
-            <TextInput value={state.embeddingModel} onChange={(v) => setState((s) => ({ ...s, embeddingModel: v }))} onSubmit={handleCustomModelSubmit} />
+            <TextInput
+              value={state.embeddingModel}
+              onChange={(v) => setState((s) => ({ ...s, embeddingModel: v }))}
+              onSubmit={handleCustomModelSubmit}
+            />
           </Box>
         </Box>
       )}

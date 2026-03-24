@@ -14,7 +14,11 @@ import {
   NoopLiveTranscriptionService,
 } from './live-transcription.js';
 import { TomAgent } from '../agent/tom-agent.js';
-import { OllamaEmbeddingService, NoopEmbeddingService, OpenAICompatibleEmbeddingService } from './embedding.js';
+import {
+  OllamaEmbeddingService,
+  NoopEmbeddingService,
+  OpenAICompatibleEmbeddingService,
+} from './embedding.js';
 import { SqliteStorageService } from './storage-sqlite.js';
 import { SearchService } from './search.js';
 import { getEmbeddingDimension, OPENROUTER_BASE_URL } from '../constants.js';
