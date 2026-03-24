@@ -6,7 +6,8 @@ export const ANALYSIS_MAX_TOKENS = 2048;
 
 // Embedding defaults
 export const DEFAULT_OLLAMA_EMBEDDING_MODEL = 'nomic-embed-text';
-export const DEFAULT_CLOUD_EMBEDDING_MODEL = 'voyage-3-lite';
+export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+export const DEFAULT_OPENROUTER_EMBEDDING_MODEL = 'openai/text-embedding-3-small';
 export const EMBEDDING_AVAILABILITY_TIMEOUT_MS = 3_000;
 export const EMBEDDING_AVAILABILITY_CACHE_MS = 30_000;
 export const DEFAULT_EMBEDDING_DIMENSION = 768;
@@ -26,6 +27,9 @@ export const EMBEDDING_MODEL_DIMENSIONS: Record<string, number> = {
   'qwen3-embedding': 1536,
   'jina-embeddings': 768,
   'voyage-3-lite': 512,
+  'openai/text-embedding-3-small': 1536,
+  'openai/text-embedding-3-large': 3072,
+  'openai/text-embedding-ada-002': 1536,
 };
 
 /**
