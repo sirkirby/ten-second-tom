@@ -4,12 +4,6 @@ import type { EntryAnalysis, ServiceContainer } from '@ten-second-tom/core';
 // Pipeline types & orchestration (extracted from record.tsx for shared use)
 // ---------------------------------------------------------------------------
 
-/**
- * Re-export ServiceContainer as RecordingPipelineServices for backward
- * compatibility.
- */
-export type { ServiceContainer as RecordingPipelineServices } from '@ten-second-tom/core';
-
 export interface PipelineResult {
   entryId: string;
   transcript: string;

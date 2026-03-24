@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { ServiceContainer, ConfigManager } from '@ten-second-tom/core';
+import { reindexEntries } from '../reindex.js';
 
 // ---------------------------------------------------------------------------
 // Screen + history types
@@ -136,8 +137,20 @@ const setupCmd: TomCommand = {
 const reindexCmd: TomCommand = {
   name: 'reindex',
   description: 'Re-embed all entries for semantic search',
-  execute: (_args, _ctx) => {
-    // Handled asynchronously in HomeScreen — this stub exists for /help and tab-complete.
+  execute: (_args, ctx) => {
+    const svcs = ctx.services;
+    if (!svcs) {
+      ctx.pushHistory({
+        id: `reindex-err-${Date.now()}`,
+        content: (
+          <Text color="yellow">
+            Not configured. Run <Text color="green">/setup</Text> first.
+          </Text>
+        ),
+      });
+      return;
+    }
+    void reindexEntries(svcs, ctx.pushHistory);
   },
 };
 

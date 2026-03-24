@@ -2,8 +2,6 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
-import { Command } from 'commander';
-import { render } from 'ink';
 import { join } from 'node:path';
 import {
   existsSync,
@@ -1226,9 +1224,3 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
     </Box>
   );
 }
-
-export const setupCommand = new Command('setup')
-  .description('Configure Ten-Second Tom (LLM provider, embedding, STT)')
-  .action(() => {
-    render(<SetupWizard />);
-  });
