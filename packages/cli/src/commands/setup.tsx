@@ -285,20 +285,61 @@ export interface SetupWizardProps {
   onComplete?: () => void;
 }
 
+/**
+ * Derive initial wizard state from an existing AppConfig (if any).
+ * Returns the pre-populated WizardState and a boolean indicating whether
+ * existing config was loaded.
+ */
+function deriveInitialState(cm: ConfigManager): { initial: WizardState; hasExisting: boolean } {
+  const existing = cm.load();
+  if (!existing) {
+    return {
+      hasExisting: false,
+      initial: {
+        llmProvider: null,
+        apiKey: '',
+        localEndpoint: DEFAULT_OLLAMA_ENDPOINT,
+        localModelId: DEFAULT_LOCAL_MODEL_ID,
+        embeddingProvider: null,
+        embeddingModel: DEFAULT_OLLAMA_EMBEDDING_MODEL,
+        selectedWhisperModel: null,
+        selectedSherpaModel: null,
+        errorMessage: '',
+      },
+    };
+  }
+
+  return {
+    hasExisting: true,
+    initial: {
+      llmProvider: existing.llm.provider,
+      apiKey: existing.llm.provider === 'cloud' ? existing.llm.apiKey : '',
+      localEndpoint:
+        existing.llm.provider === 'local' ? existing.llm.localEndpoint : DEFAULT_OLLAMA_ENDPOINT,
+      localModelId:
+        existing.llm.provider === 'local' ? existing.llm.modelId : DEFAULT_LOCAL_MODEL_ID,
+      embeddingProvider: existing.embedding.provider,
+      embeddingModel:
+        existing.embedding.provider !== 'none'
+          ? existing.embedding.model
+          : DEFAULT_OLLAMA_EMBEDDING_MODEL,
+      selectedWhisperModel: null,
+      selectedSherpaModel: null,
+      errorMessage: '',
+    },
+  };
+}
+
 export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
   const { exit } = useApp();
+  const configManager = useMemo(() => new ConfigManager(), []);
+  const { initial, hasExisting } = useMemo(
+    () => deriveInitialState(configManager),
+    [configManager],
+  );
+
   const [step, setStep] = useState<Step>('llm-provider');
-  const [state, setState] = useState<WizardState>({
-    llmProvider: null,
-    apiKey: '',
-    localEndpoint: DEFAULT_OLLAMA_ENDPOINT,
-    localModelId: DEFAULT_LOCAL_MODEL_ID,
-    embeddingProvider: null,
-    embeddingModel: DEFAULT_OLLAMA_EMBEDDING_MODEL,
-    selectedWhisperModel: null,
-    selectedSherpaModel: null,
-    errorMessage: '',
-  });
+  const [state, setState] = useState<WizardState>(initial);
   const [ollamaModelItems, setOllamaModelItems] =
     useState<Array<{ label: string; value: string }>>(FALLBACK_MODEL_ITEMS);
   const [ollamaStatusMessage, setOllamaStatusMessage] = useState('');
@@ -313,8 +354,6 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
 
   const whisperModelItems = useMemo(buildWhisperModelItems, []);
   const sherpaModelItems = useMemo(buildSherpaModelItems, []);
-
-  const configManager = useMemo(() => new ConfigManager(), []);
 
   // Auto-exit after error with a short delay; allow q/Enter to exit immediately.
   // Disabled in REPL mode (onComplete provided) — the REPL manages its own lifecycle.
@@ -753,17 +792,28 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
 
   return (
     <Box flexDirection="column" paddingY={1}>
-      <Box marginBottom={1}>
+      <Box marginBottom={1} flexDirection="column">
         <Text bold color="cyan">
           Ten-Second Tom — Setup Wizard
         </Text>
+        {hasExisting && step === 'llm-provider' && (
+          <Text dimColor>Current configuration loaded. Press Enter to keep, or change.</Text>
+        )}
       </Box>
 
       {step === 'llm-provider' && (
         <Box flexDirection="column">
           <Text>Step 1 of {TOTAL_STEPS}: Choose your LLM provider</Text>
           <Box marginTop={1}>
-            <SelectInput items={llmProviderItems} onSelect={handleLlmProviderSelect} />
+            <SelectInput
+              items={llmProviderItems}
+              initialIndex={
+                state.llmProvider
+                  ? llmProviderItems.findIndex((i) => i.value === state.llmProvider)
+                  : 0
+              }
+              onSelect={handleLlmProviderSelect}
+            />
           </Box>
         </Box>
       )}
@@ -835,7 +885,15 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
             <Text dimColor>Embeddings enable semantic (meaning-based) search</Text>
           </Box>
           <Box marginTop={1}>
-            <SelectInput items={embeddingProviderItems} onSelect={handleEmbeddingProviderSelect} />
+            <SelectInput
+              items={embeddingProviderItems}
+              initialIndex={
+                state.embeddingProvider
+                  ? embeddingProviderItems.findIndex((i) => i.value === state.embeddingProvider)
+                  : 0
+              }
+              onSelect={handleEmbeddingProviderSelect}
+            />
           </Box>
         </Box>
       )}
