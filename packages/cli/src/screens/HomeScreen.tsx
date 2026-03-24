@@ -1,11 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { Box, Text } from 'ink';
-import Spinner from 'ink-spinner';
-import type { AppConfig, SearchResult } from '@ten-second-tom/core';
+import type { AppConfig } from '@ten-second-tom/core';
 import { Prompt } from '../components/Prompt.js';
-import { InlineSearchResults } from '../components/InlineSearchResults.js';
-import { InlineEntryDetail } from '../components/InlineEntryDetail.js';
-import { toErrorMessage } from '../utils/format.js';
 import { APP_VERSION } from '../constants.js';
 import { COMMANDS, findCommand } from '../commands/registry.js';
 import type { AppContext } from '../commands/registry.js';
@@ -43,9 +39,6 @@ function configSummary(config: AppConfig, entryCount: number): string {
 }
 
 export function HomeScreen({ context, config, entryCount }: HomeScreenProps) {
-  const [searching, setSearching] = useState(false);
-  const [lastSearchResults, setLastSearchResults] = useState<SearchResult[]>([]);
-
   // ---- /command handler ----
   const handleCommand = useCallback(
     (name: string, args: string) => {
@@ -67,74 +60,13 @@ export function HomeScreen({ context, config, entryCount }: HomeScreenProps) {
     [context],
   );
 
-  // ---- inline search handler ----
+  // ---- search handler — transition to SearchScreen ----
   const handleSearch = useCallback(
-    async (query: string) => {
-      const svcs = context.services;
-      if (!svcs) {
-        context.pushHistory({
-          id: `search-err-${Date.now()}`,
-          content: (
-            <Text color="yellow">
-              Not configured. Run <Text color="green">/setup</Text> first.
-            </Text>
-          ),
-        });
-        return;
-      }
-
-      setSearching(true);
-
-      try {
-        const results = await svcs.search.search(query, 5);
-        setLastSearchResults(results);
-        context.pushHistory({
-          id: `search-${Date.now()}`,
-          content: <InlineSearchResults query={query} results={results} />,
-        });
-      } catch (err) {
-        const msg = toErrorMessage(err);
-        context.pushHistory({
-          id: `search-err-${Date.now()}`,
-          content: <Text color="red">Search failed: {msg}</Text>,
-        });
-      } finally {
-        setSearching(false);
-      }
+    (query: string) => {
+      context.setScreenData({ query });
+      context.setScreen('search');
     },
     [context],
-  );
-
-  // ---- expand result handler ----
-  const handleExpandResult = useCallback(
-    (index: number) => {
-      if (lastSearchResults.length === 0) {
-        context.pushHistory({
-          id: `expand-err-${Date.now()}`,
-          content: <Text dimColor>No search results. Type a query first.</Text>,
-        });
-        return;
-      }
-
-      const result = lastSearchResults[index - 1]; // 1-indexed display
-      if (!result) {
-        context.pushHistory({
-          id: `expand-err-${Date.now()}`,
-          content: (
-            <Text dimColor>
-              No result #{index}. Pick 1–{lastSearchResults.length}.
-            </Text>
-          ),
-        });
-        return;
-      }
-
-      context.pushHistory({
-        id: `detail-${Date.now()}`,
-        content: <InlineEntryDetail entry={result.entry} />,
-      });
-    },
-    [context, lastSearchResults],
   );
 
   return (
@@ -148,22 +80,7 @@ export function HomeScreen({ context, config, entryCount }: HomeScreenProps) {
         </Text>
       )}
       <Text dimColor>{DIVIDER}</Text>
-      {searching ? (
-        <Box>
-          <Text color="cyan">
-            <Spinner type="dots" />
-          </Text>
-          <Text> Searching...</Text>
-        </Box>
-      ) : (
-        <Prompt
-          commands={COMMANDS}
-          onCommand={handleCommand}
-          onSearch={(query) => void handleSearch(query)}
-          onExpandResult={handleExpandResult}
-          hasSearchResults={lastSearchResults.length > 0}
-        />
-      )}
+      <Prompt commands={COMMANDS} onCommand={handleCommand} onSearch={handleSearch} />
     </Box>
   );
 }

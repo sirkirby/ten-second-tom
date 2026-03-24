@@ -7,8 +7,6 @@ interface PromptProps {
   commands: TomCommand[];
   onCommand: (name: string, args: string) => void;
   onSearch: (query: string) => void;
-  onExpandResult: (index: number) => void;
-  hasSearchResults?: boolean;
 }
 
 /**
@@ -16,7 +14,6 @@ interface PromptProps {
  *
  * Renders `tom >` in green, accepts text input, and dispatches:
  * - `/command args` → onCommand(name, args)
- * - bare number → onExpandResult(number)
  * - free text → onSearch(text)
  *
  * Tab completes `/` commands: `/re` → `/record`.
@@ -24,15 +21,8 @@ interface PromptProps {
  * Shows contextual hints below the input:
  * - Empty input: "Type to search · / for commands"
  * - Input starts with `/`: filtered list of matching commands
- * - Has search results: "Type a number to expand · Type to search · / for commands"
  */
-export function Prompt({
-  commands,
-  onCommand,
-  onSearch,
-  onExpandResult,
-  hasSearchResults,
-}: PromptProps) {
+export function Prompt({ commands, onCommand, onSearch }: PromptProps) {
   const [value, setValue] = useState('');
 
   const handleSubmit = useCallback(
@@ -46,17 +36,14 @@ export function Prompt({
         const [commandName, ...rest] = withoutSlash.split(' ');
         const args = rest.join(' ');
         onCommand(commandName ?? '', args);
-      } else if (/^\d+$/.test(trimmed)) {
-        // Number — expand search result
-        onExpandResult(parseInt(trimmed, 10));
       } else {
-        // Free text — semantic search
+        // Free text — transition to SearchScreen
         onSearch(trimmed);
       }
 
       setValue('');
     },
-    [onCommand, onSearch, onExpandResult],
+    [onCommand, onSearch],
   );
 
   // Tab autocomplete for /commands
@@ -97,17 +84,8 @@ export function Prompt({
         </Text>
         <TextInput value={value} onChange={setValue} onSubmit={handleSubmit} />
       </Box>
-      {isEmpty && !hasSearchResults && (
+      {isEmpty && (
         <Box paddingLeft={2}>
-          <Text dimColor>Type to search</Text>
-          <Text dimColor> {'\u00B7'} </Text>
-          <Text dimColor>/ for commands</Text>
-        </Box>
-      )}
-      {isEmpty && hasSearchResults && (
-        <Box paddingLeft={2}>
-          <Text dimColor>Type a number to expand</Text>
-          <Text dimColor> {'\u00B7'} </Text>
           <Text dimColor>Type to search</Text>
           <Text dimColor> {'\u00B7'} </Text>
           <Text dimColor>/ for commands</Text>
