@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
-import type { AppConfig, Entry } from '@ten-second-tom/core';
+import type { AppConfig, SearchResult } from '@ten-second-tom/core';
 import { Prompt } from '../components/Prompt.js';
 import { InlineSearchResults } from '../components/InlineSearchResults.js';
 import { InlineEntryDetail } from '../components/InlineEntryDetail.js';
@@ -44,7 +44,7 @@ function configSummary(config: AppConfig, entryCount: number): string {
 
 export function HomeScreen({ context, config, entryCount }: HomeScreenProps) {
   const [searching, setSearching] = useState(false);
-  const [lastSearchResults, setLastSearchResults] = useState<Entry[]>([]);
+  const [lastSearchResults, setLastSearchResults] = useState<SearchResult[]>([]);
 
   // ---- /command handler ----
   const handleCommand = useCallback(
@@ -116,8 +116,8 @@ export function HomeScreen({ context, config, entryCount }: HomeScreenProps) {
         return;
       }
 
-      const entry = lastSearchResults[index - 1]; // 1-indexed display
-      if (!entry) {
+      const result = lastSearchResults[index - 1]; // 1-indexed display
+      if (!result) {
         context.pushHistory({
           id: `expand-err-${Date.now()}`,
           content: (
@@ -131,7 +131,7 @@ export function HomeScreen({ context, config, entryCount }: HomeScreenProps) {
 
       context.pushHistory({
         id: `detail-${Date.now()}`,
-        content: <InlineEntryDetail entry={entry} />,
+        content: <InlineEntryDetail entry={result.entry} />,
       });
     },
     [context, lastSearchResults],

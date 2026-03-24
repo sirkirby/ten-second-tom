@@ -1,16 +1,27 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import type { Entry } from '@ten-second-tom/core';
-import { getSentimentColor, formatScore } from '../utils/sentiment.js';
+import type { SearchResult } from '@ten-second-tom/core';
 import { formatShortDate, getExcerpt } from '../utils/format.js';
 
 // ---------------------------------------------------------------------------
 // InlineSearchResults — rendered into Static history after a search
 // ---------------------------------------------------------------------------
 
+const FILLED = '\u2588'; // █
+const EMPTY = '\u2591'; // ░
+const BAR_WIDTH = 5;
+
+/**
+ * Render a relevance bar like "████░" (5 chars wide).
+ */
+function relevanceBar(relevance: number): string {
+  const filled = Math.round(relevance * BAR_WIDTH);
+  return FILLED.repeat(filled) + EMPTY.repeat(BAR_WIDTH - filled);
+}
+
 interface InlineSearchResultsProps {
   query: string;
-  results: Entry[];
+  results: SearchResult[];
 }
 
 export function InlineSearchResults({ query, results }: InlineSearchResultsProps) {
@@ -21,10 +32,9 @@ export function InlineSearchResults({ query, results }: InlineSearchResultsProps
     <Box flexDirection="column">
       <Text dimColor>
         Search: &quot;{query}&quot; ({results.length} {results.length === 1 ? 'result' : 'results'}
-        {' · type a number to expand'})
+        {' \u00B7 type a number to expand'})
       </Text>
-      {results.map((entry, i) => {
-        const sentiment = entry.analysis?.sentiment;
+      {results.map(({ entry, relevance }, i) => {
         return (
           <Text key={entry.id}>
             <Text color="green" bold>
@@ -32,14 +42,7 @@ export function InlineSearchResults({ query, results }: InlineSearchResultsProps
               {i + 1}.{' '}
             </Text>
             <Text dimColor>{formatShortDate(entry.createdAt).padEnd(7)}</Text>
-            {sentiment ? (
-              <Text color={getSentimentColor(sentiment.score)}>
-                {' '}
-                {formatScore(sentiment.score)}
-              </Text>
-            ) : (
-              <Text dimColor> {'     '}</Text>
-            )}
+            <Text color="cyan"> {relevanceBar(relevance)}</Text>
             <Text>
               {'  '}
               {getExcerpt(entry.content)}

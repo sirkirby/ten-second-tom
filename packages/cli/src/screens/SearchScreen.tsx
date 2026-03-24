@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import Spinner from 'ink-spinner';
-import type { Entry } from '@ten-second-tom/core';
+import type { Entry, SearchResult } from '@ten-second-tom/core';
 import { TranscriptBox } from '../components/TranscriptBox.js';
 import { getSentimentColor, formatScore } from '../utils/sentiment.js';
 import {
@@ -38,7 +38,7 @@ type Phase = 'input' | 'searching' | 'results' | 'detail';
 export function SearchScreen({ context, initialQuery, onClose }: SearchScreenProps) {
   const [phase, setPhase] = useState<Phase>(initialQuery ? 'searching' : 'input');
   const [query, setQuery] = useState(initialQuery ?? '');
-  const [results, setResults] = useState<Entry[]>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [detailEntry, setDetailEntry] = useState<Entry | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,8 +60,8 @@ export function SearchScreen({ context, initialQuery, onClose }: SearchScreenPro
       }
 
       try {
-        const entries = await svcs.search.search(searchQuery.trim());
-        setResults(entries);
+        const searchResults = await svcs.search.search(searchQuery.trim());
+        setResults(searchResults);
         setSelectedIndex(0);
         setPhase('results');
       } catch (err) {
@@ -100,9 +100,9 @@ export function SearchScreen({ context, initialQuery, onClose }: SearchScreenPro
             setSelectedIndex((prev) => (prev + 1) % results.length);
           }
           if (key.return) {
-            const entry = results[selectedIndex];
-            if (entry) {
-              setDetailEntry(entry);
+            const result = results[selectedIndex];
+            if (result) {
+              setDetailEntry(result.entry);
               setPhase('detail');
             }
           }
@@ -249,19 +249,20 @@ export function SearchScreen({ context, initialQuery, onClose }: SearchScreenPro
         </Box>
       ) : (
         <Box flexDirection="column">
-          {results.map((entry, index) => {
+          {results.map(({ entry, relevance }, index) => {
             const isSelected = index === selectedIndex;
             const score = entry.analysis?.sentiment.score ?? 0;
             const borderColor = getSentimentColor(score);
             const dateStr = formatShortDate(entry.createdAt);
             const scoreStr = entry.analysis ? formatScore(score) : '     ';
+            const relPct = `${Math.round(relevance * 100)}%`.padStart(4);
             const excerpt = getExcerpt(entry.content);
 
             return (
               <Box key={entry.id} paddingLeft={2}>
                 <Text color={borderColor}>{BORDER_CHAR} </Text>
                 <Text bold={isSelected} inverse={isSelected}>
-                  {dateStr.padEnd(7)} {scoreStr.padEnd(6)} {excerpt}
+                  {dateStr.padEnd(7)} {relPct} {scoreStr.padEnd(6)} {excerpt}
                 </Text>
               </Box>
             );

@@ -13,6 +13,15 @@ const mockEntry: Entry = {
   updatedAt: '2026-04-01T10:00:00.000Z',
 };
 
+const mockEntry2: Entry = {
+  id: 'test-id-2',
+  type: 'note',
+  content: 'Second result for testing relevance scores',
+  inputMethod: 'typed',
+  createdAt: '2026-04-01T11:00:00.000Z',
+  updatedAt: '2026-04-01T11:00:00.000Z',
+};
+
 function makeStorage(overrides?: Partial<IStorageService>): IStorageService {
   return {
     saveEntry: vi.fn(),
@@ -50,7 +59,7 @@ describe('SearchService', () => {
     expect(embedding.embed).toHaveBeenCalledWith('deploy pipeline');
     expect(storage.searchByVector).toHaveBeenCalledWith(expect.any(Float32Array), 10);
     expect(storage.searchByKeyword).not.toHaveBeenCalled();
-    expect(results).toEqual([mockEntry]);
+    expect(results).toEqual([{ entry: mockEntry, relevance: 1 }]);
   });
 
   it('falls back to FTS when embedding is unavailable', async () => {
@@ -65,7 +74,7 @@ describe('SearchService', () => {
     expect(embedding.embed).not.toHaveBeenCalled();
     expect(storage.searchByKeyword).toHaveBeenCalledWith('deploy pipeline', 10);
     expect(storage.searchByVector).not.toHaveBeenCalled();
-    expect(results).toEqual([mockEntry]);
+    expect(results).toEqual([{ entry: mockEntry, relevance: 1 }]);
   });
 
   it('falls back to FTS when embedding throws', async () => {
@@ -80,7 +89,7 @@ describe('SearchService', () => {
 
     expect(embedding.embed).toHaveBeenCalledWith('deploy pipeline');
     expect(storage.searchByKeyword).toHaveBeenCalledWith('deploy pipeline', 10);
-    expect(results).toEqual([mockEntry]);
+    expect(results).toEqual([{ entry: mockEntry, relevance: 1 }]);
   });
 
   it('passes custom limit to searchByVector', async () => {
@@ -105,5 +114,41 @@ describe('SearchService', () => {
     await service.search('query', 10);
 
     expect(storage.searchByKeyword).toHaveBeenCalledWith('query', 10);
+  });
+
+  it('assigns descending relevance scores by position', async () => {
+    const storage = makeStorage({
+      searchByKeyword: vi.fn().mockResolvedValue([mockEntry, mockEntry2]),
+    });
+    const embedding = makeEmbedding({
+      isAvailable: vi.fn().mockResolvedValue(false),
+    });
+    const service = new SearchService(storage, embedding);
+
+    const results = await service.search('deploy');
+
+    expect(results).toHaveLength(2);
+    expect(results[0]).toEqual(expect.objectContaining({ relevance: 1 }));
+    expect(results[1]).toEqual(expect.objectContaining({ relevance: 0 }));
+    expect(results[0]).toEqual(
+      expect.objectContaining({ entry: expect.objectContaining({ id: 'test-id' }) }),
+    );
+    expect(results[1]).toEqual(
+      expect.objectContaining({ entry: expect.objectContaining({ id: 'test-id-2' }) }),
+    );
+  });
+
+  it('returns empty array with no results', async () => {
+    const storage = makeStorage({
+      searchByKeyword: vi.fn().mockResolvedValue([]),
+    });
+    const embedding = makeEmbedding({
+      isAvailable: vi.fn().mockResolvedValue(false),
+    });
+    const service = new SearchService(storage, embedding);
+
+    const results = await service.search('nonexistent');
+
+    expect(results).toEqual([]);
   });
 });

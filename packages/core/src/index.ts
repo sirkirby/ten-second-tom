@@ -14,7 +14,7 @@ export {
   NoopEmbeddingService,
   type OllamaEmbeddingConfig,
 } from './services/embedding.js';
-export { type ISearchService, SearchService } from './services/search.js';
+export { type ISearchService, type SearchResult, SearchService } from './services/search.js';
 export {
   type IAudioService,
   type AudioServiceConfig,
