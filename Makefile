@@ -1,4 +1,4 @@
-.PHONY: install build dev clean test test-watch coverage lint format check link-dev unlink-dev tom setup
+.PHONY: install build dev clean clean-all test test-watch coverage lint format format-check check link-dev unlink-dev tom setup help
 
 # ─── Setup ───────────────────────────────────────────────────────────────────
 
@@ -19,8 +19,8 @@ build: ## Build all packages
 	pnpm -r build
 
 dev: ## Watch mode — rebuild on changes
-	pnpm --filter @ten-second-tom/core dev &
-	pnpm --filter @ten-second-tom/cli dev
+	pnpm --filter ten-second-tom-core dev &
+	pnpm --filter ten-second-tom dev
 
 # ─── Quality ─────────────────────────────────────────────────────────────────
 
@@ -46,23 +46,19 @@ check: lint format-check test ## Run all checks (lint, format, tests)
 
 # ─── Dev Convenience ─────────────────────────────────────────────────────────
 
-link-dev: build ## Link 'tom' binary globally for local testing
-	@if [ -z "$$PNPM_HOME" ]; then \
-		echo ""; \
-		echo "  PNPM_HOME is not set. Run 'pnpm setup' first, then restart your shell."; \
-		echo "  In the meantime, use 'make tom ARGS=\"record\"' to run directly."; \
-		echo ""; \
-		exit 1; \
-	fi
-	cd packages/cli && pnpm link --global
+
+link-dev: build ## Link 'tom-dev' binary globally for local testing
+	@mkdir -p $(HOME)/.local/bin
+	@ln -sf $(PWD)/packages/cli/dist/cli.js $(HOME)/.local/bin/tom-dev
+	@chmod +x $(HOME)/.local/bin/tom-dev
 	@echo ""
-	@echo "  'tom' is now linked to your local build."
-	@echo "  Run 'tom setup' to get started."
+	@echo "  'tom-dev' is now linked to your local build."
+	@echo "  Run 'tom-dev setup' to get started."
 	@echo "  Run 'make unlink-dev' when done."
 
-unlink-dev: ## Remove global 'tom' link
-	cd packages/cli && pnpm unlink --global
-	@echo "  'tom' global link removed."
+unlink-dev: ## Remove global 'tom-dev' link
+	@rm -f $(HOME)/.local/bin/tom-dev
+	@echo "  'tom-dev' link removed."
 
 tom: build ## Run tom CLI directly (usage: make tom ARGS="record")
 	@node packages/cli/dist/cli.js $(ARGS)
