@@ -24,6 +24,19 @@ agent:
   provider:
     type: anthropic
     model: claude-sonnet-4-6
+  tasks:
+    full-intelligence:
+      provider:
+        type: anthropic
+      schedule:
+        runIn:
+          - idle
+          - sleep
+    skill-survey:
+      provider:
+        type: anthropic
+      schedule:
+        enabled: false
 context:
   digest_tier: 5000
   prompt_search: true
