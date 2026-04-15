@@ -26,19 +26,19 @@ Ten-Second Tom captures voice recordings and text notes, transcribes them locall
 ### From npm
 
 ```bash
-npm install -g @ten-second-tom/cli
+npm install -g ten-second-tom
 ```
 
 Or with pnpm:
 
 ```bash
-pnpm add -g @ten-second-tom/cli
+pnpm add -g ten-second-tom
 ```
 
 ### From Source
 
 ```bash
-git clone https://github.com/your-org/ten-second-tom.git
+git clone https://github.com/sirkirby/ten-second-tom.git
 cd ten-second-tom
 pnpm install
 pnpm build

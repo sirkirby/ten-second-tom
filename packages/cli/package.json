@@ -1,31 +1,63 @@
 {
   "name": "ten-second-tom",
   "version": "2.0.0",
+  "description": "Voice capture and analysis CLI for engineers",
   "type": "module",
   "bin": {
     "tom": "./dist/cli.js"
   },
+  "files": [
+    "dist/",
+    "README.md"
+  ],
+  "keywords": [
+    "cli",
+    "voice",
+    "transcription",
+    "notes",
+    "search"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/sirkirby/ten-second-tom#readme",
+  "bugs": {
+    "url": "https://github.com/sirkirby/ten-second-tom/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sirkirby/ten-second-tom.git",
+    "directory": "packages/cli"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
-    "build": "tsup src/cli.ts --format esm",
-    "dev": "tsup src/cli.ts --format esm --watch",
+    "build": "tsup --config tsup.config.ts",
+    "dev": "tsup --config tsup.config.ts --watch",
     "start": "node dist/cli.js"
   },
   "dependencies": {
-    "@fugood/whisper.node": "^1.0.16",
-    "ten-second-tom-core": "workspace:*",
-    "better-sqlite3": "^12.8.0",
-    "commander": "^13.1.0",
-    "ink": "^5.1.0",
+    "@anthropic-ai/sdk": "^0.89.0",
+    "@fugood/whisper.node": "^1.0.18",
+    "better-sqlite3": "^12.9.0",
+    "commander": "^14.0.3",
+    "ink": "^7.0.0",
     "ink-select-input": "^6.0.0",
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
-    "react": "^18.3.0",
-    "sherpa-onnx-node": "^1.12.32",
-    "sqlite-vec": "^0.1.7"
+    "node-record-lpcm16": "^1.0.1",
+    "react": "^19.2.5",
+    "sherpa-onnx-node": "^1.12.38",
+    "sqlite-vec": "^0.1.9",
+    "uuid": "^13.0.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/react": "^18.3.0",
+    "@types/react": "^19.2.14",
     "ink-testing-library": "^4.0.0",
+    "ten-second-tom-core": "workspace:*",
     "tsup": "^8.4.0"
   }
 }

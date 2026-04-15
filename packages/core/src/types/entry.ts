@@ -9,7 +9,7 @@ export const SentimentSchema = z.object({
 export const EntryAnalysisSchema = z.object({
   sentiment: SentimentSchema,
   summary: z.string(),
-  raw: z.record(z.unknown()),
+  raw: z.record(z.string(), z.unknown()),
 });
 
 export const EntrySchema = z.object({
