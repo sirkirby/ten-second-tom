@@ -14,3 +14,11 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Myco managed (machine-specific)
+.agents/skills/myco
+.agents/skills/myco-curate
+.agents/skills/rules
+docs/superpowers/plans/
+docs/superpowers/specs/
+.wrangler/
