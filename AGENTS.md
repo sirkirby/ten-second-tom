@@ -1,308 +1,112 @@
-# Ten Second Tom - AI Agent Instructions
+# Project Rules
 
-> **⚠️ IMPORTANT**: This is a quick reference guide for AI agents. The **authoritative source of truth** is [`.specify/memory/constitution.md`](./.specify/memory/constitution.md). On any conflict, the constitution wins.
+## Project Identity
 
-## Quick Links
+Ten-Second Tom — intelligence-first voice capture and analysis CLI. Node.js/TypeScript. pnpm monorepo.
 
-- **Constitution (READ FIRST)**: [`.specify/memory/constitution.md`](./.specify/memory/constitution.md)
-- **Architecture Tests**: [`tests/TenSecondTom.Tests/Architecture/VsaComplianceTests.cs`](./tests/TenSecondTom.Tests/Architecture/VsaComplianceTests.cs)
+## Non-Goals
 
-## Project Overview
+- This is NOT a general-purpose audio or AI framework. Do not add extensibility points or plugin systems beyond what the CLI requires.
+- The CLI is NOT a business logic layer. All business logic MUST live in `packages/core/`.
 
-Ten Second Tom is a modern CLI application built with **C# and .NET 10**, following **Vertical Slice Architecture (VSA)** with the **Co-location Pattern**. All architectural principles are defined in the constitution.
+## Architecture Invariants
 
-## Core Technology Stack
+### Vertical Slice Pattern
 
-```text
-Language:     C# 14 with .NET 10
-CLI:          System.CommandLine 2.0-rc
-UI:           Spectre.Console 0.51.1
-CQRS:         MediatR 13.1.0
-Validation:   FluentValidation 12.0.0
-Logging:      Serilog 4.3.0
-Testing:      xUnit 2.9+ + FluentAssertions 8.7+
-Platforms:    macOS, Windows, (Linux future)
+Each feature MUST be built as a vertical slice through the stack — types, service, tests, and CLI command together. Build features end-to-end, not layer-by-layer.
+
+### Separation of Concerns
+
+- `packages/core/` owns all business logic. The CLI is a thin rendering layer. No business logic in CLI components or commands.
+- Each service MUST have a single responsibility and communicate through a well-defined interface.
+- Domains MUST stay isolated. Storage does not know about transcription. Transcription does not know about analysis. The command layer orchestrates.
+
+### Dependency Injection
+
+- Services MUST depend on interfaces, not implementations. Accept dependencies through constructors.
+- Use factory functions to construct service graphs from configuration.
+- MUST NOT construct services ad-hoc in command files — use the shared factory.
+- All service interfaces MUST live in `core/`. Implementations are swappable.
+
+### No Magic Literals
+
+- MUST NOT use magic strings. Use named constants or enums.
+- MUST NOT use magic numbers. Extract to named constants with units in the name (e.g., `MAX_BUFFER_BYTES`, `AUTO_EXIT_DELAY_MS`).
+- Configuration values MUST come from config, not hardcoded in logic.
+
+### Functions
+
+- Functions MUST be idempotent by default. Same inputs → same outputs, no hidden side effects.
+- Prefer pure functions. Isolate side effects (I/O, state mutation) to the edges.
+- Prefer patterns over patches — when fixing a bug or adding a feature, look for the underlying pattern. Do not patch around symptoms.
+
+### DRY
+
+- MUST NOT copy-paste logic with slight variation. Extract shared logic into hooks, utilities, or services.
+- Shared UI patterns MUST go in `packages/cli/src/components/`. Shared logic goes in `hooks/` or `utils/`. Shared business logic goes in `packages/core/`.
+
+## Code Rules
+
+### TypeScript
+
+- Strict mode, ESM, `verbatimModuleSyntax` — no exceptions.
+- MUST use `.js` extensions in all relative imports (required for ESM).
+- MUST use `import type` for type-only imports.
+- Zod schemas are the source of truth for types. Infer TypeScript types from schemas with `z.infer<>`. MUST NOT manually duplicate a type that a schema defines.
+- Use discriminated unions for provider-dependent configuration.
+
+### Error Handling
+
+- Capture MUST always succeed if the mic works. Post-capture steps (analysis, embedding) MUST degrade gracefully — warn and continue.
+- Check prerequisites upfront, not mid-operation.
+- Use platform-specific error messages for system dependencies.
+- MUST NOT show raw stack traces to users.
+
+### Testing
+
+- TDD: write the failing test first, then implement.
+- Vitest with globals. Tests MUST be colocated: `src/module/__tests__/module.test.ts`
+- 80% coverage target on core.
+- MUST mock native dependencies — never depend on hardware in tests.
+- MUST use `vi.hoisted()` for mock variables inside `vi.mock()` factories (required for Vitest ESM).
+
+### CJS in ESM
+
+`node-record-lpcm16` is CommonJS. MUST use default import pattern:
+```typescript
+import recorder from 'node-record-lpcm16';
+const { record } = recorder;
+```
+MUST NOT use named imports from CJS modules.
+
+### CLI Components (Ink)
+
+- MUST use phase pattern: `init → [working phases] → done | error`.
+- MUST yield to the event loop (`setTimeout(0)`) before CPU-intensive native calls so Ink can render.
+- MUST use shared hooks and components — do not duplicate UI patterns across commands.
+
+## Quality Gates
+
+Run before every commit:
+```bash
+make check   # lint + format + tests
 ```
 
-## Development Workflow
-
-### Before Making Changes
-
-1. ✅ Read the constitution at `.specify/memory/constitution.md`
-2. ✅ Check existing tests and understand current behavior
-3. ✅ Locate the feature slice - all related code should be nearby
-4. ✅ Look for duplication - refactor rather than duplicate
-
-### TDD Cycle (Red-Green-Refactor)
-
-1. **Write Test** - Create test showing expected behavior
-2. **Verify Red** - Confirm test fails with clear error
-3. **Minimal Implementation** - Write just enough code to pass
-4. **Verify Green** - Confirm test passes
-5. **Refactor** - Clean up code while keeping tests green
-
-## Code Organization (Co-location Pattern)
-
-**One use case = One file** with nested Command/Query, Validator, Handler:
-
-```csharp
-// src/Features/[FeatureName]/[UseCase].cs
-namespace TenSecondTom.Features.[FeatureName];
-
-/// <summary>Brief description of use case</summary>
-public static class [UseCase]
-{
-    public sealed record Command(...) : IRequest<Result<T>>;
-
-    public sealed class Validator : AbstractValidator<Command>
-    {
-        public Validator()
-        {
-            // Validation rules (auto-discovered)
-        }
-    }
-
-    public sealed class Handler(...) : IRequestHandler<Command, Result<T>>
-    {
-        public async Task<Result<T>> Handle(Command request, CancellationToken ct)
-        {
-            // Business logic (validation/logging already done by pipeline)
-        }
-    }
-}
+Other useful commands:
+```bash
+make build              # Build all packages
+make test               # Run all tests
+make tom ARGS="record"  # Run CLI without global linking
+make link-dev           # Link `tom` globally (requires PNPM_HOME)
+make coverage           # Tests with coverage report
 ```
 
-**File naming**: `[Verb][Noun].cs` (e.g., `CreateUser.cs`, `ListTemplates.cs`, `GenerateOutput.cs`)
+Single test: `pnpm vitest run packages/core/src/services/__tests__/storage.test.ts`
 
-## Configuration Management (REQUIRED)
 
-**Never access `IConfiguration` directly. Always use the Options Pattern:**
+<!-- myco:managed:start -->
+## Myco Managed Guidance
 
-```csharp
-// ❌ PROHIBITED
-var apiKey = _configuration["TenSecondTom:ApiKey"];
-
-// ✅ REQUIRED
-// 1. Options class in Shared/Options/
-public sealed class MyFeatureOptions
-{
-    public const string SectionName = "TenSecondTom:MyFeature";
-    public required string ApiKey { get; init; }
-}
-
-// 2. Validator in Shared/Options/Validation/
-public sealed class MyFeatureOptionsValidator : IValidateOptions<MyFeatureOptions>
-{
-    public ValidateOptionsResult Validate(string? name, MyFeatureOptions options)
-    {
-        if (string.IsNullOrWhiteSpace(options.ApiKey))
-            return ValidateOptionsResult.Fail("ApiKey is required");
-        return ValidateOptionsResult.Success;
-    }
-}
-
-// 3. Register in ServiceCollectionExtensions.cs
-services.Configure<MyFeatureOptions>(configuration.GetSection(MyFeatureOptions.SectionName));
-services.AddSingleton<IValidateOptions<MyFeatureOptions>, MyFeatureOptionsValidator>();
-
-// 4. Inject IOptions<T>
-public sealed class MyService(IOptions<MyFeatureOptions> options)
-{
-    private readonly MyFeatureOptions _options = options.Value;
-}
-```
-
-## Modern C# Features (Required)
-
-```csharp
-// ✅ File-scoped namespaces
-namespace TenSecondTom.Features.Users;
-
-// ✅ Primary constructors
-public sealed class UserService(IUserRepository repo, ILogger<UserService> logger)
-{
-    // Use dependencies directly
-}
-
-// ✅ Records for DTOs
-public sealed record UserDto(Guid Id, string Username, string Email);
-
-// ✅ Required properties
-public sealed class Config
-{
-    public required string ApiKey { get; init; }
-}
-
-// ✅ Collection expressions
-var items = [item1, item2, item3];
-
-// ✅ Constants (NO magic strings!)
-var dir = configuration[ConfigurationKeys.RootDirectory];
-if (command == CommandNames.Today) { }
-```
-
-## Testing Requirements (80% Coverage Minimum)
-
-```csharp
-// Test structure: Arrange-Act-Assert
-public sealed class CreateUserTests
-{
-    [Fact]
-    public async Task Handle_WithValidCommand_CreatesUser()
-    {
-        // Arrange
-        var repository = new Mock<IUserRepository>();
-        var handler = new CreateUser.Handler(
-            repository.Object,
-            Mock.Of<ILogger<CreateUser.Handler>>());
-        var command = new CreateUser.Command("john", "john@example.com");
-
-        // Act
-        var result = await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().NotBeEmpty();
-    }
-
-    [Theory]
-    [InlineData("", "test@example.com")]
-    [InlineData("john", "")]
-    public async Task Validator_WithInvalidInput_Fails(string username, string email)
-    {
-        // Arrange
-        var validator = new CreateUser.Validator();
-        var command = new CreateUser.Command(username, email);
-
-        // Act
-        var result = await validator.ValidateAsync(command);
-
-        // Assert
-        result.IsValid.Should().BeFalse();
-    }
-}
-```
-
-## VSA Compliance
-
-### ✅ Allowed
-```csharp
-// Cross-feature communication via MediatR
-var audioConfig = await _mediator.Send(new GetAudioConfiguration.Query());
-
-// Shared code in Shared/ directory
-var logsDir = Path.Combine(baseDir, DirectoryNames.Logs);
-```
-
-### ❌ Prohibited
-```csharp
-// Direct feature reference
-var audioService = new AudioService(); // NO! Cross-feature coupling
-
-// Magic strings
-var key = config["TenSecondTom:ApiKey"]; // NO! Use Options Pattern
-if (command == "today") { } // NO! Use CommandNames.Today
-
-// God Objects
-public class ConfigurationSettings { /* all app config */ } // NO! Violates VSA
-
-// Obsolete code
-[Obsolete] public void OldMethod() { } // NO! Delete it instead
-```
-
-## Result Pattern (Error Handling)
-
-```csharp
-public async Task<Result<User>> CreateUserAsync(string username)
-{
-    if (string.IsNullOrWhiteSpace(username))
-        return Result<User>.Failure("Username is required");
-
-    try
-    {
-        var user = await _repository.CreateAsync(username);
-        return Result<User>.Success(user);
-    }
-    catch (DuplicateUserException ex)
-    {
-        _logger.LogWarning(ex, "Duplicate user: {Username}", username);
-        return Result<User>.Failure($"User {username} already exists");
-    }
-}
-```
-
-## Naming Conventions
-
-| Type | Convention | Example |
-|------|-----------|---------|
-| Use Case Files | `[Verb][Noun].cs` | `CreateUser.cs`, `GenerateOutput.cs` |
-| Nested Types | `Command`, `Query`, `Validator`, `Handler` | No prefixes |
-| Options Classes | `[Feature]Options` | `AudioOptions`, `LlmOptions` |
-| Options Validators | `[Options]Validator` | `AudioOptionsValidator` |
-| Constants | `[Domain]Keys/Names/Constants` | `ConfigurationKeys`, `CommandNames` |
-| DI Methods | `Add[Feature]Feature` | `AddAuthFeature()`, `AddTemplatesFeature()` |
-| Test Files | `[UseCase]Tests.cs` | `CreateUserTests.cs` |
-
-## CLI Command Structure
-
-```csharp
-// Use System.CommandLine
-var createCommand = new Command("create", "Create a new user");
-
-var usernameOption = new Option<string>("--username") { IsRequired = true };
-createCommand.AddOption(usernameOption);
-
-createCommand.SetHandler(async (string username) =>
-{
-    var result = await _mediator.Send(new CreateUser.Command(username, email));
-
-    if (result.IsSuccess)
-    {
-        Console.WriteLine($"User created: {result.Value}");
-        return 0; // Success
-    }
-
-    Console.Error.WriteLine($"Error: {result.Error}");
-    return 1; // Failure
-}, usernameOption);
-```
-
-## Priority Order for Suggestions
-
-1. **Correctness** - Code must work correctly and handle edge cases
-2. **Tests** - TDD with 80% coverage (non-negotiable)
-3. **Maintainability** - DRY, clear, well-organized code
-4. **Performance** - Optimize when justified
-5. **Documentation** - XML comments on public APIs
-
-## What NOT to Do
-
-❌ Web frameworks (ASP.NET Core, Blazor)
-❌ GUI frameworks (WPF, WinForms)
-❌ Direct `IConfiguration` access with strings
-❌ Magic strings for config keys, commands, paths
-❌ Cross-feature coupling (direct references)
-❌ God Objects (monolithic classes)
-❌ `[Obsolete]` attributes (delete old code)
-❌ Code without tests
-❌ Test frameworks other than xUnit
-❌ Ignoring 80% coverage requirement
-
-## When in Doubt
-
-1. Check [`.specify/memory/constitution.md`](./.specify/memory/constitution.md) first
-2. Look for similar patterns in the codebase
-3. Run architecture tests to verify VSA compliance: `tests/TenSecondTom.Tests/Architecture/VsaComplianceTests.cs`
-4. Ask the user for clarification
-
----
-
-**Constitution Version**: 1.8.0 | **Last Updated**: 2025-01-19
-
-**Recent Changes**:
-- ConfigurationSettings God Object removed (aggressive refactor complete)
-- IConfigurationSectionStore is now the standard for config storage
-- Force parameter pattern for independent configuration commands
-- All `[Obsolete]` code removed from production
-
-For detailed architectural principles, design patterns, and governance, consult [`.specify/memory/constitution.md`](./.specify/memory/constitution.md).
+- When `capture.ignore_plan_dirs_in_git` is enabled, custom directories in `capture.plan_dirs` may be intentionally gitignored after capture into Myco.
+- Do not force-add files from intentionally gitignored custom plan directories unless the user explicitly asks.
+<!-- myco:managed:end -->

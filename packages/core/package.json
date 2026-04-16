@@ -1,0 +1,33 @@
+{
+  "name": "ten-second-tom-core",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --external sherpa-onnx-node --external @fugood/whisper.node --external better-sqlite3 --external sqlite-vec",
+    "dev": "tsup src/index.ts --format esm --dts --watch --external sherpa-onnx-node --external @fugood/whisper.node --external better-sqlite3 --external sqlite-vec"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.89.0",
+    "@fugood/whisper.node": "^1.0.18",
+    "better-sqlite3": "^12.9.0",
+    "node-record-lpcm16": "^1.0.1",
+    "sherpa-onnx-node": "^1.12.38",
+    "sqlite-vec": "^0.1.9",
+    "uuid": "^13.0.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/uuid": "^11.0.0",
+    "tsup": "^8.4.0"
+  }
+}

@@ -1,0 +1,8 @@
+{"type":"server-started","port":58910,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:58910","screen_dir":"/Users/chris/Repos/ten-second-tom/.superpowers/brainstorm/39887-1774280144"}
+{"type":"screen-added","file":"/Users/chris/Repos/ten-second-tom/.superpowers/brainstorm/39887-1774280144/shell-layout.html"}
+{"source":"user-event","type":"click","text":"Ten-Second Tom v2.0\n        LLM: gpt-oss (local) · STT: whisper · Embedding: bge-m3 · 12 entries\n        \n        tom ❯ record, note, search, help\n      \n    \n    \n      A — Compact Header\n      Title + one-line config summary + prompt. Clean and dense like Claude Code.","choice":"compact","id":null,"timestamp":1774280311373}
+{"type":"screen-added","file":"/Users/chris/Repos/ten-second-tom/.superpowers/brainstorm/39887-1774280144/shell-layout-v2.html"}
+{"source":"user-event","type":"click","text":"Ten-Second Tom v2.0\n        gpt-oss · whisper · bge-m3 · 12 entries\n        \n        tom ❯ _\n      \n    \n    \n      Combined — Terse + Clean\n      Model names only, no labels. Thin divider to prompt. Autocomplete handles discovery.","choice":"combined","id":null,"timestamp":1774280406104}
+{"type":"screen-added","file":"/Users/chris/Repos/ten-second-tom/.superpowers/brainstorm/39887-1774280144/app-flow.html"}
+{"type":"screen-added","file":"/Users/chris/Repos/ten-second-tom/.superpowers/brainstorm/39887-1774280144/waiting.html"}
+{"type":"server-stopped","reason":"idle timeout"}
