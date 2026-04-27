@@ -1,5 +1,5 @@
 version: 3
-config_version: 5
+config_version: 6
 embedding:
   provider: ollama
   model: bge-m3
@@ -25,20 +25,22 @@ agent:
     type: anthropic
     model: claude-sonnet-4-6
   tasks:
-    full-intelligence:
+    skill-survey:
+      provider:
+        type: anthropic
+      schedule:
+        enabled: false
+    vault-evolve:
       provider:
         type: anthropic
       schedule:
         runIn:
           - idle
           - sleep
-    skill-survey:
-      provider:
-        type: anthropic
-      schedule:
-        enabled: false
 context:
   digest_tier: 5000
+  session_start_digest_enabled: false
+  cortex_enabled: true
   prompt_search: true
   prompt_max_spores: 3
 backup: {}
