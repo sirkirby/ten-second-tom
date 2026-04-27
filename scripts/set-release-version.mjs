@@ -37,19 +37,5 @@ function updatePackageVersion(relativePath) {
   writeJson(relativePath, pkg);
 }
 
-function updateCliVersionConstant() {
-  const relativePath = 'packages/cli/src/constants.ts';
-  const absolutePath = path.join(repoRoot, relativePath);
-  const current = fs.readFileSync(absolutePath, 'utf8');
-  const next = current.replace(
-    /export const APP_VERSION = '.*';/,
-    `export const APP_VERSION = ${JSON.stringify(version)};`,
-  );
-
-  if (current === next) return;
-  fs.writeFileSync(absolutePath, next, 'utf8');
-}
-
 updatePackageVersion('packages/cli/package.json');
 updatePackageVersion('packages/core/package.json');
-updateCliVersionConstant();
