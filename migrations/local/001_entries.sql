@@ -5,8 +5,8 @@ CREATE TABLE IF NOT EXISTS entries (
   audio_path TEXT,
   input_method TEXT NOT NULL CHECK(input_method IN ('typed', 'dictated', 'recorded')),
   analysis TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 CREATE INDEX IF NOT EXISTS idx_entries_type ON entries(type);
 CREATE INDEX IF NOT EXISTS idx_entries_created ON entries(created_at DESC);
@@ -23,3 +23,8 @@ CREATE TRIGGER IF NOT EXISTS entries_au AFTER UPDATE ON entries BEGIN
   INSERT INTO entries_fts(entries_fts, rowid, content) VALUES('delete', old.rowid, old.content);
   INSERT INTO entries_fts(rowid, content) VALUES (new.rowid, new.content);
 END;
+
+CREATE VIRTUAL TABLE IF NOT EXISTS entry_embeddings USING vec0(
+  entry_id TEXT PRIMARY KEY,
+  embedding float[768]
+);

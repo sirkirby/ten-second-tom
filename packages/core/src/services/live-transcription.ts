@@ -9,6 +9,7 @@ import {
   SHERPA_ONNX_JOINER_FILENAME,
   SHERPA_ONNX_TOKENS_FILENAME,
   SHERPA_ONNX_POLL_INTERVAL_MS,
+  SHERPA_ONNX_MAX_DECODE_ITERATIONS_PER_POLL,
 } from '../constants.js';
 import { int16BufferToFloat32 } from './audio-utils.js';
 
@@ -59,7 +60,11 @@ export type CreateRecognizerFn = (config: SherpaOnnxRecognizerConfig) => SherpaO
 
 export interface ILiveTranscriptionService {
   /** Begin processing audio from the stream, calling onText with accumulated text. */
-  start(audioStream: Readable, onText: (text: string) => void): void;
+  start(
+    audioStream: Readable,
+    onText: (text: string) => void,
+    onError?: (error: Error) => void,
+  ): void;
   /** Stop processing and clean up. */
   stop(): void;
   /** Whether the sherpa-onnx model files exist and the service can operate. */
@@ -109,6 +114,11 @@ function defaultCreateRecognizer(config: SherpaOnnxRecognizerConfig): SherpaOnnx
 export interface SherpaOnnxLiveTranscriptionConfig {
   /** Absolute path to the directory containing the sherpa-onnx model files. */
   modelsPath: string;
+  modelDir?: string;
+  encoderFilename?: string;
+  decoderFilename?: string;
+  joinerFilename?: string;
+  tokensFilename?: string;
   /**
    * Optional factory to create the sherpa-onnx recognizer.
    * Defaults to loading the real sherpa-onnx-node module. Override in tests.
@@ -134,6 +144,11 @@ export interface SherpaOnnxLiveTranscriptionConfig {
  */
 export class SherpaOnnxLiveTranscriptionService implements ILiveTranscriptionService {
   private readonly modelsPath: string;
+  private readonly modelDirName: string;
+  private readonly encoderFilename: string;
+  private readonly decoderFilename: string;
+  private readonly joinerFilename: string;
+  private readonly tokensFilename: string;
   private readonly createRecognizerFn: CreateRecognizerFn;
   private readonly available: boolean;
   private recognizer: SherpaOnnxOnlineRecognizer | null = null;
@@ -145,22 +160,31 @@ export class SherpaOnnxLiveTranscriptionService implements ILiveTranscriptionSer
 
   constructor(config: SherpaOnnxLiveTranscriptionConfig) {
     this.modelsPath = config.modelsPath;
+    this.modelDirName = config.modelDir ?? SHERPA_ONNX_MODEL_DIR;
+    this.encoderFilename = config.encoderFilename ?? SHERPA_ONNX_ENCODER_FILENAME;
+    this.decoderFilename = config.decoderFilename ?? SHERPA_ONNX_DECODER_FILENAME;
+    this.joinerFilename = config.joinerFilename ?? SHERPA_ONNX_JOINER_FILENAME;
+    this.tokensFilename = config.tokensFilename ?? SHERPA_ONNX_TOKENS_FILENAME;
     this.createRecognizerFn = config.createRecognizer ?? defaultCreateRecognizer;
 
     // Check filesystem once at construction time and cache the result
-    const modelDir = join(this.modelsPath, SHERPA_ONNX_MODEL_DIR);
+    const modelDir = join(this.modelsPath, this.modelDirName);
     this.available =
-      existsSync(join(modelDir, SHERPA_ONNX_ENCODER_FILENAME)) &&
-      existsSync(join(modelDir, SHERPA_ONNX_DECODER_FILENAME)) &&
-      existsSync(join(modelDir, SHERPA_ONNX_JOINER_FILENAME)) &&
-      existsSync(join(modelDir, SHERPA_ONNX_TOKENS_FILENAME));
+      existsSync(join(modelDir, this.encoderFilename)) &&
+      existsSync(join(modelDir, this.decoderFilename)) &&
+      existsSync(join(modelDir, this.joinerFilename)) &&
+      existsSync(join(modelDir, this.tokensFilename));
   }
 
   isAvailable(): boolean {
     return this.available;
   }
 
-  start(audioStream: Readable, onText: (text: string) => void): void {
+  start(
+    audioStream: Readable,
+    onText: (text: string) => void,
+    onError?: (error: Error) => void,
+  ): void {
     if (this.recognizer !== null) {
       throw new Error('Live transcription already active — call stop() first');
     }
@@ -168,21 +192,21 @@ export class SherpaOnnxLiveTranscriptionService implements ILiveTranscriptionSer
     if (!this.isAvailable()) {
       throw new Error(
         'sherpa-onnx model not found. Download the streaming model to ' +
-          join(this.modelsPath, SHERPA_ONNX_MODEL_DIR),
+          join(this.modelsPath, this.modelDirName),
       );
     }
 
-    const modelDir = join(this.modelsPath, SHERPA_ONNX_MODEL_DIR);
+    const modelDir = join(this.modelsPath, this.modelDirName);
 
     this.recognizer = this.createRecognizerFn({
       featConfig: { sampleRate: AUDIO_SAMPLE_RATE, featureDim: 80 },
       modelConfig: {
         transducer: {
-          encoder: join(modelDir, SHERPA_ONNX_ENCODER_FILENAME),
-          decoder: join(modelDir, SHERPA_ONNX_DECODER_FILENAME),
-          joiner: join(modelDir, SHERPA_ONNX_JOINER_FILENAME),
+          encoder: join(modelDir, this.encoderFilename),
+          decoder: join(modelDir, this.decoderFilename),
+          joiner: join(modelDir, this.joinerFilename),
         },
-        tokens: join(modelDir, SHERPA_ONNX_TOKENS_FILENAME),
+        tokens: join(modelDir, this.tokensFilename),
         numThreads: 2,
         provider: 'cpu',
         debug: 0,
@@ -202,36 +226,51 @@ export class SherpaOnnxLiveTranscriptionService implements ILiveTranscriptionSer
 
     // Listen for PCM data and feed it to the recognizer
     this.dataListener = (chunk: Buffer) => {
-      if (this.stream === null) return;
-      const float32 = int16BufferToFloat32(chunk);
-      this.stream.acceptWaveform({ sampleRate: AUDIO_SAMPLE_RATE, samples: float32 });
+      try {
+        if (this.stream === null) return;
+        const float32 = int16BufferToFloat32(chunk);
+        this.stream.acceptWaveform({ sampleRate: AUDIO_SAMPLE_RATE, samples: float32 });
+      } catch (err) {
+        this.stop();
+        onError?.(err instanceof Error ? err : new Error(String(err)));
+      }
     };
 
     audioStream.on('data', this.dataListener);
 
     // Poll the recognizer for decoded results
     this.pollTimer = setInterval(() => {
-      if (this.recognizer === null || this.stream === null) return;
+      try {
+        if (this.recognizer === null || this.stream === null) return;
 
-      while (this.recognizer.isReady(this.stream)) {
-        this.recognizer.decode(this.stream);
-      }
-
-      const result = this.recognizer.getResult(this.stream);
-      const currentText = result.text.trim();
-
-      // Check for endpoint (natural pause / sentence boundary)
-      if (this.recognizer.isEndpoint(this.stream)) {
-        if (currentText.length > 0) {
-          this.accumulatedText += (this.accumulatedText.length > 0 ? ' ' : '') + currentText;
-          onText(this.accumulatedText);
+        let decodeIterations = 0;
+        while (
+          decodeIterations < SHERPA_ONNX_MAX_DECODE_ITERATIONS_PER_POLL &&
+          this.recognizer.isReady(this.stream)
+        ) {
+          this.recognizer.decode(this.stream);
+          decodeIterations++;
         }
-        this.recognizer.reset(this.stream);
-      } else if (currentText.length > 0) {
-        // Show in-progress text combined with accumulated finalized text
-        const displayText =
-          this.accumulatedText + (this.accumulatedText.length > 0 ? ' ' : '') + currentText;
-        onText(displayText);
+
+        const result = this.recognizer.getResult(this.stream);
+        const currentText = result.text.trim();
+
+        // Check for endpoint (natural pause / sentence boundary)
+        if (this.recognizer.isEndpoint(this.stream)) {
+          if (currentText.length > 0) {
+            this.accumulatedText += (this.accumulatedText.length > 0 ? ' ' : '') + currentText;
+            onText(this.accumulatedText);
+          }
+          this.recognizer.reset(this.stream);
+        } else if (currentText.length > 0) {
+          // Show in-progress text combined with accumulated finalized text
+          const displayText =
+            this.accumulatedText + (this.accumulatedText.length > 0 ? ' ' : '') + currentText;
+          onText(displayText);
+        }
+      } catch (err) {
+        this.stop();
+        onError?.(err instanceof Error ? err : new Error(String(err)));
       }
     }, SHERPA_ONNX_POLL_INTERVAL_MS);
   }
@@ -275,7 +314,11 @@ export class SherpaOnnxLiveTranscriptionService implements ILiveTranscriptionSer
  * Recording still works — the user just won't see live transcript preview.
  */
 export class NoopLiveTranscriptionService implements ILiveTranscriptionService {
-  start(_audioStream: Readable, _onText: (text: string) => void): void {
+  start(
+    _audioStream: Readable,
+    _onText: (text: string) => void,
+    _onError?: (error: Error) => void,
+  ): void {
     // No-op: live transcription not available
   }
 

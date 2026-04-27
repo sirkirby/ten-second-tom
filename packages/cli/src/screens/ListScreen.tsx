@@ -2,15 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
 import type { Entry } from 'ten-second-tom-core';
-import { TranscriptBox } from '../components/TranscriptBox.js';
+import { EntryDetail } from '../components/EntryDetail.js';
 import { getSentimentColor, formatScore } from '../utils/sentiment.js';
-import {
-  formatShortDate,
-  formatFullDate,
-  getExcerpt,
-  formatConfidence,
-  toErrorMessage,
-} from '../utils/format.js';
+import { formatShortDate, getExcerpt, toErrorMessage } from '../utils/format.js';
 import { BORDER_CHAR } from '../constants.js';
 import type { AppContext } from '../commands/registry.js';
 
@@ -36,6 +30,21 @@ export interface ListScreenProps {
 
 type Phase = 'loading' | 'results' | 'detail';
 
+function renderOneShotEntries(label: string, loadedEntries: Entry[]): React.ReactNode {
+  return (
+    <Box flexDirection="column">
+      <Text>
+        Recent {label} ({loadedEntries.length})
+      </Text>
+      {loadedEntries.map((entry) => (
+        <Text key={entry.id}>
+          {formatShortDate(entry.createdAt)} {entry.id} {getExcerpt(entry.content)}
+        </Text>
+      ))}
+    </Box>
+  );
+}
+
 function filterLabel(filter: ListScreenProps['filter']): string {
   if (filter === 'notes') return 'notes';
   if (filter === 'recordings') return 'recordings';
@@ -53,6 +62,7 @@ export function ListScreen({ context, filter, onClose }: ListScreenProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [detailEntry, setDetailEntry] = useState<Entry | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const stdinSupportsInput = process.stdin.isTTY === true;
 
   // -------------------------------------------------------------------------
   // Load entries on mount
@@ -75,11 +85,25 @@ export function ListScreen({ context, filter, onClose }: ListScreenProps) {
         setTotalCount(loaded.length);
         setSelectedIndex(0);
         setPhase('results');
+        if (context.oneShot) {
+          context.pushHistory({
+            id: `list-result-${Date.now()}`,
+            content: renderOneShotEntries(filterLabel(filter), loaded),
+          });
+          onClose();
+        }
       })
       .catch((err: unknown) => {
         setError(`Failed to load entries: ${toErrorMessage(err)}`);
         setEntries([]);
         setPhase('results');
+        if (context.oneShot) {
+          context.pushHistory({
+            id: `list-err-${Date.now()}`,
+            content: <Text color="red">Failed to load entries: {toErrorMessage(err)}</Text>,
+          });
+          onClose();
+        }
       });
   }, []);
 
@@ -119,6 +143,7 @@ export function ListScreen({ context, filter, onClose }: ListScreenProps) {
       },
       [phase, entries, selectedIndex, onClose],
     ),
+    { isActive: stdinSupportsInput && !context.oneShot },
   );
 
   // -------------------------------------------------------------------------
@@ -139,46 +164,9 @@ export function ListScreen({ context, filter, onClose }: ListScreenProps) {
   // Render — Detail view
   // -------------------------------------------------------------------------
   if (phase === 'detail' && detailEntry) {
-    const analysis = detailEntry.analysis;
-    const hasTopics =
-      analysis &&
-      Array.isArray(analysis.raw['topics']) &&
-      (analysis.raw['topics'] as string[]).length > 0;
-    const hasContextType =
-      analysis &&
-      typeof analysis.raw['contextType'] === 'string' &&
-      (analysis.raw['contextType'] as string).length > 0;
-
     return (
       <Box flexDirection="column" gap={1}>
-        <Text bold>Entry — {formatFullDate(detailEntry.createdAt)}</Text>
-
-        <Box paddingLeft={2}>
-          <TranscriptBox text={detailEntry.content} />
-        </Box>
-
-        {analysis && (
-          <Box paddingLeft={2} flexDirection="column">
-            <Box gap={2}>
-              <Text>
-                <Text color={getSentimentColor(analysis.sentiment.score)}>
-                  {analysis.sentiment.label}
-                </Text>
-                {` (${formatScore(analysis.sentiment.score)})`}
-              </Text>
-              <Text dimColor>{formatConfidence(analysis.sentiment.confidence)} confidence</Text>
-            </Box>
-
-            {(hasTopics || hasContextType) && (
-              <Text dimColor>
-                {hasTopics ? (analysis.raw['topics'] as string[]).join(', ') : ''}
-                {hasTopics && hasContextType ? ' \u00B7 ' : ''}
-                {hasContextType ? String(analysis.raw['contextType']) : ''}
-              </Text>
-            )}
-          </Box>
-        )}
-
+        <EntryDetail entry={detailEntry} />
         <Box paddingLeft={2}>
           <Text dimColor>Esc to go back</Text>
         </Box>

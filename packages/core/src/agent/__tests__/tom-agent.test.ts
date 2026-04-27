@@ -339,6 +339,17 @@ describe('TomAgent', () => {
       await expect(agent.analyze('some content')).rejects.toThrow('Ollama error: 500');
     });
 
+    it('throws a descriptive timeout error for slow local models', async () => {
+      mockFetch.mockRejectedValueOnce(new DOMException('Timed out', 'TimeoutError'));
+
+      const { TomAgent } = await import('../tom-agent.js');
+      const agent = new TomAgent(localConfig);
+
+      await expect(agent.analyze('some content')).rejects.toThrow(
+        'Ollama analysis timed out after 180s for model qwen2.5:7b',
+      );
+    });
+
     it('throws when Ollama returns empty message', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,

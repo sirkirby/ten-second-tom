@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ConfigManager } from '../config-manager.js';
@@ -50,6 +50,20 @@ describe('ConfigManager', () => {
     expect(loaded?.stt).toEqual(validConfig.stt);
     expect(loaded?.embedding).toEqual(validConfig.embedding);
     expect(loaded?.storage).toEqual(validConfig.storage);
+  });
+
+  it('writes config and data directories with private permissions', () => {
+    const dir = createTempDir();
+    const homePath = join(dir, '.tom');
+    const manager = new ConfigManager(homePath);
+
+    manager.save(validConfig);
+
+    if (process.platform !== 'win32') {
+      expect(statSync(homePath).mode & 0o777).toBe(0o700);
+      expect(statSync(join(homePath, 'audio')).mode & 0o777).toBe(0o700);
+      expect(statSync(join(homePath, 'config.json')).mode & 0o777).toBe(0o600);
+    }
   });
 
   it('returns undefined when no config exists', () => {

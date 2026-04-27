@@ -3,6 +3,9 @@ export const DEFAULT_CLOUD_MODEL_ID = 'claude-sonnet-4-6';
 export const DEFAULT_LOCAL_MODEL_ID = 'qwen2.5:7b';
 export const DEFAULT_OLLAMA_ENDPOINT = 'http://localhost:11434';
 export const ANALYSIS_MAX_TOKENS = 2048;
+export const ANALYSIS_REQUEST_TIMEOUT_MS = 180_000;
+export const OLLAMA_FETCH_TIMEOUT_MS = 5_000;
+export const MODEL_DOWNLOAD_TIMEOUT_MS = 1_800_000;
 
 // Embedding defaults
 export const DEFAULT_OLLAMA_EMBEDDING_MODEL = 'nomic-embed-text';
@@ -10,7 +13,13 @@ export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 export const DEFAULT_OPENROUTER_EMBEDDING_MODEL = 'openai/text-embedding-3-small';
 export const EMBEDDING_AVAILABILITY_TIMEOUT_MS = 3_000;
 export const EMBEDDING_AVAILABILITY_CACHE_MS = 30_000;
+export const EMBEDDING_REQUEST_TIMEOUT_MS = 30_000;
 export const DEFAULT_EMBEDDING_DIMENSION = 768;
+export const REINDEX_BATCH_SIZE = 100;
+
+// Local data permissions
+export const PRIVATE_DIR_MODE = 0o700;
+export const PRIVATE_FILE_MODE = 0o600;
 
 /**
  * Known embedding model dimensions. Used to determine the vec0 table column
@@ -80,3 +89,4 @@ export const SHERPA_ONNX_TOKENS_FILENAME = 'tokens.txt';
 
 // Interval (ms) between polling the sherpa-onnx recognizer for new results
 export const SHERPA_ONNX_POLL_INTERVAL_MS = 100;
+export const SHERPA_ONNX_MAX_DECODE_ITERATIONS_PER_POLL = 25;

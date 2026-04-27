@@ -22,6 +22,7 @@ import {
 import { SqliteStorageService } from './storage-sqlite.js';
 import { SearchService } from './search.js';
 import { getEmbeddingDimension, OPENROUTER_BASE_URL } from '../constants.js';
+import { findSherpaModel } from '../models/sherpa-models.js';
 
 export interface ServiceContainer {
   audio: IAudioService;
@@ -46,11 +47,22 @@ export function buildServicesFromConfig(
   const transcription = new WhisperTranscriptionService();
 
   // Live transcription (sherpa-onnx) — degrades gracefully to noop if model not available
+  const configuredSherpa =
+    config.liveTranscription?.provider === 'sherpa'
+      ? findSherpaModel(config.liveTranscription.sherpaModelId)
+      : undefined;
   const sherpaLive = new SherpaOnnxLiveTranscriptionService({
     modelsPath: configManager.modelsPath,
+    modelDir: configuredSherpa?.dirName,
+    encoderFilename: configuredSherpa?.encoderFilename,
+    decoderFilename: configuredSherpa?.decoderFilename,
+    joinerFilename: configuredSherpa?.joinerFilename,
+    tokensFilename: configuredSherpa?.tokensFilename,
   });
   const liveTranscription: ILiveTranscriptionService = sherpaLive.isAvailable()
-    ? sherpaLive
+    ? config.liveTranscription?.provider === 'none'
+      ? new NoopLiveTranscriptionService()
+      : sherpaLive
     : new NoopLiveTranscriptionService();
 
   const agent = new TomAgent(config.llm);

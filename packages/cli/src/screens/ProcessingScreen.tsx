@@ -2,13 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import { join } from 'node:path';
-import { buildServicesFromConfig } from 'ten-second-tom-core';
-import type { EntryAnalysis, ServiceContainer } from 'ten-second-tom-core';
+import { buildServicesFromConfig, reanalyzeEntry, runAnalysisPipeline } from 'ten-second-tom-core';
+import type { ServiceContainer } from 'ten-second-tom-core';
 import { TranscriptBox } from '../components/TranscriptBox.js';
 import { ErrorDisplay } from '../components/ErrorDisplay.js';
 import { checkSetupComplete } from '../hooks/useSetupGuard.js';
 import { useAutoExit } from '../hooks/useAutoExit.js';
-import { runAnalysisPipeline } from '../pipeline.js';
 import { toErrorMessage } from '../utils/format.js';
 import type { AppContext } from '../commands/registry.js';
 import type { ResultsSummaryProps } from '../components/ResultsSummary.js';
@@ -171,9 +170,12 @@ export function ProcessingScreen({
           svcs = buildServicesFromConfig(guard.config, guard.configManager);
         }
 
-        // Phase 1: Load the entry
-        const entry = await svcs.storage.getEntry(entryId);
-        if (!entry) {
+        if (!cancelled) {
+          setPhase('analyzing');
+        }
+
+        const result = await reanalyzeEntry(entryId, svcs);
+        if (!result) {
           if (!cancelled) {
             setError(`Entry not found: ${entryId}`);
             setPhase('error');
@@ -182,51 +184,17 @@ export function ProcessingScreen({
         }
 
         if (!cancelled) {
-          setTranscript(entry.content);
-          setPhase('analyzing');
-        }
-
-        // Phase 2: Re-run analysis
-        const [analysisResult, embeddingResult] = await Promise.allSettled([
-          svcs.agent.analyze(entry.content),
-          svcs.embedding.embed(entry.content),
-        ]);
-
-        if (cancelled) return;
-
-        const warnings: string[] = [];
-        let analysis: EntryAnalysis | null = null;
-
-        if (analysisResult.status === 'fulfilled') {
-          analysis = analysisResult.value;
-          await svcs.storage.updateEntryAnalysis(entry.id, analysis);
-        } else {
-          const msg = toErrorMessage(analysisResult.reason);
-          if (!cancelled) {
-            setError(`AI analysis failed: ${msg}`);
-            setPhase('error');
-          }
-          return;
-        }
-
-        if (embeddingResult.status === 'fulfilled') {
-          try {
-            await svcs.storage.updateEntryEmbedding(entry.id, embeddingResult.value);
-          } catch {
-            warnings.push('Embedding storage unavailable — entry saved without vector index.');
-          }
-        } else {
-          warnings.push('Embedding unavailable — entry saved without vector index.');
+          setTranscript(result.entry.content);
         }
 
         if (cancelled) return;
 
         setPhase('done');
         onComplete({
-          transcript: entry.content,
-          analysis,
-          warnings,
-          entryType: entry.type,
+          transcript: result.entry.content,
+          analysis: result.analysis,
+          warnings: result.warnings,
+          entryType: result.entry.type,
         });
       } catch (err) {
         if (!cancelled) {

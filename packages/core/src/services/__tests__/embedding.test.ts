@@ -28,11 +28,15 @@ describe('OllamaEmbeddingService', () => {
     expect(result).toBeInstanceOf(Float32Array);
     expect(result.length).toBe(768);
     expect(result[0]).toBeCloseTo(0.001);
-    expect(mockFetch).toHaveBeenCalledWith('http://localhost:11434/api/embeddings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'nomic-embed-text', prompt: 'Hello, world!' }),
-    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'http://localhost:11434/api/embeddings',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'nomic-embed-text', prompt: 'Hello, world!' }),
+        signal: expect.any(AbortSignal),
+      }),
+    );
   });
 
   it('throws when the API call fails', async () => {
@@ -164,14 +168,18 @@ describe('OpenAICompatibleEmbeddingService', () => {
     expect(result).toBeInstanceOf(Float32Array);
     expect(result.length).toBe(1536);
     expect(result[0]).toBeCloseTo(0.001);
-    expect(mockFetch).toHaveBeenCalledWith('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer sk-test-key',
-      },
-      body: JSON.stringify({ input: 'Hello, world!', model: 'text-embedding-3-small' }),
-    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://api.openai.com/v1/embeddings',
+      expect.objectContaining({
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer sk-test-key',
+        },
+        body: JSON.stringify({ input: 'Hello, world!', model: 'text-embedding-3-small' }),
+        signal: expect.any(AbortSignal),
+      }),
+    );
   });
 
   it('omits Authorization header when no apiKey provided', async () => {

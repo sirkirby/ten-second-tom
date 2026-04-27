@@ -56,6 +56,7 @@ export function RecordingScreen({ context, onComplete, onCancel }: RecordingScre
   const phaseRef = useRef<Phase>('init');
   const transcriptRef = useRef('');
   const durationRef = useRef(0);
+  const stdinSupportsInput = process.stdin.isTTY === true;
 
   // Keep phaseRef in sync
   useEffect(() => {
@@ -161,11 +162,19 @@ export function RecordingScreen({ context, onComplete, onCancel }: RecordingScre
         // Start live transcription (sherpa-onnx) if available
         if (svcs.liveTranscription.isAvailable()) {
           try {
-            svcs.liveTranscription.start(svcs.audio.getAudioStream(), (text) => {
-              if (!cancelled) {
-                setTranscript(text);
-              }
-            });
+            svcs.liveTranscription.start(
+              svcs.audio.getAudioStream(),
+              (text) => {
+                if (!cancelled) {
+                  setTranscript(text);
+                }
+              },
+              (err) => {
+                if (!cancelled) {
+                  setLiveTranscriptionWarning(`Live preview stopped: ${toErrorMessage(err)}`);
+                }
+              },
+            );
           } catch (err) {
             const msg = toErrorMessage(err);
             if (!cancelled) {
@@ -248,14 +257,17 @@ export function RecordingScreen({ context, onComplete, onCancel }: RecordingScre
   // -------------------------------------------------------------------------
   // Keyboard handling
   // -------------------------------------------------------------------------
-  useInput((_input, key) => {
-    if (key.return && phaseRef.current === 'recording') {
-      void handleStop();
-    }
-    if (key.escape && phaseRef.current === 'recording') {
-      void handleCancel();
-    }
-  });
+  useInput(
+    (_input, key) => {
+      if (key.return && phaseRef.current === 'recording') {
+        void handleStop();
+      }
+      if (key.escape && phaseRef.current === 'recording') {
+        void handleCancel();
+      }
+    },
+    { isActive: stdinSupportsInput },
+  );
 
   // -------------------------------------------------------------------------
   // One-shot: auto-exit after showing an error

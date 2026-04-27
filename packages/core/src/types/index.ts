@@ -15,9 +15,11 @@ export {
   SttConfigSchema,
   EmbeddingConfigSchema,
   StorageConfigSchema,
+  LiveTranscriptionConfigSchema,
   type AppConfig,
   type LlmConfig,
   type SttConfig,
   type EmbeddingConfig,
   type StorageConfig,
+  type LiveTranscriptionConfig,
 } from './config.js';

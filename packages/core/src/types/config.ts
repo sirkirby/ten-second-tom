@@ -43,11 +43,22 @@ export const StorageConfigSchema = z.object({
   dbPath: z.string().min(1),
 });
 
+export const LiveTranscriptionConfigSchema = z.discriminatedUnion('provider', [
+  z.object({
+    provider: z.literal('sherpa'),
+    sherpaModelId: z.string().min(1),
+  }),
+  z.object({
+    provider: z.literal('none'),
+  }),
+]);
+
 export const AppConfigSchema = z.object({
   llm: LlmConfigSchema,
   stt: SttConfigSchema,
   embedding: EmbeddingConfigSchema,
   storage: StorageConfigSchema,
+  liveTranscription: LiveTranscriptionConfigSchema.optional(),
 });
 
 export type AppConfig = z.infer<typeof AppConfigSchema>;
@@ -55,3 +66,4 @@ export type LlmConfig = z.infer<typeof LlmConfigSchema>;
 export type SttConfig = z.infer<typeof SttConfigSchema>;
 export type EmbeddingConfig = z.infer<typeof EmbeddingConfigSchema>;
 export type StorageConfig = z.infer<typeof StorageConfigSchema>;
+export type LiveTranscriptionConfig = z.infer<typeof LiveTranscriptionConfigSchema>;

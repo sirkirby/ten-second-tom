@@ -1,15 +1,4 @@
 import { describe, it, expect, vi } from 'vitest';
-
-// ---------------------------------------------------------------------------
-// We test the exported pipeline helpers directly (no Ink rendering needed).
-// ---------------------------------------------------------------------------
-
-// Mock ten-second-tom-core before importing the module under test
-vi.mock('ten-second-tom-core', () => ({
-  // Only the type re-exports are needed; the pipeline function itself
-  // doesn't call any core constructors — it receives services as an arg.
-}));
-
 import type {
   IAgentService,
   IEmbeddingService,
@@ -18,15 +7,11 @@ import type {
   IAudioService,
   ITranscriptionService,
   ILiveTranscriptionService,
+  Entry,
   EntryAnalysis,
   ServiceContainer,
-} from 'ten-second-tom-core';
-
-import { runAnalysisPipeline } from './pipeline.js';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+} from '../../index.js';
+import { reanalyzeEntry, runAnalysisPipeline } from '../pipeline.js';
 
 function makeAnalysis(): EntryAnalysis {
   return {
@@ -36,16 +21,21 @@ function makeAnalysis(): EntryAnalysis {
   };
 }
 
-function makeMockServices(overrides: Partial<ServiceContainer> = {}): ServiceContainer {
-  const mockEntry = {
-    id: 'test-uuid-1234',
-    type: 'recording' as const,
+function makeEntry(overrides: Partial<Entry> = {}): Entry {
+  return {
+    id: '00000000-0000-4000-8000-000000000001',
+    type: 'recording',
     content: 'hello world',
     audioPath: '2026-03/2026-03-22-abcd1234.wav',
-    inputMethod: 'recorded' as const,
+    inputMethod: 'recorded',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    ...overrides,
   };
+}
+
+function makeMockServices(overrides: Partial<ServiceContainer> = {}): ServiceContainer {
+  const mockEntry = makeEntry();
 
   const storage: IStorageService = {
     saveEntry: vi.fn().mockResolvedValue(mockEntry),
@@ -68,10 +58,10 @@ function makeMockServices(overrides: Partial<ServiceContainer> = {}): ServiceCon
   };
 
   const transcription: ITranscriptionService = {
-    transcribeStream: vi.fn().mockResolvedValue('hello world'),
     transcribeFile: vi.fn().mockResolvedValue('hello world'),
     isModelLoaded: vi.fn().mockReturnValue(true),
     loadModel: vi.fn().mockResolvedValue(undefined),
+    release: vi.fn().mockResolvedValue(undefined),
   };
 
   const liveTranscription: ILiveTranscriptionService = {
@@ -105,10 +95,6 @@ function makeMockServices(overrides: Partial<ServiceContainer> = {}): ServiceCon
   };
 }
 
-// ---------------------------------------------------------------------------
-// Tests: runAnalysisPipeline
-// ---------------------------------------------------------------------------
-
 describe('runAnalysisPipeline', () => {
   it('saves entry, runs analysis and embedding, returns result', async () => {
     const services = makeMockServices();
@@ -117,32 +103,26 @@ describe('runAnalysisPipeline', () => {
 
     const result = await runAnalysisPipeline(transcript, audioPath, services);
 
-    // Entry was saved
     expect(services.storage.saveEntry).toHaveBeenCalledWith({
       type: 'recording',
       content: transcript,
       audioPath,
       inputMethod: 'recorded',
     });
-
-    // Analysis was run and stored
     expect(services.agent.analyze).toHaveBeenCalledWith(transcript);
     expect(services.storage.updateEntryAnalysis).toHaveBeenCalledWith(
-      'test-uuid-1234',
+      '00000000-0000-4000-8000-000000000001',
       makeAnalysis(),
     );
-
-    // Embedding was run and stored
     expect(services.embedding.embed).toHaveBeenCalledWith(transcript);
     expect(services.storage.updateEntryEmbedding).toHaveBeenCalledWith(
-      'test-uuid-1234',
+      '00000000-0000-4000-8000-000000000001',
       expect.any(Float32Array),
     );
-
     expect(result.analysis).toEqual(makeAnalysis());
     expect(result.embeddingStored).toBe(true);
     expect(result.warnings).toHaveLength(0);
-    expect(result.entryId).toBe('test-uuid-1234');
+    expect(result.entryId).toBe('00000000-0000-4000-8000-000000000001');
   });
 
   it('saves entry without analysis when agent.analyze rejects', async () => {
@@ -154,16 +134,30 @@ describe('runAnalysisPipeline', () => {
 
     const result = await runAnalysisPipeline('hello world', 'audio.wav', services);
 
-    // Entry was still saved
     expect(services.storage.saveEntry).toHaveBeenCalled();
-
-    // Analysis update was NOT called
     expect(services.storage.updateEntryAnalysis).not.toHaveBeenCalled();
-
-    // Result reflects degraded state
     expect(result.analysis).toBeNull();
     expect(result.warnings).toHaveLength(1);
     expect(result.warnings[0]).toContain('AI analysis unavailable');
+    expect(result.warnings[0]).toContain('API key invalid');
+  });
+
+  it('warns and continues when analysis storage fails after capture is saved', async () => {
+    const services = makeMockServices({
+      storage: {
+        ...makeMockServices().storage,
+        saveEntry: vi.fn().mockResolvedValue(makeEntry()),
+        updateEntryAnalysis: vi.fn().mockRejectedValue(new Error('database locked')),
+      },
+    });
+
+    const result = await runAnalysisPipeline('hello world', 'audio.wav', services);
+
+    expect(services.storage.saveEntry).toHaveBeenCalled();
+    expect(result.analysis).toEqual(makeAnalysis());
+    expect(result.warnings).toContain(
+      'Analysis storage unavailable — entry saved without persisted analysis.',
+    );
   });
 
   it('saves entry without embedding when embed rejects', async () => {
@@ -176,13 +170,8 @@ describe('runAnalysisPipeline', () => {
 
     const result = await runAnalysisPipeline('hello world', 'audio.wav', services);
 
-    // Entry was still saved
     expect(services.storage.saveEntry).toHaveBeenCalled();
-
-    // Embedding update was NOT called
     expect(services.storage.updateEntryEmbedding).not.toHaveBeenCalled();
-
-    // Analysis still succeeded
     expect(result.analysis).toEqual(makeAnalysis());
     expect(result.embeddingStored).toBe(false);
     expect(result.warnings).toHaveLength(1);
@@ -202,9 +191,7 @@ describe('runAnalysisPipeline', () => {
 
     const result = await runAnalysisPipeline('hello world', 'audio.wav', services);
 
-    // Entry was still saved
     expect(services.storage.saveEntry).toHaveBeenCalled();
-
     expect(result.analysis).toBeNull();
     expect(result.embeddingStored).toBe(false);
     expect(result.warnings).toHaveLength(2);
@@ -225,8 +212,29 @@ describe('runAnalysisPipeline', () => {
       audioPath: undefined,
       inputMethod: 'typed',
     });
+    expect(result.entryId).toBe('00000000-0000-4000-8000-000000000001');
+  });
+});
 
-    expect(result.entryId).toBe('test-uuid-1234');
-    expect(result.audioPath).toBeUndefined();
+describe('reanalyzeEntry', () => {
+  it('returns undefined when the entry does not exist', async () => {
+    const services = makeMockServices({
+      storage: {
+        ...makeMockServices().storage,
+        getEntry: vi.fn().mockResolvedValue(undefined),
+      },
+    });
+
+    await expect(reanalyzeEntry('missing', services)).resolves.toBeUndefined();
+  });
+
+  it('reruns analysis and embedding for an existing entry', async () => {
+    const services = makeMockServices();
+
+    const result = await reanalyzeEntry('00000000-0000-4000-8000-000000000001', services);
+
+    expect(result?.entry.id).toBe('00000000-0000-4000-8000-000000000001');
+    expect(result?.analysis).toEqual(makeAnalysis());
+    expect(result?.embeddingStored).toBe(true);
   });
 });

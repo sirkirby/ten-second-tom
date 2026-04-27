@@ -2,7 +2,11 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { EntryAnalysis } from '../types/entry.js';
 import type { LlmConfig } from '../types/config.js';
 import { getModelId, getBaseUrl } from './config.js';
-import { ANALYSIS_MAX_TOKENS, DEFAULT_OLLAMA_ENDPOINT } from '../constants.js';
+import {
+  ANALYSIS_MAX_TOKENS,
+  ANALYSIS_REQUEST_TIMEOUT_MS,
+  DEFAULT_OLLAMA_ENDPOINT,
+} from '../constants.js';
 
 export interface IAgentService {
   analyze(content: string): Promise<EntryAnalysis>;
@@ -74,6 +78,12 @@ function parseAnalysisResponse(text: string): EntryAnalysis {
   };
 }
 
+function isTimeoutError(error: unknown): boolean {
+  return (
+    error instanceof DOMException && (error.name === 'AbortError' || error.name === 'TimeoutError')
+  );
+}
+
 export class TomAgent implements IAgentService {
   private readonly config: LlmConfig;
   private readonly client: Anthropic | null;
@@ -143,19 +153,33 @@ export class TomAgent implements IAgentService {
   private async analyzeLocal(content: string): Promise<EntryAnalysis> {
     const endpoint = this.baseUrl ?? DEFAULT_OLLAMA_ENDPOINT;
 
-    const response = await fetch(`${endpoint}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: this.modelId,
-        messages: [
-          { role: 'system', content: ANALYSIS_PROMPT },
-          { role: 'user', content },
-        ],
-        stream: false,
-        format: 'json',
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${endpoint}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(ANALYSIS_REQUEST_TIMEOUT_MS),
+        body: JSON.stringify({
+          model: this.modelId,
+          messages: [
+            { role: 'system', content: ANALYSIS_PROMPT },
+            { role: 'user', content },
+          ],
+          stream: false,
+          format: 'json',
+        }),
+      });
+    } catch (error) {
+      if (isTimeoutError(error)) {
+        throw new Error(
+          `Ollama analysis timed out after ${Math.round(
+            ANALYSIS_REQUEST_TIMEOUT_MS / 1000,
+          )}s for model ${this.modelId}. Larger local models may need more time or a smaller model.`,
+          { cause: error },
+        );
+      }
+      throw error;
+    }
 
     if (!response.ok) {
       throw new Error(`Ollama error: ${response.status} ${response.statusText}`);

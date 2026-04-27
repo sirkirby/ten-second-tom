@@ -42,9 +42,14 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [configManager, setConfigManager] = useState<ConfigManager | null>(null);
   const [entryCount, setEntryCount] = useState(0);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   // One-shot: tracks whether the command has completed (triggers auto-exit)
   const [commandDone, setCommandDone] = useState(false);
+  const [oneShotCommandActive, setOneShotCommandActive] = useState(
+    mode === 'oneshot' && Boolean(initialCommand),
+  );
+  const canExitOnKey = mode === 'oneshot' && process.stdin.isTTY === true;
 
   // Data passed from RecordingScreen → ProcessingScreen
   const [recordingData, setRecordingData] = useState<{
@@ -66,7 +71,7 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
         exit();
       }
     },
-    { isActive: commandDone && mode === 'oneshot' },
+    { isActive: commandDone && canExitOnKey },
   );
 
   // ---- helpers ----
@@ -78,23 +83,21 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
     setScreenData((prev) => ({ ...prev, ...data }));
   }, []);
 
-  // ---- build context ----
-  const context: AppContext = {
-    services,
-    configManager,
-    setScreen,
-    pushHistory,
-    setScreenData: handleSetScreenData,
-    exit,
-    oneShot: mode === 'oneshot',
-  };
+  const finishCommand = useCallback(() => {
+    if (mode === 'oneshot') {
+      setOneShotCommandActive(false);
+      setCommandDone(true);
+    }
+  }, [mode]);
 
-  // ---- on mount: check setup, build services, count entries ----
-  useEffect(() => {
+  const loadConfiguredServices = useCallback(() => {
     const guard = checkSetupComplete();
     if (!guard.ok) {
-      // Not configured — stay on home screen, config will be null
-      return;
+      setConfig(null);
+      setConfigManager(null);
+      setServices(null);
+      setEntryCount(0);
+      return undefined;
     }
 
     const { config: loadedConfig, configManager: loadedCM } = guard;
@@ -105,24 +108,45 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
       const svcs = buildServicesFromConfig(loadedConfig, loadedCM);
       setServices(svcs);
 
-      // Count entries
       void svcs.storage.countEntries().then((count) => {
         setEntryCount(count);
       });
 
-      // Release native whisper context on exit to suppress "ggml_metal_free:
-      // deallocating" and similar native teardown messages.
-      const cleanup = () => {
-        void svcs.transcription.release();
-      };
-      process.on('exit', cleanup);
-      return () => {
-        process.off('exit', cleanup);
-      };
+      return svcs;
     } catch {
-      // Service construction failed — degrade gracefully, home screen still works
+      setServices(null);
+      return undefined;
     }
   }, []);
+
+  // ---- build context ----
+  const context: AppContext = {
+    services,
+    configManager,
+    setScreen,
+    pushHistory,
+    setScreenData: handleSetScreenData,
+    exit,
+    oneShot: mode === 'oneshot',
+    finishCommand,
+  };
+
+  // ---- on mount: check setup, build services, count entries ----
+  useEffect(() => {
+    const svcs = loadConfiguredServices();
+    setInitialLoadComplete(true);
+    if (!svcs) return undefined;
+
+    // Release native whisper context on exit to suppress "ggml_metal_free:
+    // deallocating" and similar native teardown messages.
+    const cleanup = () => {
+      void svcs.transcription.release();
+    };
+    process.on('exit', cleanup);
+    return () => {
+      process.off('exit', cleanup);
+    };
+  }, [loadConfiguredServices]);
 
   // ---- refresh entry count whenever home screen is shown ----
   useEffect(() => {
@@ -134,7 +158,14 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
 
   // ---- execute initial command in one-shot mode ----
   useEffect(() => {
-    if (mode !== 'oneshot' || !initialCommand || initialCommandExecuted.current) return;
+    if (
+      mode !== 'oneshot' ||
+      !initialCommand ||
+      initialCommandExecuted.current ||
+      !initialLoadComplete
+    ) {
+      return;
+    }
     initialCommandExecuted.current = true;
 
     const cmd = findCommand(initialCommand);
@@ -145,8 +176,9 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
         id: `unknown-${Date.now()}`,
         content: `Unknown command: ${initialCommand}`,
       });
+      finishCommand();
     }
-  }, [mode, initialCommand, initialArgs]);
+  }, [mode, initialCommand, initialArgs, initialLoadComplete, finishCommand]);
 
   // screenData is consumed by child screens via context — suppress the
   // unused-variable lint warning here since it is referenced indirectly.
@@ -235,12 +267,12 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
       {/* One-shot done: show exit hint instead of home screen */}
       {commandDone && mode === 'oneshot' && (
         <Box paddingTop={1}>
-          <Text dimColor>Press any key to exit (auto-exits in 5s)</Text>
+          <Text dimColor>{canExitOnKey ? 'Press any key to exit (auto-exits in 5s)' : 'Done'}</Text>
         </Box>
       )}
 
       {/* Active screen — hidden in one-shot done state */}
-      {!commandDone && screen === 'home' && (
+      {!commandDone && !oneShotCommandActive && screen === 'home' && (
         <HomeScreen context={context} config={config} entryCount={entryCount} />
       )}
 
@@ -306,8 +338,13 @@ export function App({ mode, initialCommand, initialArgs }: AppProps) {
 
       {screen === 'setup' && (
         <SetupWizard
+          autoExitOnError={mode === 'oneshot'}
           onComplete={() => {
+            loadConfiguredServices();
             setScreen('home');
+            if (mode === 'oneshot') {
+              finishCommand();
+            }
           }}
         />
       )}

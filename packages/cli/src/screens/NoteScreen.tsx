@@ -8,12 +8,12 @@ import {
   checkAudioPrerequisites,
   buildServicesFromConfig,
   getMicrophonePermissionHint,
+  runAnalysisPipeline,
 } from 'ten-second-tom-core';
 import type { ServiceContainer } from 'ten-second-tom-core';
 import { checkSetupComplete } from '../hooks/useSetupGuard.js';
 import { useAutoExit } from '../hooks/useAutoExit.js';
 import { ErrorDisplay } from '../components/ErrorDisplay.js';
-import { runAnalysisPipeline } from '../pipeline.js';
 import { toErrorMessage } from '../utils/format.js';
 import type { AppContext } from '../commands/registry.js';
 import type { ResultsSummaryProps } from '../components/ResultsSummary.js';
@@ -52,6 +52,7 @@ export function NoteScreen({ context, onComplete, onCancel }: NoteScreenProps) {
   const audioBaseDirRef = useRef<string>('');
   const phaseRef = useRef<Phase>('input');
   const inputModeRef = useRef<InputMode>('typing');
+  const stdinSupportsInput = process.stdin.isTTY === true;
 
   // Keep refs in sync
   useEffect(() => {
@@ -138,9 +139,15 @@ export function NoteScreen({ context, onComplete, onCancel }: NoteScreenProps) {
 
       // Begin live transcription — chunks update the note text
       try {
-        svcs.liveTranscription.start(svcs.audio.getAudioStream(), (text) => {
-          setNoteText(text);
-        });
+        svcs.liveTranscription.start(
+          svcs.audio.getAudioStream(),
+          (text) => {
+            setNoteText(text);
+          },
+          (err) => {
+            setDictationWarning(`Live transcription stopped: ${toErrorMessage(err)}`);
+          },
+        );
       } catch (err) {
         const msg = toErrorMessage(err);
         setDictationWarning(`Live transcription failed to start: ${msg}`);
@@ -235,22 +242,25 @@ export function NoteScreen({ context, onComplete, onCancel }: NoteScreenProps) {
   // -------------------------------------------------------------------------
   // Keyboard handling: Tab toggles mode, Esc cancels
   // -------------------------------------------------------------------------
-  useInput((_input, key) => {
-    if (phaseRef.current !== 'input') return;
+  useInput(
+    (_input, key) => {
+      if (phaseRef.current !== 'input') return;
 
-    if (key.tab) {
-      void toggleMode();
-    }
-
-    if (key.escape) {
-      // Clean up any active dictation before cancelling
-      if (inputModeRef.current === 'dictation') {
-        void stopDictation().then(() => onCancel());
-      } else {
-        onCancel();
+      if (key.tab) {
+        void toggleMode();
       }
-    }
-  });
+
+      if (key.escape) {
+        // Clean up any active dictation before cancelling
+        if (inputModeRef.current === 'dictation') {
+          void stopDictation().then(() => onCancel());
+        } else {
+          onCancel();
+        }
+      }
+    },
+    { isActive: stdinSupportsInput },
+  );
 
   // -------------------------------------------------------------------------
   // Cleanup on unmount — stop any active recording

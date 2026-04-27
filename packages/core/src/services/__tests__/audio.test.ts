@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PassThrough } from 'node:stream';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 // Mock node-record-lpcm16 before importing the module under test
-const { mockRecordFn } = vi.hoisted(() => {
+const { mockExecFileSync, mockRecordFn } = vi.hoisted(() => {
+  const mockExecFileSync = vi.fn();
   const mockRecordFn = vi.fn();
-  return { mockRecordFn };
+  return { mockExecFileSync, mockRecordFn };
 });
 
 vi.mock('node-record-lpcm16', () => {
@@ -15,6 +16,10 @@ vi.mock('node-record-lpcm16', () => {
     default: { record: mockRecordFn },
   };
 });
+
+vi.mock('node:child_process', () => ({
+  execFileSync: mockExecFileSync,
+}));
 
 // Import after mock is registered
 const { AudioService, checkAudioPrerequisites, checkModelExists, createWavHeader } =
@@ -37,6 +42,7 @@ let audioDir: string;
 beforeEach(() => {
   audioDir = mkdtempSync(join(tmpdir(), 'tst-audio-'));
   vi.clearAllMocks();
+  mockExecFileSync.mockReturnValue(Buffer.from(''));
 });
 
 afterEach(() => {
@@ -145,6 +151,29 @@ describe('AudioService', () => {
 
     // Verify the raw PCM data follows the header
     expect(fileData.subarray(44)).toEqual(pcmData);
+
+    if (process.platform !== 'win32') {
+      expect(statSync(filePath).mode & 0o777).toBe(0o600);
+    }
+  });
+
+  it('stopRecording() resets state when the recorder stream errors', async () => {
+    const stream = new PassThrough();
+    const fakeRecording = {
+      stream: () => stream,
+      stop: vi.fn(() => {
+        setImmediate(() => stream.emit('error', new Error('recorder failed')));
+      }),
+      pause: vi.fn(),
+      resume: vi.fn(),
+    };
+    mockRecordFn.mockReturnValue(fakeRecording);
+
+    const service = new AudioService({ audioDir });
+    service.startRecording();
+
+    await expect(service.stopRecording()).rejects.toThrow('recorder failed');
+    expect(service.isRecording()).toBe(false);
   });
 
   it('stopRecording() resets state so recording can start again', async () => {
@@ -215,25 +244,19 @@ describe('createWavHeader', () => {
 
 describe('checkAudioPrerequisites', () => {
   it('returns { ok: true } when sox is available', () => {
-    // We cannot fully control whether sox is installed in the test env,
-    // but we can at least verify the function returns a valid shape.
     const result = checkAudioPrerequisites();
-    expect(result).toHaveProperty('ok');
-    if (result.ok) {
-      expect(result).toEqual({ ok: true });
-    } else {
-      expect(result).toHaveProperty('message');
-      expect(result.message).toContain('SoX');
-    }
+    expect(result).toEqual({ ok: true });
+    expect(mockExecFileSync).toHaveBeenCalledWith('sox', ['--version'], { stdio: 'ignore' });
   });
 
-  it('returns an object with ok and message properties', () => {
+  it('returns platform guidance when sox is missing', () => {
+    mockExecFileSync.mockImplementation(() => {
+      throw new Error('missing');
+    });
+
     const result = checkAudioPrerequisites();
-    expect(typeof result.ok).toBe('boolean');
-    if (!result.ok) {
-      expect(typeof result.message).toBe('string');
-      expect(result.message.length).toBeGreaterThan(0);
-    }
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('SoX');
   });
 });
 
