@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,6 +8,7 @@ import type { AppConfig } from '../../types/config.js';
 let tempDir: string;
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   if (tempDir) {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -109,6 +110,18 @@ describe('ConfigManager', () => {
     const manager = new ConfigManager(homePath);
 
     expect(manager.homePath).toBe(homePath);
+  });
+
+  it('uses TOM_HOME as the default home directory when set', () => {
+    const dir = createTempDir();
+    const homePath = join(dir, '.tom-dev');
+    vi.stubEnv('TOM_HOME', homePath);
+
+    const manager = new ConfigManager();
+
+    expect(manager.homePath).toBe(homePath);
+    expect(manager.audioPath).toBe(join(homePath, 'audio'));
+    expect(manager.modelsPath).toBe(join(homePath, 'models'));
   });
 
   it('returns audio directory path', () => {

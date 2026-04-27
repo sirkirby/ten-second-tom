@@ -102,6 +102,10 @@ Run `tom setup` to configure your LLM provider and embedding strategy. The setup
 
 For cloud analysis, you'll need an [Anthropic API key](https://console.anthropic.com/). For local analysis, [install Ollama](https://ollama.ai) and pull a model (e.g., `ollama pull qwen2.5:7b`).
 
+Set `TOM_HOME` to use a different configuration and data directory. The `make link-dev`
+workflow installs a `tom-dev` wrapper that defaults to `~/.tom-dev`, keeping development
+configuration separate from the globally installed `tom` package.
+
 ## Development
 
 ### Install Dependencies
