@@ -5,4 +5,4 @@ export const EXIT_HINT_TEXT = 'Press Enter or q to exit.';
 /** Left one-quarter block — used as a sentiment-colored border in list views. */
 export const BORDER_CHAR = '\u258E';
 
-export const APP_VERSION = '2.0.0';
+export const APP_VERSION = "2.0.1";
