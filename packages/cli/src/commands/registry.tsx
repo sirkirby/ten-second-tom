@@ -1,7 +1,9 @@
 import React from 'react';
 import { Box, Text } from 'ink';
+import { runAnalysisPipeline } from 'ten-second-tom-core';
 import type { ServiceContainer, ConfigManager } from 'ten-second-tom-core';
 import { reindexEntries } from '../reindex.js';
+import { ResultsSummary } from '../components/ResultsSummary.js';
 
 // ---------------------------------------------------------------------------
 // Screen + history types
@@ -26,6 +28,7 @@ export interface AppContext {
   setScreenData: (data: Record<string, unknown>) => void;
   exit: () => void;
   oneShot: boolean;
+  finishCommand: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -91,6 +94,49 @@ const noteCmd: TomCommand = {
   name: 'note',
   description: 'Create a text note (type or dictate)',
   execute: (_args, ctx) => {
+    const text = _args.trim();
+    if (ctx.oneShot && text.length > 0) {
+      const svcs = ctx.services;
+      if (!svcs) {
+        ctx.pushHistory({
+          id: `note-err-${Date.now()}`,
+          content: (
+            <Text color="yellow">
+              Not configured. Run <Text color="green">tom setup</Text> first.
+            </Text>
+          ),
+        });
+        ctx.finishCommand();
+        return;
+      }
+
+      void runAnalysisPipeline(text, undefined, svcs, {
+        entryType: 'note',
+        inputMethod: 'typed',
+      })
+        .then((result) => {
+          ctx.pushHistory({
+            id: `note-result-${Date.now()}`,
+            content: (
+              <ResultsSummary
+                transcript={result.transcript}
+                analysis={result.analysis}
+                warnings={result.warnings}
+                entryType="note"
+              />
+            ),
+          });
+        })
+        .catch((err: unknown) => {
+          ctx.pushHistory({
+            id: `note-err-${Date.now()}`,
+            content: <Text color="red">Failed to save note: {String(err)}</Text>,
+          });
+        })
+        .finally(ctx.finishCommand);
+      return;
+    }
+
     ctx.setScreen('note');
   },
 };
@@ -99,8 +145,16 @@ const searchCmd: TomCommand = {
   name: 'search',
   description: 'Search entries by meaning or keyword',
   execute: (args, ctx) => {
-    if (args.trim()) {
-      ctx.setScreenData({ query: args.trim() });
+    const query = args.trim();
+    if (query) {
+      ctx.setScreenData({ query });
+    } else if (ctx.oneShot) {
+      ctx.pushHistory({
+        id: `search-usage-${Date.now()}`,
+        content: <Text color="yellow">Usage: tom search &lt;query&gt;</Text>,
+      });
+      ctx.finishCommand();
+      return;
     }
     ctx.setScreen('search');
   },
@@ -110,9 +164,16 @@ const analyzeCmd: TomCommand = {
   name: 'analyze',
   description: 'Re-run analysis on an existing entry',
   execute: (args, ctx) => {
-    if (args.trim()) {
-      ctx.setScreenData({ entryId: args.trim() });
+    const entryId = args.trim();
+    if (!entryId) {
+      ctx.pushHistory({
+        id: `analyze-usage-${Date.now()}`,
+        content: <Text color="yellow">Usage: tom analyze &lt;entry-id&gt;</Text>,
+      });
+      if (ctx.oneShot) ctx.finishCommand();
+      return;
     }
+    ctx.setScreenData({ entryId });
     ctx.setScreen('processing');
   },
 };
@@ -121,7 +182,17 @@ const listCmd: TomCommand = {
   name: 'list',
   description: 'Browse recent entries',
   execute: (args, ctx) => {
-    ctx.setScreenData({ filter: args.trim() || undefined });
+    const filterArg = args.trim();
+    const filter = filterArg === 'notes' || filterArg === 'recordings' ? filterArg : undefined;
+    if (filterArg && !filter) {
+      ctx.pushHistory({
+        id: `list-usage-${Date.now()}`,
+        content: <Text color="yellow">Usage: tom list [notes|recordings]</Text>,
+      });
+      if (ctx.oneShot) ctx.finishCommand();
+      return;
+    }
+    ctx.setScreenData({ filter });
     ctx.setScreen('list');
   },
 };
@@ -148,6 +219,11 @@ const reindexCmd: TomCommand = {
           </Text>
         ),
       });
+      if (ctx.oneShot) ctx.finishCommand();
+      return;
+    }
+    if (ctx.oneShot) {
+      void reindexEntries(svcs, ctx.pushHistory).finally(ctx.finishCommand);
       return;
     }
     void reindexEntries(svcs, ctx.pushHistory);

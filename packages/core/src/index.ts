@@ -38,4 +38,25 @@ export {
   type SherpaOnnxLiveTranscriptionConfig,
 } from './services/live-transcription.js';
 export { type ServiceContainer, buildServicesFromConfig } from './services/service-factory.js';
+export {
+  runAnalysisPipeline,
+  reanalyzeEntry,
+  type PipelineOptions,
+  type PipelineResult,
+  type ReanalysisResult,
+} from './services/pipeline.js';
+export {
+  reindexEntries,
+  type ReindexOptions,
+  type ReindexProgress,
+  type ReindexResult,
+} from './services/reindex.js';
+export {
+  buildSetupConfig,
+  downloadModel,
+  extractTarBz2,
+  fetchOllamaModels,
+  type BuildSetupConfigOptions,
+  type OllamaModel,
+} from './services/setup.js';
 export { int16BufferToFloat32 } from './services/audio-utils.js';

@@ -4,9 +4,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const version = process.argv[2]?.trim();
+const SEMVER_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
 if (!version) {
   console.error('Usage: node scripts/set-release-version.mjs <version>');
+  process.exit(1);
+}
+
+if (!SEMVER_PATTERN.test(version)) {
+  console.error(`Invalid semver version: ${version}`);
   process.exit(1);
 }
 
@@ -37,7 +43,7 @@ function updateCliVersionConstant() {
   const current = fs.readFileSync(absolutePath, 'utf8');
   const next = current.replace(
     /export const APP_VERSION = '.*';/,
-    `export const APP_VERSION = '${version}';`,
+    `export const APP_VERSION = ${JSON.stringify(version)};`,
   );
 
   if (current === next) return;

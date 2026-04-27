@@ -1,5 +1,6 @@
 import React from 'react';
 import { Text } from 'ink';
+import { reindexEntries as reindexEntriesInCore } from 'ten-second-tom-core';
 import type { ServiceContainer } from 'ten-second-tom-core';
 import type { HistoryEntry } from './commands/registry.js';
 
@@ -11,9 +12,9 @@ export async function reindexEntries(
   services: ServiceContainer,
   pushHistory: (entry: HistoryEntry) => void,
 ): Promise<void> {
-  const entries = await services.storage.listEntries({ limit: 100_000 });
+  const total = await services.storage.countEntries();
 
-  if (entries.length === 0) {
+  if (total === 0) {
     pushHistory({
       id: `reindex-empty-${Date.now()}`,
       content: <Text dimColor>No entries to re-index.</Text>,
@@ -32,27 +33,17 @@ export async function reindexEntries(
 
   pushHistory({
     id: `reindex-start-${Date.now()}`,
-    content: <Text dimColor>Re-indexing {entries.length} entries...</Text>,
+    content: <Text dimColor>Re-indexing {total} entries...</Text>,
   });
 
-  let updated = 0;
-  let failed = 0;
-  for (const entry of entries) {
-    try {
-      const embedding = await services.embedding.embed(entry.content);
-      await services.storage.updateEntryEmbedding(entry.id, embedding);
-      updated++;
-    } catch {
-      failed++;
-    }
-  }
+  const result = await reindexEntriesInCore(services);
 
   pushHistory({
     id: `reindex-done-${Date.now()}`,
     content: (
       <Text color="green">
-        Re-indexed {entries.length} entries ({updated} updated
-        {failed > 0 ? `, ${failed} failed` : ''})
+        Re-indexed {result.total} entries ({result.updated} updated
+        {result.failed > 0 ? `, ${result.failed} failed` : ''})
       </Text>
     ),
   });

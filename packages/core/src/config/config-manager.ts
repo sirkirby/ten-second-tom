@@ -1,6 +1,15 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { AppConfigSchema, type AppConfig } from '../types/config.js';
+import { PRIVATE_DIR_MODE, PRIVATE_FILE_MODE } from '../constants.js';
+
+function chmodBestEffort(path: string, mode: number): void {
+  try {
+    chmodSync(path, mode);
+  } catch {
+    // Some platforms/filesystems do not support POSIX modes.
+  }
+}
 
 export class ConfigManager {
   readonly homePath: string;
@@ -21,15 +30,25 @@ export class ConfigManager {
   }
 
   ensureDirectories(): void {
-    mkdirSync(this.homePath, { recursive: true });
-    mkdirSync(this.audioPath, { recursive: true });
-    mkdirSync(this.modelsPath, { recursive: true });
+    mkdirSync(this.homePath, { recursive: true, mode: PRIVATE_DIR_MODE });
+    mkdirSync(this.audioPath, { recursive: true, mode: PRIVATE_DIR_MODE });
+    mkdirSync(this.modelsPath, { recursive: true, mode: PRIVATE_DIR_MODE });
+    chmodBestEffort(this.homePath, PRIVATE_DIR_MODE);
+    chmodBestEffort(this.audioPath, PRIVATE_DIR_MODE);
+    chmodBestEffort(this.modelsPath, PRIVATE_DIR_MODE);
   }
 
   save(config: AppConfig): void {
     AppConfigSchema.parse(config);
     this.ensureDirectories();
-    writeFileSync(this.configFilePath, JSON.stringify(config, null, 2), 'utf-8');
+    const tempConfigPath = `${this.configFilePath}.tmp`;
+    writeFileSync(tempConfigPath, JSON.stringify(config, null, 2), {
+      encoding: 'utf-8',
+      mode: PRIVATE_FILE_MODE,
+    });
+    chmodBestEffort(tempConfigPath, PRIVATE_FILE_MODE);
+    renameSync(tempConfigPath, this.configFilePath);
+    chmodBestEffort(this.configFilePath, PRIVATE_FILE_MODE);
     this.cachedConfig = config;
   }
 
@@ -40,6 +59,7 @@ export class ConfigManager {
       this.cachedConfig = undefined;
       return undefined;
     }
+    chmodBestEffort(this.configFilePath, PRIVATE_FILE_MODE);
     const raw = readFileSync(this.configFilePath, 'utf-8');
     const parsed: unknown = JSON.parse(raw);
     const result = AppConfigSchema.parse(parsed);

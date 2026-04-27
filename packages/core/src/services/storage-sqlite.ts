@@ -1,9 +1,10 @@
 import Database from 'better-sqlite3';
 import * as sqliteVec from 'sqlite-vec';
 import { randomUUID } from 'node:crypto';
+import { chmodSync, existsSync } from 'node:fs';
 import type { Entry, CreateEntry, EntryAnalysis } from '../types/entry.js';
 import type { IStorageService, ListEntriesOptions } from './storage.js';
-import { DEFAULT_EMBEDDING_DIMENSION } from '../constants.js';
+import { DEFAULT_EMBEDDING_DIMENSION, PRIVATE_FILE_MODE } from '../constants.js';
 
 const MIGRATION_SQL = `
 CREATE TABLE IF NOT EXISTS entries (
@@ -13,8 +14,8 @@ CREATE TABLE IF NOT EXISTS entries (
   audio_path TEXT,
   input_method TEXT NOT NULL CHECK(input_method IN ('typed', 'dictated', 'recorded')),
   analysis TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 CREATE INDEX IF NOT EXISTS idx_entries_type ON entries(type);
 CREATE INDEX IF NOT EXISTS idx_entries_created ON entries(created_at DESC);
@@ -58,6 +59,25 @@ interface EntryRow {
   updated_at: string;
 }
 
+function chmodBestEffort(path: string, mode: number): void {
+  try {
+    if (existsSync(path)) chmodSync(path, mode);
+  } catch {
+    // Some platforms/filesystems do not support POSIX modes.
+  }
+}
+
+function escapeFtsQuery(query: string): string | undefined {
+  const terms = query
+    .trim()
+    .split(/\s+/)
+    .map((term) => term.replace(/"/g, '""'))
+    .filter((term) => term.length > 0);
+
+  if (terms.length === 0) return undefined;
+  return terms.map((term) => `"${term}"`).join(' ');
+}
+
 function rowToEntry(row: EntryRow): Entry {
   return {
     id: row.id,
@@ -87,11 +107,15 @@ export class SqliteStorageService implements IStorageService {
   private readonly stmtCountEntries: Database.Statement;
   private readonly stmtSearchVector: Database.Statement;
   private readonly txnUpsertEmbedding: (id: string, buffer: Buffer) => void;
+  private readonly txnDeleteEntry: (id: string) => void;
 
   constructor(dbPath: string, embeddingDimension: number = DEFAULT_EMBEDDING_DIMENSION) {
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
+    chmodBestEffort(dbPath, PRIVATE_FILE_MODE);
+    chmodBestEffort(`${dbPath}-wal`, PRIVATE_FILE_MODE);
+    chmodBestEffort(`${dbPath}-shm`, PRIVATE_FILE_MODE);
 
     // Load sqlite-vec extension before running migrations so vec0 is available
     sqliteVec.load(this.db);
@@ -148,6 +172,11 @@ export class SqliteStorageService implements IStorageService {
     this.txnUpsertEmbedding = this.db.transaction((id: string, buffer: Buffer) => {
       this.stmtDeleteEmbedding.run(id);
       this.stmtInsertEmbedding.run(id, buffer);
+    });
+
+    this.txnDeleteEntry = this.db.transaction((id: string) => {
+      this.stmtDeleteEmbedding.run(id);
+      this.stmtDeleteEntry.run(id);
     });
   }
 
@@ -241,7 +270,9 @@ export class SqliteStorageService implements IStorageService {
   }
 
   async searchByKeyword(query: string, limit: number = 20): Promise<Entry[]> {
-    const rows = this.stmtSearchFts.all(query, limit) as EntryRow[];
+    const escapedQuery = escapeFtsQuery(query);
+    if (!escapedQuery) return [];
+    const rows = this.stmtSearchFts.all(escapedQuery, limit) as EntryRow[];
     return rows.map(rowToEntry);
   }
 
@@ -252,7 +283,7 @@ export class SqliteStorageService implements IStorageService {
   }
 
   async deleteEntry(id: string): Promise<void> {
-    this.stmtDeleteEntry.run(id);
+    this.txnDeleteEntry(id);
   }
 
   close(): void {

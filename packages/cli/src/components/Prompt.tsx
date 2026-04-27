@@ -24,6 +24,7 @@ interface PromptProps {
  */
 export function Prompt({ commands, onCommand, onSearch }: PromptProps) {
   const [value, setValue] = useState('');
+  const stdinSupportsInput = process.stdin.isTTY === true;
 
   const handleSubmit = useCallback(
     (text: string) => {
@@ -47,20 +48,23 @@ export function Prompt({ commands, onCommand, onSearch }: PromptProps) {
   );
 
   // Tab autocomplete for /commands
-  useInput((_input, key) => {
-    if (!key.tab) return;
+  useInput(
+    (_input, key) => {
+      if (!key.tab) return;
 
-    const trimmed = value.trim();
-    if (!trimmed.startsWith('/')) return;
+      const trimmed = value.trim();
+      if (!trimmed.startsWith('/')) return;
 
-    const partial = trimmed.slice(1).toLowerCase();
-    if (!partial) return;
+      const partial = trimmed.slice(1).toLowerCase();
+      if (!partial) return;
 
-    const matches = commands.filter((c) => c.name.startsWith(partial));
-    if (matches.length === 1 && matches[0]) {
-      setValue('/' + matches[0].name + ' ');
-    }
-  });
+      const matches = commands.filter((c) => c.name.startsWith(partial));
+      if (matches.length === 1 && matches[0]) {
+        setValue('/' + matches[0].name + ' ');
+      }
+    },
+    { isActive: stdinSupportsInput },
+  );
 
   // Compute filtered command suggestions when input starts with /
   const commandSuggestions = useMemo(() => {

@@ -1,5 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import Database from 'better-sqlite3';
+import * as sqliteVec from 'sqlite-vec';
+import { mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteStorageService } from '../storage-sqlite.js';
@@ -139,6 +141,19 @@ describe('SqliteStorageService', () => {
     expect(results[0]?.id).toBe(matching.id);
   });
 
+  it('treats search punctuation as literal text instead of FTS syntax', async () => {
+    const svc = createService();
+
+    const matching = await svc.saveEntry({
+      ...baseNote,
+      content: 'The dashboard: deployment failed before lunch',
+    });
+
+    const results = await svc.searchByKeyword('dashboard: deployment?');
+
+    expect(results[0]?.id).toBe(matching.id);
+  });
+
   it('deletes an entry', async () => {
     const svc = createService();
 
@@ -148,6 +163,38 @@ describe('SqliteStorageService', () => {
 
     const result = await svc.getEntry(saved.id);
     expect(result).toBeUndefined();
+  });
+
+  it('deletes embeddings with their entry', async () => {
+    const svc = createService();
+    const dbPath = join(tempDir, 'test.db');
+
+    const saved = await svc.saveEntry(baseNote);
+    await svc.updateEntryEmbedding(saved.id, makeEmbedding(0.5));
+
+    await svc.deleteEntry(saved.id);
+    svc.close();
+    service = undefined as unknown as SqliteStorageService;
+
+    const db = new Database(dbPath);
+    try {
+      sqliteVec.load(db);
+      const row = db.prepare('SELECT COUNT(*) as count FROM entry_embeddings').get() as {
+        count: number;
+      };
+      expect(row.count).toBe(0);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('creates the database with private permissions', async () => {
+    const svc = createService();
+    await svc.saveEntry(baseNote);
+
+    if (process.platform !== 'win32') {
+      expect(statSync(join(tempDir, 'test.db')).mode & 0o777).toBe(0o600);
+    }
   });
 
   // --- Vector embedding tests ---

@@ -92,6 +92,23 @@ describe('SearchService', () => {
     expect(results).toEqual([{ entry: mockEntry, relevance: 1 }]);
   });
 
+  it('falls back to FTS when vector search returns no results', async () => {
+    const storage = makeStorage({
+      searchByVector: vi.fn().mockResolvedValue([]),
+      searchByKeyword: vi.fn().mockResolvedValue([mockEntry2]),
+    });
+    const embedding = makeEmbedding({
+      isAvailable: vi.fn().mockResolvedValue(true),
+    });
+    const service = new SearchService(storage, embedding);
+
+    const results = await service.search('deploy pipeline', 7);
+
+    expect(storage.searchByVector).toHaveBeenCalledWith(expect.any(Float32Array), 7);
+    expect(storage.searchByKeyword).toHaveBeenCalledWith('deploy pipeline', 7);
+    expect(results).toEqual([{ entry: mockEntry2, relevance: 1 }]);
+  });
+
   it('passes custom limit to searchByVector', async () => {
     const storage = makeStorage();
     const embedding = makeEmbedding({

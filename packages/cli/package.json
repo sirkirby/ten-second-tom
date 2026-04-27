@@ -4,7 +4,7 @@
   "description": "Voice capture and analysis CLI for engineers",
   "type": "module",
   "bin": {
-    "tom": "./dist/cli.js"
+    "tom": "dist/cli.js"
   },
   "files": [
     "dist/",

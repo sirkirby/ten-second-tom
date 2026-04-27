@@ -276,6 +276,55 @@ describe('SherpaOnnxLiveTranscriptionService', () => {
 
       service.stop();
     });
+
+    it('stops and reports native polling errors without throwing from the timer', () => {
+      vi.useFakeTimers();
+
+      const mockStream = makeMockStream();
+      const mockRecognizer = makeMockRecognizer(mockStream);
+      const createRecognizer = vi.fn(() => mockRecognizer) as CreateRecognizerFn;
+      const onError = vi.fn();
+
+      vi.mocked(mockRecognizer.isReady).mockImplementation(() => {
+        throw new Error('native decode failed');
+      });
+
+      const service = new SherpaOnnxLiveTranscriptionService({
+        modelsPath: '/models',
+        createRecognizer,
+      });
+
+      service.start(new PassThrough(), vi.fn(), onError);
+      vi.advanceTimersByTime(100);
+
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'native decode failed' }),
+      );
+      expect(mockStream.free).toHaveBeenCalled();
+      expect(mockRecognizer.free).toHaveBeenCalled();
+    });
+
+    it('bounds decode iterations per poll so backlog yields to the event loop', () => {
+      vi.useFakeTimers();
+
+      const mockStream = makeMockStream();
+      const mockRecognizer = makeMockRecognizer(mockStream);
+      const createRecognizer = vi.fn(() => mockRecognizer) as CreateRecognizerFn;
+
+      vi.mocked(mockRecognizer.isReady).mockReturnValue(true);
+      vi.mocked(mockRecognizer.getResult).mockReturnValue({ text: '' });
+
+      const service = new SherpaOnnxLiveTranscriptionService({
+        modelsPath: '/models',
+        createRecognizer,
+      });
+
+      service.start(new PassThrough(), vi.fn());
+      vi.advanceTimersByTime(100);
+
+      expect(mockRecognizer.decode).toHaveBeenCalledTimes(25);
+      service.stop();
+    });
   });
 
   describe('stop()', () => {

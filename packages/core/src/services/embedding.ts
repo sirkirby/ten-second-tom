@@ -1,6 +1,7 @@
 import {
   EMBEDDING_AVAILABILITY_TIMEOUT_MS,
   EMBEDDING_AVAILABILITY_CACHE_MS,
+  EMBEDDING_REQUEST_TIMEOUT_MS,
 } from '../constants.js';
 
 export interface IEmbeddingService {
@@ -29,6 +30,7 @@ export class OllamaEmbeddingService implements IEmbeddingService {
     const response = await fetch(`${this.endpoint}/api/embeddings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(EMBEDDING_REQUEST_TIMEOUT_MS),
       body: JSON.stringify({ model: this.model, prompt: text }),
     });
     if (!response.ok) {
@@ -84,6 +86,7 @@ export class OpenAICompatibleEmbeddingService implements IEmbeddingService {
     const response = await fetch(`${this.baseUrl}/embeddings`, {
       method: 'POST',
       headers,
+      signal: AbortSignal.timeout(EMBEDDING_REQUEST_TIMEOUT_MS),
       body: JSON.stringify({ input: text, model: this.model }),
     });
     if (!response.ok) {

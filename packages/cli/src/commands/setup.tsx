@@ -3,17 +3,10 @@ import { Box, Text, useApp, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
 import { join } from 'node:path';
-import {
-  existsSync,
-  mkdirSync,
-  createWriteStream,
-  unlinkSync,
-  renameSync,
-  statSync,
-} from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, statSync } from 'node:fs';
 import { ConfigManager } from 'ten-second-tom-core';
 import {
+  buildSetupConfig,
   DEFAULT_OLLAMA_ENDPOINT,
   DEFAULT_LOCAL_MODEL_ID,
   DEFAULT_OLLAMA_EMBEDDING_MODEL,
@@ -22,19 +15,18 @@ import {
   WHISPER_MODELS,
   getDefaultWhisperModel,
   SHERPA_MODELS,
+  downloadModel,
+  fetchOllamaModels,
 } from 'ten-second-tom-core';
-import type {
-  AppConfig,
-  LlmConfig,
-  EmbeddingConfig,
-  WhisperModel,
-  SherpaModel,
-} from 'ten-second-tom-core';
+import type { LlmConfig, EmbeddingConfig, WhisperModel, SherpaModel } from 'ten-second-tom-core';
 import { useAutoExit } from '../hooks/useAutoExit.js';
 import { toErrorMessage } from '../utils/format.js';
-import { EXIT_HINT_TEXT, OLLAMA_FETCH_TIMEOUT_MS } from '../constants.js';
+import { EXIT_HINT_TEXT } from '../constants.js';
 
 const TOTAL_STEPS = 6;
+const SETUP_ALREADY_DOWNLOADED_DELAY_MS = 1_000;
+const SETUP_DOWNLOAD_COMPLETE_DELAY_MS = 500;
+const SETUP_DONE_EXIT_DELAY_MS = 1_500;
 
 type Step =
   | 'llm-provider'
@@ -58,11 +50,11 @@ type Step =
   | 'error';
 
 interface WizardState {
-  llmProvider: 'cloud' | 'local' | null;
+  llmProvider: LlmConfig['provider'] | null;
   apiKey: string;
   localEndpoint: string;
   localModelId: string;
-  embeddingProvider: 'ollama' | 'openrouter' | 'custom' | 'none' | null;
+  embeddingProvider: EmbeddingConfig['provider'] | null;
   embeddingModel: string;
   embeddingApiKey: string;
   embeddingEndpoint: string;
@@ -114,11 +106,6 @@ const KNOWN_EMBEDDING_MODELS = [
   { name: 'jina-embeddings', recommended: false, description: 'Jina AI embeddings' },
 ];
 
-interface OllamaModel {
-  name: string;
-  size: number;
-}
-
 function formatBytes(bytes: number): string {
   const gb = bytes / (1024 * 1024 * 1024);
   if (gb >= 1) {
@@ -129,50 +116,6 @@ function formatBytes(bytes: number): string {
     return `${mb.toFixed(0)} MB`;
   }
   return `${(bytes / 1024).toFixed(0)} KB`;
-}
-
-/**
- * Fetch the list of installed models from an Ollama instance.
- * Exported for testability.
- */
-export async function fetchOllamaModels(
-  endpoint: string,
-): Promise<{ ok: true; models: OllamaModel[] } | { ok: false; error: string }> {
-  // Normalise endpoint — strip trailing slash
-  const base = endpoint.replace(/\/+$/, '');
-  const url = `${base}/api/tags`;
-
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), OLLAMA_FETCH_TIMEOUT_MS);
-
-    const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeout);
-
-    if (!response.ok) {
-      return { ok: false, error: `Ollama returned HTTP ${response.status}` };
-    }
-
-    const data = (await response.json()) as { models?: Array<{ name: string; size: number }> };
-    const models: OllamaModel[] = (data.models ?? []).map((m) => ({
-      name: m.name,
-      size: m.size,
-    }));
-
-    return { ok: true, models };
-  } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') {
-      return {
-        ok: false,
-        error: `Could not connect to Ollama at ${endpoint}. Connection timed out. Make sure Ollama is running.`,
-      };
-    }
-    const msg = toErrorMessage(err);
-    return {
-      ok: false,
-      error: `Could not connect to Ollama at ${endpoint}. Make sure Ollama is running. (${msg})`,
-    };
-  }
 }
 
 const embeddingProviderItems = [
@@ -217,82 +160,11 @@ function makeProgressBar(percent: number, width: number = 20): string {
   return '[' + '\u2588'.repeat(filled) + '\u2591'.repeat(empty) + ']';
 }
 
-/**
- * Download a file with progress tracking.
- * Exported for testability.
- */
-export async function downloadModel(
-  url: string,
-  destPath: string,
-  onProgress: (bytesDownloaded: number, totalBytes: number) => void,
-): Promise<void> {
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(`Download failed: HTTP ${response.status} ${response.statusText}`);
-  }
-
-  if (!response.body) {
-    throw new Error('Download failed: no response body');
-  }
-
-  const contentLength = Number(response.headers.get('content-length') ?? 0);
-  let bytesDownloaded = 0;
-
-  // Ensure the directory exists
-  const dir = join(destPath, '..');
-  mkdirSync(dir, { recursive: true });
-
-  // Use a temporary path so a partial download doesn't leave a corrupted file
-  const tmpPath = destPath + '.downloading';
-
-  const fileStream = createWriteStream(tmpPath);
-
-  try {
-    const reader = response.body.getReader();
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      fileStream.write(Buffer.from(value));
-      bytesDownloaded += value.byteLength;
-      onProgress(bytesDownloaded, contentLength);
-    }
-
-    // Wait for the write stream to finish
-    await new Promise<void>((resolve, reject) => {
-      fileStream.on('finish', resolve);
-      fileStream.on('error', reject);
-      fileStream.end();
-    });
-
-    // Rename temp file to final destination
-    renameSync(tmpPath, destPath);
-  } catch (err) {
-    // Clean up partial download
-    fileStream.end();
-    try {
-      unlinkSync(tmpPath);
-    } catch {
-      // Best effort cleanup
-    }
-    throw err;
-  }
-}
-
-/**
- * Extract a .tar.bz2 archive to a target directory.
- * Uses the system `tar` command (available on macOS, Linux, and Windows 10+).
- */
-export function extractTarBz2(archivePath: string, targetDir: string): void {
-  mkdirSync(targetDir, { recursive: true });
-  execFileSync('tar', ['xjf', archivePath, '-C', targetDir]);
-}
-
 export interface SetupWizardProps {
   /** When provided, called instead of exit() on completion (REPL mode). */
   onComplete?: () => void;
+  /** Allows one-shot setup to exit after an error even when onComplete is present. */
+  autoExitOnError?: boolean;
 }
 
 /**
@@ -301,7 +173,12 @@ export interface SetupWizardProps {
  * existing config was loaded.
  */
 function deriveInitialState(cm: ConfigManager): { initial: WizardState; hasExisting: boolean } {
-  const existing = cm.load();
+  let existing: ReturnType<ConfigManager['load']>;
+  try {
+    existing = cm.load();
+  } catch {
+    existing = undefined;
+  }
   if (!existing) {
     return {
       hasExisting: false,
@@ -354,7 +231,7 @@ function deriveInitialState(cm: ConfigManager): { initial: WizardState; hasExist
   };
 }
 
-export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
+export function SetupWizard({ onComplete, autoExitOnError = !onComplete }: SetupWizardProps = {}) {
   const { exit } = useApp();
   const configManager = useMemo(() => new ConfigManager(), []);
   const { initial, hasExisting } = useMemo(
@@ -453,21 +330,25 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
 
   // Auto-exit after error with a short delay; allow q/Enter to exit immediately.
   // Disabled in REPL mode (onComplete provided) — the REPL manages its own lifecycle.
-  useAutoExit(step === 'error', undefined, !onComplete);
+  useAutoExit(step === 'error', undefined, autoExitOnError);
+  const stdinSupportsInput = process.stdin.isTTY === true;
 
-  useInput((input, key) => {
-    if ((input === 'q' || key.return) && step === 'error') {
-      if (onComplete) {
-        onComplete();
-      } else {
-        exit();
+  useInput(
+    (input, key) => {
+      if ((input === 'q' || key.return) && step === 'error') {
+        if (onComplete) {
+          onComplete();
+        } else {
+          exit();
+        }
       }
-    }
-    // Allow Esc to cancel setup when running inside the REPL (onComplete provided)
-    if (key.escape && onComplete) {
-      onComplete();
-    }
-  });
+      // Allow Esc to cancel setup when running inside the REPL (onComplete provided)
+      if (key.escape && onComplete) {
+        onComplete();
+      }
+    },
+    { isActive: stdinSupportsInput },
+  );
 
   function handleLlmProviderSelect(item: { value: 'cloud' | 'local' }) {
     setState((s) => ({ ...s, llmProvider: item.value }));
@@ -684,7 +565,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
       // Proceed to sherpa selection after a short delay
       setTimeout(() => {
         setStep('sherpa-model');
-      }, 1000);
+      }, SETUP_ALREADY_DOWNLOADED_DELAY_MS);
       return;
     }
 
@@ -713,7 +594,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
       // Proceed to sherpa model selection
       setTimeout(() => {
         setStep('sherpa-model');
-      }, 500);
+      }, SETUP_DOWNLOAD_COMPLETE_DELAY_MS);
     } catch (err) {
       const msg = toErrorMessage(err);
       setWhisperDownloadProgress({
@@ -780,7 +661,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
       });
       setTimeout(() => {
         handleSave();
-      }, 1000);
+      }, SETUP_ALREADY_DOWNLOADED_DELAY_MS);
       return;
     }
 
@@ -821,7 +702,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
       // Proceed to save
       setTimeout(() => {
         handleSave();
-      }, 500);
+      }, SETUP_DOWNLOAD_COMPLETE_DELAY_MS);
     } catch (err) {
       const msg = toErrorMessage(err);
       setSherpaDownloadProgress({
@@ -888,17 +769,17 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
               }
             : { provider: 'none', model: '' };
 
-    const config: AppConfig = {
+    const config = buildSetupConfig({
       llm,
-      stt: {
-        engine: 'whisper.node',
-        modelPath: join(configManager.modelsPath, whisperModel.filename),
-      },
       embedding,
-      storage: {
-        dbPath: join(configManager.homePath, 'tom.db'),
-      },
-    };
+      homePath: configManager.homePath,
+      modelsPath: configManager.modelsPath,
+      whisperModelFilename: whisperModel.filename,
+      liveTranscription:
+        state.selectedSherpaModel === null
+          ? { provider: 'none' }
+          : { provider: 'sherpa', sherpaModelId: state.selectedSherpaModel.id },
+    });
 
     try {
       configManager.save(config);
@@ -909,7 +790,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps = {}) {
         } else {
           exit();
         }
-      }, 1500);
+      }, SETUP_DONE_EXIT_DELAY_MS);
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
       const message =
