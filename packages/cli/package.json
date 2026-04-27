@@ -1,6 +1,6 @@
 {
   "name": "ten-second-tom",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Voice capture and analysis CLI for engineers",
   "type": "module",
   "bin": {
