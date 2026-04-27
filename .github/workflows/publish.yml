@@ -141,45 +141,33 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Check npm package version
+        id: npm-version
+        env:
+          VERSION: ${{ needs.validate-tag.outputs.version }}
+        run: |
+          if npm view "ten-second-tom@$VERSION" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "ten-second-tom@$VERSION is already published"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish package
+        if: steps.npm-version.outputs.exists != 'true'
         working-directory: packages/cli
         run: npx npm@latest publish --provenance --access public
 
       - name: Publish summary
         env:
           VERSION: ${{ needs.validate-tag.outputs.version }}
+          VERSION_EXISTS: ${{ steps.npm-version.outputs.exists }}
         run: |
-          echo "## Published to npmjs.org" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$VERSION_EXISTS" = "true" ]; then
+            echo "## Package already published on npmjs.org" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## Published to npmjs.org" >> "$GITHUB_STEP_SUMMARY"
+          fi
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "**Version:** $VERSION" >> "$GITHUB_STEP_SUMMARY"
           echo "**Package:** [ten-second-tom](https://www.npmjs.com/package/ten-second-tom)" >> "$GITHUB_STEP_SUMMARY"
-
-  sync-version:
-    name: Sync version to main
-    runs-on: ubuntu-latest
-    needs: [validate-tag, publish]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Update versioned files
-        env:
-          VERSION: ${{ needs.validate-tag.outputs.version }}
-        run: node scripts/set-release-version.mjs "$VERSION"
-
-      - name: Commit version bump
-        env:
-          VERSION: ${{ needs.validate-tag.outputs.version }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add packages/cli/package.json packages/core/package.json packages/cli/src/constants.ts
-          git diff --cached --quiet && exit 0
-          git commit -m "chore(release): sync package version to $VERSION [skip ci]"
-          git push
