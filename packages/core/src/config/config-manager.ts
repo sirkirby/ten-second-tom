@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import { AppConfigSchema, type AppConfig } from '../types/config.js';
 import { PRIVATE_DIR_MODE, PRIVATE_FILE_MODE } from '../constants.js';
 
+const TOM_HOME_ENV = 'TOM_HOME';
+
 function chmodBestEffort(path: string, mode: number): void {
   try {
     chmodSync(path, mode);
@@ -23,7 +25,9 @@ export class ConfigManager {
 
   constructor(homePath?: string) {
     this.homePath =
-      homePath ?? join(process.env['HOME'] ?? process.env['USERPROFILE'] ?? '', '.tom');
+      homePath ??
+      process.env[TOM_HOME_ENV] ??
+      join(process.env['HOME'] ?? process.env['USERPROFILE'] ?? '', '.tom');
     this.audioPath = join(this.homePath, 'audio');
     this.modelsPath = join(this.homePath, 'models');
     this.configFilePath = join(this.homePath, 'config.json');

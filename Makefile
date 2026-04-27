@@ -47,12 +47,18 @@ check: lint format-check test ## Run all checks (lint, format, tests)
 # ─── Dev Convenience ─────────────────────────────────────────────────────────
 
 
-link-dev: build ## Link 'tom-dev' binary globally for local testing
+link-dev: build ## Install 'tom-dev' wrapper globally for local testing
 	@mkdir -p $(HOME)/.local/bin
-	@ln -sf $(PWD)/packages/cli/dist/cli.js $(HOME)/.local/bin/tom-dev
+	@rm -f $(HOME)/.local/bin/tom-dev
+	@printf '%s\n' \
+		'#!/usr/bin/env sh' \
+		'export TOM_HOME="$${TOM_HOME:-$$HOME/.tom-dev}"' \
+		'exec node "$(CURDIR)/packages/cli/dist/cli.js" "$$@"' \
+		> $(HOME)/.local/bin/tom-dev
 	@chmod +x $(HOME)/.local/bin/tom-dev
 	@echo ""
-	@echo "  'tom-dev' is now linked to your local build."
+	@echo "  'tom-dev' now runs your local build."
+	@echo "  Dev config/data directory: $(HOME)/.tom-dev"
 	@echo "  Run 'tom-dev setup' to get started."
 	@echo "  Run 'make unlink-dev' when done."
 
