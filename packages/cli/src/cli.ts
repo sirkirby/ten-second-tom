@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { APP_VERSION } from './constants.js';
+import { APP_VERSION } from './version.js';
 
 const args = process.argv.slice(2);
 const KNOWN_COMMANDS = ['record', 'note', 'search', 'analyze', 'setup', 'list', 'reindex'];
